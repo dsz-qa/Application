@@ -1,0 +1,33 @@
+﻿<UserControl x:Class="Finly.Pages.AccountsPage"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <Grid Margin="16">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+
+        <!-- Górny pasek -->
+        <StackPanel Orientation="Horizontal" Grid.Row="0" Margin="0,0,0,8">
+            <Button Content="Dodaj konto" Click="Add_Click"/>
+            <Button Content="Edytuj" Margin="8,0,0,0" Click="Edit_Click"/>
+            <Button Content="Usuń"  Margin="8,0,0,0" Click="Delete_Click"/>
+        </StackPanel>
+
+        <!-- Lista kont -->
+        <DataGrid x:Name="Grid"
+                  Grid.Row="1"
+                  AutoGenerateColumns="False"
+                  IsReadOnly="True"
+                  SelectionMode="Single"
+                  CanUserAddRows="False">
+            <DataGrid.Columns>
+                <DataGridTextColumn Header="Nazwa"    Binding="{Binding AccountName}" Width="2*"/>
+                <DataGridTextColumn Header="IBAN"     Binding="{Binding Iban}"        Width="2*"/>
+                <DataGridTextColumn Header="Waluta"   Binding="{Binding Currency}"    Width="100"/>
+                <DataGridTextColumn Header="Saldo"    Binding="{Binding Balance, StringFormat={}{0:N2}}" Width="120"/>
+            </DataGrid.Columns>
+        </DataGrid>
+    </Grid>
+</UserControl>
+

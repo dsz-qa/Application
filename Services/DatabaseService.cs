@@ -4,7 +4,6 @@ using System;
 using System.Collections.Generic;
 using System.Data;
 using System.IO;
-using System.Text;
 
 namespace Finly.Services
 {
@@ -182,36 +181,125 @@ namespace Finly.Services
         }
 
         // =========================================================
-        // ======================== WYDATKI ========================
+        // ========================= KONTA =========================
         // =========================================================
-        public static DataTable GetExpenses(
-            int userId, DateTime? from = null, DateTime? to = null,
-            int? categoryId = null, string? search = null)
+
+        public static DataTable GetAccountsTable(int userId)
         {
             using var c = OpenAndEnsureSchema();
             using var cmd = c.CreateCommand();
+            cmd.CommandText = @"SELECT Id, AccountName, Iban, Currency, Balance
+                                FROM BankAccounts
+                                WHERE UserId=@u
+                                ORDER BY AccountName;";
+            cmd.Parameters.AddWithValue("@u", userId);
 
-            var sb = new StringBuilder(@"
-SELECT e.Id,
-       e.UserId,
-       e.Date,
-       e.Amount,
-       e.Description AS Title,      -- alias pod UI
-       e.Description AS Note,       -- drugi alias (jeœli UI odwo³a siê do Note)
-       e.CategoryId,
-       COALESCE(c.Name,'(brak)') AS CategoryName
+            using var r = cmd.ExecuteReader();
+            var dt = new DataTable();
+            dt.Load(r);
+            return dt;
+        }
+
+        public static List<BankAccountModel> GetAccounts(int userId)
+        {
+            var list = new List<BankAccountModel>();
+            using var c = OpenAndEnsureSchema();
+            using var cmd = c.CreateCommand();
+            cmd.CommandText = @"SELECT Id, UserId, ConnectionId, AccountName, Iban, Currency, Balance
+                                FROM BankAccounts WHERE UserId=@u ORDER BY AccountName;";
+            cmd.Parameters.AddWithValue("@u", userId);
+
+            using var r = cmd.ExecuteReader();
+            while (r.Read())
+            {
+                list.Add(new BankAccountModel
+                {
+                    Id = r.GetInt32(0),
+                    UserId = r.GetInt32(1),
+                    ConnectionId = r.IsDBNull(2) ? (int?)null : r.GetInt32(2),
+                    AccountName = GetStringSafe(r, 3),
+                    Iban = GetStringSafe(r, 4),
+                    Currency = string.IsNullOrWhiteSpace(GetStringSafe(r, 5)) ? "PLN" : GetStringSafe(r, 5),
+                    Balance = r.IsDBNull(6) ? 0m : Convert.ToDecimal(r.GetValue(6))
+                });
+            }
+            return list;
+        }
+
+        public static int InsertAccount(BankAccountModel a)
+        {
+            using var c = OpenAndEnsureSchema();
+            using var cmd = c.CreateCommand();
+            cmd.CommandText = @"
+INSERT INTO BankAccounts(UserId, ConnectionId, AccountName, Iban, Currency, Balance)
+VALUES (@u, @conn, @name, @iban, @cur, @bal);
+SELECT last_insert_rowid();";
+            cmd.Parameters.AddWithValue("@u", a.UserId);
+            cmd.Parameters.AddWithValue("@conn", (object?)a.ConnectionId ?? DBNull.Value);
+            cmd.Parameters.AddWithValue("@name", a.AccountName ?? "");
+            cmd.Parameters.AddWithValue("@iban", a.Iban ?? "");
+            cmd.Parameters.AddWithValue("@cur", string.IsNullOrWhiteSpace(a.Currency) ? "PLN" : a.Currency);
+            cmd.Parameters.AddWithValue("@bal", a.Balance);
+            return Convert.ToInt32(cmd.ExecuteScalar());
+        }
+
+        public static void UpdateAccount(BankAccountModel a)
+        {
+            using var c = OpenAndEnsureSchema();
+            using var cmd = c.CreateCommand();
+            cmd.CommandText = @"
+UPDATE BankAccounts SET
+    ConnectionId=@conn, AccountName=@name, Iban=@iban, Currency=@cur, Balance=@bal
+WHERE Id=@id AND UserId=@u;";
+            cmd.Parameters.AddWithValue("@id", a.Id);
+            cmd.Parameters.AddWithValue("@u", a.UserId);
+            cmd.Parameters.AddWithValue("@conn", (object?)a.ConnectionId ?? DBNull.Value);
+            cmd.Parameters.AddWithValue("@name", a.AccountName ?? "");
+            cmd.Parameters.AddWithValue("@iban", a.Iban ?? "");
+            cmd.Parameters.AddWithValue("@cur", string.IsNullOrWhiteSpace(a.Currency) ? "PLN" : a.Currency);
+            cmd.Parameters.AddWithValue("@bal", a.Balance);
+            cmd.ExecuteNonQuery();
+        }
+
+        public static void DeleteAccount(int id, int userId)
+        {
+            using var c = OpenAndEnsureSchema();
+            using var cmd = c.CreateCommand();
+            cmd.CommandText = "DELETE FROM BankAccounts WHERE Id=@id AND UserId=@u;";
+            cmd.Parameters.AddWithValue("@id", id);
+            cmd.Parameters.AddWithValue("@u", userId);
+            cmd.ExecuteNonQuery();
+        }
+
+        // =========================================================
+        // ========================= WYDATKI =======================
+        // =========================================================
+
+        public static DataTable GetExpenses(
+            int userId,
+            DateTime? from = null,
+            DateTime? to = null,
+            int? categoryId = null,
+            string? search = null,
+            int? accountId = null)   // opcjonalny filtr konta
+        {
+            using var con = OpenAndEnsureSchema();
+            using var cmd = con.CreateCommand();
+            var sb = new System.Text.StringBuilder(@"
+SELECT e.Id, e.UserId, e.Date, e.Amount, e.Title, e.Note,
+       e.CategoryId, COALESCE(c.Name,'(brak)') AS CategoryName, e.AccountId
 FROM Expenses e
 LEFT JOIN Categories c ON c.Id = e.CategoryId
 WHERE e.UserId = @uid");
             cmd.Parameters.AddWithValue("@uid", userId);
 
-            if (from != null) { sb.Append(" AND date(e.Date) >= date(@from)"); cmd.Parameters.AddWithValue("@from", ToIsoDate(from.Value)); }
-            if (to != null) { sb.Append(" AND date(e.Date) <= date(@to)"); cmd.Parameters.AddWithValue("@to", ToIsoDate(to.Value)); }
+            if (from != null) { sb.Append(" AND date(e.Date) >= date(@from)"); cmd.Parameters.AddWithValue("@from", from.Value.ToString("yyyy-MM-dd")); }
+            if (to != null) { sb.Append(" AND date(e.Date) <= date(@to)"); cmd.Parameters.AddWithValue("@to", to.Value.ToString("yyyy-MM-dd")); }
             if (categoryId != null) { sb.Append(" AND e.CategoryId = @cid"); cmd.Parameters.AddWithValue("@cid", categoryId.Value); }
-
+            if (accountId != null) { sb.Append(" AND e.AccountId  = @acc"); cmd.Parameters.AddWithValue("@acc", accountId.Value); }
             if (!string.IsNullOrWhiteSpace(search))
             {
-                sb.Append(" AND lower(e.Description) LIKE @q"); // szukamy po Description
+                sb.Append(" AND (lower(e.Title) LIKE @q OR lower(e.Note) LIKE @q)");
                 cmd.Parameters.AddWithValue("@q", "%" + search.Trim().ToLower() + "%");
             }
 
@@ -223,8 +311,6 @@ WHERE e.UserId = @uid");
             dt.Load(r);
             return dt;
         }
-
-
 
         public static List<ExpenseDisplayModel> GetExpensesWithCategory()
         {
@@ -295,7 +381,6 @@ ORDER BY e.Date DESC, e.Id DESC;";
             using var r = cmd.ExecuteReader();
             if (!r.Read()) return null;
 
-            // Jeœli model ma int? — 0 te¿ zadzia³a; jeœli int — te¿ OK.
             var catId = r.IsDBNull(5) ? 0 : r.GetInt32(5);
 
             return new Expense
@@ -386,6 +471,7 @@ VALUES (@u, @a, @d, @desc, @c);";
         }
     }
 }
+
 
 
 
