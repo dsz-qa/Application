@@ -95,8 +95,10 @@ namespace Finly.Pages
             _allExpenses = DatabaseService.GetExpensesWithCategoryNameByUser(_userId)
                 .Select(e =>
                 {
-                    e.CategoryName = string.IsNullOrWhiteSpace(e.CategoryName) ? "Brak kategorii" : e.CategoryName.Trim();
-                    e.Category = e.CategoryName; // alias zgodności
+                    e.CategoryName = string.IsNullOrWhiteSpace(e.CategoryName)
+                        ? "Brak kategorii"
+                        : e.CategoryName.Trim();
+                    e.Category = e.CategoryName; // alias zgodności z kolumną w DataGrid
                     return e;
                 })
                 .OrderByDescending(e => e.Date)
@@ -122,15 +124,16 @@ namespace Finly.Pages
             DateTime? to = ToDatePicker.SelectedDate;
             var query = (QueryTextBox?.Text ?? string.Empty).Trim();
 
-            var filtered = _allExpenses.Where(exp =>
+            var filtered = _allExpenses
+                .Where(exp =>
                        (string.IsNullOrWhiteSpace(selectedCategory) || exp.CategoryName == selectedCategory)
                     && (!from.HasValue || exp.Date >= from.Value)
                     && (!to.HasValue || exp.Date <= to.Value)
                     && (string.IsNullOrWhiteSpace(query) ||
                         (!string.IsNullOrWhiteSpace(exp.Description) &&
                          exp.Description.IndexOf(query, StringComparison.OrdinalIgnoreCase) >= 0)))
-                    .OrderByDescending(e => e.Date)
-                    .ToList();
+                .OrderByDescending(e => e.Date)
+                .ToList();
 
             _currentView = filtered;
             ExpenseGrid.ItemsSource = _currentView;
@@ -140,20 +143,24 @@ namespace Finly.Pages
 
         private void RefreshKpis(IReadOnlyCollection<ExpenseDisplayModel> set)
         {
-            var total = set.Sum(e => e.Amount); // double
+            // Suma i liczba wpisów
+            var total = set.Sum(e => e.Amount);
+            if (TotalAmountText != null) TotalAmountText.Text = $"{total:0.00} zł";
+            if (EntryCountText != null) EntryCountText.Text = set.Count.ToString();
+
+            // Średnia dzienna
             if (set.Count > 0)
             {
                 var min = set.Min(e => e.Date);
                 var max = set.Max(e => e.Date);
-                var days = Math.Max(1.0, (max - min).TotalDays + 1.0); // double
-                var avg = total / days;                               // double / double
-                DailyAverageText.Text = $"{avg:0.00} zł";
+                var days = Math.Max(1.0, (max - min).TotalDays + 1.0);
+                var avg = total / days;
+                if (DailyAverageText != null) DailyAverageText.Text = $"{avg:0.00} zł";
             }
             else
             {
-                DailyAverageText.Text = "0 zł";
+                if (DailyAverageText != null) DailyAverageText.Text = "0,00 zł";
             }
-
         }
 
         private void FilterButton_Click(object sender, RoutedEventArgs e) => ApplyFiltersAndRefresh();
@@ -264,4 +271,5 @@ namespace Finly.Pages
         }
     }
 }
+
 
