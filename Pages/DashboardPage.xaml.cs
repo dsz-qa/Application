@@ -6,20 +6,16 @@ using System.Windows.Controls;
 using System.Windows.Input;
 using Finly.Views.Dialogs;
 using Finly.Models;
-using Finly.Services;      // DatabaseService, ToastService, UserService
-using Finly.ViewModels;    // AuthViewModel (do komunikatów po wylogowaniu/US unięciu konta)
-using Finly.Views;         // AuthWindow, EditExpenseView, ConfirmDialog
+using Finly.Services;
+using Finly.ViewModels;
+using Finly.Views;
 
 namespace Finly.Pages
 {
     public partial class DashboardPage : UserControl
     {
         private readonly int _userId;
-
-        // Pełny zestaw danych z bazy
         private List<ExpenseDisplayModel> _allExpenses = new();
-
-        // Aktualnie filtrowany widok
         private List<ExpenseDisplayModel> _currentView = new();
 
         public DashboardPage() : this(GetCurrentUserIdSafe()) { }
@@ -42,13 +38,12 @@ namespace Finly.Pages
             catch { return 0; }
         }
 
-        // ===== nawigacja (dół) =====
-
+        // ===== nawigacja =====
         private void AddExpenseButton_Click(object sender, RoutedEventArgs e)
-            => (Window.GetWindow(this) as Finly.Views.ShellWindow)?.NavigateTo("AddExpense");
+            => (Window.GetWindow(this) as ShellWindow)?.NavigateTo("AddExpense");
 
         private void ShowChart_Click(object sender, RoutedEventArgs e)
-            => (Window.GetWindow(this) as Finly.Views.ShellWindow)?.NavigateTo("Charts");
+            => (Window.GetWindow(this) as ShellWindow)?.NavigateTo("Charts");
 
         private void DeleteAccount_Click(object sender, RoutedEventArgs e)
         {
@@ -67,7 +62,7 @@ namespace Finly.Pages
                     }
 
                     ToastService.Success("Konto zostało usunięte.");
-                    (Window.GetWindow(this) as Finly.Views.ShellWindow)?.Close();
+                    (Window.GetWindow(this) as ShellWindow)?.Close();
 
                     var auth = new AuthWindow();
                     if (auth.DataContext is AuthViewModel vm)
@@ -89,21 +84,17 @@ namespace Finly.Pages
             if (auth.DataContext is AuthViewModel vm)
                 vm.ShowLogoutInfo();
 
-            (Window.GetWindow(this) as Finly.Views.ShellWindow)?.Close();
-
+            (Window.GetWindow(this) as ShellWindow)?.Close();
             Application.Current.MainWindow = auth;
             auth.Show();
         }
 
         // ===== dane / filtry =====
-
         private void LoadExpenses()
         {
-            // Najprościej: gotowy widok z nazwami kategorii dla danego użytkownika
             _allExpenses = DatabaseService.GetExpensesWithCategoryNameByUser(_userId)
                 .Select(e =>
                 {
-                    // sanityzacja pustych nazw
                     e.CategoryName = string.IsNullOrWhiteSpace(e.CategoryName) ? "Brak kategorii" : e.CategoryName.Trim();
                     e.Category = e.CategoryName; // alias zgodności
                     return e;
@@ -149,22 +140,20 @@ namespace Finly.Pages
 
         private void RefreshKpis(IReadOnlyCollection<ExpenseDisplayModel> set)
         {
-            var total = set.Sum(e => e.Amount);
-            TotalAmountText.Text = $"{total:0.00} zł";
-            EntryCountText.Text = set.Count.ToString();
-
+            var total = set.Sum(e => e.Amount); // double
             if (set.Count > 0)
             {
                 var min = set.Min(e => e.Date);
                 var max = set.Max(e => e.Date);
-                var days = Math.Max(1, (max - min).TotalDays + 1);
-                var avg = total / days;
+                var days = Math.Max(1.0, (max - min).TotalDays + 1.0); // double
+                var avg = total / days;                               // double / double
                 DailyAverageText.Text = $"{avg:0.00} zł";
             }
             else
             {
                 DailyAverageText.Text = "0 zł";
             }
+
         }
 
         private void FilterButton_Click(object sender, RoutedEventArgs e) => ApplyFiltersAndRefresh();
@@ -181,7 +170,6 @@ namespace Finly.Pages
         }
 
         // ===== akcje na wierszu =====
-
         private void EditExpense_Click(object sender, RoutedEventArgs e)
         {
             if (sender is Button btn && btn.Tag is int id)
@@ -243,7 +231,6 @@ namespace Finly.Pages
             }
         }
 
-        // Double-click na wierszu -> edycja
         private void ExpenseGrid_MouseDoubleClick(object? sender, MouseButtonEventArgs e)
         {
             if (ExpenseGrid.SelectedItem is ExpenseDisplayModel selected)
@@ -263,7 +250,6 @@ namespace Finly.Pages
             }
         }
 
-        // (stub) szybkie dodawanie – zostawiamy jako informację, żeby nie blokować kompilacji
         private void QuickAdd_Click(object sender, RoutedEventArgs e)
         {
             var text = QuickAddBox?.Text?.Trim();
@@ -278,3 +264,4 @@ namespace Finly.Pages
         }
     }
 }
+

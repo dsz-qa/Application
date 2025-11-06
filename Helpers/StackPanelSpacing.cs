@@ -1,17 +1,11 @@
-﻿using System.Windows;
+﻿using System.Linq;
+using System.Windows;
 using System.Windows.Controls;
 
 namespace Finly.Helpers
 {
-    /// <summary>
-    /// Attached property: helpers:StackPanelSpacing.Spacing="8"
-    /// Ustawia Margin między dziećmi StackPanel.
-    /// </summary>
     public static class StackPanelSpacing
     {
-        public static double GetSpacing(DependencyObject obj) => (double)obj.GetValue(SpacingProperty);
-        public static void SetSpacing(DependencyObject obj, double value) => obj.SetValue(SpacingProperty, value);
-
         public static readonly DependencyProperty SpacingProperty =
             DependencyProperty.RegisterAttached(
                 "Spacing",
@@ -19,39 +13,45 @@ namespace Finly.Helpers
                 typeof(StackPanelSpacing),
                 new PropertyMetadata(0d, OnSpacingChanged));
 
+        public static void SetSpacing(Panel element, double value) => element.SetValue(SpacingProperty, value);
+        public static double GetSpacing(Panel element) => (double)element.GetValue(SpacingProperty);
+
         private static void OnSpacingChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
         {
-            if (d is not StackPanel panel) return;
-
-            panel.Loaded -= Panel_Loaded;
-            panel.Loaded += Panel_Loaded;
-
-            // Dla dynamicznych zmian (np. ItemsControl z PanelTemplate = StackPanel)
-            if (panel.IsLoaded) Apply(panel);
-        }
-
-        private static void Panel_Loaded(object sender, RoutedEventArgs e)
-        {
-            if (sender is StackPanel p) Apply(p);
-        }
-
-        private static void Apply(StackPanel panel)
-        {
-            var spacing = GetSpacing(panel);
-            var count = panel.Children.Count;
-            for (int i = 0; i < count; i++)
+            if (d is Panel panel)
             {
-                if (panel.Children[i] is FrameworkElement fe)
-                {
-                    var m = fe.Margin;
-                    if (panel.Orientation == Orientation.Horizontal)
-                        fe.Margin = new Thickness(i == 0 ? 0 : spacing, m.Top, 0, m.Bottom);
-                    else
-                        fe.Margin = new Thickness(m.Left, i == 0 ? 0 : spacing, m.Right, 0);
-                }
+                panel.Loaded -= Panel_Loaded;
+                panel.Loaded += Panel_Loaded;
+                Apply(panel);
+            }
+        }
+
+        private static void Panel_Loaded(object? sender, RoutedEventArgs e)
+        {
+            if (sender is Panel p) Apply(p);
+        }
+
+        private static void Apply(Panel panel)
+        {
+            double gap = GetSpacing(panel);
+            if (gap <= 0) return;
+
+            bool vertical = panel is not StackPanel sp || sp.Orientation == Orientation.Vertical;
+
+            var children = panel.Children.OfType<FrameworkElement>().ToList();
+            for (int i = 0; i < children.Count; i++)
+            {
+                var el = children[i];
+                var m = el.Margin;
+
+                el.Margin = vertical
+                    ? new Thickness(m.Left, i == 0 ? m.Top : gap, m.Right, m.Bottom)
+                    : new Thickness(i == 0 ? m.Left : gap, m.Top, m.Right, m.Bottom);
             }
         }
     }
 }
+
+
 
 

@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Globalization;
-using System.Linq;
 using System.Windows;
 using Finly.Models;
 using Finly.Services;
@@ -10,26 +9,46 @@ namespace Finly.Views
     public partial class EditExpenseWindow : Window
     {
         private readonly int _userId;
-        private readonly Expense _expense;
+        private Expense _expense;
 
+        // DODAWANIE – pusty rekord
+        public EditExpenseWindow(int userId)
+        {
+            InitializeComponent();
+            _userId = userId;
+            _expense = new Expense
+            {
+                Id = 0,
+                UserId = userId,
+                Date = DateTime.Today,
+                Amount = 0
+            };
+            InitCategories();
+            BindCurrent();
+        }
+
+        // EDYCJA – istniejący rekord
         public EditExpenseWindow(Expense expense, int userId)
         {
             InitializeComponent();
-            _expense = expense ?? throw new ArgumentNullException(nameof(expense));
             _userId = userId;
+            _expense = expense ?? throw new ArgumentNullException(nameof(expense));
+            InitCategories();
+            BindCurrent();
+        }
 
-            // Podpowiedzi kategorii
-            try
-            {
-                var cats = DatabaseService.GetCategoriesByUser(_userId);
-                CategoryBox.ItemsSource = cats;
-            }
-            catch { /* w razie czego – brak podpowiedzi nie blokuje okna */ }
+        private void InitCategories()
+        {
+            try { CategoryBox.ItemsSource = DatabaseService.GetCategoriesByUser(_userId); }
+            catch { /* brak podpowiedzi nie blokuje okna */ }
+        }
 
-            // Wypełnij pola
+        private void BindCurrent()
+        {
             AmountBox.Text = _expense.Amount.ToString("0.##", CultureInfo.CurrentCulture);
             DateBox.SelectedDate = _expense.Date;
-            CategoryBox.Text = string.IsNullOrWhiteSpace(_expense.CategoryName) ? _expense.Category : _expense.CategoryName;
+            var catName = _expense.CategoryName ?? _expense.Category ?? string.Empty;
+            CategoryBox.Text = catName;
             DescriptionBox.Text = _expense.Description ?? string.Empty;
         }
 
@@ -41,60 +60,43 @@ namespace Finly.Views
 
         private void Save_Click(object sender, RoutedEventArgs e)
         {
-            // Walidacja kwoty
             var amountText = (AmountBox.Text ?? "").Trim();
 
-            // Spróbuj wg kultury lokalnej, a potem invariant (kropka)
-            bool parsed =
-                double.TryParse(amountText, NumberStyles.Any, CultureInfo.CurrentCulture, out double amount)
-             || double.TryParse(amountText, NumberStyles.Any, CultureInfo.InvariantCulture, out amount);
-
-            if (!parsed || amount <= 0)
+            if (!(double.TryParse(amountText, NumberStyles.Any, CultureInfo.CurrentCulture, out var amount) ||
+                  double.TryParse(amountText, NumberStyles.Any, CultureInfo.InvariantCulture, out amount)) ||
+                amount <= 0)
             {
                 ToastService.Error("Podaj poprawną kwotę większą od 0.");
-                AmountBox.Focus();
-                AmountBox.SelectAll();
+                AmountBox.Focus(); AmountBox.SelectAll();
                 return;
             }
 
             var date = DateBox.SelectedDate ?? DateTime.Today;
-
             var categoryName = (CategoryBox.Text ?? "").Trim();
-            if (string.IsNullOrWhiteSpace(categoryName))
-                categoryName = "Inne";
+            if (string.IsNullOrWhiteSpace(categoryName)) categoryName = "Inne";
 
             int categoryId;
-            try
-            {
-                categoryId = DatabaseService.GetOrCreateCategoryId(categoryName, _userId);
-            }
-            catch (Exception ex)
-            {
-                ToastService.Error("Nie udało się odczytać/zapisać kategorii: " + ex.Message);
-                return;
-            }
+            try { categoryId = DatabaseService.GetOrCreateCategoryId(_userId, categoryName); }
+            catch (Exception ex) { ToastService.Error("Nie udało się odczytać/zapisać kategorii: " + ex.Message); return; }
 
-            var updated = new Expense
-            {
-                Id = _expense.Id,
-                Amount = amount,
-                Date = date,
-                Description = string.IsNullOrWhiteSpace(DescriptionBox.Text) ? null : DescriptionBox.Text.Trim(),
-                CategoryId = categoryId,
-                UserId = _userId
-            };
+            _expense.Amount = amount;
+            _expense.Date = date;
+            _expense.Description = string.IsNullOrWhiteSpace(DescriptionBox.Text) ? null : DescriptionBox.Text.Trim();
+            _expense.CategoryId = categoryId;
+            _expense.UserId = _userId;
 
             try
             {
-                DatabaseService.UpdateExpense(updated);
-                ToastService.Success("Zapisano zmiany.");
+                if (_expense.Id == 0) DatabaseService.AddExpense(_expense);
+                else DatabaseService.UpdateExpense(_expense);
+
+                ToastService.Success("Zapisano.");
                 DialogResult = true;
                 Close();
             }
-            catch (Exception ex)
-            {
-                ToastService.Error("Błąd podczas zapisu: " + ex.Message);
-            }
+            catch (Exception ex) { ToastService.Error("Błąd podczas zapisu: " + ex.Message); }
         }
     }
 }
+
+

@@ -33,7 +33,7 @@ namespace Finly.Pages
         {
             InitializeComponent();
             _userId = userId;
-            LoadChartData(); // startowo bez filtrów
+            LoadChartData();
         }
 
         private static int SafeGetUserId()
@@ -52,14 +52,13 @@ namespace Finly.Pages
         private void LoadChartData(DateTime? start = null, DateTime? end = null)
         {
             var all = DatabaseService.GetExpensesWithCategory()
-                .Where(e => e.UserId == _userId)
-                .ToList();
+                                     .Where(e => e.UserId == _userId)
+                                     .ToList();
 
-            var filtered = all
-                .Where(e =>
-                    (!start.HasValue || e.Date >= start.Value) &&
-                    (!end.HasValue || e.Date <= end.Value))
-                .ToList();
+            var filtered = all.Where(e =>
+                                (!start.HasValue || e.Date >= start.Value) &&
+                                (!end.HasValue || e.Date <= end.Value))
+                              .ToList();
 
             LoadPieChart(filtered);
             LoadLineChart(filtered);
@@ -74,7 +73,6 @@ namespace Finly.Pages
             }).ToList();
         }
 
-        // ============== PIE ==============
         private void LoadPieChart(List<ExpenseDisplayModel> data)
         {
             var grouped = data
@@ -86,7 +84,6 @@ namespace Finly.Pages
                     {
                         Name = g.Key,
                         Values = new[] { sum },
-                        // etykiety prosto – bez odwołań do PrimaryValue (różnice między wersjami)
                         DataLabelsSize = 12,
                         DataLabelsPaint = new SolidColorPaint(SKColors.White),
                         DataLabelsPosition = LiveChartsCore.Measure.PolarLabelsPosition.Middle
@@ -97,17 +94,12 @@ namespace Finly.Pages
             pieChart.Series = grouped;
         }
 
-        // ============== LINE ==============
         private void LoadLineChart(List<ExpenseDisplayModel> data)
         {
             var points = data
                 .GroupBy(e => e.Date.Date)
                 .OrderBy(g => g.Key)
-                .Select(g => new
-                {
-                    Date = g.Key,
-                    Amount = g.Sum(e => e.Amount)
-                })
+                .Select(g => new { Date = g.Key, Amount = g.Sum(e => e.Amount) })
                 .ToList();
 
             lineChart.Series = new ISeries[]
@@ -137,29 +129,17 @@ namespace Finly.Pages
                 {
                     Name = "Kwota [zł]",
                     LabelsPaint = new SolidColorPaint(SKColors.Gray),
-                    // Jeśli wolisz pełne wartości, usuń Labeler:
                     Labeler = value => value >= 1000 ? $"{value/1000:0.#} tys." : $"{value:0}"
                 }
             };
         }
 
-        // ============== EXPORT PNG ==============
         private void ExportChartsToPng_Click(object sender, RoutedEventArgs e)
         {
-            // Pie
-            var dlgPie = new Microsoft.Win32.SaveFileDialog
-            {
-                Filter = "PNG Image|*.png",
-                FileName = "WykresKolowy"
-            };
+            var dlgPie = new Microsoft.Win32.SaveFileDialog { Filter = "PNG Image|*.png", FileName = "WykresKolowy" };
             if (dlgPie.ShowDialog() != true) return;
 
-            // Line
-            var dlgLine = new Microsoft.Win32.SaveFileDialog
-            {
-                Filter = "PNG Image|*.png",
-                FileName = "WykresLiniowy"
-            };
+            var dlgLine = new Microsoft.Win32.SaveFileDialog { Filter = "PNG Image|*.png", FileName = "WykresLiniowy" };
             if (dlgLine.ShowDialog() != true) return;
 
             SaveVisualAsPng(pieChart, dlgPie.FileName);
@@ -183,10 +163,8 @@ namespace Finly.Pages
             encoder.Save(fs);
         }
 
-        // ============== EXPORT PDF (QuestPDF) ==============
         private void ExportChartToPdf_Click(object sender, RoutedEventArgs e)
         {
-            // tymczasowe PNG
             var pieTemp = Path.Combine(Path.GetTempPath(), $"finly_pie_{Guid.NewGuid():N}.png");
             var lineTemp = Path.Combine(Path.GetTempPath(), $"finly_line_{Guid.NewGuid():N}.png");
 
@@ -202,7 +180,6 @@ namespace Finly.Pages
                 };
                 if (sfd.ShowDialog() != true) return;
 
-                // QuestPDF – jedna strona, dwa obrazy pod sobą
                 var pieBytes = File.ReadAllBytes(pieTemp);
                 var lineBytes = File.ReadAllBytes(lineTemp);
 
@@ -231,13 +208,11 @@ namespace Finly.Pages
             }
             finally
             {
-                // sprzątanie
                 try { File.Delete(pieTemp); } catch { }
                 try { File.Delete(lineTemp); } catch { }
             }
         }
 
-        // ============== SORTOWANIE / ZDARZENIA UI ==============
         private void SortComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
             var selected = (SortComboBox.SelectedItem as ComboBoxItem)?.Content?.ToString();
@@ -300,4 +275,5 @@ namespace Finly.Pages
         }
     }
 }
+
 

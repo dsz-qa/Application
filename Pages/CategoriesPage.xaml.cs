@@ -1,4 +1,6 @@
-﻿using System.Windows.Controls;
+﻿using Microsoft.Data.Sqlite;
+using System.Data;
+using System.Windows.Controls;
 namespace Finly.Pages
 {
     public partial class CategoriesPage : UserControl
@@ -8,4 +10,5 @@ namespace Finly.Pages
         public CategoriesPage(int userId) : this() { _userId = userId; }
     }
 
-}
+
+    }
