@@ -1,0 +1,31 @@
+# Visual Studio cache
+.vs/
+.~vs/
+.vscode/
+.idea/
+
+# Build artefacts
+bin/
+obj/
+[Bb]uild/
+[Ll]ogs/
+
+# Testy
+TestResult*/
+*.trx
+
+# Użytkownik/IDE
+*.user
+*.suo
+*.rsuser
+*.userosscache
+*.sln.docstates
+
+# NuGet (opcjonalnie)
+packages/
+*.nupkg
+
+# SQLite/junk
+*.db-shm
+*.db-wal
+*.vsidx

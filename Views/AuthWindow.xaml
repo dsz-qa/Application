@@ -200,14 +200,15 @@
                      HorizontalAlignment="Stretch"
                      Margin="0,0,0,12"
                      Visibility="{Binding LoginIsError, Converter={StaticResource BoolToVisibility}}"/>
-
                     <!-- Login lub e-mail -->
-                    <TextBlock Text="Login lub e-mail:" FontSize="15" Margin="0,0,0,6"/>
+                    <TextBlock Text="E-mail:" FontSize="15" Margin="0,0,0,6"/>
                     <TextBox x:Name="LoginUsername"
-                   TabIndex="0"
-                   Text="{Binding Username, UpdateSourceTrigger=PropertyChanged}"
-                   MinHeight="42" FontSize="15" Margin="0,0,0,14"
-                   TextChanged="LoginUsername_TextChanged">
+         Foreground="{DynamicResource App.Foreground}"
+         CaretBrush="{DynamicResource App.Foreground}"
+         TabIndex="0"
+         Text="{Binding Username, UpdateSourceTrigger=PropertyChanged}"
+         MinHeight="42" FontSize="15" Margin="0,0,0,14"
+         TextChanged="LoginUsername_TextChanged">
                         <TextBox.Style>
                             <Style TargetType="TextBox">
                                 <Style.Triggers>
@@ -225,9 +226,11 @@
                     <Grid Margin="0,0,0,10">
                         <!-- Ukryte -->
                         <PasswordBox x:Name="PwdLogin"
-                         TabIndex="1"
-                         MinHeight="42" FontSize="15"
-                         PasswordChanged="PwdLogin_PasswordChanged">
+                 Foreground="{DynamicResource App.Foreground}"
+                 CaretBrush="{DynamicResource App.Foreground}"
+                 TabIndex="1"
+                 MinHeight="42" FontSize="15"
+                 PasswordChanged="PwdLogin_PasswordChanged">
                             <PasswordBox.Style>
                                 <Style TargetType="PasswordBox">
                                     <Style.Triggers>
@@ -242,10 +245,12 @@
 
                         <!-- Jawne (po Pokaż hasło) -->
                         <TextBox x:Name="PwdLoginText"
-                     TabIndex="1"
-                     MinHeight="42" FontSize="15"
-                     Visibility="Collapsed"
-                     TextChanged="PwdLoginText_TextChanged">
+             Foreground="{DynamicResource App.Foreground}"
+             CaretBrush="{DynamicResource App.Foreground}"
+             TabIndex="1"
+             MinHeight="42" FontSize="15"
+             Visibility="Collapsed"
+             TextChanged="PwdLoginText_TextChanged">
                             <TextBox.Style>
                                 <Style TargetType="TextBox">
                                     <Style.Triggers>
@@ -260,28 +265,29 @@
                     </Grid>
 
                     <CheckBox Content="Pokaż hasło"
-                    TabIndex="2"
-                    Style="{StaticResource CheckBox.Accent}"
-                    Margin="0,0,0,18"
-                    FontSize="15"
-                    Checked="LoginShowPassword_Checked"
-                    Unchecked="LoginShowPassword_Unchecked"/>
+          TabIndex="2"
+          Style="{StaticResource CheckBox.Accent}"
+          Margin="0,0,0,18"
+          FontSize="15"
+          Checked="LoginShowPassword_Checked"
+          Unchecked="LoginShowPassword_Unchecked"/>
 
                     <Button x:Name="LoginBtn"
-                  TabIndex="3"
-                  Content="Zaloguj"
-                  Style="{StaticResource WidePrimaryButton}"
-                  Click="LoginButton_Click"
-                  IsDefault="True"/>
+        TabIndex="3"
+        Content="Zaloguj"
+        Style="{StaticResource WidePrimaryButton}"
+        Click="LoginButton_Click"
+        IsDefault="True"/>
 
                     <Separator Style="{StaticResource OrangeSeparator}"/>
 
                     <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,2,0,0">
                         <TextBlock Text="Nie masz jeszcze konta?" FontSize="15" VerticalAlignment="Center"/>
                         <Button Content="Zarejestruj się"
-                    Click="SwitchToRegister_Click"
-                    Height="40" MinWidth="180" FontSize="15" Margin="12,0,0,0"/>
+            Click="SwitchToRegister_Click"
+            Height="40" MinWidth="180" FontSize="15" Margin="12,0,0,0"/>
                     </StackPanel>
+
 
                     <!-- Wybór typu konta (pokazywany po kliknięciu „Zarejestruj się”) -->
                     <StackPanel x:Name="AccountTypeChooser"
@@ -322,7 +328,7 @@
                  SnapsToDevicePixels="True"
                  RenderOptions.BitmapScalingMode="HighQuality"/>
 
-                    <TextBlock Text="Login:" FontSize="15" Margin="0,0,0,6"/>
+                    <TextBlock Text="E-mail:" FontSize="15" Margin="0,0,0,6"/>
                     <TextBox x:Name="RegUsername"
                    TabIndex="10"
                    Text="{Binding Username, UpdateSourceTrigger=PropertyChanged}"
