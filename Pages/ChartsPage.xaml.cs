@@ -8,7 +8,6 @@ using LiveChartsCore.SkiaSharpView.WPF;
 
 using QuestPDF.Fluent;
 using QuestPDF.Helpers;
-using QuestPDF.Infrastructure;
 
 using SkiaSharp;
 using System;
@@ -44,9 +43,7 @@ namespace Finly.Pages
 
         private void FilterButton_Click(object sender, RoutedEventArgs e)
         {
-            var start = FromDatePicker.SelectedDate;
-            var end = ToDatePicker.SelectedDate;
-            LoadChartData(start, end);
+            LoadChartData(FromDatePicker.SelectedDate, ToDatePicker.SelectedDate);
         }
 
         private void LoadChartData(DateTime? start = null, DateTime? end = null)
@@ -73,6 +70,7 @@ namespace Finly.Pages
             }).ToList();
         }
 
+        // === PIE ===
         private void LoadPieChart(List<ExpenseDisplayModel> data)
         {
             var grouped = data
@@ -94,6 +92,7 @@ namespace Finly.Pages
             pieChart.Series = grouped;
         }
 
+        // === LINE ===
         private void LoadLineChart(List<ExpenseDisplayModel> data)
         {
             var points = data
@@ -134,29 +133,46 @@ namespace Finly.Pages
             };
         }
 
+        // === EXPORT PNG ===
         private void ExportChartsToPng_Click(object sender, RoutedEventArgs e)
         {
-            var dlgPie = new Microsoft.Win32.SaveFileDialog { Filter = "PNG Image|*.png", FileName = "WykresKolowy" };
-            if (dlgPie.ShowDialog() != true) return;
+            try
+            {
+                var dlgPie = new Microsoft.Win32.SaveFileDialog { Filter = "PNG Image|*.png", FileName = "WykresKolowy" };
+                if (dlgPie.ShowDialog() != true) return;
 
-            var dlgLine = new Microsoft.Win32.SaveFileDialog { Filter = "PNG Image|*.png", FileName = "WykresLiniowy" };
-            if (dlgLine.ShowDialog() != true) return;
+                var dlgLine = new Microsoft.Win32.SaveFileDialog { Filter = "PNG Image|*.png", FileName = "WykresLiniowy" };
+                if (dlgLine.ShowDialog() != true) return;
 
-            SaveVisualAsPng(pieChart, dlgPie.FileName);
-            SaveVisualAsPng(lineChart, dlgLine.FileName);
+                SaveVisualAsPng(pieChart, dlgPie.FileName);
+                SaveVisualAsPng(lineChart, dlgLine.FileName);
 
-            MessageBox.Show("Wykresy zapisano jako PNG.", "Sukces",
-                MessageBoxButton.OK, MessageBoxImage.Information);
+                ToastService.Success("Wykresy zapisano jako PNG.");
+            }
+            catch (Exception ex)
+            {
+                ToastService.Error("Nie udało się zapisać PNG: " + ex.Message);
+            }
         }
 
         private static void SaveVisualAsPng(FrameworkElement visual, string path)
         {
+            // jeśli kontrolka nie jest zmierzona/rozmieszczona – zrób to lokalnie
+            if (double.IsNaN(visual.ActualWidth) || visual.ActualWidth == 0 ||
+                double.IsNaN(visual.ActualHeight) || visual.ActualHeight == 0)
+            {
+                visual.Measure(new System.Windows.Size(double.PositiveInfinity, double.PositiveInfinity));
+                visual.Arrange(new System.Windows.Rect(visual.DesiredSize));
+                visual.UpdateLayout();
+            }
+
             var bmp = new RenderTargetBitmap(
                 Math.Max(1, (int)visual.ActualWidth),
                 Math.Max(1, (int)visual.ActualHeight),
                 96, 96, PixelFormats.Pbgra32);
 
             bmp.Render(visual);
+
             var encoder = new PngBitmapEncoder();
             encoder.Frames.Add(BitmapFrame.Create(bmp));
             using var fs = File.Create(path);
@@ -202,9 +218,11 @@ namespace Finly.Pages
                 });
 
                 doc.GeneratePdf(sfd.FileName);
-
-                MessageBox.Show("Wykresy zapisane do PDF.", "Sukces",
-                    MessageBoxButton.OK, MessageBoxImage.Information);
+                ToastService.Success("Wykresy zapisano do PDF.");
+            }
+            catch (Exception ex)
+            {
+                ToastService.Error("Nie udało się zapisać PDF: " + ex.Message);
             }
             finally
             {
@@ -213,13 +231,14 @@ namespace Finly.Pages
             }
         }
 
+
+        // ===== Sortowanie (na toastach zamiast MessageBox) =====
         private void SortComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
             var selected = (SortComboBox.SelectedItem as ComboBoxItem)?.Content?.ToString();
             if (_expenses == null || _expenses.Count == 0)
             {
-                MessageBox.Show("Brak danych do sortowania.", "Błąd",
-                    MessageBoxButton.OK, MessageBoxImage.Error);
+                ToastService.Info("Brak danych do sortowania.");
                 return;
             }
 
@@ -250,8 +269,7 @@ namespace Finly.Pages
             var selected = (DateSortComboBox.SelectedItem as ComboBoxItem)?.Content?.ToString();
             if (_expenses == null || _expenses.Count == 0)
             {
-                MessageBox.Show("Brak danych do sortowania.", "Błąd",
-                    MessageBoxButton.OK, MessageBoxImage.Error);
+                ToastService.Info("Brak danych do sortowania.");
                 return;
             }
 
@@ -275,5 +293,6 @@ namespace Finly.Pages
         }
     }
 }
+
 
 

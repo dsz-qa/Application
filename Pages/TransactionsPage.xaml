@@ -78,13 +78,15 @@
         </DataGrid>
 
         <!-- STOPKA -->
-        <StackPanel Grid.Row="2"
-                Orientation="Horizontal"
-                HorizontalAlignment="Right"
-                Margin="0,10,0,0">
-            <TextBlock Text="Suma w widoku:" Margin="0,0,8,0"/>
-            <TextBlock x:Name="SumMonthText" FontWeight="SemiBold"/>
+        <!-- STOPKA / SUMA + LICZNIK -->
+        <StackPanel Grid.Row="2" Orientation="Horizontal"
+            HorizontalAlignment="Right" Margin="0,10,0,0">
+            <TextBlock Text="Wpisów:"/>
+            <TextBlock x:Name="EntriesCountText" FontWeight="SemiBold" Margin="6,0,12,0"/>
+            <TextBlock Text="Suma w widoku:"/>
+            <TextBlock x:Name="SumMonthText" FontWeight="SemiBold" Margin="6,0,0,0"/>
         </StackPanel>
+
     </Grid>
 </UserControl>
 

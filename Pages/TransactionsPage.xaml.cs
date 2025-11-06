@@ -3,6 +3,7 @@ using System.Data;
 using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
+using Finly.Models;
 using Finly.Services;
 using Finly.Views;
 using Finly.Views.Dialogs;
@@ -37,15 +38,57 @@ namespace Finly.Pages
             string? q = string.IsNullOrWhiteSpace(SearchBox.Text) ? null : SearchBox.Text.Trim();
 
             var dt = DatabaseService.GetExpenses(_uid, from, to, cat, q);
-            TransactionsGrid.ItemsSource = dt.DefaultView;
-            TransactionsGrid.Tag = dt.Rows.Count;
 
-            // Suma miesiąca (double)
+            TransactionsGrid.ItemsSource = dt.DefaultView;
+
+            // licznik w stopce
+            if (EntriesCountText != null)
+                EntriesCountText.Text = dt.Rows.Count.ToString();
+
+            // suma bieżącego miesiąca
             var first = new DateTime(DateTime.Now.Year, DateTime.Now.Month, 1);
             var last = first.AddMonths(1).AddDays(-1);
             var month = DatabaseService.GetExpenses(_uid, first, last, cat, q);
             var sum = month.AsEnumerable().Sum(r => Convert.ToDouble(r["Amount"]));
-            SumMonthText.Text = $"Miesiąc: {sum:N2} zł";
+            SumMonthText.Text = $"{sum:N2} zł";
+        }
+
+        private void EditExpense_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is Button b && b.Tag is int id)
+            {
+                var exp = DatabaseService.GetExpenseById(id);
+                if (exp == null) return;
+
+                var w = new EditExpenseWindow(exp, _uid)
+                {
+                    Owner = Window.GetWindow(this)
+                };
+
+                if (w.ShowDialog() == true)
+                {
+                    ToastService.Success("Zaktualizowano wydatek.");
+                    LoadExpenses();
+                }
+            }
+        }
+
+        private void DeleteExpense_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is Button b && b.Tag is int id)
+            {
+                var dlg = new ConfirmDialog("Czy na pewno chcesz usunąć ten wydatek?")
+                {
+                    Owner = Window.GetWindow(this)
+                };
+
+                if (dlg.ShowDialog() == true)
+                {
+                    DatabaseService.DeleteExpense(id);
+                    ToastService.Success("Usunięto wydatek.");
+                    LoadExpenses();
+                }
+            }
         }
 
         private void ApplyFilters_Click(object s, RoutedEventArgs e) => LoadExpenses();
@@ -59,41 +102,14 @@ namespace Finly.Pages
             LoadExpenses();
         }
 
+        // (jeśli masz przycisk Dodaj tutaj – polecam po prostu nawigację do strony dodawania)
         private void AddExpense_Click(object s, RoutedEventArgs e)
-        {
-            var w = new EditExpenseWindow(_uid) { Owner = Window.GetWindow(this) };
-            if (w.ShowDialog() == true) { ToastService.Success("Dodano wydatek."); LoadExpenses(); }
-        }
-
-        private void EditExpense_Click(object s, RoutedEventArgs e)
-        {
-            if (s is Button b && b.Tag is int id)
-            {
-                var exp = DatabaseService.GetExpenseById(id);
-                if (exp == null) return;
-
-                var w = new EditExpenseWindow(exp, _uid) { Owner = Window.GetWindow(this) };
-                if (w.ShowDialog() == true) { ToastService.Success("Zaktualizowano wydatek."); LoadExpenses(); }
-            }
-        }
-
-        private void DeleteExpense_Click(object s, RoutedEventArgs e)
-        {
-            if (s is Button b && b.Tag is int id)
-            {
-                var dlg = new ConfirmDialog("Czy na pewno chcesz usunąć ten wydatek?")
-                { Owner = Window.GetWindow(this) };
-
-                if (dlg.ShowDialog() == true)
-                {
-                    DatabaseService.DeleteExpense(id);
-                    ToastService.Success("Usunięto wydatek.");
-                    LoadExpenses();
-                }
-            }
-        }
+            => (Window.GetWindow(this) as ShellWindow)?.NavigateTo("AddExpense");
     }
 }
+
+
+
 
 
 
