@@ -1,0 +1,73 @@
+﻿<Window x:Class="Finly.Views.EditPersonalWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Edytuj dane osobowe"
+        WindowStartupLocation="CenterOwner"
+        Width="640" Height="560" MinWidth="560" MinHeight="420"
+        Background="{DynamicResource App.Background}"
+        Foreground="{DynamicResource App.Foreground}">
+	<!-- Dwa wiersze: (0) scrollowalna treść, (1) pasek przycisków -->
+	<Grid>
+		<Grid.RowDefinitions>
+			<RowDefinition Height="*" />
+			<RowDefinition Height="Auto" />
+		</Grid.RowDefinitions>
+
+		<!-- SCROLLUJĄCA ZAWARTOŚĆ -->
+		<ScrollViewer Grid.Row="0" VerticalScrollBarVisibility="Auto">
+			<StackPanel Margin="20" >
+				<TextBlock Text="Dane osobowe" FontSize="18" FontWeight="Semibold" Margin="0,0,0,16"/>
+
+				<TextBox x:Name="EmailBox"
+						 Text="{Binding Email, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+						 IsReadOnly="False"
+						 IsEnabled="True"
+						 Focusable="True"
+						 Margin="0,4,0,12"/>
+
+
+				<StackPanel Margin="0,0,0,10">
+					<TextBlock Text="Imię"/>
+					<TextBox Text="{Binding FirstName, UpdateSourceTrigger=PropertyChanged}"/>
+				</StackPanel>
+
+				<StackPanel Margin="0,0,0,10">
+					<TextBlock Text="Nazwisko"/>
+					<TextBox Text="{Binding LastName, UpdateSourceTrigger=PropertyChanged}"/>
+				</StackPanel>
+
+				<StackPanel Margin="0,0,0,10">
+					<TextBlock Text="Rok urodzenia"/>
+					<TextBox Text="{Binding BirthYear, UpdateSourceTrigger=PropertyChanged}"/>
+				</StackPanel>
+
+				<StackPanel Margin="0,0,0,10">
+					<TextBlock Text="Miasto zamieszkania"/>
+					<TextBox Text="{Binding City, UpdateSourceTrigger=PropertyChanged}"/>
+				</StackPanel>
+
+				<StackPanel Margin="0,0,0,10">
+					<TextBlock Text="Kod pocztowy"/>
+					<TextBox Text="{Binding PostalCode, UpdateSourceTrigger=PropertyChanged}"/>
+				</StackPanel>
+
+				<StackPanel Margin="0,0,0,10">
+					<TextBlock Text="Numer domu / mieszkania"/>
+					<TextBox Text="{Binding HouseNo, UpdateSourceTrigger=PropertyChanged}"/>
+				</StackPanel>
+			</StackPanel>
+		</ScrollViewer>
+
+		<!-- STICKY PRZYCISKI (nie przewijają się) -->
+		<DockPanel Grid.Row="1" Margin="16,10,16,16">
+			<StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+				<!-- Enter zadziała dzięki IsDefault -->
+				<Button Content="Zapisz" Width="120" Margin="0,0,8,0"
+                        IsDefault="True"
+                        Click="Save_Click"
+                        Style="{StaticResource PrimaryButton}" />
+				<Button Content="Anuluj" Width="120" IsCancel="True"/>
+			</StackPanel>
+		</DockPanel>
+	</Grid>
+</Window>

@@ -1,0 +1,2 @@
+# 
+Aplikacja do zarządzania finansami

@@ -1,0 +1,7 @@
+﻿<UserControl x:Class="Finly.Pages.BudgetsPage"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <Grid Margin="16">
+        <TextBlock Text="Budżety" FontSize="18" FontWeight="Bold"/>
+    </Grid>
+</UserControl>

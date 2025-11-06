@@ -1,0 +1,70 @@
+﻿<Application x:Class="Finly.App"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:conv="clr-namespace:Finly.Helpers.Converters"
+             xmlns:sys="clr-namespace:System;assembly=mscorlib"
+             Startup="Application_Startup"
+             ShutdownMode="OnMainWindowClose">
+
+    <Application.Resources>
+        <ResourceDictionary>
+
+            <!-- Style + motyw -->
+            <ResourceDictionary.MergedDictionaries>
+                <ResourceDictionary Source="/Styles/_Index.xaml"/>
+                <ResourceDictionary Source="/Themes/Dark.xaml"/>
+            </ResourceDictionary.MergedDictionaries>
+
+            <!-- Konwertery globalne (możesz zostawić; nie są przyczyną błędu) -->
+            <conv:BoolToBrushConverter x:Key="BoolToBrush"/>
+            <conv:BoolToSymbolConverter x:Key="BoolToSymbol"/>
+            <conv:BoolToVisibilityConverter x:Key="BoolToVisibility"/>
+            <conv:InverseBoolToVisibilityConverter x:Key="InverseBoolToVisibility"/>
+
+            <!-- Klucze globalne -->
+            <FontFamily x:Key="App.FontFamily">Segoe UI</FontFamily>
+            <sys:Double x:Key="App.FontSize">14</sys:Double>
+
+            <!-- Tekst -->
+            <Style TargetType="TextBlock">
+                <Setter Property="Foreground" Value="{DynamicResource App.Foreground}"/>
+                <Setter Property="FontFamily" Value="{StaticResource App.FontFamily}"/>
+                <Setter Property="FontSize"   Value="{StaticResource App.FontSize}"/>
+            </Style>
+            <Style TargetType="Label">
+                <Setter Property="Foreground" Value="{DynamicResource App.Foreground}"/>
+            </Style>
+            <Style TargetType="{x:Type TextElement}">
+                <Setter Property="Foreground" Value="{DynamicResource App.Foreground}"/>
+            </Style>
+
+            <!-- Okna / kontrolki bazowe  cos-->
+            <Style TargetType="Window">
+                <Setter Property="Background" Value="{DynamicResource App.Background}"/>
+                <Setter Property="Foreground" Value="{DynamicResource App.Foreground}"/>
+                <Setter Property="FontFamily" Value="Segoe UI"/>
+                <Setter Property="ResizeMode" Value="CanResize"/>
+                <Setter Property="MinWidth"  Value="1100"/>
+                <Setter Property="MinHeight" Value="700"/>
+            </Style>
+
+            <Style TargetType="UserControl">
+                <Setter Property="Background" Value="{DynamicResource App.Background}"/>
+                <Setter Property="Foreground" Value="{DynamicResource App.Foreground}"/>
+                <Setter Property="FontFamily" Value="Segoe UI"/>
+            </Style>
+
+            <Style TargetType="Grid">
+                <Setter Property="Background" Value="{DynamicResource App.Background}"/>
+            </Style>
+
+            <Style TargetType="Border">
+                <Setter Property="Background"      Value="{DynamicResource Surface.Background}"/>
+                <Setter Property="BorderBrush"     Value="{DynamicResource Surface.Border}"/>
+                <Setter Property="BorderThickness" Value="1"/>
+                <Setter Property="CornerRadius"    Value="8"/>
+            </Style>
+
+        </ResourceDictionary>
+    </Application.Resources>
+</Application>

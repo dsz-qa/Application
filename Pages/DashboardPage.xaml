@@ -1,0 +1,154 @@
+﻿<UserControl x:Class="Finly.Pages.DashboardPage"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+    <!-- Lokalne style wymagane przez tę stronę -->
+    <UserControl.Resources>
+        <!-- Karta/sekcja na ciemnym/jasnym tle -->
+        <Style x:Key="Card" TargetType="Border">
+            <Setter Property="Background"      Value="{DynamicResource Surface.Background}"/>
+            <Setter Property="BorderBrush"     Value="{DynamicResource Surface.Border}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="CornerRadius"    Value="12"/>
+            <Setter Property="Padding"         Value="12"/>
+            <Setter Property="SnapsToDevicePixels" Value="True"/>
+        </Style>
+
+        <!-- Wyrównanie kwot w komórkach DataGrid -->
+        <Style x:Key="RightAlignedCell" TargetType="{x:Type TextBlock}">
+            <Setter Property="HorizontalAlignment" Value="Right"/>
+            <Setter Property="TextAlignment"       Value="Right"/>
+        </Style>
+
+        <!-- Drobne style typograficzne dla KPI -->
+        <Style x:Key="KpiTitle" TargetType="TextBlock">
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Foreground" Value="{DynamicResource App.Foreground}"/>
+        </Style>
+        <Style x:Key="KpiValue" TargetType="TextBlock">
+            <Setter Property="FontSize"   Value="18"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="Margin"     Value="0,4,0,0"/>
+            <Setter Property="Foreground" Value="{DynamicResource App.Foreground}"/>
+        </Style>
+    </UserControl.Resources>
+
+    <Grid Margin="16">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <!-- KPI -->
+            <RowDefinition Height="Auto"/>
+            <!-- Filtry -->
+            <RowDefinition Height="*"/>
+            <!-- Lista -->
+            <RowDefinition Height="Auto"/>
+            <!-- Dolny pasek -->
+        </Grid.RowDefinitions>
+
+        <!-- ===== KPI ===== -->
+        <UniformGrid Grid.Row="0" Columns="3" Margin="0,0,0,12">
+            <Border Style="{StaticResource Card}" Margin="0,0,12,0">
+                <StackPanel>
+                    <TextBlock Text="Suma wydatków" Style="{StaticResource KpiTitle}"/>
+                    <TextBlock x:Name="TotalAmountText" Style="{StaticResource KpiValue}"/>
+                </StackPanel>
+            </Border>
+
+            <Border Style="{StaticResource Card}" Margin="0,0,12,0">
+                <StackPanel>
+                    <TextBlock Text="Liczba wpisów" Style="{StaticResource KpiTitle}"/>
+                    <TextBlock x:Name="EntryCountText" Style="{StaticResource KpiValue}"/>
+                </StackPanel>
+            </Border>
+
+            <Border Style="{StaticResource Card}">
+                <StackPanel>
+                    <TextBlock Text="Średnia dzienna" Style="{StaticResource KpiTitle}"/>
+                    <TextBlock x:Name="DailyAverageText" Style="{StaticResource KpiValue}"/>
+                </StackPanel>
+            </Border>
+        </UniformGrid>
+
+        <!-- ===== FILTRY ===== -->
+        <Border Grid.Row="1" Style="{StaticResource Card}" Margin="0,0,0,12">
+            <ScrollViewer HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Disabled">
+                <StackPanel Orientation="Horizontal">
+                    <ComboBox x:Name="CategoryFilterComboBox" Width="180" Margin="0,0,8,0" IsEditable="True"/>
+                    <DatePicker x:Name="FromDatePicker" Width="140" Margin="0,0,8,0"/>
+                    <DatePicker x:Name="ToDatePicker"   Width="140" Margin="0,0,8,0"/>
+
+                    <!-- Szukaj w opisie -->
+                    <TextBox x:Name="QueryTextBox" Width="220" Margin="0,0,8,0"
+                             Style="{StaticResource WatermarkTextBox}"
+                             Tag="Szukaj w opisie…"/>
+
+                    <Button Content="Filtruj"
+                            Style="{StaticResource PrimaryButton}"
+                            Click="FilterButton_Click"/>
+                    <Button Content="Wyczyść"
+                            Margin="8,0,0,0"
+                            Click="ClearFilters_Click"/>
+                </StackPanel>
+            </ScrollViewer>
+        </Border>
+
+        <!-- ===== LISTA WYDATKÓW ===== -->
+        <Border Grid.Row="2" Style="{StaticResource Card}" Margin="0,0,0,12">
+            <DataGrid x:Name="ExpenseGrid"
+                      AutoGenerateColumns="False"
+                      HeadersVisibility="Column"
+                      IsReadOnly="True"
+                      MouseDoubleClick="ExpenseGrid_MouseDoubleClick">
+                <DataGrid.Columns>
+                    <DataGridTextColumn Header="Data"
+                                        Binding="{Binding Date, StringFormat={}{0:yyyy-MM-dd}}"
+                                        Width="140"/>
+                    <DataGridTextColumn Header="Kategoria"
+                                        Binding="{Binding Category}"
+                                        Width="*"/>
+                    <DataGridTextColumn Header="Kwota"
+                                        Binding="{Binding Amount, StringFormat={}{0:N2} zł}"
+                                        Width="140"
+                                        ElementStyle="{StaticResource RightAlignedCell}"/>
+                    <DataGridTextColumn Header="Opis"
+                                        Binding="{Binding Description}"
+                                        Width="2*"/>
+
+                    <DataGridTemplateColumn Header="Akcje" Width="180">
+                        <DataGridTemplateColumn.CellTemplate>
+                            <DataTemplate>
+                                <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                                    <Button Content="Edytuj" Padding="10,4" Margin="0,0,6,0"
+                                            Tag="{Binding Id}" Click="EditExpense_Click"/>
+                                    <Button Content="Usuń" Padding="10,4"
+                                            Tag="{Binding Id}" Click="DeleteExpense_Click"/>
+                                </StackPanel>
+                            </DataTemplate>
+                        </DataGridTemplateColumn.CellTemplate>
+                    </DataGridTemplateColumn>
+                </DataGrid.Columns>
+            </DataGrid>
+        </Border>
+
+        <!-- ===== DOLNY PASEK ===== -->
+        <DockPanel Grid.Row="3" LastChildFill="False" Margin="0,8,0,0">
+            <!-- lewa -->
+            <StackPanel Orientation="Horizontal" DockPanel.Dock="Left">
+                <TextBox x:Name="QuickAddBox" Width="320" Margin="0,0,8,0"
+                         Style="{StaticResource WatermarkTextBox}"
+                         Tag="Szybkie dodawanie: np. 35,90 #zakupy @karta"/>
+                <Button Content="Dodaj"
+                        Style="{StaticResource PrimaryButton}"
+                        Click="QuickAdd_Click"/>
+                <Button Content="Usuń zaznaczony"
+                        Margin="8,0,0,0"
+                        Click="DeleteSelected_Click"/>
+            </StackPanel>
+
+            <!-- prawa -->
+            <StackPanel Orientation="Horizontal" DockPanel.Dock="Right">
+                <Button Content="Wykres wydatków" Click="ShowChart_Click"/>
+            </StackPanel>
+        </DockPanel>
+    </Grid>
+</UserControl>

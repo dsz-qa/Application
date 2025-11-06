@@ -1,0 +1,322 @@
+﻿<Window x:Class="Finly.Views.ShellWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:shell="clr-namespace:System.Windows.Shell;assembly=PresentationFramework"
+        xmlns:sys="clr-namespace:System;assembly=mscorlib"
+        Title="Finly"
+        WindowStyle="None"
+        ResizeMode="CanResize"
+        WindowState="Normal"
+        MinWidth="1024" MinHeight="640"
+        UseLayoutRounding="True"
+        SnapsToDevicePixels="True"
+        TextOptions.TextFormattingMode="Display"
+        TextOptions.TextRenderingMode="ClearType"
+        Background="{DynamicResource App.Background}"
+        Loaded="Window_Loaded"
+        Icon="/Assets/Icons/logoFinly.ico"
+        SizeChanged="Window_SizeChanged">
+
+    <!-- =================== RESOURCES =================== -->
+    <Window.Resources>
+
+        <!-- Fallback (nadpisywane przez Sizes.*) -->
+        <sys:Double x:Key="NavButton.Width">240</sys:Double>
+        <sys:Double x:Key="NavButton.Height">56</sys:Double>
+        <sys:Double x:Key="NavButton.FontSize">16</sys:Double>
+
+        <sys:Double x:Key="FooterButton.Width">220</sys:Double>
+        <sys:Double x:Key="FooterButton.Height">48</sys:Double>
+        <sys:Double x:Key="FooterButton.FontSize">14</sys:Double>
+
+        <sys:Double x:Key="Logo.Size">180</sys:Double>
+
+        <!-- Breakpointy -->
+        <ResourceDictionary x:Key="Sizes.Large">
+            <sys:String x:Key="SidebarCol.Width">380</sys:String>
+            <sys:Double x:Key="NavButton.Width">240</sys:Double>
+            <sys:Double x:Key="NavButton.Height">56</sys:Double>
+            <sys:Double x:Key="NavButton.FontSize">16</sys:Double>
+            <sys:Double x:Key="FooterButton.Width">220</sys:Double>
+            <sys:Double x:Key="FooterButton.Height">48</sys:Double>
+            <sys:Double x:Key="FooterButton.FontSize">14</sys:Double>
+            <sys:Double x:Key="Logo.Size">180</sys:Double>
+        </ResourceDictionary>
+
+        <ResourceDictionary x:Key="Sizes.Medium">
+            <sys:String x:Key="SidebarCol.Width">340</sys:String>
+            <sys:Double x:Key="NavButton.Width">220</sys:Double>
+            <sys:Double x:Key="NavButton.Height">52</sys:Double>
+            <sys:Double x:Key="NavButton.FontSize">15</sys:Double>
+            <sys:Double x:Key="FooterButton.Width">210</sys:Double>
+            <sys:Double x:Key="FooterButton.Height">46</sys:Double>
+            <sys:Double x:Key="FooterButton.FontSize">13</sys:Double>
+            <sys:Double x:Key="Logo.Size">160</sys:Double>
+        </ResourceDictionary>
+
+        <ResourceDictionary x:Key="Sizes.Compact">
+            <sys:String x:Key="SidebarCol.Width">300</sys:String>
+            <sys:Double x:Key="NavButton.Width">200</sys:Double>
+            <sys:Double x:Key="NavButton.Height">46</sys:Double>
+            <sys:Double x:Key="NavButton.FontSize">14</sys:Double>
+            <sys:Double x:Key="FooterButton.Width">200</sys:Double>
+            <sys:Double x:Key="FooterButton.Height">44</sys:Double>
+            <sys:Double x:Key="FooterButton.FontSize">13</sys:Double>
+            <sys:Double x:Key="Logo.Size">130</sys:Double>
+        </ResourceDictionary>
+
+        <!-- Pasek tytułu -->
+        <Style x:Key="TitleBarIconButton" TargetType="Button">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderBrush" Value="{x:Null}"/>
+            <Setter Property="Padding" Value="8"/>
+            <Setter Property="Margin" Value="4,0,0,0"/>
+            <Setter Property="Foreground" Value="{DynamicResource App.Foreground}"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
+        </Style>
+
+        <!-- NAV -->
+        <Style x:Key="NavButton" TargetType="{x:Type ToggleButton}">
+            <Setter Property="HorizontalAlignment" Value="Center"/>
+            <Setter Property="Width"     Value="{DynamicResource NavButton.Width}"/>
+            <Setter Property="Height"    Value="{DynamicResource NavButton.Height}"/>
+            <Setter Property="Padding"   Value="16,10"/>
+            <Setter Property="Margin"    Value="0,8"/>
+            <Setter Property="FontSize"  Value="{DynamicResource NavButton.FontSize}"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="HorizontalContentAlignment" Value="Center"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource Brand.Orange}"/>
+            <Setter Property="BorderThickness" Value="2"/>
+            <Setter Property="Foreground" Value="#FFFFFF"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="{x:Type ToggleButton}">
+                        <Border x:Name="bg"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="12">
+                            <ContentPresenter Margin="12,0"
+                                              HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                              VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="bg" Property="Background" Value="#33ED7A1A"/>
+                            </Trigger>
+                            <Trigger Property="IsChecked" Value="True">
+                                <Setter TargetName="bg" Property="Background" Value="#33ED7A1A"/>
+                                <Setter Property="BorderBrush" Value="{DynamicResource Brand.Orange}"/>
+                                <Setter Property="Foreground" Value="#FFFFFF"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- Stopka -->
+        <Style x:Key="SidebarActionToggle.Blue" TargetType="{x:Type ToggleButton}">
+            <Setter Property="Foreground" Value="{DynamicResource Sidebar.Foreground}"/>
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource Brand.Blue}"/>
+            <Setter Property="BorderThickness" Value="2"/>
+            <Setter Property="HorizontalAlignment" Value="Center"/>
+            <Setter Property="Width"     Value="{DynamicResource FooterButton.Width}"/>
+            <Setter Property="Height"    Value="{DynamicResource FooterButton.Height}"/>
+            <Setter Property="FontSize"  Value="{DynamicResource FooterButton.FontSize}"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="{x:Type ToggleButton}">
+                        <Border x:Name="bg"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="10">
+                            <ContentPresenter Margin="10,2"
+                                              HorizontalAlignment="Center"
+                                              VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="bg" Property="Background" Value="{DynamicResource Brand.Blue.HoverOverlay}"/>
+                            </Trigger>
+                            <Trigger Property="IsChecked" Value="True">
+                                <Setter TargetName="bg" Property="Background" Value="{DynamicResource Brand.Blue.HoverOverlay}"/>
+                                <Setter Property="FontWeight" Value="SemiBold"/>
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="bg" Property="Background" Value="{DynamicResource Brand.Blue.PressedOverlay}"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+    </Window.Resources>
+
+    <!-- WindowChrome (własny pasek tytułu) -->
+    <shell:WindowChrome.WindowChrome>
+        <shell:WindowChrome CaptionHeight="48"
+                            ResizeBorderThickness="6"
+                            CornerRadius="0"
+                            UseAeroCaptionButtons="False"/>
+    </shell:WindowChrome.WindowChrome>
+
+    <!-- =================== LAYOUT =================== -->
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="48"/>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+
+        <!-- Pasek tytułu -->
+        <Grid Grid.Row="0"
+              Background="{DynamicResource TitleBar.Background}"
+              MouseLeftButtonDown="TitleBar_MouseLeftButtonDown">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition/>
+                <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
+
+            <TextBlock Text="Finly"
+                       VerticalAlignment="Center"
+                       Margin="12,0,0,0"
+                       Foreground="{DynamicResource App.Foreground}"
+                       FontWeight="SemiBold"/>
+
+            <StackPanel Grid.Column="1" Orientation="Horizontal">
+                <Button Style="{StaticResource TitleBarIconButton}" Width="46" Height="32"
+                        Click="Minimize_Click" shell:WindowChrome.IsHitTestVisibleInChrome="True">
+                    <TextBlock Text="—" FontSize="16"/>
+                </Button>
+                <Button Style="{StaticResource TitleBarIconButton}" Width="46" Height="32"
+                        Click="MaxRestore_Click" shell:WindowChrome.IsHitTestVisibleInChrome="True">
+                    <TextBlock Text="⬜" FontSize="12"/>
+                </Button>
+                <Button Style="{StaticResource TitleBarIconButton}" Width="46" Height="32"
+                        Click="Close_Click" shell:WindowChrome.IsHitTestVisibleInChrome="True">
+                    <TextBlock Text="✕" FontSize="12"/>
+                </Button>
+            </StackPanel>
+        </Grid>
+
+        <!-- Treść -->
+        <Grid Grid.Row="1">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition x:Name="SidebarCol" Width="380" MinWidth="260"/>
+                <ColumnDefinition Width="*"/>
+            </Grid.ColumnDefinitions>
+
+            <!-- SIDEBAR -->
+            <Border x:Name="SidebarHost" Grid.Column="0"
+                    Background="{DynamicResource Sidebar.Background}"
+                    SizeChanged="SidebarHost_SizeChanged">
+                <!-- zawartość, która skaluje się przez LayoutTransform -->
+                <Grid x:Name="SidebarRoot">
+                    <Grid.LayoutTransform>
+                        <ScaleTransform x:Name="SidebarScale" ScaleX="1" ScaleY="1"/>
+                    </Grid.LayoutTransform>
+
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+
+                    <!-- logo -->
+                    <StackPanel Grid.Row="0" Margin="16,16,16,8">
+                        <Button Click="Logo_Click" Background="Transparent" BorderBrush="{x:Null}" Cursor="Hand">
+                            <DockPanel LastChildFill="False" VerticalAlignment="Center">
+                                <Image Width="{DynamicResource Logo.Size}" Height="{DynamicResource Logo.Size}"
+                                       SnapsToDevicePixels="True"
+                                       RenderOptions.BitmapScalingMode="HighQuality"
+                                       Stretch="Uniform"
+                                       Source="pack://application:,,,/Assets/Images/logoFinly.png"
+                                       DockPanel.Dock="Left"/>
+                            </DockPanel>
+                        </Button>
+                        <Separator Margin="0,12,0,8" Background="{DynamicResource Surface.Border}"/>
+                    </StackPanel>
+
+                    <!-- nawigacja -->
+                    <StackPanel Grid.Row="1" Margin="8,0,8,8" x:Name="NavContainer">
+                        <ToggleButton x:Name="NavAdd"            Style="{StaticResource NavButton}" Content="Dodaj wydatek"  Click="Nav_Add_Click"/>
+                        <ToggleButton x:Name="NavTransactions"   Style="{StaticResource NavButton}" Content="Transakcje"     Click="Nav_Transactions_Click"/>
+                        <ToggleButton x:Name="NavCharts"         Style="{StaticResource NavButton}" Content="Wykresy"        Click="Nav_Charts_Click"/>
+                        <ToggleButton x:Name="NavBudgets"        Style="{StaticResource NavButton}" Content="Budżety"        Click="Nav_Budgets_Click"/>
+                        <ToggleButton x:Name="NavSubscriptions"  Style="{StaticResource NavButton}" Content="Subskrypcje"    Click="Nav_Subscriptions_Click"/>
+                        <ToggleButton x:Name="NavGoals"          Style="{StaticResource NavButton}" Content="Cele"           Click="Nav_Goals_Click"/>
+                        <ToggleButton x:Name="NavCategories"     Style="{StaticResource NavButton}" Content="Kategorie"      Click="Nav_Categories_Click"/>
+                        <ToggleButton x:Name="NavReports"        Style="{StaticResource NavButton}" Content="Raporty"        Click="Nav_Reports_Click"/>
+                        <ToggleButton x:Name="NavImport"         Style="{StaticResource NavButton}" Content="Import / Sync"  Click="Nav_Import_Click"/>
+                    </StackPanel>
+
+                    <!-- stopka -->
+                    <Grid Grid.Row="2" Margin="8,8,8,16">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                        </Grid.RowDefinitions>
+
+                        <Separator Grid.Row="0" Margin="0,8,0,12" Background="{DynamicResource Surface.Border}"/>
+
+                        <Grid Grid.Row="1">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition/>
+                                <ColumnDefinition/>
+                                <ColumnDefinition/>
+                            </Grid.ColumnDefinitions>
+
+                            <ToggleButton x:Name="FooterAccount" Grid.Column="0"
+                                          Style="{StaticResource SidebarActionToggle.Blue}"
+                                          Click="OpenProfile_Click">
+                                <StackPanel Orientation="Vertical" HorizontalAlignment="Center">
+                                    <TextBlock FontFamily="Segoe MDL2 Assets" Text="&#xE77B;" FontSize="18"
+                                               HorizontalAlignment="Center" Margin="0,0,0,4"/>
+                                    <TextBlock Text="Konto"/>
+                                </StackPanel>
+                            </ToggleButton>
+
+                            <ToggleButton x:Name="FooterSettings" Grid.Column="1"
+                                          Style="{StaticResource SidebarActionToggle.Blue}"
+                                          Click="OpenSettings_Click">
+                                <StackPanel Orientation="Vertical" HorizontalAlignment="Center">
+                                    <TextBlock FontFamily="Segoe MDL2 Assets" Text="&#xE713;" FontSize="18"
+                                               HorizontalAlignment="Center" Margin="0,0,0,4"/>
+                                    <TextBlock Text="Ustawienia"/>
+                                </StackPanel>
+                            </ToggleButton>
+
+                            <ToggleButton x:Name="FooterLogout" Grid.Column="2"
+                                          Style="{StaticResource SidebarActionToggle.Blue}"
+                                          Click="Nav_Logout_Click">
+                                <StackPanel Orientation="Vertical" HorizontalAlignment="Center">
+                                    <TextBlock FontFamily="Segoe MDL2 Assets" Text="&#xF3B1;" FontSize="18"
+                                               HorizontalAlignment="Center" Margin="0,0,0,4"/>
+                                    <TextBlock Text="Wyloguj"/>
+                                </StackPanel>
+                            </ToggleButton>
+                        </Grid>
+                    </Grid>
+                </Grid>
+            </Border>
+
+            <!-- CONTENT -->
+            <Grid Grid.Column="1" Background="{DynamicResource App.Background}">
+                <ContentControl x:Name="RightHost"/>
+                <Canvas x:Name="ToastLayer"
+                HorizontalAlignment="Stretch"
+                VerticalAlignment="Stretch"
+                IsHitTestVisible="False"/>
+            </Grid>
+        </Grid>
+    </Grid>
+</Window>
+
+

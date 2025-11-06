@@ -1,0 +1,49 @@
+﻿<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <SolidColorBrush x:Key="DataGrid.SelectedBackground" Color="#39404A"/>
+
+    <Style TargetType="DataGrid">
+        <Setter Property="Background"               Value="{DynamicResource Surface.Background}"/>
+        <Setter Property="Foreground"               Value="{DynamicResource App.Foreground}"/>
+        <Setter Property="BorderBrush"              Value="{DynamicResource Surface.Border}"/>
+        <Setter Property="HorizontalGridLinesBrush" Value="{DynamicResource Surface.Border}"/>
+        <Setter Property="VerticalGridLinesBrush"   Value="{DynamicResource Surface.Border}"/>
+        <Setter Property="RowBackground"            Value="{DynamicResource Surface.Background}"/>
+        <!-- w trybie jasnym też bezpiecznie – bez „mocnej” ciemnej alternacji -->
+        <Setter Property="AlternatingRowBackground" Value="{DynamicResource Surface.Background}"/>
+        <Setter Property="SelectionUnit"            Value="FullRow"/>
+        <Setter Property="CanUserAddRows"           Value="False"/>
+    </Style>
+
+    <Style TargetType="DataGridColumnHeader">
+        <Setter Property="Background"      Value="#23262B"/>
+        <Setter Property="Foreground"      Value="{DynamicResource App.Foreground}"/>
+        <Setter Property="BorderBrush"     Value="{DynamicResource Surface.Border}"/>
+        <Setter Property="BorderThickness" Value="0,0,0,1"/>
+        <Setter Property="FontWeight"      Value="SemiBold"/>
+    </Style>
+
+    <Style TargetType="DataGridCell">
+        <Setter Property="Background"      Value="{DynamicResource Surface.Background}"/>
+        <Setter Property="Foreground"      Value="{DynamicResource App.Foreground}"/>
+        <Setter Property="BorderBrush"     Value="{DynamicResource Surface.Border}"/>
+        <Setter Property="BorderThickness" Value="0,0,0,1"/>
+    </Style>
+
+    <Style TargetType="DataGridRow">
+        <Setter Property="Background"      Value="{DynamicResource Surface.Background}"/>
+        <Setter Property="Foreground"      Value="{DynamicResource App.Foreground}"/>
+        <Setter Property="BorderBrush"     Value="{DynamicResource Surface.Border}"/>
+        <Setter Property="BorderThickness" Value="0,0,0,1"/>
+        <Style.Triggers>
+            <Trigger Property="IsSelected" Value="True">
+                <Setter Property="Background" Value="{StaticResource DataGrid.SelectedBackground}"/>
+                <Setter Property="Foreground" Value="{DynamicResource App.Foreground}"/>
+            </Trigger>
+        </Style.Triggers>
+    </Style>
+
+    <Style TargetType="ScrollViewer">
+        <Setter Property="Background" Value="{DynamicResource App.Background}"/>
+    </Style>
+</ResourceDictionary>

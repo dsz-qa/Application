@@ -1,0 +1,59 @@
+﻿<UserControl x:Class="Finly.Pages.ChartsPage"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:lvc="http://livecharts.com"
+             xmlns:lvcwpf="clr-namespace:LiveChartsCore.SkiaSharpView.WPF;assembly=LiveChartsCore.SkiaSharpView.WPF">
+
+	<Grid Margin="10">
+		<Grid.RowDefinitions>
+			<RowDefinition Height="Auto"/>
+			<!-- Pasek filtrów -->
+			<RowDefinition Height="*"/>
+			<!-- Wykresy -->
+		</Grid.RowDefinitions>
+
+		<!-- Pasek filtrów u góry -->
+		<StackPanel Orientation="Horizontal" Margin="0,0,0,10" VerticalAlignment="Top">
+			<TextBlock Text="Sortuj:" VerticalAlignment="Center" Margin="0,0,5,0"/>
+			<ComboBox x:Name="SortComboBox" Width="150" SelectionChanged="SortComboBox_SelectionChanged" Margin="0,0,10,0">
+				<ComboBoxItem Content="Kategoria A-Z" />
+				<ComboBoxItem Content="Kategoria Z-A" />
+				<ComboBoxItem Content="Suma rosnąco" />
+				<ComboBoxItem Content="Suma malejąco" />
+			</ComboBox>
+
+			<TextBlock Text="Sortowanie wg daty:" VerticalAlignment="Center" Margin="0,0,5,0"/>
+			<ComboBox x:Name="DateSortComboBox" Width="140" SelectionChanged="DateSortComboBox_SelectionChanged" Margin="0,0,10,0">
+				<ComboBoxItem Content="Data rosnąco" />
+				<ComboBoxItem Content="Data malejąco" />
+			</ComboBox>
+
+			<TextBlock Text="Od:" VerticalAlignment="Center" Margin="0,0,5,0"/>
+			<DatePicker x:Name="FromDatePicker" Width="120" Margin="0,0,10,0"/>
+
+			<TextBlock Text="Do:" VerticalAlignment="Center" Margin="0,0,5,0"/>
+			<DatePicker x:Name="ToDatePicker" Width="120" Margin="0,0,10,0"/>
+
+			<Button Content="Filtruj" Width="80" Click="FilterButton_Click" Margin="0,0,10,0"/>
+			<Button Content="Eksportuj oba wykresy do PNG" Click="ExportChartsToPng_Click" Margin="5"/>
+			<Button Content="Eksportuj do PDF" Click="ExportChartToPdf_Click" Margin="5"/>
+		</StackPanel>
+
+		<!-- Wykresy -->
+		<Grid Grid.Row="1">
+			<Grid.RowDefinitions>
+				<RowDefinition Height="*"/>
+				<RowDefinition Height="*"/>
+			</Grid.RowDefinitions>
+
+			<GroupBox Header="Wydatki wg kategorii" Grid.Row="0" Margin="0,5,0,5">
+				<lvcwpf:PieChart x:Name="pieChart"/>
+			</GroupBox>
+
+			<GroupBox Header="Wydatki wg daty" Grid.Row="1">
+				<lvcwpf:CartesianChart x:Name="lineChart"/>
+			</GroupBox>
+		</Grid>
+	</Grid>
+</UserControl>
+

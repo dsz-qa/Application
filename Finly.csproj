@@ -1,0 +1,53 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+	<PropertyGroup>
+		<RootNamespace>Finly</RootNamespace>
+		<AssemblyName>Finly</AssemblyName>
+		<OutputType>WinExe</OutputType>
+		<TargetFramework>net8.0-windows10.0.19041.0</TargetFramework>
+		<UseWPF>true</UseWPF>
+		<Nullable>enable</Nullable>
+		<ImplicitUsings>enable</ImplicitUsings>
+		<Platforms>AnyCPU;x64</Platforms>
+		<PlatformTarget>x64</PlatformTarget>
+		<ApplicationManifest>app.manifest</ApplicationManifest>
+		<ApplicationIcon>Assets\Icons\logoFinly.ico</ApplicationIcon>
+	</PropertyGroup>
+	<ItemGroup>
+	  <Compile Remove="Nowy folder\**" />
+	  <EmbeddedResource Remove="Nowy folder\**" />
+	  <None Remove="Nowy folder\**" />
+	  <Page Remove="Nowy folder\**" />
+	</ItemGroup>
+	<ItemGroup>
+	  <None Remove="Assets\Icons\logoFinly.ico" />
+	  <None Remove="Assets\Images\logoFinly.png" />
+	</ItemGroup>
+
+	<!-- Logo jako zasób -->
+
+	<!-- Pakiety używane w projekcie -->
+	<ItemGroup>
+		<PackageReference Include="Microsoft.Data.Sqlite" Version="9.0.10" />
+		<PackageReference Include="LiveChartsCore.SkiaSharpView.WPF" Version="2.0.0-rc6.1" />
+		<PackageReference Include="SkiaSharp" Version="3.119.1" />
+		<PackageReference Include="SkiaSharp.Views.WPF" Version="3.119.1" />
+		<PackageReference Include="SkiaSharp.Views.Desktop.Common" Version="3.119.1" />
+		<PackageReference Include="QuestPDF" Version="2025.7.3" />
+	</ItemGroup>
+
+
+
+	<!-- Same foldery (opcjonalnie) -->
+	<ItemGroup>
+		<Folder Include="Themes\" />
+		<Folder Include="Styles\" />
+	</ItemGroup>
+	<ItemGroup>
+	  <Resource Include="Assets\Icons\logoFinly.ico">
+	    <CopyToOutputDirectory>Never</CopyToOutputDirectory>
+	  </Resource>
+	  <Resource Include="Assets\Images\logoFinly.png">
+	    <CopyToOutputDirectory>Never</CopyToOutputDirectory>
+	  </Resource>
+	</ItemGroup>
+</Project>

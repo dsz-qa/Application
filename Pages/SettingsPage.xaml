@@ -1,0 +1,37 @@
+﻿<UserControl x:Class="Finly.Pages.SettingsPage"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             mc:Ignorable="d">
+	<Grid Margin="16">
+		<Grid.RowDefinitions>
+			<RowDefinition Height="Auto"/>
+			<RowDefinition Height="12"/>
+			<RowDefinition Height="Auto"/>
+			<RowDefinition Height="*"/>
+		</Grid.RowDefinitions>
+
+		<!-- MOTYW -->
+		<GroupBox Header="Motyw aplikacji">
+			<StackPanel Orientation="Horizontal" Margin="8,6">
+				<RadioButton x:Name="LightRadio" Content="Jasny"  Checked="LightRadio_Checked" Margin="0,0,12,0"/>
+				<RadioButton x:Name="DarkRadio"  Content="Ciemny" Checked="DarkRadio_Checked"/>
+				<Button x:Name="PreviewBtn" Content="Przetestuj"
+                        Margin="16,0,0,0" Click="PreviewBtn_Click"/>
+			</StackPanel>
+		</GroupBox>
+
+		<Separator Grid.Row="1"/>
+
+		<!-- POZYCJA POWIADOMIEŃ -->
+		<GroupBox Grid.Row="2" Header="Pozycja powiadomień (tostów)">
+			<StackPanel Orientation="Horizontal" Margin="8,6">
+				<ComboBox x:Name="ToastPosCombo" Width="220"
+                          SelectionChanged="ToastPosCombo_SelectionChanged"/>
+				<Button x:Name="TestToastButton" Content="Wyświetl test"
+                        Margin="12,0,0,0" Click="PreviewBtn_Click"/>
+			</StackPanel>
+		</GroupBox>
+	</Grid>
+</UserControl>

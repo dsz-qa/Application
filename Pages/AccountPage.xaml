@@ -1,0 +1,193 @@
+﻿<UserControl x:Class="Finly.Pages.AccountPage"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:conv="clr-namespace:Finly.Helpers.Converters"
+             mc:Ignorable="d">
+
+    <!-- Zasoby lokalne strony -->
+    <UserControl.Resources>
+        <!-- Jeśli gdzieś użyjesz, masz gotowy konwerter -->
+        <conv:BoolToVisibilityConverter x:Key="BoolToVisibility" CollapseWhenFalse="True"/>
+    </UserControl.Resources>
+
+    <ScrollViewer VerticalScrollBarVisibility="Auto">
+        <StackPanel Margin="24">
+            <TextBlock Text="Konto" FontSize="24" FontWeight="Bold"/>
+
+            <!-- ============ PROFIL ============ -->
+            <Border Margin="0,12,0,0"
+                    Background="{DynamicResource Surface.Background}"
+                    BorderBrush="{DynamicResource Surface.Border}"
+                    BorderThickness="1" CornerRadius="10">
+                <Grid Margin="16">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <!-- nagłówek -->
+                        <RowDefinition Height="Auto"/>
+                        <!-- dane użytkownika + przycisk -->
+                        <RowDefinition Height="Auto"/>
+                        <!-- zmiana hasła -->
+                    </Grid.RowDefinitions>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+
+                    <!-- Nagłówek -->
+                    <TextBlock Grid.Row="0" Grid.ColumnSpan="2"
+                               Text="Profil" FontSize="18" FontWeight="SemiBold"
+                               Margin="0,0,0,8"/>
+
+                    <!-- Dane użytkownika (zwarty blok) -->
+                    <StackPanel Grid.Row="1" Grid.Column="0" Margin="0,0,16,0">
+                        <TextBlock Text="Dane użytkownika" FontWeight="SemiBold" Margin="0,0,0,6"/>
+                        <StackPanel Orientation="Horizontal" Margin="0,2,0,0">
+                            <TextBlock Text="E-mail:" Width="160"/>
+                            <TextBlock Text="{Binding EmailDisplay}" FontWeight="SemiBold"/>
+                        </StackPanel>
+                        <StackPanel Orientation="Horizontal" Margin="0,2,0,0">
+                            <TextBlock Text="Imię:" Width="160"/>
+                            <TextBlock Text="{Binding FirstNameDisplay}"/>
+                        </StackPanel>
+                        <StackPanel Orientation="Horizontal" Margin="0,2,0,0">
+                            <TextBlock Text="Nazwisko:" Width="160"/>
+                            <TextBlock Text="{Binding LastNameDisplay}"/>
+                        </StackPanel>
+                        <StackPanel Orientation="Horizontal" Margin="0,2,0,0">
+                            <TextBlock Text="Data urodzin:" Width="160"/>
+                            <TextBlock Text="{Binding BirthDateDisplay}"/>
+                        </StackPanel>
+                        <StackPanel Orientation="Horizontal" Margin="0,2,0,0">
+                            <TextBlock Text="Adres:" Width="160"/>
+                            <TextBlock Text="{Binding AddressDisplay}" TextWrapping="Wrap"/>
+                        </StackPanel>
+                    </StackPanel>
+
+                    <!-- Przycisk edycji -->
+                    <Button Grid.Row="1" Grid.Column="1"
+                            Content="Uzupełnij / edytuj dane osobowe"
+                            VerticalAlignment="Top" Width="260"
+                            Style="{StaticResource PrimaryButton}"
+                            Click="EditPersonal_Click"/>
+
+                    <!-- ===== Zmiana hasła ===== -->
+                    <StackPanel Grid.Row="2" Grid.ColumnSpan="2" Margin="0,16,0,0">
+                        <TextBlock Text="Zmiana hasła" FontSize="16" FontWeight="SemiBold"/>
+
+                        <Grid Margin="8,8,0,0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="220"/>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="220"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+
+                            <TextBlock Grid.Column="0" Text="Wpisz aktualne hasło:" VerticalAlignment="Center"/>
+                            <PasswordBox x:Name="PwdOld" Grid.Column="1"/>
+
+                            <TextBlock Grid.Column="2" Text="Nowe hasło:" VerticalAlignment="Center" Margin="16,0,0,0"/>
+                            <PasswordBox x:Name="PwdNew" Grid.Column="3"/>
+                        </Grid>
+
+                        <Grid Margin="0,6,0,0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="220"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0" Text="Powtórz nowe hasło:" VerticalAlignment="Center"/>
+                            <PasswordBox x:Name="PwdNew2" Grid.Column="1"/>
+                        </Grid>
+
+                        <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
+                            <Button Content="Zmień hasło"
+                                    Click="ChangePassword_Click"
+                                    Style="{StaticResource PrimaryButton}"/>
+                            <TextBlock Margin="12,0,0,0"
+                                       Text="{Binding PasswordChangeMessage}"
+                                       Foreground="{Binding PasswordChangeBrush}"/>
+                        </StackPanel>
+                    </StackPanel>
+                </Grid>
+            </Border>
+
+            <!-- ============ BANKI + RACHUNKI ============ -->
+            <Border Margin="0,12,0,0"
+                    Background="{DynamicResource Surface.Background}"
+                    BorderBrush="{DynamicResource Surface.Border}"
+                    BorderThickness="1" CornerRadius="10">
+                <StackPanel Margin="16">
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock Text="Połączone banki" FontSize="18" FontWeight="SemiBold"/>
+                        <Button Margin="12,0,0,0" Content="Dodaj bank" Style="{StaticResource PrimaryButton}"
+                                Command="{Binding ConnectBankCommand}"/>
+                        <Button Margin="8,0,0,0" Content="Synchronizuj teraz" Command="{Binding SyncNowCommand}"/>
+                    </StackPanel>
+
+                    <ItemsControl ItemsSource="{Binding BankConnections}" Margin="0,8,0,0">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <Border Margin="0,6,0,0"
+                                        Background="{DynamicResource Surface.Background}"
+                                        BorderBrush="{DynamicResource Surface.Border}"
+                                        BorderThickness="1" CornerRadius="6">
+                                    <Grid Margin="10">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="2*"/>
+                                            <ColumnDefinition Width="2*"/>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+
+                                        <StackPanel>
+                                            <TextBlock Text="{Binding BankName}" FontWeight="SemiBold"/>
+                                            <TextBlock Text="{Binding AccountHolder}" FontSize="12" Opacity="0.8"/>
+                                        </StackPanel>
+
+                                        <StackPanel Grid.Column="1">
+                                            <TextBlock Text="Ostatnia synchronizacja" FontSize="12" Opacity="0.8"/>
+                                            <TextBlock Text="{Binding LastSync, StringFormat={}{0:yyyy-MM-dd HH:mm}}"/>
+                                        </StackPanel>
+
+                                        <TextBlock Grid.Column="2" Text="{Binding Status}" VerticalAlignment="Center"/>
+                                        <Button Grid.Column="3" Content="Odłącz"
+                                                Command="{Binding DataContext.DisconnectBankCommand,
+                                                                  RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                CommandParameter="{Binding}"/>
+                                    </Grid>
+                                </Border>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+
+                    <Expander Header="Rachunki (saldo)" IsExpanded="False" Margin="0,8,0,0">
+                        <DataGrid ItemsSource="{Binding BankAccounts}"
+                                  AutoGenerateColumns="False"
+                                  HeadersVisibility="Column"
+                                  CanUserAddRows="False"
+                                  IsReadOnly="True"
+                                  Margin="0,8,0,0">
+                            <DataGrid.Columns>
+                                <DataGridTextColumn Header="Bank" Binding="{Binding BankName}" Width="*"/>
+                                <DataGridTextColumn Header="Nazwa rachunku" Binding="{Binding AccountName}" Width="*"/>
+                                <DataGridTextColumn Header="IBAN" Binding="{Binding Iban}" Width="2*"/>
+                                <DataGridTextColumn Header="Saldo" Binding="{Binding Balance, StringFormat={}{0:N2}}" Width="*"/>
+                                <DataGridTextColumn Header="Waluta" Binding="{Binding Currency}" Width="80"/>
+                                <DataGridTextColumn Header="Ost. sync" Binding="{Binding LastSync, StringFormat={}{0:yyyy-MM-dd HH:mm}}" Width="*"/>
+                            </DataGrid.Columns>
+                        </DataGrid>
+                    </Expander>
+                </StackPanel>
+            </Border>
+
+        </StackPanel>
+    </ScrollViewer>
+</UserControl>
+
+
+
+
+
+
+

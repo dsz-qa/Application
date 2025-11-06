@@ -1,0 +1,32 @@
+﻿<UserControl x:Class="Finly.Pages.AddExpensePage"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+	<Grid Margin="10">
+		<Grid.RowDefinitions>
+			<RowDefinition Height="Auto"/>
+			<RowDefinition Height="Auto"/>
+			<RowDefinition Height="Auto"/>
+			<RowDefinition Height="Auto"/>
+			<RowDefinition Height="Auto"/>
+		</Grid.RowDefinitions>
+
+		<TextBlock Text="Kwota:" Grid.Row="0" Margin="0,0,0,5"/>
+		<TextBox x:Name="AmountBox" Grid.Row="0" Margin="60,0,0,5" Width="200"/>
+
+		<TextBlock Text="Kategoria:" Grid.Row="1" Margin="0,5,0,5"/>
+		<TextBox x:Name="CategoryBox" Grid.Row="1" Margin="60,5,0,5" Width="200"/>
+
+		<TextBlock Text="Data:" Grid.Row="2" Margin="0,5,0,5"/>
+		<DatePicker x:Name="DateBox" Grid.Row="2" Margin="60,5,0,5" Width="200"/>
+
+		<TextBlock Text="Opis:" Grid.Row="3" Margin="0,5,0,5"/>
+		<TextBox x:Name="DescriptionBox" Grid.Row="3" Margin="60,5,0,5" Width="200" Height="60"
+                 AcceptsReturn="True" TextWrapping="Wrap"/>
+
+		<StackPanel Orientation="Horizontal" Grid.Row="4" Margin="0,20,0,0" HorizontalAlignment="Center">
+			<Button Content="Dodaj"  Width="80" Margin="5" Click="AddButton_Click"/>
+			<Button Content="Anuluj" Width="80" Margin="5" Click="CancelButton_Click"/>
+		</StackPanel>
+        
+	</Grid>
+</UserControl>
