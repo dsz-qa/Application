@@ -453,8 +453,6 @@
                         <TextBlock Text="KRS (opcjonalnie):"/>
                         <TextBox Text="{Binding KRS, UpdateSourceTrigger=PropertyChanged}" Margin="0,0,0,8"/>
 
-                        <TextBlock Text="Adres siedziby" FontWeight="SemiBold" Margin="0,12,0,6"/>
-
                         <!-- Miasto -->
                         <TextBlock Text="Miasto:"/>
                         <TextBox Text="{Binding CompanyCity, UpdateSourceTrigger=PropertyChanged}" Margin="0,0,0,8"/>
@@ -468,7 +466,7 @@
                         <TextBox Text="{Binding CompanyStreet, UpdateSourceTrigger=PropertyChanged}" Margin="0,0,0,8"/>
 
                         <!-- Nr domu / mieszkania -->
-                        <TextBlock Text="Nr domu / mieszkania / lokalu:"/>
+                        <TextBlock Text="Nr lokalu:"/>
                         <TextBox Text="{Binding CompanyHouseNo, UpdateSourceTrigger=PropertyChanged}" Margin="0,0,0,12"/>
                     </StackPanel>
 

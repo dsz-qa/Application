@@ -59,21 +59,23 @@
                             Binding="{Binding Title}"/>
                 <DataGridTextColumn Header="Kwota" Width="120"
                             Binding="{Binding Amount, StringFormat={}{0:N2} zł}"/>
-                <DataGridTemplateColumn Header="" Width="Auto">
+                <DataGridTemplateColumn Header="" Width="Auto" IsReadOnly="True">
                     <DataGridTemplateColumn.CellTemplate>
                         <DataTemplate>
-                            <StackPanel Orientation="Horizontal">
+                            <StackPanel Orientation="Horizontal" Margin="4,0,0,0">
+                                <!-- UWAGA: Row[Id] dla DataRowView -->
                                 <Button Content="Edytuj"
-                        Tag="{Binding Id}"
-                        Click="EditExpense_Click"
-                        Margin="0,0,6,0"/>
+                Tag="{Binding Path=Row[Id]}"
+                Click="EditExpense_Click"
+                Margin="0,0,6,0"/>
                                 <Button Content="Usuń"
-                        Tag="{Binding Id}"
-                        Click="DeleteExpense_Click"/>
+                Tag="{Binding Path=Row[Id]}"
+                Click="DeleteExpense_Click"/>
                             </StackPanel>
                         </DataTemplate>
                     </DataGridTemplateColumn.CellTemplate>
                 </DataGridTemplateColumn>
+
             </DataGrid.Columns>
         </DataGrid>
 

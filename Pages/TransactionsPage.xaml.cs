@@ -55,10 +55,16 @@ namespace Finly.Pages
 
         private void EditExpense_Click(object sender, RoutedEventArgs e)
         {
-            if (sender is Button b && b.Tag is int id)
+            if (sender is Button { Tag: { } tag })
             {
+                int id = Convert.ToInt32(tag);
+
                 var exp = DatabaseService.GetExpenseById(id);
-                if (exp == null) return;
+                if (exp == null)
+                {
+                    ToastService.Info("Nie znaleziono wydatku do edycji.");
+                    return;
+                }
 
                 var w = new EditExpenseWindow(exp, _uid)
                 {
@@ -73,14 +79,15 @@ namespace Finly.Pages
             }
         }
 
+
+
         private void DeleteExpense_Click(object sender, RoutedEventArgs e)
         {
-            if (sender is Button b && b.Tag is int id)
+            if (sender is Button { Tag: { } tag })
             {
-                var dlg = new ConfirmDialog("Czy na pewno chcesz usunąć ten wydatek?")
-                {
-                    Owner = Window.GetWindow(this)
-                };
+                var id = Convert.ToInt32(tag);
+                var dlg = new Finly.Views.Dialogs.ConfirmDialog("Czy na pewno chcesz usunąć ten wydatek?")
+                { Owner = Window.GetWindow(this) };
 
                 if (dlg.ShowDialog() == true)
                 {
@@ -88,6 +95,10 @@ namespace Finly.Pages
                     ToastService.Success("Usunięto wydatek.");
                     LoadExpenses();
                 }
+            }
+            else
+            {
+                ToastService.Info("Nie udało się odczytać identyfikatora wiersza.");
             }
         }
 
@@ -103,8 +114,10 @@ namespace Finly.Pages
         }
 
         // (jeśli masz przycisk Dodaj tutaj – polecam po prostu nawigację do strony dodawania)
-        private void AddExpense_Click(object s, RoutedEventArgs e)
-            => (Window.GetWindow(this) as ShellWindow)?.NavigateTo("AddExpense");
+        private void AddExpense_Click(object sender, RoutedEventArgs e)
+        {
+            (Window.GetWindow(this) as Finly.Views.ShellWindow)?.NavigateTo("AddExpense");
+        }
     }
 }
 

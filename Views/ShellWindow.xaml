@@ -176,32 +176,49 @@
         </Grid.RowDefinitions>
 
         <!-- Pasek tytułu -->
-        <Grid Grid.Row="0"
-              Background="{DynamicResource TitleBar.Background}"
-              MouseLeftButtonDown="TitleBar_MouseLeftButtonDown">
+        <Grid Grid.Row="0" Background="{DynamicResource TitleBar.Background}"
+          MouseLeftButtonDown="TitleBar_MouseLeftButtonDown">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition/>
                 <ColumnDefinition Width="Auto"/>
             </Grid.ColumnDefinitions>
 
-            <TextBlock Text="Finly"
-                       VerticalAlignment="Center"
-                       Margin="12,0,0,0"
-                       Foreground="{DynamicResource App.Foreground}"
-                       FontWeight="SemiBold"/>
+            <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="12,0,0,0">
+                <Image Source="/Assets/Images/logoFinly.png"
+               Width="40" Height="40" Stretch="Uniform" Margin="0,0,8,0"
+               RenderOptions.BitmapScalingMode="HighQuality"
+               shell:WindowChrome.IsHitTestVisibleInChrome="True"/>
+                <TextBlock Text="Logowanie / Rejestracja"
+                   Foreground="{DynamicResource App.Foreground}"
+                   FontSize="14" VerticalAlignment="Center"/>
+            </StackPanel>
 
             <StackPanel Grid.Column="1" Orientation="Horizontal">
-                <Button Style="{StaticResource TitleBarIconButton}" Width="46" Height="32"
-                        Click="Minimize_Click" shell:WindowChrome.IsHitTestVisibleInChrome="True">
-                    <TextBlock Text="—" FontSize="16"/>
+                <Button Width="46" Height="32" Padding="0"
+                Background="Transparent" BorderBrush="{x:Null}"
+                Click="Minimize_Click"
+                shell:WindowChrome.IsHitTestVisibleInChrome="True">
+                    <TextBlock Text="—" FontSize="16" VerticalAlignment="Center"
+                     HorizontalAlignment="Center"
+                     Foreground="{DynamicResource App.Foreground}"/>
                 </Button>
-                <Button Style="{StaticResource TitleBarIconButton}" Width="46" Height="32"
-                        Click="MaxRestore_Click" shell:WindowChrome.IsHitTestVisibleInChrome="True">
-                    <TextBlock Text="⬜" FontSize="12"/>
+
+                <Button Width="46" Height="32" Padding="0"
+                Background="Transparent" BorderBrush="{x:Null}"
+                Click="MaxRestore_Click"
+                shell:WindowChrome.IsHitTestVisibleInChrome="True">
+                    <TextBlock Text="⬜" FontSize="12" VerticalAlignment="Center"
+                     HorizontalAlignment="Center"
+                     Foreground="{DynamicResource App.Foreground}"/>
                 </Button>
-                <Button Style="{StaticResource TitleBarIconButton}" Width="46" Height="32"
-                        Click="Close_Click" shell:WindowChrome.IsHitTestVisibleInChrome="True">
-                    <TextBlock Text="✕" FontSize="12"/>
+
+                <Button Width="46" Height="32" Padding="0"
+                Background="Transparent" BorderBrush="{x:Null}"
+                Click="Close_Click"
+                shell:WindowChrome.IsHitTestVisibleInChrome="True">
+                    <TextBlock x:Name="CloseGlyph" Text="✕" FontSize="12"
+                     VerticalAlignment="Center" HorizontalAlignment="Center"
+                     Foreground="{DynamicResource App.Foreground}"/>
                 </Button>
             </StackPanel>
         </Grid>
