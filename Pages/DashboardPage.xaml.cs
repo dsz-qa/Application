@@ -98,7 +98,7 @@ namespace Finly.Pages
                     e.CategoryName = string.IsNullOrWhiteSpace(e.CategoryName)
                         ? "Brak kategorii"
                         : e.CategoryName.Trim();
-                    e.Category = e.CategoryName; // alias zgodności z kolumną w DataGrid
+                    e.Category = e.CategoryName; // alias dla kolumny DataGrid
                     return e;
                 })
                 .OrderByDescending(e => e.Date)
@@ -171,7 +171,27 @@ namespace Finly.Pages
             CategoryFilterComboBox.Text = string.Empty;
             FromDatePicker.SelectedDate = null;
             ToDatePicker.SelectedDate = null;
+            PresetRangeCombo.SelectedIndex = 0; // (brak)
             if (QueryTextBox != null) QueryTextBox.Text = string.Empty;
+
+            ApplyFiltersAndRefresh();
+        }
+
+        private void PresetRangeCombo_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            string? label = (PresetRangeCombo.SelectedItem as ComboBoxItem)?.Content?.ToString();
+            RangePreset preset = label switch
+            {
+                "Dzisiaj" => RangePreset.Dzisiaj,
+                "Ten tydzień" => RangePreset.TenTydzien,
+                "Ten miesiąc" => RangePreset.TenMiesiac,
+                "Ten rok" => RangePreset.TenRok,
+                _ => RangePreset.Brak
+            };
+
+            DateRangeService.GetRange(preset, out var from, out var to);
+            FromDatePicker.SelectedDate = from;
+            ToDatePicker.SelectedDate = to;
 
             ApplyFiltersAndRefresh();
         }
@@ -271,5 +291,6 @@ namespace Finly.Pages
         }
     }
 }
+
 
 

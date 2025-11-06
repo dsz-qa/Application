@@ -69,6 +69,18 @@
         <Border Grid.Row="1" Style="{StaticResource Card}" Margin="0,0,0,12">
             <ScrollViewer HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Disabled">
                 <StackPanel Orientation="Horizontal">
+
+                    <!-- PRESET ZAKRESU -->
+                    <ComboBox x:Name="PresetRangeCombo"
+                              Width="160" Margin="0,0,8,0"
+                              SelectionChanged="PresetRangeCombo_SelectionChanged">
+                        <ComboBoxItem Content="(brak)"/>
+                        <ComboBoxItem Content="Dzisiaj"/>
+                        <ComboBoxItem Content="Ten tydzień"/>
+                        <ComboBoxItem Content="Ten miesiąc"/>
+                        <ComboBoxItem Content="Ten rok"/>
+                    </ComboBox>
+
                     <ComboBox x:Name="CategoryFilterComboBox" Width="180" Margin="0,0,8,0" IsEditable="True"/>
                     <DatePicker x:Name="FromDatePicker" Width="140" Margin="0,0,8,0"/>
                     <DatePicker x:Name="ToDatePicker"   Width="140" Margin="0,0,8,0"/>
@@ -128,7 +140,6 @@
 
         <!-- ===== DOLNY PASEK ===== -->
         <DockPanel Grid.Row="3" LastChildFill="False" Margin="0,8,0,0">
-            <!-- lewa -->
             <StackPanel Orientation="Horizontal" DockPanel.Dock="Left">
                 <TextBox x:Name="QuickAddBox" Width="320" Margin="0,0,8,0"
                          Style="{StaticResource WatermarkTextBox}"
@@ -141,7 +152,6 @@
                         Click="DeleteSelected_Click"/>
             </StackPanel>
 
-            <!-- prawa -->
             <StackPanel Orientation="Horizontal" DockPanel.Dock="Right">
                 <Button Content="Wykres wydatków" Click="ShowChart_Click"/>
             </StackPanel>

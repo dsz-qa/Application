@@ -3,7 +3,6 @@ using System.Data;
 using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
-using Finly.Models;
 using Finly.Services;
 using Finly.Views;
 using Finly.Views.Dialogs;
@@ -38,19 +37,50 @@ namespace Finly.Pages
             string? q = string.IsNullOrWhiteSpace(SearchBox.Text) ? null : SearchBox.Text.Trim();
 
             var dt = DatabaseService.GetExpenses(_uid, from, to, cat, q);
-
             TransactionsGrid.ItemsSource = dt.DefaultView;
 
             // licznik w stopce
-            if (EntriesCountText != null)
-                EntriesCountText.Text = dt.Rows.Count.ToString();
+            EntriesCountText.Text = dt.Rows.Count.ToString();
 
-            // suma bieżącego miesiąca
-            var first = new DateTime(DateTime.Now.Year, DateTime.Now.Month, 1);
-            var last = first.AddMonths(1).AddDays(-1);
-            var month = DatabaseService.GetExpenses(_uid, first, last, cat, q);
-            var sum = month.AsEnumerable().Sum(r => Convert.ToDouble(r["Amount"]));
+            // suma bieżącego widoku (po filtrach)
+            var sum = dt.AsEnumerable().Sum(r => Convert.ToDouble(r["Amount"]));
             SumMonthText.Text = $"{sum:N2} zł";
+        }
+
+        private void ApplyFilters_Click(object s, RoutedEventArgs e) => LoadExpenses();
+
+        private void ClearFilters_Click(object s, RoutedEventArgs e)
+        {
+            FromDate.SelectedDate = null;
+            ToDate.SelectedDate = null;
+            CategoryFilter.SelectedIndex = -1;
+            PresetRangeCombo.SelectedIndex = 0; // (brak)
+            SearchBox.Text = "";
+            LoadExpenses();
+        }
+
+        private void PresetRangeCombo_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            string? label = (PresetRangeCombo.SelectedItem as ComboBoxItem)?.Content?.ToString();
+            RangePreset preset = label switch
+            {
+                "Dzisiaj" => RangePreset.Dzisiaj,
+                "Ten tydzień" => RangePreset.TenTydzien,
+                "Ten miesiąc" => RangePreset.TenMiesiac,
+                "Ten rok" => RangePreset.TenRok,
+                _ => RangePreset.Brak
+            };
+
+            DateRangeService.GetRange(preset, out var from, out var to);
+            FromDate.SelectedDate = from;
+            ToDate.SelectedDate = to;
+
+            LoadExpenses();
+        }
+
+        private void AddExpense_Click(object sender, RoutedEventArgs e)
+        {
+            (Window.GetWindow(this) as ShellWindow)?.NavigateTo("AddExpense");
         }
 
         private void EditExpense_Click(object sender, RoutedEventArgs e)
@@ -58,7 +88,6 @@ namespace Finly.Pages
             if (sender is Button { Tag: { } tag })
             {
                 int id = Convert.ToInt32(tag);
-
                 var exp = DatabaseService.GetExpenseById(id);
                 if (exp == null)
                 {
@@ -66,7 +95,7 @@ namespace Finly.Pages
                     return;
                 }
 
-                var w = new EditExpenseWindow(exp, _uid)
+                var w = new Finly.Views.EditExpenseWindow(exp, _uid)
                 {
                     Owner = Window.GetWindow(this)
                 };
@@ -79,14 +108,12 @@ namespace Finly.Pages
             }
         }
 
-
-
         private void DeleteExpense_Click(object sender, RoutedEventArgs e)
         {
             if (sender is Button { Tag: { } tag })
             {
                 var id = Convert.ToInt32(tag);
-                var dlg = new Finly.Views.Dialogs.ConfirmDialog("Czy na pewno chcesz usunąć ten wydatek?")
+                var dlg = new ConfirmDialog("Czy na pewno chcesz usunąć ten wydatek?")
                 { Owner = Window.GetWindow(this) };
 
                 if (dlg.ShowDialog() == true)
@@ -100,23 +127,6 @@ namespace Finly.Pages
             {
                 ToastService.Info("Nie udało się odczytać identyfikatora wiersza.");
             }
-        }
-
-        private void ApplyFilters_Click(object s, RoutedEventArgs e) => LoadExpenses();
-
-        private void ClearFilters_Click(object s, RoutedEventArgs e)
-        {
-            FromDate.SelectedDate = null;
-            ToDate.SelectedDate = null;
-            CategoryFilter.SelectedIndex = -1;
-            SearchBox.Text = "";
-            LoadExpenses();
-        }
-
-        // (jeśli masz przycisk Dodaj tutaj – polecam po prostu nawigację do strony dodawania)
-        private void AddExpense_Click(object sender, RoutedEventArgs e)
-        {
-            (Window.GetWindow(this) as Finly.Views.ShellWindow)?.NavigateTo("AddExpense");
         }
     }
 }

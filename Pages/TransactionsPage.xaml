@@ -12,85 +12,80 @@
         <!-- FILTRY -->
         <StackPanel Orientation="Horizontal">
             <ComboBox x:Name="CategoryFilter"
-                Width="200"
-                Margin="0,0,8,0"
-                DisplayMemberPath="Name"
-                SelectedValuePath="Id"/>
+                      Width="200"
+                      Margin="0,0,8,0"
+                      DisplayMemberPath="Name"
+                      SelectedValuePath="Id"/>
 
-            <DatePicker x:Name="FromDate"
-                  Width="140"
-                  Margin="0,0,8,0"/>
-            <DatePicker x:Name="ToDate"
-                  Width="140"
-                  Margin="0,0,8,0"/>
+            <!-- Preset zakresu -->
+            <ComboBox x:Name="PresetRangeCombo"
+                      Width="160" Margin="0,0,8,0"
+                      SelectionChanged="PresetRangeCombo_SelectionChanged">
+                <ComboBoxItem Content="(brak)"/>
+                <ComboBoxItem Content="Dzisiaj"/>
+                <ComboBoxItem Content="Ten tydzień"/>
+                <ComboBoxItem Content="Ten miesiąc"/>
+                <ComboBoxItem Content="Ten rok"/>
+            </ComboBox>
 
-            <TextBox x:Name="SearchBox"
-               Width="220"
-               MinHeight="32"
-               FontSize="14"
-               Margin="0,0,8,0"/>
+            <DatePicker x:Name="FromDate" Width="140" Margin="0,0,8,0"/>
+            <DatePicker x:Name="ToDate"   Width="140" Margin="0,0,8,0"/>
 
-            <Button Content="Szukaj"
-              Click="ApplyFilters_Click"
-              Margin="0,0,8,0"/>
-            <Button Content="Wyczyść"
-              Click="ClearFilters_Click"
-              Margin="0,0,8,0"/>
-            <Button Content="Dodaj"
-              Click="AddExpense_Click"/>
+            <TextBox x:Name="SearchBox" Width="220" MinHeight="32" FontSize="14" Margin="0,0,8,0"/>
+
+            <Button Content="Szukaj"  Click="ApplyFilters_Click"  Margin="0,0,8,0"/>
+            <Button Content="Wyczyść" Click="ClearFilters_Click" Margin="0,0,8,0"/>
+            <Button Content="Dodaj"   Click="AddExpense_Click"/>
         </StackPanel>
 
         <!-- LISTA -->
         <DataGrid x:Name="TransactionsGrid"
-              Grid.Row="1"
-              Margin="0,10,0,0"
-              AutoGenerateColumns="False"
-              IsReadOnly="True"
-              CanUserAddRows="False"
-              HeadersVisibility="Column"
-              SelectionMode="Single"
-              SelectionUnit="FullRow">
+                  Grid.Row="1"
+                  Margin="0,10,0,0"
+                  AutoGenerateColumns="False"
+                  IsReadOnly="True"
+                  CanUserAddRows="False"
+                  HeadersVisibility="Column"
+                  SelectionMode="Single"
+                  SelectionUnit="FullRow">
             <DataGrid.Columns>
                 <DataGridTextColumn Header="Data" Width="120"
-                            Binding="{Binding Date, StringFormat=\{0:yyyy-MM-dd\}}"/>
+                                    Binding="{Binding Date, StringFormat=\{0:yyyy-MM-dd\}}"/>
                 <DataGridTextColumn Header="Kategoria" Width="160"
-                            Binding="{Binding CategoryName}"/>
+                                    Binding="{Binding CategoryName}"/>
                 <DataGridTextColumn Header="Tytuł" Width="*"
-                            Binding="{Binding Title}"/>
+                                    Binding="{Binding Title}"/>
                 <DataGridTextColumn Header="Kwota" Width="120"
-                            Binding="{Binding Amount, StringFormat={}{0:N2} zł}"/>
+                                    Binding="{Binding Amount, StringFormat={}{0:N2} zł}"/>
                 <DataGridTemplateColumn Header="" Width="Auto" IsReadOnly="True">
                     <DataGridTemplateColumn.CellTemplate>
                         <DataTemplate>
                             <StackPanel Orientation="Horizontal" Margin="4,0,0,0">
-                                <!-- UWAGA: Row[Id] dla DataRowView -->
                                 <Button Content="Edytuj"
-                Tag="{Binding Path=Row[Id]}"
-                Click="EditExpense_Click"
-                Margin="0,0,6,0"/>
+                                        Tag="{Binding Path=Row[Id]}"
+                                        Click="EditExpense_Click"
+                                        Margin="0,0,6,0"/>
                                 <Button Content="Usuń"
-                Tag="{Binding Path=Row[Id]}"
-                Click="DeleteExpense_Click"/>
+                                        Tag="{Binding Path=Row[Id]}"
+                                        Click="DeleteExpense_Click"/>
                             </StackPanel>
                         </DataTemplate>
                     </DataGridTemplateColumn.CellTemplate>
                 </DataGridTemplateColumn>
-
             </DataGrid.Columns>
         </DataGrid>
 
-        <!-- STOPKA -->
         <!-- STOPKA / SUMA + LICZNIK -->
         <StackPanel Grid.Row="2" Orientation="Horizontal"
-            HorizontalAlignment="Right" Margin="0,10,0,0">
+                    HorizontalAlignment="Right" Margin="0,10,0,0">
             <TextBlock Text="Wpisów:"/>
             <TextBlock x:Name="EntriesCountText" FontWeight="SemiBold" Margin="6,0,12,0"/>
             <TextBlock Text="Suma w widoku:"/>
             <TextBlock x:Name="SumMonthText" FontWeight="SemiBold" Margin="6,0,0,0"/>
         </StackPanel>
-
     </Grid>
 </UserControl>
+
 
 
 

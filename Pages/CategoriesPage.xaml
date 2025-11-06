@@ -1,8 +1,44 @@
 ﻿<UserControl x:Class="Finly.Pages.CategoriesPage"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
-    <Grid>
-        <TextBlock Text="Kategorie (wkrótce)" Margin="16"/>
+
+    <Grid Margin="16">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+
+        <!-- FILTRY: preset + daty -->
+        <StackPanel Orientation="Horizontal" Grid.Row="0">
+            <ComboBox x:Name="PresetRangeCombo"
+                      Width="160" Margin="0,0,8,0"
+                      SelectionChanged="PresetRangeCombo_SelectionChanged">
+                <ComboBoxItem Content="(brak)"/>
+                <ComboBoxItem Content="Dzisiaj"/>
+                <ComboBoxItem Content="Ten tydzień"/>
+                <ComboBoxItem Content="Ten miesiąc"/>
+                <ComboBoxItem Content="Ten rok"/>
+            </ComboBox>
+
+            <DatePicker x:Name="FromDate" Width="140" Margin="0,0,8,0"/>
+            <DatePicker x:Name="ToDate"   Width="140" Margin="0,0,8,0"/>
+
+            <Button Content="Filtruj" Click="Filter_Click" Margin="0,0,8,0"/>
+            <Button Content="Wyczyść" Click="Clear_Click"/>
+        </StackPanel>
+
+        <!-- Tabela podsumowań kategorii -->
+        <DataGrid x:Name="CategorySummaryGrid"
+                  Grid.Row="1" Margin="0,10,0,0"
+                  AutoGenerateColumns="False" IsReadOnly="True"
+                  CanUserAddRows="False">
+            <DataGrid.Columns>
+                <DataGridTextColumn Header="Kategoria" Binding="{Binding Name}" Width="*"/>
+                <DataGridTextColumn Header="Wpisów" Binding="{Binding Count}" Width="120"/>
+                <DataGridTextColumn Header="Suma"
+                                    Binding="{Binding Sum, StringFormat={}{0:N2} zł}"
+                                    Width="160"/>
+            </DataGrid.Columns>
+        </DataGrid>
     </Grid>
 </UserControl>
-
