@@ -8,6 +8,25 @@ namespace Finly.Services
     /// DEMO PSD2: CRUD + „synchronizacja”
     public static class OpenBankingService
     {
+
+
+        // HELPERY – wszystkie statyczne
+        private static int? GetNullableInt32(SqliteDataReader r, int i)
+            => r.IsDBNull(i) ? (int?)null : r.GetInt32(i);
+
+        private static string GetStringSafe(SqliteDataReader r, int i)
+            => r.IsDBNull(i) ? string.Empty : r.GetString(i);
+
+        private static decimal GetDecimalSafe(SqliteDataReader r, int i)
+            => r.IsDBNull(i) ? 0m : Convert.ToDecimal(r.GetValue(i));
+
+        private static DateTime? GetNullableDate(SqliteDataReader r, int i)
+        {
+            if (r.IsDBNull(i)) return null;
+            var v = r.GetValue(i)?.ToString();
+            return DateTime.TryParse(v, out var dt) ? dt : (DateTime?)null;
+        }
+
         public static IEnumerable<BankConnectionModel> GetConnections(int userId)
         {
             using var c = DatabaseService.GetConnection();
@@ -31,16 +50,27 @@ namespace Finly.Services
             }
         }
 
+        // TA METODA MUSI BYĆ STATYCZNA
         public static IEnumerable<BankAccountModel> GetAccounts(int userId)
         {
-            using var c = DatabaseService.GetConnection();
-            using var cmd = c.CreateCommand();
-            cmd.CommandText = @"SELECT a.Id, a.ConnectionId, a.UserId, b.BankName,
-                                       a.AccountName, a.Iban, a.Currency, a.Balance, a.LastSync
-                                FROM BankAccounts a
-                                LEFT JOIN BankConnections b ON b.Id=a.ConnectionId
-                                WHERE a.UserId=@u;";
-            cmd.Parameters.AddWithValue("@u", userId);
+            using var con = DatabaseService.GetConnection();
+            using var cmd = con.CreateCommand();
+            cmd.CommandText = @"
+SELECT
+    a.Id,                           -- 0
+    a.ConnectionId,                 -- 1 (NULL-able)
+    a.UserId,                       -- 2
+    COALESCE(b.BankName,'') AS BankName, -- 3
+    a.AccountName,                  -- 4
+    a.Iban,                         -- 5
+    a.Currency,                     -- 6
+    a.Balance,                      -- 7
+    a.LastSync                      -- 8 (TEXT/NULL)
+FROM BankAccounts a
+LEFT JOIN BankConnections b ON b.Id = a.ConnectionId
+WHERE a.UserId = @uid
+ORDER BY a.AccountName;";
+            cmd.Parameters.AddWithValue("@uid", userId);
 
             using var r = cmd.ExecuteReader();
             while (r.Read())
@@ -48,17 +78,18 @@ namespace Finly.Services
                 yield return new BankAccountModel
                 {
                     Id = r.GetInt32(0),
-                    ConnectionId = r.GetInt32(1),
+                    ConnectionId = GetNullableInt32(r, 1),
                     UserId = r.GetInt32(2),
-                    BankName = r.IsDBNull(3) ? "" : r.GetString(3),
-                    AccountName = r.GetString(4),
-                    Iban = r.GetString(5),
-                    Currency = r.GetString(6),
-                    Balance = r.GetDecimal(7),
-                    LastSync = r.IsDBNull(8) ? (DateTime?)null : r.GetDateTime(8)
+                    BankName = GetStringSafe(r, 3),
+                    AccountName = GetStringSafe(r, 4),
+                    Iban = GetStringSafe(r, 5),
+                    Currency = GetStringSafe(r, 6),
+                    Balance = GetDecimalSafe(r, 7),
+                    LastSync = GetNullableDate(r, 8)
                 };
             }
         }
+
 
         public static bool ConnectDemo(int userId)
         {

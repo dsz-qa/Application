@@ -7,7 +7,7 @@ using System.IO;
 
 namespace Finly.Services
 {
-    /// Centralny serwis SQLite – spójny z wywo³aniami w UI
+    /// Centralny serwis SQLite – spójny z wywo³aniami w UI.
     public static class DatabaseService
     {
         // ====== stan/lock schematu ======
@@ -40,6 +40,7 @@ namespace Finly.Services
             var con = new SqliteConnection(cs);
             con.Open();
 
+            // FK musz¹ byæ W£¥CZONE na KA¯DYM po³¹czeniu
             using var pragma = con.CreateCommand();
             pragma.CommandText = "PRAGMA foreign_keys = ON;";
             pragma.ExecuteNonQuery();
@@ -66,17 +67,14 @@ namespace Finly.Services
                 {
                     if (!_schemaInitialized)
                     {
-                        using var c = GetConnection();
-                        SchemaService.Ensure(c);
+                        using var c0 = GetConnection();
+                        SchemaService.Ensure(c0);
                         _schemaInitialized = true;
                     }
                 }
             }
             return GetConnection();
         }
-
-
-
 
         private static string ToIsoDate(DateTime dt) => dt.ToString("yyyy-MM-dd");
 
@@ -161,7 +159,7 @@ namespace Finly.Services
             return existing ?? CreateCategory(userId, name);
         }
 
-        // alias zgodnoœci z wczeœniejszymi wywo³aniami (string, int)
+        // alias zgodnoœci
         public static int GetOrCreateCategoryId(string name, int userId) => GetOrCreateCategoryId(userId, name);
 
         public static void UpdateCategory(int id, string name)
@@ -187,21 +185,24 @@ namespace Finly.Services
         // ========================= KONTA =========================
         // =========================================================
 
+        /// <summary>
+        /// Widok listy rachunków. Kolumna BankName to placeholder (na przysz³oœæ JOIN).
+        /// </summary>
         public static DataTable GetAccountsTable(int userId)
         {
             using var c = OpenAndEnsureSchema();
             using var cmd = c.CreateCommand();
             cmd.CommandText = @"
-        SELECT 
-            Id,
-            '' AS BankName,               -- placeholder (na przysz³oœæ mo¿esz tu zrobiæ JOIN)
-            AccountName,
-            Iban,
-            Currency,
-            Balance
-        FROM BankAccounts
-        WHERE UserId=@u
-        ORDER BY AccountName;";
+SELECT 
+    Id,
+    '' AS BankName,
+    AccountName,
+    Iban,
+    Currency,
+    Balance
+FROM BankAccounts
+WHERE UserId=@u
+ORDER BY AccountName;";
             cmd.Parameters.AddWithValue("@u", userId);
 
             using var r = cmd.ExecuteReader();
@@ -209,7 +210,6 @@ namespace Finly.Services
             dt.Load(r);
             return dt;
         }
-
 
         public static List<BankAccountModel> GetAccounts(int userId)
         {
@@ -240,6 +240,17 @@ namespace Finly.Services
         public static int InsertAccount(BankAccountModel a)
         {
             using var c = OpenAndEnsureSchema();
+
+            // Je¿eli podano ConnectionId, ale taki rekord nie istnieje – wyzeruj,
+            // aby nie z³apaæ FK na INSERT.
+            if (a.ConnectionId is int cid)
+            {
+                using var chk = c.CreateCommand();
+                chk.CommandText = "SELECT 1 FROM BankConnections WHERE Id=@cid LIMIT 1;";
+                chk.Parameters.AddWithValue("@cid", cid);
+                if (chk.ExecuteScalar() is null) a.ConnectionId = null;
+            }
+
             using var cmd = c.CreateCommand();
             cmd.CommandText = @"
 INSERT INTO BankAccounts(UserId, ConnectionId, AccountName, Iban, Currency, Balance)
@@ -254,9 +265,26 @@ SELECT last_insert_rowid();";
             return Convert.ToInt32(cmd.ExecuteScalar());
         }
 
+        /// <summary>
+        /// Stabilny UPDATE z ochron¹ przed 'FOREIGN KEY constraint failed'
+        /// (sieroty w ConnectionId -> SET NULL).
+        /// </summary>
         public static void UpdateAccount(BankAccountModel a)
         {
             using var c = OpenAndEnsureSchema();
+
+            // 1) Napraw ewentualne „sieroty” w istniej¹cym rekordzie
+            EnsureValidConnectionId(c, a.Id);
+
+            // 2) Jeœli przychodzi nowe ConnectionId – sprawdŸ, czy istnieje.
+            if (a.ConnectionId is int cid)
+            {
+                using var chk = c.CreateCommand();
+                chk.CommandText = "SELECT 1 FROM BankConnections WHERE Id=@cid LIMIT 1;";
+                chk.Parameters.AddWithValue("@cid", cid);
+                if (chk.ExecuteScalar() is null) a.ConnectionId = null; // miêkkie wyzerowanie
+            }
+
             using var cmd = c.CreateCommand();
             cmd.CommandText = @"
 UPDATE BankAccounts SET
@@ -269,7 +297,18 @@ WHERE Id=@id AND UserId=@u;";
             cmd.Parameters.AddWithValue("@iban", a.Iban ?? "");
             cmd.Parameters.AddWithValue("@cur", string.IsNullOrWhiteSpace(a.Currency) ? "PLN" : a.Currency);
             cmd.Parameters.AddWithValue("@bal", a.Balance);
-            cmd.ExecuteNonQuery();
+
+            try
+            {
+                cmd.ExecuteNonQuery();
+            }
+            catch (SqliteException ex) when (ex.SqliteErrorCode == 19) // FK failed
+            {
+                // Wyœcig? Zmiêkcz FK do NULL i spróbuj ponownie.
+                EnsureValidConnectionId(c, a.Id);
+                cmd.Parameters["@conn"].Value = (object?)a.ConnectionId ?? DBNull.Value;
+                cmd.ExecuteNonQuery();
+            }
         }
 
         public static void DeleteAccount(int id, int userId)
@@ -292,7 +331,7 @@ WHERE Id=@id AND UserId=@u;";
             DateTime? to = null,
             int? categoryId = null,
             string? search = null,
-            int? accountId = null)   // opcjonalny filtr konta
+            int? accountId = null)
         {
             using var con = OpenAndEnsureSchema();
             using var cmd = con.CreateCommand();
@@ -451,7 +490,6 @@ WHERE Id=@id;";
             cmd.ExecuteNonQuery();
         }
 
-        /// Wygodny wrapper u¿ywany w AddExpensePage
         public static void AddExpense(Expense e)
         {
             using var c = OpenAndEnsureSchema();
@@ -480,8 +518,39 @@ VALUES (@u, @a, @d, @desc, @c);";
             cmd.Parameters.AddWithValue("@id", id);
             cmd.ExecuteNonQuery();
         }
+
+        // ===== FK helper =====
+
+        /// <summary>
+        /// Jeœli BankAccounts.ConnectionId wskazuje na nieistniej¹cy rekord – ustawia NULL,
+        /// aby nie wywalaæ 'FOREIGN KEY constraint failed' przy UPDATE/DELETE.
+        /// </summary>
+        private static void EnsureValidConnectionId(SqliteConnection c, int accountId)
+        {
+            using var get = c.CreateCommand();
+            get.CommandText = "SELECT ConnectionId FROM BankAccounts WHERE Id=@id LIMIT 1;";
+            get.Parameters.AddWithValue("@id", accountId);
+            var raw = get.ExecuteScalar();
+
+            if (raw is null || raw == DBNull.Value) return;  // ju¿ NULL
+
+            var cid = Convert.ToInt32(raw);
+
+            using var chk = c.CreateCommand();
+            chk.CommandText = "SELECT 1 FROM BankConnections WHERE Id=@cid LIMIT 1;";
+            chk.Parameters.AddWithValue("@cid", cid);
+            var exists = chk.ExecuteScalar() != null;
+            if (exists) return;
+
+            using var fix = c.CreateCommand();
+            fix.CommandText = "UPDATE BankAccounts SET ConnectionId=NULL WHERE Id=@id;";
+            fix.Parameters.AddWithValue("@id", accountId);
+            fix.ExecuteNonQuery();
+        }
     }
 }
+
+
 
 
 

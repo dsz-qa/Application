@@ -32,7 +32,7 @@ namespace Finly.Services
                     return c;
                 }
 
-                bool ColTx(string table, string col) => ColumnExists(con, tx, table, col);
+                bool ColExists(string table, string col) => ColumnExists(con, tx, table, col);
 
                 // ===== Tabele (idempotentnie) =====
                 using (var cmd = Cmd(@"
@@ -81,16 +81,18 @@ CREATE TABLE IF NOT EXISTS BankConnections(
     LastSync      TEXT
 );
 
+-- Uwaga: docelowa definicja BankAccounts ma ConnectionId NULL i ON DELETE SET NULL
 CREATE TABLE IF NOT EXISTS BankAccounts(
     Id           INTEGER PRIMARY KEY AUTOINCREMENT,
-    ConnectionId INTEGER NOT NULL,
+    ConnectionId INTEGER NULL,
     UserId       INTEGER NOT NULL,
     AccountName  TEXT NOT NULL,
     Iban         TEXT NOT NULL,
     Currency     TEXT NOT NULL,
     Balance      NUMERIC NOT NULL DEFAULT 0,
     LastSync     TEXT,
-    FOREIGN KEY(ConnectionId) REFERENCES BankConnections(Id)
+    FOREIGN KEY(UserId)       REFERENCES Users(Id) ON DELETE CASCADE,
+    FOREIGN KEY(ConnectionId) REFERENCES BankConnections(Id) ON DELETE SET NULL
 );
 
 CREATE TABLE IF NOT EXISTS PersonalProfiles(
@@ -121,7 +123,7 @@ CREATE TABLE IF NOT EXISTS CompanyProfiles(
                     cmd.ExecuteNonQuery();
                 }
 
-                // ===== Migracje idempotentne (stare bazy) =====
+                // ===== Migracje (idempotentne) =====
                 // Users
                 AddColumnIfMissing(con, tx, "Users", "AccountType", "TEXT", "DEFAULT 'Personal'");
                 AddColumnIfMissing(con, tx, "Users", "CompanyName", "TEXT");
@@ -138,15 +140,15 @@ CREATE TABLE IF NOT EXISTS CompanyProfiles(
                 // Categories
                 AddColumnIfMissing(con, tx, "Categories", "UserId", "INTEGER NULL");
 
-                // Expenses – kluczowe pod Twój kod zapytań
+                // Expenses – spójne z zapytaniami w UI
                 AddColumnIfMissing(con, tx, "Expenses", "Title", "TEXT");
                 AddColumnIfMissing(con, tx, "Expenses", "Description", "TEXT");
                 AddColumnIfMissing(con, tx, "Expenses", "CategoryId", "INTEGER NULL");
-                AddColumnIfMissing(con, tx, "Expenses", "AccountId", "INTEGER NULL"); // <- to usuwa błąd e.AccountId
+                AddColumnIfMissing(con, tx, "Expenses", "AccountId", "INTEGER NULL");
                 AddColumnIfMissing(con, tx, "Expenses", "Note", "TEXT");
 
-                // Backfill: ustaw Title = Description, gdy Title jest puste
-                if (ColTx("Expenses", "Title") && ColTx("Expenses", "Description"))
+                // Backfill: Title = Description, jeśli Title puste
+                if (ColExists("Expenses", "Title") && ColExists("Expenses", "Description"))
                 {
                     using var backfill = Cmd(
                         "UPDATE Expenses SET Title = COALESCE(Title, Description) " +
@@ -154,8 +156,14 @@ CREATE TABLE IF NOT EXISTS CompanyProfiles(
                     backfill.ExecuteNonQuery();
                 }
 
-                // ===== Indeksy =====
-                using (var idx = Cmd(@"
+                tx.Commit();
+
+                // Po CREATE/ALTER z FK: upewnij się, że BankAccounts ma właściwy układ.
+                Ensure_BankAccounts_ConnectionId_Nullable_And_FK(con);
+
+                // ===== Indeksy (po migracji) =====
+                using var idx = con.CreateCommand();
+                idx.CommandText = @"
 CREATE UNIQUE INDEX IF NOT EXISTS UX_Users_Username_NC
     ON Users(Username COLLATE NOCASE);
 
@@ -166,50 +174,17 @@ CREATE INDEX IF NOT EXISTS IX_Expenses_User_Date
     ON Expenses(UserId, Date);
 
 CREATE INDEX IF NOT EXISTS IX_Expenses_User_Category
-    ON Expenses(UserId, CategoryId);
-"))
-                {
-                    idx.ExecuteNonQuery();
-                }
-
-                // ===== Seed (tylko gdy pusto) =====
-                using (var check = Cmd("SELECT COUNT(1) FROM Categories;"))
-                {
-                    var cnt = Convert.ToInt32(check.ExecuteScalar());
-                    if (cnt == 0)
-                    {
-                        using var seed = Cmd(@"
-INSERT INTO Categories (UserId, Name) VALUES (NULL, 'Jedzenie');
-INSERT INTO Categories (UserId, Name) VALUES (NULL, 'Transport');
-INSERT INTO Categories (UserId, Name) VALUES (NULL, 'Rachunki');");
-                        seed.ExecuteNonQuery();
-                    }
-                }
-
-                tx.Commit();
+    ON Expenses(UserId, CategoryId);";
+                idx.ExecuteNonQuery();
             }
         }
 
         // ===== Helpers =====
-        private static bool ColumnExists(SqliteConnection con, string table, string column)
-        {
-            using var cmd = con.CreateCommand();
-            cmd.CommandText = $"PRAGMA table_info({table});";
-            using var r = cmd.ExecuteReader();
-            while (r.Read())
-            {
-                var name = r.GetString(1);
-                if (string.Equals(name, column, StringComparison.OrdinalIgnoreCase))
-                    return true;
-            }
-            return false;
-        }
-
         private static bool ColumnExists(SqliteConnection con, SqliteTransaction tx, string table, string column)
         {
             using var cmd = con.CreateCommand();
             cmd.Transaction = tx;
-            cmd.CommandText = $"PRAGMA table_info({table});";
+            cmd.CommandText = $"PRAGMA table_info('{table}');";
             using var r = cmd.ExecuteReader();
             while (r.Read())
             {
@@ -231,8 +206,64 @@ INSERT INTO Categories (UserId, Name) VALUES (NULL, 'Rachunki');");
                 alter.ExecuteNonQuery();
             }
         }
+
+        // --- Migracja BankAccounts do: ConnectionId NULL + ON DELETE SET NULL ---
+
+        private static bool ColumnIsNotNull(SqliteConnection c, string table, string column)
+        {
+            using var cmd = c.CreateCommand();
+            cmd.CommandText = $"PRAGMA table_info('{table}');";
+            using var r = cmd.ExecuteReader();
+            while (r.Read())
+            {
+                var name = r.GetString(1);
+                if (string.Equals(name, column, StringComparison.OrdinalIgnoreCase))
+                    return r.GetInt32(3) == 1; // notnull=1
+            }
+            return false;
+        }
+
+        private static void Ensure_BankAccounts_ConnectionId_Nullable_And_FK(SqliteConnection c)
+        {
+            // Jeśli już jest NULLABLE – przyjmujemy, że FK jest poprawny (zdefiniowany jak w docelowej CREATE TABLE)
+            if (!ColumnIsNotNull(c, "BankAccounts", "ConnectionId")) return;
+
+            using var t = c.BeginTransaction();
+            using var cmd = c.CreateCommand();
+            cmd.Transaction = t;
+
+            cmd.CommandText = "PRAGMA foreign_keys=OFF;"; cmd.ExecuteNonQuery();
+
+            cmd.CommandText = @"
+CREATE TABLE BankAccounts_new (
+  Id           INTEGER PRIMARY KEY AUTOINCREMENT,
+  ConnectionId INTEGER NULL,
+  UserId       INTEGER NOT NULL,
+  AccountName  TEXT NOT NULL,
+  Iban         TEXT NOT NULL,
+  Currency     TEXT NOT NULL,
+  Balance      NUMERIC NOT NULL DEFAULT 0,
+  LastSync     TEXT,
+  FOREIGN KEY(UserId)       REFERENCES Users(Id) ON DELETE CASCADE,
+  FOREIGN KEY(ConnectionId) REFERENCES BankConnections(Id) ON DELETE SET NULL
+);";
+            cmd.ExecuteNonQuery();
+
+            cmd.CommandText = @"
+INSERT INTO BankAccounts_new (Id, ConnectionId, UserId, AccountName, Iban, Currency, Balance, LastSync)
+SELECT Id, ConnectionId, UserId, AccountName, Iban, Currency, Balance, LastSync
+FROM BankAccounts;";
+            cmd.ExecuteNonQuery();
+
+            cmd.CommandText = "DROP TABLE BankAccounts;"; cmd.ExecuteNonQuery();
+            cmd.CommandText = "ALTER TABLE BankAccounts_new RENAME TO BankAccounts;"; cmd.ExecuteNonQuery();
+
+            cmd.CommandText = "PRAGMA foreign_keys=ON;"; cmd.ExecuteNonQuery();
+            t.Commit();
+        }
     }
 }
+
 
 
 
