@@ -203,6 +203,7 @@ namespace Finly.Views
                 "import" => new ImportPage(),
                 "reports" => new ReportsPage(),
                 "settings" => new SettingsPage(),
+                "banks" => new BanksPage(),          // <—— DODANE
                 _ => new DashboardPage(uid),
             };
 

@@ -9,7 +9,7 @@ namespace Finly.Pages
     public partial class AccountPage : UserControl
     {
         private readonly int _userId;
-        private AccountViewModel _vm;
+        private readonly AccountViewModel _vm;
 
         public AccountPage(int userId)
         {
@@ -28,26 +28,24 @@ namespace Finly.Pages
                     Owner = Application.Current.MainWindow
                 };
                 var ok = dlg.ShowDialog() == true;
-                if (ok)
-                    vm.Refresh();     // <- po zapisie odśwież widok: e-mail, adres, itp.
+                if (ok) vm.Refresh();
             }
         }
 
-
-        // PRZYCISK: „Zmień hasło”
         private void ChangePassword_Click(object sender, RoutedEventArgs e)
         {
             if (DataContext is not AccountViewModel vm) return;
 
-            // PwdOld / PwdNew / PwdNew2 masz nazwane w XAML
             var oldPwd = PwdOld.Password;
             var newPwd = PwdNew.Password;
             var newPwd2 = PwdNew2.Password;
 
             vm.ChangePassword(oldPwd, newPwd, newPwd2);
+        }
 
-            // Opcjonalnie czyścimy pola:
-            // PwdOld.Password = PwdNew.Password = PwdNew2.Password = string.Empty;
+        private void OpenBanks_Click(object sender, RoutedEventArgs e)
+        {
+            (Window.GetWindow(this) as ShellWindow)?.NavigateTo("banks");
         }
     }
 }

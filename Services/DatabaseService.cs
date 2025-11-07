@@ -75,6 +75,9 @@ namespace Finly.Services
             return GetConnection();
         }
 
+
+
+
         private static string ToIsoDate(DateTime dt) => dt.ToString("yyyy-MM-dd");
 
         // ==== helpery odczytu z DataReadera ====
@@ -188,10 +191,17 @@ namespace Finly.Services
         {
             using var c = OpenAndEnsureSchema();
             using var cmd = c.CreateCommand();
-            cmd.CommandText = @"SELECT Id, AccountName, Iban, Currency, Balance
-                                FROM BankAccounts
-                                WHERE UserId=@u
-                                ORDER BY AccountName;";
+            cmd.CommandText = @"
+        SELECT 
+            Id,
+            '' AS BankName,               -- placeholder (na przysz³oœæ mo¿esz tu zrobiæ JOIN)
+            AccountName,
+            Iban,
+            Currency,
+            Balance
+        FROM BankAccounts
+        WHERE UserId=@u
+        ORDER BY AccountName;";
             cmd.Parameters.AddWithValue("@u", userId);
 
             using var r = cmd.ExecuteReader();
@@ -199,6 +209,7 @@ namespace Finly.Services
             dt.Load(r);
             return dt;
         }
+
 
         public static List<BankAccountModel> GetAccounts(int userId)
         {
