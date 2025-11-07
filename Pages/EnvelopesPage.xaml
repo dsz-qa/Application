@@ -1,0 +1,142 @@
+﻿<UserControl x:Class="Finly.Pages.EnvelopesPage"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             mc:Ignorable="d">
+
+	<ScrollViewer VerticalScrollBarVisibility="Auto">
+		<StackPanel Margin="24">
+
+			<TextBlock Text="Koperty gotówka" FontSize="24" FontWeight="Bold"/>
+
+			<!-- ==== GOTÓWKA ==== -->
+			<Border Margin="0,12,0,0"
+                    Background="{DynamicResource Surface.Background}"
+                    BorderBrush="{DynamicResource Surface.Border}"
+                    BorderThickness="1" CornerRadius="10" Padding="16">
+				<Grid>
+					<Grid.ColumnDefinitions>
+						<ColumnDefinition Width="*"/>
+						<ColumnDefinition Width="Auto"/>
+					</Grid.ColumnDefinitions>
+
+					<StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+						<TextBlock Text="Gotówka w portfelu:" VerticalAlignment="Center"/>
+						<TextBox x:Name="CashBox" Width="140" HorizontalContentAlignment="Right" Margin="12,0,0,0"/>
+						<Button Content="Zapisz"
+                                Width="120"
+                                Style="{StaticResource PrimaryButton}"
+                                Click="SaveCash_Click"
+                                Margin="12,0,0,0"/>
+					</StackPanel>
+
+					<StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+						<StackPanel Margin="24,0,0,0">
+							<TextBlock Text="Przydzielono do kopert" FontSize="12" Opacity="0.8"/>
+							<TextBlock x:Name="AllocatedSumText" FontWeight="SemiBold"/>
+						</StackPanel>
+						<StackPanel Margin="24,0,0,0">
+							<TextBlock Text="Nierozdzielona gotówka" FontSize="12" Opacity="0.8"/>
+							<TextBlock x:Name="UnassignedText" FontWeight="SemiBold"/>
+						</StackPanel>
+					</StackPanel>
+				</Grid>
+			</Border>
+
+			<!-- ==== LISTA KOPERT ==== -->
+			<Border Margin="0,12,0,0"
+                    Background="{DynamicResource Surface.Background}"
+                    BorderBrush="{DynamicResource Surface.Border}"
+                    BorderThickness="1" CornerRadius="10" Padding="16">
+				<StackPanel>
+					<StackPanel Orientation="Horizontal">
+						<TextBlock Text="Koperty" FontSize="18" FontWeight="SemiBold"/>
+						<Button Content="Dodaj nową"
+                                Style="{StaticResource PrimaryButton}"
+                                Click="StartAdd_Click"
+                                Margin="8,0,0,0"/>
+					</StackPanel>
+
+					<DataGrid x:Name="EnvelopesGrid"
+                              Margin="0,8,0,0"
+                              AutoGenerateColumns="False"
+                              IsReadOnly="True"
+                              CanUserAddRows="False"
+                              SelectionMode="Single"
+                              SelectionUnit="FullRow"
+                              MouseDoubleClick="EnvelopesGrid_MouseDoubleClick">
+						<DataGrid.Columns>
+							<DataGridTextColumn Header="Nazwa" Binding="{Binding Row[Name]}" Width="*" />
+							<DataGridTextColumn Header="Cel" Binding="{Binding Row[Target], StringFormat={}{0:N2}}" Width="120" />
+							<DataGridTextColumn Header="Przydzielono" Binding="{Binding Row[Allocated], StringFormat={}{0:N2}}" Width="140" />
+							<DataGridTextColumn Header="Pozostało" Binding="{Binding Row[Remaining], StringFormat={}{0:N2}}" Width="140" />
+							<DataGridTextColumn Header="Notatka" Binding="{Binding Row[Note]}" Width="2*"/>
+							<DataGridTemplateColumn Header="Akcje" Width="160">
+								<DataGridTemplateColumn.CellTemplate>
+									<DataTemplate>
+										<StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+											<Button Content="Edytuj" Margin="0,0,8,0"
+                                                    Tag="{Binding Row[Id]}"
+                                                    Click="EditEnvelope_Click"/>
+											<Button Content="Usuń"
+                                                    Tag="{Binding Row[Id]}"
+                                                    Click="DeleteEnvelope_Click"/>
+										</StackPanel>
+									</DataTemplate>
+								</DataGridTemplateColumn.CellTemplate>
+							</DataGridTemplateColumn>
+						</DataGrid.Columns>
+					</DataGrid>
+				</StackPanel>
+			</Border>
+
+			<!-- ==== FORMULARZ DODAJ/EDYTUJ ==== -->
+			<Border Margin="0,12,0,24"
+                    Background="{DynamicResource Surface.Background}"
+                    BorderBrush="{DynamicResource Surface.Border}"
+                    BorderThickness="1" CornerRadius="10" Padding="16">
+				<StackPanel>
+					<TextBlock x:Name="FormHeader" Text="Dodaj kopertę" FontSize="18" FontWeight="SemiBold"/>
+
+					<Grid Margin="0,8,0,0">
+						<Grid.ColumnDefinitions>
+							<ColumnDefinition Width="220"/>
+							<ColumnDefinition Width="*"/>
+							<ColumnDefinition Width="220"/>
+							<ColumnDefinition Width="*"/>
+						</Grid.ColumnDefinitions>
+						<Grid.RowDefinitions>
+							<RowDefinition Height="Auto"/>
+							<RowDefinition Height="Auto"/>
+						</Grid.RowDefinitions>
+
+						<TextBlock Grid.Column="0" Text="Nazwa:" VerticalAlignment="Center" Margin="0,0,8,0"/>
+						<TextBox x:Name="NameBox" Grid.Column="1"/>
+
+						<TextBlock Grid.Column="2" Text="Cel (PLN):" VerticalAlignment="Center" Margin="12,0,8,0"/>
+						<TextBox x:Name="TargetBox" Grid.Column="3" HorizontalContentAlignment="Right"/>
+
+						<TextBlock Grid.Row="1" Grid.Column="0" Text="Przydzielono (PLN):" VerticalAlignment="Center" Margin="0,8,8,0"/>
+						<TextBox x:Name="AllocatedBox" Grid.Row="1" Grid.Column="1" HorizontalContentAlignment="Right" Margin="0,8,0,0"/>
+
+						<TextBlock Grid.Row="1" Grid.Column="2" Text="Notatka:" VerticalAlignment="Top" Margin="12,8,8,0"/>
+						<TextBox x:Name="NoteBox" Grid.Row="1" Grid.Column="3" Height="60" TextWrapping="Wrap" AcceptsReturn="True" Margin="0,8,0,0"/>
+					</Grid>
+
+					<StackPanel Orientation="Horizontal" Margin="0,8,0,0">
+						<Button x:Name="SaveEnvelopeBtn"
+                                Content="Zapisz"
+                                Style="{StaticResource PrimaryButton}"
+                                Click="SaveEnvelope_Click"/>
+						<Button Content="Anuluj" Click="CancelEdit_Click" Margin="8,0,0,0"/>
+						<TextBlock x:Name="FormMessage" Margin="12,0,0,0" />
+					</StackPanel>
+				</StackPanel>
+			</Border>
+
+		</StackPanel>
+	</ScrollViewer>
+</UserControl>
+
+

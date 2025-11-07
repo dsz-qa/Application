@@ -9,7 +9,6 @@ using System.Windows.Interop;
 
 using Finly.Pages;
 using Finly.Services;
-using Finly.Views;
 
 namespace Finly.Views
 {
@@ -24,7 +23,7 @@ namespace Finly.Views
             NavigateTo("dashboard");
         }
 
-        // ====== Hook WinAPI: gwarantuje, że WindowState=Maximized = „obszar roboczy” (taskbar widoczny) ======
+        // ====== Hook WinAPI: „Maximized” = obszar roboczy (taskbar widoczny) ======
         protected override void OnSourceInitialized(EventArgs e)
         {
             base.OnSourceInitialized(e);
@@ -102,8 +101,6 @@ namespace Finly.Views
         {
             ApplyBreakpoint(ActualWidth, ActualHeight);
             FitSidebar();
-
-            // start jak normalna aplikacja – maksymalizacja, ale z widocznym paskiem zadań
             WindowState = WindowState.Maximized;
         }
 
@@ -169,7 +166,6 @@ namespace Finly.Views
             double scale = 1.0;
             if (available > 0 && needed > available) scale = available / needed;
 
-            // bez przegięć
             if (scale < 0.7) scale = 0.7;
             if (scale > 1.0) scale = 1.0;
 
@@ -177,7 +173,7 @@ namespace Finly.Views
             SidebarRoot.LayoutTransform = SidebarScale;
         }
 
-        // ====== Nawigacja główna ======
+        // ====== Nawigacja główna (JEDYNA wersja) ======
         public void NavigateTo(string route)
         {
             var uid = UserService.CurrentUserId;
@@ -203,7 +199,8 @@ namespace Finly.Views
                 "import" => new ImportPage(),
                 "reports" => new ReportsPage(),
                 "settings" => new SettingsPage(),
-                "banks" => new BanksPage(),          // <—— DODANE
+                "banks" => new BanksPage(),
+                "envelopes" => new EnvelopesPage(uid),   // NOWA TRASA
                 _ => new DashboardPage(uid),
             };
 
@@ -249,6 +246,12 @@ namespace Finly.Views
         private void Nav_Import_Click(object s, RoutedEventArgs e)
         { RightHost.Content = new ImportPage(); SetActiveNav(NavImport); SetActiveFooter(null); }
 
+        private void Nav_Banks_Click(object s, RoutedEventArgs e)
+        { NavigateTo("banks"); SetActiveNav(null); SetActiveFooter(null); }
+
+        private void Nav_Envelopes_Click(object s, RoutedEventArgs e)
+        { NavigateTo("envelopes"); SetActiveNav(null); SetActiveFooter(null); }
+
         // ====== Stopka ======
         private void OpenProfile_Click(object s, RoutedEventArgs e)
         {
@@ -280,6 +283,6 @@ namespace Finly.Views
             if (FooterSettings != null) FooterSettings.IsChecked = active == FooterSettings;
             if (FooterLogout != null) FooterLogout.IsChecked = false;
         }
-
     }
 }
+

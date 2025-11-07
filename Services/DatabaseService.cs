@@ -547,8 +547,150 @@ VALUES (@u, @a, @d, @desc, @c);";
             fix.Parameters.AddWithValue("@id", accountId);
             fix.ExecuteNonQuery();
         }
+
+        // =========================================================
+        // ======================== KOPERTY ========================
+        // =========================================================
+
+        public static DataTable GetEnvelopesTable(int userId)
+        {
+            using var c = OpenAndEnsureSchema();
+            using var cmd = c.CreateCommand();
+            cmd.CommandText = @"
+SELECT 
+    Id,
+    UserId,
+    Name,
+    Target,
+    Allocated,
+    Note,
+    CreatedAt
+FROM Envelopes
+WHERE UserId=@u
+ORDER BY Name COLLATE NOCASE;";
+            cmd.Parameters.AddWithValue("@u", userId);
+
+            var dt = new DataTable();
+            using var r = cmd.ExecuteReader();
+            dt.Load(r);
+            return dt;
+        }
+
+        public static int InsertEnvelope(int userId, string name, decimal target, decimal allocated, string? note)
+        {
+            using var c = OpenAndEnsureSchema();
+            using var cmd = c.CreateCommand();
+            cmd.CommandText = @"
+INSERT INTO Envelopes(UserId, Name, Target, Allocated, Note, CreatedAt)
+VALUES (@u, @n, @t, @a, @note, CURRENT_TIMESTAMP);
+SELECT last_insert_rowid();";
+            cmd.Parameters.AddWithValue("@u", userId);
+            cmd.Parameters.AddWithValue("@n", name?.Trim() ?? "");
+            cmd.Parameters.AddWithValue("@t", target);
+            cmd.Parameters.AddWithValue("@a", allocated);
+            cmd.Parameters.AddWithValue("@note", (object?)note ?? DBNull.Value);
+
+            var idObj = cmd.ExecuteScalar();
+            return Convert.ToInt32(idObj);
+        }
+
+        public static void UpdateEnvelope(int id, int userId, string name, decimal target, decimal allocated, string? note)
+        {
+            using var c = OpenAndEnsureSchema();
+            using var cmd = c.CreateCommand();
+            cmd.CommandText = @"
+UPDATE Envelopes
+SET Name=@n, Target=@t, Allocated=@a, Note=@note
+WHERE Id=@id AND UserId=@u;";
+            cmd.Parameters.AddWithValue("@id", id);
+            cmd.Parameters.AddWithValue("@u", userId);
+            cmd.Parameters.AddWithValue("@n", name?.Trim() ?? "");
+            cmd.Parameters.AddWithValue("@t", target);
+            cmd.Parameters.AddWithValue("@a", allocated);
+            cmd.Parameters.AddWithValue("@note", (object?)note ?? DBNull.Value);
+            cmd.ExecuteNonQuery();
+        }
+
+        public static void DeleteEnvelope(int id)
+        {
+            using var c = OpenAndEnsureSchema();
+            using var cmd = c.CreateCommand();
+            cmd.CommandText = "DELETE FROM Envelopes WHERE Id=@id;";
+            cmd.Parameters.AddWithValue("@id", id);
+            cmd.ExecuteNonQuery();
+        }
+
+        // =========================================================
+        // ======================== GOTÓWKA ========================
+        // =========================================================
+
+        public static decimal GetCashOnHand(int userId)
+        {
+            using var c = OpenAndEnsureSchema();
+            using var cmd = c.CreateCommand();
+            cmd.CommandText = "SELECT Amount FROM CashOnHand WHERE UserId=@u LIMIT 1;";
+            cmd.Parameters.AddWithValue("@u", userId);
+            var obj = cmd.ExecuteScalar();
+            return (obj == null || obj == DBNull.Value) ? 0m : Convert.ToDecimal(obj);
+        }
+
+        public static void SetCashOnHand(int userId, decimal amount)
+        {
+            using var c = OpenAndEnsureSchema();
+            using var up = c.CreateCommand();
+            // UPSERT – wstawi nowy wiersz lub zaktualizuje istniej¹cy
+            up.CommandText = @"
+INSERT INTO CashOnHand(UserId, Amount, UpdatedAt)
+VALUES (@u, @a, CURRENT_TIMESTAMP)
+ON CONFLICT(UserId) DO UPDATE 
+SET Amount=excluded.Amount, UpdatedAt=CURRENT_TIMESTAMP;";
+            up.Parameters.AddWithValue("@u", userId);
+            up.Parameters.AddWithValue("@a", amount);
+            up.ExecuteNonQuery();
+        }
+
+        // =========================================================
+        // ======================= PODSUMOWANIA ====================
+        // =========================================================
+
+        public static decimal GetTotalBanksBalance(int userId)
+        {
+            using var c = OpenAndEnsureSchema();
+            using var cmd = c.CreateCommand();
+            cmd.CommandText = "SELECT COALESCE(SUM(Balance),0) FROM BankAccounts WHERE UserId=@u;";
+            cmd.Parameters.AddWithValue("@u", userId);
+            return Convert.ToDecimal(cmd.ExecuteScalar());
+        }
+
+        private static decimal GetTotalAllocatedInEnvelopes(int userId)
+        {
+            using var c = OpenAndEnsureSchema();
+            using var cmd = c.CreateCommand();
+            cmd.CommandText = "SELECT COALESCE(SUM(Allocated),0) FROM Envelopes WHERE UserId=@u;";
+            cmd.Parameters.AddWithValue("@u", userId);
+            return Convert.ToDecimal(cmd.ExecuteScalar());
+        }
+
+        public sealed class MoneySnapshot
+        {
+            public decimal Banks { get; set; }
+            public decimal Cash { get; set; }
+            public decimal Envelopes { get; set; } // suma przydzielona w kopertach (Allocated)
+            public decimal AvailableToAllocate => Banks + Cash - Envelopes;
+            public decimal Total => Banks + Cash;
+        }
+
+        public static MoneySnapshot GetMoneySnapshot(int userId)
+        {
+            var banks = GetTotalBanksBalance(userId);
+            var cash = GetCashOnHand(userId);
+            var envelopes = GetTotalAllocatedInEnvelopes(userId);
+
+            return new MoneySnapshot { Banks = banks, Cash = cash, Envelopes = envelopes };
+        }
     }
 }
+
 
 
 

@@ -1,14 +1,15 @@
-﻿using System;
+﻿using Finly.Models;
+using Finly.Services;
+using Finly.ViewModels;
+using Finly.Views;
+using Finly.Views.Dialogs;
+using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
-using Finly.Views.Dialogs;
-using Finly.Models;
-using Finly.Services;
-using Finly.ViewModels;
-using Finly.Views;
 
 namespace Finly.Pages
 {
@@ -38,8 +39,25 @@ namespace Finly.Pages
             catch { return 0; }
         }
 
-        // ===== nawigacja =====
-        private void AddExpenseButton_Click(object sender, RoutedEventArgs e)
+private void RefreshSnapshot()
+    {
+        var uid = Finly.Services.UserService.GetCurrentUserId();
+        var s = DatabaseService.GetMoneySnapshot(uid);
+
+        DbTotal.Text = s.Total.ToString("N2", CultureInfo.CurrentCulture) + " zł";
+        DbEnvelopes.Text = s.Envelopes.ToString("N2", CultureInfo.CurrentCulture) + " zł";
+        DbAvail.Text = s.AvailableToAllocate.ToString("N2", CultureInfo.CurrentCulture) + " zł";
+    }
+
+    public override void OnApplyTemplate()
+    {
+        base.OnApplyTemplate();
+        RefreshSnapshot();
+    }
+
+
+    // ===== nawigacja =====
+    private void AddExpenseButton_Click(object sender, RoutedEventArgs e)
             => (Window.GetWindow(this) as ShellWindow)?.NavigateTo("AddExpense");
 
         private void ShowChart_Click(object sender, RoutedEventArgs e)

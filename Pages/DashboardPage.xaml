@@ -43,6 +43,28 @@
                 <ColumnDefinition Width="220"/>
             </Grid.ColumnDefinitions>
 
+            <UniformGrid Rows="1" Margin="16" Columns="3">
+                <Border Padding="12" CornerRadius="10" BorderBrush="{DynamicResource Surface.Border}" BorderThickness="1">
+                    <StackPanel>
+                        <TextBlock Text="Razem" FontWeight="SemiBold"/>
+                        <TextBlock x:Name="DbTotal" FontSize="24" FontWeight="Bold"/>
+                    </StackPanel>
+                </Border>
+                <Border Padding="12" CornerRadius="10" BorderBrush="{DynamicResource Surface.Border}" BorderThickness="1">
+                    <StackPanel>
+                        <TextBlock Text="W kopertach" FontWeight="SemiBold"/>
+                        <TextBlock x:Name="DbEnvelopes" FontSize="24" FontWeight="Bold"/>
+                    </StackPanel>
+                </Border>
+                <Border Padding="12" CornerRadius="10" BorderBrush="{DynamicResource Surface.Border}" BorderThickness="1">
+                    <StackPanel>
+                        <TextBlock Text="Do rozdysponowania" FontWeight="SemiBold"/>
+                        <TextBlock x:Name="DbAvail" FontSize="24" FontWeight="Bold"/>
+                    </StackPanel>
+                </Border>
+            </UniformGrid>
+
+
             <GroupBox Header="Suma wydatków" Grid.Column="1" Margin="0,0,8,0">
                 <TextBlock x:Name="TotalAmountText"
                            FontSize="20" FontWeight="SemiBold"

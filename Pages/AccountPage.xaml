@@ -31,6 +31,48 @@
                         <ColumnDefinition Width="Auto"/>
                     </Grid.ColumnDefinitions>
 
+                    <!-- ===== Twoje pieniądze / snapshot ===== -->
+                    <Border Margin="0,12,0,0"
+        Background="{DynamicResource Surface.Background}"
+        BorderBrush="{DynamicResource Surface.Border}"
+        BorderThickness="1" CornerRadius="10">
+                        <Grid Margin="16">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+
+                            <StackPanel>
+                                <TextBlock Text="Banki" FontWeight="SemiBold"/>
+                                <TextBlock x:Name="LblBanks" FontSize="18" FontWeight="Bold"/>
+                            </StackPanel>
+
+                            <StackPanel Grid.Column="1">
+                                <TextBlock Text="Gotówka" FontWeight="SemiBold"/>
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock x:Name="LblCash" FontSize="18" FontWeight="Bold"/>
+                                    <Button Content="Edytuj" Margin="8,0,0,0" Click="EditCash_Click"/>
+                                </StackPanel>
+                            </StackPanel>
+
+                            <StackPanel Grid.Column="2">
+                                <TextBlock Text="W kopertach" FontWeight="SemiBold"/>
+                                <TextBlock x:Name="LblEnvelopes" FontSize="18" FontWeight="Bold"/>
+                            </StackPanel>
+
+                            <StackPanel Grid.Column="3">
+                                <TextBlock Text="Do rozdysponowania" FontWeight="SemiBold"/>
+                                <TextBlock x:Name="LblAvailable" FontSize="18" FontWeight="Bold"/>
+                            </StackPanel>
+
+                            <Button Grid.Column="4" Content="Koperty" Style="{StaticResource PrimaryButton}" Click="OpenEnvelopes_Click"/>
+                        </Grid>
+                    </Border>
+
+
                     <!-- Nagłówek -->
                     <TextBlock Grid.Row="0" Grid.ColumnSpan="2"
                                Text="Profil" FontSize="18" FontWeight="SemiBold"

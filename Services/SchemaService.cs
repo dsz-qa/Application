@@ -13,7 +13,7 @@ namespace Finly.Services
 
             lock (_schemaLock)
             {
-                // Bezpieczne PRAGMA
+                // PRAGMA (na każdym połączeniu)
                 using (var p = con.CreateCommand())
                 {
                     p.CommandText = @"PRAGMA foreign_keys = ON;
@@ -81,7 +81,7 @@ CREATE TABLE IF NOT EXISTS BankConnections(
     LastSync      TEXT
 );
 
--- Uwaga: docelowa definicja BankAccounts ma ConnectionId NULL i ON DELETE SET NULL
+-- ConnectionId może być NULL; przy usunięciu połączenia ustawiamy NULL
 CREATE TABLE IF NOT EXISTS BankAccounts(
     Id           INTEGER PRIMARY KEY AUTOINCREMENT,
     ConnectionId INTEGER NULL,
@@ -118,6 +118,26 @@ CREATE TABLE IF NOT EXISTS CompanyProfiles(
     CreatedAt       TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY(UserId) REFERENCES Users(Id) ON DELETE CASCADE
 );
+
+-- ===== Koperty (zgodne z DatabaseService/EnvelopesPage) =====
+CREATE TABLE IF NOT EXISTS Envelopes(
+    Id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    UserId     INTEGER NOT NULL,
+    Name       TEXT    NOT NULL,
+    Target     NUMERIC NOT NULL DEFAULT 0,
+    Allocated  NUMERIC NOT NULL DEFAULT 0,
+    Note       TEXT    NULL,
+    CreatedAt  TEXT    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY(UserId) REFERENCES Users(Id) ON DELETE CASCADE
+);
+
+-- ===== Gotówka użytkownika (jeden wiersz na usera) =====
+CREATE TABLE IF NOT EXISTS CashOnHand(
+    UserId     INTEGER PRIMARY KEY,
+    Amount     NUMERIC NOT NULL DEFAULT 0,
+    UpdatedAt  TEXT    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY(UserId) REFERENCES Users(Id) ON DELETE CASCADE
+);
 "))
                 {
                     cmd.ExecuteNonQuery();
@@ -136,6 +156,7 @@ CREATE TABLE IF NOT EXISTS CompanyProfiles(
                 AddColumnIfMissing(con, tx, "Users", "LastName", "TEXT");
                 AddColumnIfMissing(con, tx, "Users", "Address", "TEXT");
                 AddColumnIfMissing(con, tx, "Users", "CreatedAt", "TEXT", "NOT NULL DEFAULT CURRENT_TIMESTAMP");
+                // (celowo: BRAK kolumny Users.CashOnHand – używamy osobnej tabeli CashOnHand)
 
                 // Categories
                 AddColumnIfMissing(con, tx, "Categories", "UserId", "INTEGER NULL");
@@ -146,6 +167,12 @@ CREATE TABLE IF NOT EXISTS CompanyProfiles(
                 AddColumnIfMissing(con, tx, "Expenses", "CategoryId", "INTEGER NULL");
                 AddColumnIfMissing(con, tx, "Expenses", "AccountId", "INTEGER NULL");
                 AddColumnIfMissing(con, tx, "Expenses", "Note", "TEXT");
+
+                // Envelopes – gdy baza była starsza
+                AddColumnIfMissing(con, tx, "Envelopes", "Target", "NUMERIC", "NOT NULL DEFAULT 0");
+                AddColumnIfMissing(con, tx, "Envelopes", "Allocated", "NUMERIC", "NOT NULL DEFAULT 0");
+                AddColumnIfMissing(con, tx, "Envelopes", "Note", "TEXT");
+                AddColumnIfMissing(con, tx, "Envelopes", "CreatedAt", "TEXT", "NOT NULL DEFAULT CURRENT_TIMESTAMP");
 
                 // Backfill: Title = Description, jeśli Title puste
                 if (ColExists("Expenses", "Title") && ColExists("Expenses", "Description"))
@@ -158,7 +185,7 @@ CREATE TABLE IF NOT EXISTS CompanyProfiles(
 
                 tx.Commit();
 
-                // Po CREATE/ALTER z FK: upewnij się, że BankAccounts ma właściwy układ.
+                // Uporządkuj BankAccounts: ConnectionId NULL + ON DELETE SET NULL
                 Ensure_BankAccounts_ConnectionId_Nullable_And_FK(con);
 
                 // ===== Indeksy (po migracji) =====
@@ -174,7 +201,10 @@ CREATE INDEX IF NOT EXISTS IX_Expenses_User_Date
     ON Expenses(UserId, Date);
 
 CREATE INDEX IF NOT EXISTS IX_Expenses_User_Category
-    ON Expenses(UserId, CategoryId);";
+    ON Expenses(UserId, CategoryId);
+
+CREATE INDEX IF NOT EXISTS IX_Envelopes_User
+    ON Envelopes(UserId);";
                 idx.ExecuteNonQuery();
             }
         }
@@ -208,7 +238,6 @@ CREATE INDEX IF NOT EXISTS IX_Expenses_User_Category
         }
 
         // --- Migracja BankAccounts do: ConnectionId NULL + ON DELETE SET NULL ---
-
         private static bool ColumnIsNotNull(SqliteConnection c, string table, string column)
         {
             using var cmd = c.CreateCommand();
@@ -225,7 +254,7 @@ CREATE INDEX IF NOT EXISTS IX_Expenses_User_Category
 
         private static void Ensure_BankAccounts_ConnectionId_Nullable_And_FK(SqliteConnection c)
         {
-            // Jeśli już jest NULLABLE – przyjmujemy, że FK jest poprawny (zdefiniowany jak w docelowej CREATE TABLE)
+            // jeśli ConnectionId już jest NULLABLE – kończymy
             if (!ColumnIsNotNull(c, "BankAccounts", "ConnectionId")) return;
 
             using var t = c.BeginTransaction();
@@ -263,6 +292,7 @@ FROM BankAccounts;";
         }
     }
 }
+
 
 
 
