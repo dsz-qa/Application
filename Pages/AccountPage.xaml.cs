@@ -4,7 +4,6 @@ using Finly.Views;
 using System.Globalization;
 using System.Windows;
 using System.Windows.Controls;
-using System.Windows.Input;
 
 namespace Finly.Pages
 {
@@ -19,11 +18,14 @@ namespace Finly.Pages
             _userId = userId;
             _vm = new AccountViewModel(userId);
             DataContext = _vm;
+
+            // Odśwież KPI, gdy widok jest już w wizualnym drzewie
+            Loaded += (_, __) => RefreshMoney();
         }
 
         private void RefreshMoney()
         {
-            var uid = Finly.Services.UserService.GetCurrentUserId();
+            var uid = UserService.GetCurrentUserId();
             var s = DatabaseService.GetMoneySnapshot(uid);
 
             LblBanks.Text = s.Banks.ToString("N2", CultureInfo.CurrentCulture) + " zł";
@@ -32,21 +34,14 @@ namespace Finly.Pages
             LblAvailable.Text = s.AvailableToAllocate.ToString("N2", CultureInfo.CurrentCulture) + " zł";
         }
 
-        public override void OnApplyTemplate()
-        {
-            base.OnApplyTemplate();
-            RefreshMoney();
-        }
-
         private void OpenEnvelopes_Click(object sender, RoutedEventArgs e)
         {
-            // jeśli masz nawigację w ShellWindow:
-            (Application.Current.MainWindow as Finly.Views.ShellWindow)?.NavigateTo("envelopes");
+            (Application.Current.MainWindow as ShellWindow)?.NavigateTo("envelopes");
         }
 
         private void EditCash_Click(object sender, RoutedEventArgs e)
         {
-            var uid = Finly.Services.UserService.GetCurrentUserId();
+            var uid = UserService.GetCurrentUserId();
             var current = DatabaseService.GetCashOnHand(uid);
 
             var win = new Window
@@ -55,50 +50,47 @@ namespace Finly.Pages
                 Owner = Application.Current.MainWindow,
                 WindowStartupLocation = WindowStartupLocation.CenterOwner,
                 SizeToContent = SizeToContent.WidthAndHeight,
-                Content = new StackPanel
-                {
-                    Margin = new Thickness(16),
-                    Children =
-            {
-                new TextBlock{ Text="Stan gotówki (zł):" },
-                new TextBox{ Name="Input", Width=200, Text=current.ToString(CultureInfo.CurrentCulture), Margin=new Thickness(0,6,0,12) },
-                new StackPanel
-                {
-                    Orientation=Orientation.Horizontal,
-                    Children =
-                    {
-                        new Button{ Content="OK", Width=80, IsDefault=true, Margin=new Thickness(0,0,8,0),
-                            Command = new RoutedCommand() }
-                    }
-                }
-            }
-                }
-            };
-
-            // prosto: pobierz textbox przez VisualTree (tu krótsza droga)
-            win.Loaded += (_, __) =>
-            {
-                var panel = (StackPanel)win.Content;
-                var tb = (TextBox)panel.Children[1];
-                var btnOk = ((StackPanel)panel.Children[2]).Children[0] as Button;
-                btnOk.Click += (_, __2) =>
-                {
-                    if (decimal.TryParse(tb.Text, NumberStyles.Any, CultureInfo.CurrentCulture, out var v) && v >= 0)
-                    {
-                        DatabaseService.SetCashOnHand(uid, v);
-                        win.DialogResult = true;
-                        win.Close();
-                        RefreshMoney();
-                    }
-                    else
-                    {
-                        MessageBox.Show("Podaj poprawną kwotę ≥ 0.", "Błąd", MessageBoxButton.OK, MessageBoxImage.Warning);
-                    }
-                };
+                Content = BuildCashEditor(current)
             };
 
             win.ShowDialog();
         }
+
+        private UIElement BuildCashEditor(decimal current)
+        {
+            var panel = new StackPanel { Margin = new Thickness(16) };
+            var tb = new TextBox { Width = 200, Text = current.ToString(CultureInfo.CurrentCulture), Margin = new Thickness(0, 6, 0, 12) };
+            var okBtn = new Button { Content = "OK", Width = 80, IsDefault = true, Margin = new Thickness(0, 0, 8, 0) };
+
+            panel.Children.Add(new TextBlock { Text = "Stan gotówki (zł):" });
+            panel.Children.Add(tb);
+            panel.Children.Add(new StackPanel
+            {
+                Orientation = Orientation.Horizontal,
+                Children = { okBtn }
+            });
+
+            okBtn.Click += (_, __) =>
+            {
+                if (decimal.TryParse(tb.Text, System.Globalization.NumberStyles.Any, CultureInfo.CurrentCulture, out var v) && v >= 0)
+                {
+                    var uid = UserService.GetCurrentUserId();
+                    DatabaseService.SetCashOnHand(uid, v);
+
+                    // Zamknij okno i odśwież KPI
+                    var win = Window.GetWindow(okBtn);
+                    if (win != null) { win.DialogResult = true; win.Close(); }
+                    RefreshMoney();
+                }
+                else
+                {
+                    MessageBox.Show("Podaj poprawną kwotę ≥ 0.", "Błąd", MessageBoxButton.OK, MessageBoxImage.Warning);
+                }
+            };
+
+            return panel;
+        }
+
         private void EditPersonal_Click(object sender, RoutedEventArgs e)
         {
             if (DataContext is AccountViewModel vm)
@@ -129,3 +121,4 @@ namespace Finly.Pages
         }
     }
 }
+

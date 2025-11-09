@@ -176,8 +176,9 @@
         </Grid.RowDefinitions>
 
         <!-- Pasek tytułu -->
-        <Grid Grid.Row="0" Background="{DynamicResource TitleBar.Background}"
-          MouseLeftButtonDown="TitleBar_MouseLeftButtonDown">
+        <Grid Grid.Row="0"
+              Background="{DynamicResource TitleBar.Background}"
+              MouseLeftButtonDown="TitleBar_MouseLeftButtonDown">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition/>
                 <ColumnDefinition Width="Auto"/>
@@ -185,40 +186,40 @@
 
             <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="12,0,0,0">
                 <Image Source="/Assets/Images/logoFinly.png"
-               Width="40" Height="40" Stretch="Uniform" Margin="0,0,8,0"
-               RenderOptions.BitmapScalingMode="HighQuality"
-               shell:WindowChrome.IsHitTestVisibleInChrome="True"/>
+                       Width="40" Height="40" Stretch="Uniform" Margin="0,0,8,0"
+                       RenderOptions.BitmapScalingMode="HighQuality"
+                       shell:WindowChrome.IsHitTestVisibleInChrome="True"/>
                 <TextBlock Text="Logowanie / Rejestracja"
-                   Foreground="{DynamicResource App.Foreground}"
-                   FontSize="14" VerticalAlignment="Center"/>
+                           Foreground="{DynamicResource App.Foreground}"
+                           FontSize="14" VerticalAlignment="Center"/>
             </StackPanel>
 
             <StackPanel Grid.Column="1" Orientation="Horizontal">
                 <Button Width="46" Height="32" Padding="0"
-                Background="Transparent" BorderBrush="{x:Null}"
-                Click="Minimize_Click"
-                shell:WindowChrome.IsHitTestVisibleInChrome="True">
+                        Background="Transparent" BorderBrush="{x:Null}"
+                        Click="Minimize_Click"
+                        shell:WindowChrome.IsHitTestVisibleInChrome="True">
                     <TextBlock Text="—" FontSize="16" VerticalAlignment="Center"
-                     HorizontalAlignment="Center"
-                     Foreground="{DynamicResource App.Foreground}"/>
+                               HorizontalAlignment="Center"
+                               Foreground="{DynamicResource App.Foreground}"/>
                 </Button>
 
                 <Button Width="46" Height="32" Padding="0"
-                Background="Transparent" BorderBrush="{x:Null}"
-                Click="MaxRestore_Click"
-                shell:WindowChrome.IsHitTestVisibleInChrome="True">
+                        Background="Transparent" BorderBrush="{x:Null}"
+                        Click="MaxRestore_Click"
+                        shell:WindowChrome.IsHitTestVisibleInChrome="True">
                     <TextBlock Text="⬜" FontSize="12" VerticalAlignment="Center"
-                     HorizontalAlignment="Center"
-                     Foreground="{DynamicResource App.Foreground}"/>
+                               HorizontalAlignment="Center"
+                               Foreground="{DynamicResource App.Foreground}"/>
                 </Button>
 
                 <Button Width="46" Height="32" Padding="0"
-                Background="Transparent" BorderBrush="{x:Null}"
-                Click="Close_Click"
-                shell:WindowChrome.IsHitTestVisibleInChrome="True">
+                        Background="Transparent" BorderBrush="{x:Null}"
+                        Click="Close_Click"
+                        shell:WindowChrome.IsHitTestVisibleInChrome="True">
                     <TextBlock x:Name="CloseGlyph" Text="✕" FontSize="12"
-                     VerticalAlignment="Center" HorizontalAlignment="Center"
-                     Foreground="{DynamicResource App.Foreground}"/>
+                               VerticalAlignment="Center" HorizontalAlignment="Center"
+                               Foreground="{DynamicResource App.Foreground}"/>
                 </Button>
             </StackPanel>
         </Grid>
@@ -272,7 +273,6 @@
                         <ToggleButton x:Name="NavCategories"     Style="{StaticResource NavButton}" Content="Kategorie"      Click="Nav_Categories_Click"/>
                         <ToggleButton x:Name="NavReports"        Style="{StaticResource NavButton}" Content="Raporty"        Click="Nav_Reports_Click"/>
                         <ToggleButton x:Name="NavImport"         Style="{StaticResource NavButton}" Content="Import / Sync"  Click="Nav_Import_Click"/>
-                        
                     </StackPanel>
 
                     <!-- stopka -->
@@ -325,16 +325,20 @@
                 </Grid>
             </Border>
 
-            <!-- CONTENT -->
-            <Grid Grid.Column="1" Background="{DynamicResource App.Background}">
-                <ContentControl x:Name="RightHost"/>
+            <!-- CONTENT (ważne: ZIndex i HitTest) -->
+            <Grid Grid.Column="1" Background="{DynamicResource App.Background}" ClipToBounds="True">
+                <ContentControl x:Name="RightHost"
+                                Panel.ZIndex="0"
+                                IsHitTestVisible="True"/>
                 <Canvas x:Name="ToastLayer"
-                HorizontalAlignment="Stretch"
-                VerticalAlignment="Stretch"
-                IsHitTestVisible="False"/>
+                        Panel.ZIndex="1000"
+                        HorizontalAlignment="Stretch"
+                        VerticalAlignment="Stretch"
+                        IsHitTestVisible="False"/>
             </Grid>
         </Grid>
     </Grid>
 </Window>
+
 
 

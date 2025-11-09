@@ -11,7 +11,7 @@
     </UserControl.Resources>
 
     <ScrollViewer VerticalScrollBarVisibility="Auto">
-        <StackPanel Margin="24" >
+        <StackPanel Margin="24">
 
             <TextBlock Text="Konto" FontSize="24" FontWeight="Bold"/>
 
@@ -21,21 +21,33 @@
                     BorderBrush="{DynamicResource Surface.Border}"
                     BorderThickness="1" CornerRadius="10">
                 <Grid Margin="16">
+                    <!-- FIX: 4 wiersze zamiast 3 -->
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto"/>
+                        <!-- nagłówek "Profil" -->
                         <RowDefinition Height="Auto"/>
+                        <!-- snapshot: banki/gotówka/koperty -->
                         <RowDefinition Height="Auto"/>
+                        <!-- dane użytkownika + przycisk -->
+                        <RowDefinition Height="Auto"/>
+                        <!-- zmiana hasła -->
                     </Grid.RowDefinitions>
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*"/>
                         <ColumnDefinition Width="Auto"/>
                     </Grid.ColumnDefinitions>
 
+                    <!-- Nagłówek -->
+                    <TextBlock Grid.Row="0" Grid.ColumnSpan="2"
+                               Text="Profil" FontSize="18" FontWeight="SemiBold"
+                               Margin="0,0,0,8"/>
+
                     <!-- ===== Twoje pieniądze / snapshot ===== -->
-                    <Border Margin="0,12,0,0"
-        Background="{DynamicResource Surface.Background}"
-        BorderBrush="{DynamicResource Surface.Border}"
-        BorderThickness="1" CornerRadius="10">
+                    <!-- FIX: przeniesione do Grid.Row=1 + ColumnSpan=2 -->
+                    <Border Grid.Row="1" Grid.ColumnSpan="2" Margin="0,8,0,0"
+                            Background="{DynamicResource Surface.Background}"
+                            BorderBrush="{DynamicResource Surface.Border}"
+                            BorderThickness="1" CornerRadius="10">
                         <Grid Margin="16">
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="*"/>
@@ -54,7 +66,10 @@
                                 <TextBlock Text="Gotówka" FontWeight="SemiBold"/>
                                 <StackPanel Orientation="Horizontal">
                                     <TextBlock x:Name="LblCash" FontSize="18" FontWeight="Bold"/>
-                                    <Button Content="Edytuj" Margin="8,0,0,0" Click="EditCash_Click"/>
+                                    <Button Content="Edytuj"
+                                            Margin="8,0,0,0"
+                                            Click="EditCash_Click"
+                                            Panel.ZIndex="10"/>
                                 </StackPanel>
                             </StackPanel>
 
@@ -68,18 +83,17 @@
                                 <TextBlock x:Name="LblAvailable" FontSize="18" FontWeight="Bold"/>
                             </StackPanel>
 
-                            <Button Grid.Column="4" Content="Koperty" Style="{StaticResource PrimaryButton}" Click="OpenEnvelopes_Click"/>
+                            <Button Grid.Column="4"
+                                    Content="Koperty"
+                                    Style="{StaticResource PrimaryButton}"
+                                    Click="OpenEnvelopes_Click"
+                                    Panel.ZIndex="10"/>
                         </Grid>
                     </Border>
 
-
-                    <!-- Nagłówek -->
-                    <TextBlock Grid.Row="0" Grid.ColumnSpan="2"
-                               Text="Profil" FontSize="18" FontWeight="SemiBold"
-                               Margin="0,0,0,8"/>
-
                     <!-- Dane użytkownika -->
-                    <StackPanel Grid.Row="1" Grid.Column="0" Margin="0,0,16,0">
+                    <!-- FIX: przeniesione do Grid.Row=2 -->
+                    <StackPanel Grid.Row="2" Grid.Column="0" Margin="0,8,16,0">
                         <TextBlock Text="Dane użytkownika" FontWeight="SemiBold" Margin="0,0,0,6"/>
                         <StackPanel Orientation="Horizontal" Margin="0,2,0,0">
                             <TextBlock Text="E-mail:" Width="160"/>
@@ -104,14 +118,16 @@
                     </StackPanel>
 
                     <!-- Edycja danych osobowych -->
-                    <Button Grid.Row="1" Grid.Column="1"
+                    <!-- FIX: też Grid.Row=2, ta sama „linia” co dane -->
+                    <Button Grid.Row="2" Grid.Column="1"
                             Content="Uzupełnij / edytuj dane osobowe"
                             VerticalAlignment="Top" Width="260"
                             Style="{StaticResource PrimaryButton}"
                             Click="EditPersonal_Click"/>
 
                     <!-- Zmiana hasła -->
-                    <StackPanel Grid.Row="2" Grid.ColumnSpan="2" Margin="0,16,0,0">
+                    <!-- FIX: przeniesione do Grid.Row=3 -->
+                    <StackPanel Grid.Row="3" Grid.ColumnSpan="2" Margin="0,16,0,0">
                         <TextBlock Text="Zmiana hasła" FontSize="16" FontWeight="SemiBold"/>
 
                         <Grid Margin="8,8,0,0">
@@ -164,7 +180,6 @@
                                 Click="OpenBanks_Click"/>
                     </StackPanel>
 
-                    <!-- Podgląd sald (tylko do odczytu) -->
                     <Expander Header="Rachunki (podgląd tylko do odczytu)" IsExpanded="False" Margin="0,8,0,0">
                         <DataGrid ItemsSource="{Binding BankAccounts}"
                                   AutoGenerateColumns="False"
@@ -187,6 +202,7 @@
         </StackPanel>
     </ScrollViewer>
 </UserControl>
+
 
 
 
