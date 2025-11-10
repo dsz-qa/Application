@@ -15,7 +15,7 @@
                 <ResourceDictionary Source="/Themes/Dark.xaml"/>
             </ResourceDictionary.MergedDictionaries>
 
-            <!-- Konwertery globalne (możesz zostawić; nie są przyczyną błędu) -->
+            <!-- (jeśli tych konwerterów nie masz – możesz na chwilę zakomentować) -->
             <conv:BoolToBrushConverter x:Key="BoolToBrush"/>
             <conv:BoolToSymbolConverter x:Key="BoolToSymbol"/>
             <conv:BoolToVisibilityConverter x:Key="BoolToVisibility"/>
@@ -38,7 +38,7 @@
                 <Setter Property="Foreground" Value="{DynamicResource App.Foreground}"/>
             </Style>
 
-            <!-- Okna / kontrolki bazowe  cos-->
+            <!-- Okna / kontrolki bazowe -->
             <Style TargetType="Window">
                 <Setter Property="Background" Value="{DynamicResource App.Background}"/>
                 <Setter Property="Foreground" Value="{DynamicResource App.Foreground}"/>
@@ -65,8 +65,9 @@
                 <Setter Property="CornerRadius"    Value="8"/>
             </Style>
 
+            <!-- Bezpieczny SidebarNavButton – żadnych brakujących zasobów -->
             <Style x:Key="SidebarNavButton" TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
-                <Setter Property="Foreground" Value="{DynamicResource Foreground.Primary}"/>
+                <Setter Property="Foreground" Value="{DynamicResource App.Foreground}"/>
                 <Setter Property="Background" Value="Transparent"/>
                 <Setter Property="HorizontalContentAlignment" Value="Left"/>
                 <Setter Property="Padding" Value="10,8"/>
@@ -74,26 +75,27 @@
                     <Setter.Value>
                         <ControlTemplate TargetType="Button">
                             <Border Background="{TemplateBinding Background}"
-                        CornerRadius="8"
-                        BorderThickness="0">
-                                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                                    <!-- Ikona: Źródło podajemy w Tag (pack URI albo ścieżka względna) -->
+                                    CornerRadius="8"
+                                    BorderThickness="0">
+                                <StackPanel Orientation="Horizontal">
+                                    <!-- Ikona przekazywana przez Tag -->
                                     <Image Width="18" Height="18"
-                               Source="{Binding RelativeSource={RelativeSource TemplatedParent}, Path=Tag}"
-                               Stretch="Uniform"
-                               VerticalAlignment="Center"
-                               RenderOptions.BitmapScalingMode="HighQuality"
-                               SnapsToDevicePixels="True"/>
+                                           Source="{Binding RelativeSource={RelativeSource TemplatedParent}, Path=Tag}"
+                                           Stretch="Uniform"
+                                           VerticalAlignment="Center"
+                                           RenderOptions.BitmapScalingMode="HighQuality"
+                                           SnapsToDevicePixels="True"
+                                           Margin="0,0,8,0"/>
                                     <ContentPresenter VerticalAlignment="Center"
-                                          RecognizesAccessKey="True"/>
+                                                      RecognizesAccessKey="True"/>
                                 </StackPanel>
                             </Border>
                             <ControlTemplate.Triggers>
                                 <Trigger Property="IsMouseOver" Value="True">
-                                    <Setter Property="Background" Value="{DynamicResource Surface.Hover}"/>
+                                    <Setter Property="Background" Value="#1AFFFFFF"/>
                                 </Trigger>
                                 <Trigger Property="IsPressed" Value="True">
-                                    <Setter Property="Background" Value="{DynamicResource Surface.Active}"/>
+                                    <Setter Property="Background" Value="#26FFFFFF"/>
                                 </Trigger>
                                 <Trigger Property="IsEnabled" Value="False">
                                     <Setter Property="Opacity" Value="0.5"/>
@@ -103,7 +105,6 @@
                     </Setter.Value>
                 </Setter>
             </Style>
-
 
         </ResourceDictionary>
     </Application.Resources>
