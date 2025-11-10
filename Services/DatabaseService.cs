@@ -4,6 +4,7 @@ using System;
 using System.Collections.Generic;
 using System.Data;
 using System.IO;
+using System.Text;
 
 namespace Finly.Services
 {
@@ -335,7 +336,7 @@ WHERE Id=@id AND UserId=@u;";
         {
             using var con = OpenAndEnsureSchema();
             using var cmd = con.CreateCommand();
-            var sb = new System.Text.StringBuilder(@"
+            var sb = new StringBuilder(@"
 SELECT e.Id, e.UserId, e.Date, e.Amount, e.Title, e.Note,
        e.CategoryId, COALESCE(c.Name,'(brak)') AS CategoryName, e.AccountId
 FROM Expenses e
@@ -671,12 +672,14 @@ SET Amount=excluded.Amount, UpdatedAt=CURRENT_TIMESTAMP;";
             return Convert.ToDecimal(cmd.ExecuteScalar());
         }
 
+        // ======================= PODSUMOWANIA / PRZELEWY =======================
+
         public sealed class MoneySnapshot
         {
             public decimal Banks { get; set; }
             public decimal Cash { get; set; }
-            public decimal Envelopes { get; set; } // suma przydzielona w kopertach (Allocated)
-            public decimal AvailableToAllocate => Banks + Cash - Envelopes;
+            public decimal Envelopes { get; set; }              // suma przydzielona w kopertach
+            public decimal AvailableToAllocate => Cash - Envelopes; // tylko gotówka do podzia³u
             public decimal Total => Banks + Cash;
         }
 
@@ -686,10 +689,72 @@ SET Amount=excluded.Amount, UpdatedAt=CURRENT_TIMESTAMP;";
             var cash = GetCashOnHand(userId);
             var envelopes = GetTotalAllocatedInEnvelopes(userId);
 
-            return new MoneySnapshot { Banks = banks, Cash = cash, Envelopes = envelopes };
+            return new MoneySnapshot
+            {
+                Banks = banks,
+                Cash = cash,
+                Envelopes = envelopes
+            };
+        }
+
+        /// <summary>
+        /// Przelew z rachunku bankowego do gotówki.
+        /// Zmniejsza saldo konta i zwiêksza CashOnHand — w jednej transakcji.
+        /// </summary>
+        public static void TransferBankToCash(int userId, int accountId, decimal amount)
+        {
+            if (amount <= 0) throw new ArgumentException("Kwota musi byæ dodatnia.", nameof(amount));
+
+            using var c = OpenAndEnsureSchema();
+            using var tx = c.BeginTransaction();
+
+            // SprawdŸ saldo
+            decimal currentBal;
+            using (var chk = c.CreateCommand())
+            {
+                chk.Transaction = tx;
+                chk.CommandText = @"SELECT Balance FROM BankAccounts WHERE Id=@id AND UserId=@u LIMIT 1;";
+                chk.Parameters.AddWithValue("@id", accountId);
+                chk.Parameters.AddWithValue("@u", userId);
+                var obj = chk.ExecuteScalar();
+                if (obj == null || obj == DBNull.Value)
+                    throw new InvalidOperationException("Nie znaleziono rachunku lub nie nale¿y do u¿ytkownika.");
+                currentBal = Convert.ToDecimal(obj);
+            }
+            if (currentBal < amount)
+                throw new InvalidOperationException("Na rachunku brakuje œrodków na tak¹ wyp³atê.");
+
+            // Odejmij z banku
+            using (var up = c.CreateCommand())
+            {
+                up.Transaction = tx;
+                up.CommandText = @"UPDATE BankAccounts SET Balance = Balance - @a WHERE Id=@id AND UserId=@u;";
+                up.Parameters.AddWithValue("@a", amount);
+                up.Parameters.AddWithValue("@id", accountId);
+                up.Parameters.AddWithValue("@u", userId);
+                up.ExecuteNonQuery();
+            }
+
+            // Dodaj do gotówki (UPSERT: kumuluje kwotê)
+            using (var cash = c.CreateCommand())
+            {
+                cash.Transaction = tx;
+                cash.CommandText = @"
+INSERT INTO CashOnHand(UserId, Amount, UpdatedAt)
+VALUES (@u, @a, CURRENT_TIMESTAMP)
+ON CONFLICT(UserId) DO UPDATE
+SET Amount = CashOnHand.Amount + excluded.Amount,
+    UpdatedAt = CURRENT_TIMESTAMP;";
+                cash.Parameters.AddWithValue("@u", userId);
+                cash.Parameters.AddWithValue("@a", amount);
+                cash.ExecuteNonQuery();
+            }
+
+            tx.Commit();
         }
     }
 }
+
 
 
 

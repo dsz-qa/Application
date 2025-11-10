@@ -1,7 +1,9 @@
 ﻿using Finly.Services;
 using Finly.ViewModels;
 using Finly.Views;
+using System;
 using System.Globalization;
+using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
 
@@ -19,7 +21,6 @@ namespace Finly.Pages
             _vm = new AccountViewModel(userId);
             DataContext = _vm;
 
-            // Odśwież KPI, gdy widok jest już w wizualnym drzewie
             Loaded += (_, __) => RefreshMoney();
         }
 
@@ -64,22 +65,15 @@ namespace Finly.Pages
 
             panel.Children.Add(new TextBlock { Text = "Stan gotówki (zł):" });
             panel.Children.Add(tb);
-            panel.Children.Add(new StackPanel
-            {
-                Orientation = Orientation.Horizontal,
-                Children = { okBtn }
-            });
+            panel.Children.Add(new StackPanel { Orientation = Orientation.Horizontal, Children = { okBtn } });
 
             okBtn.Click += (_, __) =>
             {
-                if (decimal.TryParse(tb.Text, System.Globalization.NumberStyles.Any, CultureInfo.CurrentCulture, out var v) && v >= 0)
+                if (decimal.TryParse(tb.Text, NumberStyles.Any, CultureInfo.CurrentCulture, out var v) && v >= 0)
                 {
                     var uid = UserService.GetCurrentUserId();
                     DatabaseService.SetCashOnHand(uid, v);
-
-                    // Zamknij okno i odśwież KPI
-                    var win = Window.GetWindow(okBtn);
-                    if (win != null) { win.DialogResult = true; win.Close(); }
+                    (Window.GetWindow(okBtn))?.Close();
                     RefreshMoney();
                 }
                 else
@@ -87,8 +81,89 @@ namespace Finly.Pages
                     MessageBox.Show("Podaj poprawną kwotę ≥ 0.", "Błąd", MessageBoxButton.OK, MessageBoxImage.Warning);
                 }
             };
-
             return panel;
+        }
+
+        private void WithdrawFromBank_Click(object sender, RoutedEventArgs e)
+        {
+            var uid = UserService.GetCurrentUserId();
+            var accounts = DatabaseService.GetAccounts(uid);
+            if (accounts == null || accounts.Count == 0)
+            {
+                MessageBox.Show("Nie masz żadnych rachunków bankowych.", "Wypłata z banku",
+                    MessageBoxButton.OK, MessageBoxImage.Information);
+                return;
+            }
+
+            var cmb = new ComboBox { Width = 340, Margin = new Thickness(0, 0, 0, 8) };
+            var items = accounts.Select(a => new
+            {
+                a.Id,
+                Label = $"{a.AccountName}  |  saldo: {a.Balance:N2} {a.Currency}"
+            }).ToList();
+            cmb.ItemsSource = items;
+            cmb.DisplayMemberPath = "Label";
+            cmb.SelectedIndex = 0;
+
+            var amountBox = new TextBox { Width = 200, Margin = new Thickness(0, 0, 0, 8) };
+
+            var dlg = new Window
+            {
+                Title = "Wypłata z banku do gotówki",
+                Owner = Application.Current.MainWindow,
+                WindowStartupLocation = WindowStartupLocation.CenterOwner,
+                SizeToContent = SizeToContent.WidthAndHeight,
+                Content = new StackPanel
+                {
+                    Margin = new Thickness(16),
+                    Children =
+                    {
+                        new TextBlock{ Text="Wybierz rachunek:" },
+                        cmb,
+                        new TextBlock{ Text="Kwota (zł):" },
+                        amountBox,
+                        new StackPanel
+                        {
+                            Orientation = Orientation.Horizontal,
+                            Children =
+                            {
+                                new Button{ Content="OK", IsDefault=true, Width=100, Margin=new Thickness(0,8,8,0) },
+                                new Button{ Content="Anuluj", IsCancel=true, Width=100, Margin=new Thickness(0,8,0,0) }
+                            }
+                        }
+                    }
+                }
+            };
+
+            // OK
+            ((StackPanel)((StackPanel)dlg.Content).Children[4]).Children[0].AddHandler(Button.ClickEvent,
+                new RoutedEventHandler((_, __) =>
+                {
+                    if (cmb.SelectedItem == null)
+                    {
+                        MessageBox.Show("Wybierz rachunek.", "Błąd", MessageBoxButton.OK, MessageBoxImage.Warning);
+                        return;
+                    }
+                    if (!decimal.TryParse(amountBox.Text, NumberStyles.Any, CultureInfo.CurrentCulture, out var amt) || amt <= 0)
+                    {
+                        MessageBox.Show("Podaj poprawną dodatnią kwotę.", "Błąd", MessageBoxButton.OK, MessageBoxImage.Warning);
+                        return;
+                    }
+
+                    var sel = (dynamic)cmb.SelectedItem;
+                    try
+                    {
+                        DatabaseService.TransferBankToCash(uid, (int)sel.Id, amt);
+                        dlg.Close();
+                        RefreshMoney();
+                    }
+                    catch (Exception ex)
+                    {
+                        MessageBox.Show(ex.Message, "Nie udało się wykonać wypłaty", MessageBoxButton.OK, MessageBoxImage.Error);
+                    }
+                }));
+
+            dlg.ShowDialog();
         }
 
         private void EditPersonal_Click(object sender, RoutedEventArgs e)
@@ -121,4 +196,5 @@ namespace Finly.Pages
         }
     }
 }
+
 

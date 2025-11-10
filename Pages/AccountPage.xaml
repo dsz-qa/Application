@@ -21,16 +21,12 @@
                     BorderBrush="{DynamicResource Surface.Border}"
                     BorderThickness="1" CornerRadius="10">
                 <Grid Margin="16">
-                    <!-- FIX: 4 wiersze zamiast 3 -->
+                    <!-- 4 wiersze: nagłówek / snapshot / dane+przycisk / zmiana hasła -->
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto"/>
-                        <!-- nagłówek "Profil" -->
                         <RowDefinition Height="Auto"/>
-                        <!-- snapshot: banki/gotówka/koperty -->
                         <RowDefinition Height="Auto"/>
-                        <!-- dane użytkownika + przycisk -->
                         <RowDefinition Height="Auto"/>
-                        <!-- zmiana hasła -->
                     </Grid.RowDefinitions>
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*"/>
@@ -42,8 +38,7 @@
                                Text="Profil" FontSize="18" FontWeight="SemiBold"
                                Margin="0,0,0,8"/>
 
-                    <!-- ===== Twoje pieniądze / snapshot ===== -->
-                    <!-- FIX: przeniesione do Grid.Row=1 + ColumnSpan=2 -->
+                    <!-- ===== Snapshot pieniędzy ===== -->
                     <Border Grid.Row="1" Grid.ColumnSpan="2" Margin="0,8,0,0"
                             Background="{DynamicResource Surface.Background}"
                             BorderBrush="{DynamicResource Surface.Border}"
@@ -68,8 +63,10 @@
                                     <TextBlock x:Name="LblCash" FontSize="18" FontWeight="Bold"/>
                                     <Button Content="Edytuj"
                                             Margin="8,0,0,0"
-                                            Click="EditCash_Click"
-                                            Panel.ZIndex="10"/>
+                                            Click="EditCash_Click"/>
+                                    <Button Content="Wypłać z banku"
+                                            Margin="8,0,0,0"
+                                            Click="WithdrawFromBank_Click"/>
                                 </StackPanel>
                             </StackPanel>
 
@@ -86,13 +83,11 @@
                             <Button Grid.Column="4"
                                     Content="Koperty"
                                     Style="{StaticResource PrimaryButton}"
-                                    Click="OpenEnvelopes_Click"
-                                    Panel.ZIndex="10"/>
+                                    Click="OpenEnvelopes_Click"/>
                         </Grid>
                     </Border>
 
                     <!-- Dane użytkownika -->
-                    <!-- FIX: przeniesione do Grid.Row=2 -->
                     <StackPanel Grid.Row="2" Grid.Column="0" Margin="0,8,16,0">
                         <TextBlock Text="Dane użytkownika" FontWeight="SemiBold" Margin="0,0,0,6"/>
                         <StackPanel Orientation="Horizontal" Margin="0,2,0,0">
@@ -118,7 +113,6 @@
                     </StackPanel>
 
                     <!-- Edycja danych osobowych -->
-                    <!-- FIX: też Grid.Row=2, ta sama „linia” co dane -->
                     <Button Grid.Row="2" Grid.Column="1"
                             Content="Uzupełnij / edytuj dane osobowe"
                             VerticalAlignment="Top" Width="260"
@@ -126,7 +120,6 @@
                             Click="EditPersonal_Click"/>
 
                     <!-- Zmiana hasła -->
-                    <!-- FIX: przeniesione do Grid.Row=3 -->
                     <StackPanel Grid.Row="3" Grid.ColumnSpan="2" Margin="0,16,0,0">
                         <TextBlock Text="Zmiana hasła" FontSize="16" FontWeight="SemiBold"/>
 
@@ -202,6 +195,7 @@
         </StackPanel>
     </ScrollViewer>
 </UserControl>
+
 
 
 

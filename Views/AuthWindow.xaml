@@ -57,7 +57,7 @@
                 Background="Transparent" BorderBrush="{x:Null}"
                 Click="Minimize_Click"
                 shell:WindowChrome.IsHitTestVisibleInChrome="True">
-                    <TextBlock Text="—" FontSize="16" VerticalAlignment="Center"
+                    <TextBlock Text="-" FontSize="16" VerticalAlignment="Center"
                      HorizontalAlignment="Center"
                      Foreground="{DynamicResource App.Foreground}"/>
                 </Button>
