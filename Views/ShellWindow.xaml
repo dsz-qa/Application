@@ -273,6 +273,11 @@
                         <ToggleButton x:Name="NavCategories"     Style="{StaticResource NavButton}" Content="Kategorie"      Click="Nav_Categories_Click"/>
                         <ToggleButton x:Name="NavReports"        Style="{StaticResource NavButton}" Content="Raporty"        Click="Nav_Reports_Click"/>
                         <ToggleButton x:Name="NavImport"         Style="{StaticResource NavButton}" Content="Import / Sync"  Click="Nav_Import_Click"/>
+                        <ToggleButton x:Name="NavEnvelopes" Style="{StaticResource NavButton}"
+              Content="Koperty" Click="Nav_Envelopes_Click"/>
+                        <ToggleButton x:Name="NavBanks" Style="{StaticResource NavButton}"
+              Content="Rachunki bankowe" Click="Nav_Banks_Click"/>
+
                     </StackPanel>
 
                     <!-- stopka -->

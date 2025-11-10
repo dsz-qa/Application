@@ -51,6 +51,9 @@ namespace Finly.Pages
 
                 EnvelopesGrid.ItemsSource = _dt?.DefaultView;
 
+
+                EnvelopesGrid.ItemsSource = _dt?.DefaultView;
+
                 // 3) Sumy
                 var allocated = _dt?.AsEnumerable().Sum(r => SafeDec(r["Allocated"])) ?? 0m;
                 AllocatedSumText.Text = allocated.ToString("N2");

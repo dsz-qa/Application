@@ -1,6 +1,8 @@
-﻿using Finly.Services;
+﻿using Finly.Models;
+using Finly.Services;
 using Finly.ViewModels;
 using Finly.Views;
+using Finly.Views.Dialogs;
 using System;
 using System.Globalization;
 using System.Linq;
@@ -194,7 +196,91 @@ namespace Finly.Pages
         {
             (Window.GetWindow(this) as ShellWindow)?.NavigateTo("banks");
         }
+
+
+private void LoadAccountsIntoGrid()
+    {
+        // jeśli w VM masz List<BankAccountModel> BankAccounts – użyj tego:
+        if (DataContext is AccountViewModel vm)
+            AccountsGrid.ItemsSource = vm.BankAccounts;
     }
+
+    private void AddAccount_Click(object sender, RoutedEventArgs e)
+    {
+        var model = new BankAccountModel { UserId = UserService.GetCurrentUserId(), Currency = "PLN", Balance = 0m };
+        var dlg = new EditAccountDialog(model) { Owner = Window.GetWindow(this) };
+        if (dlg.ShowDialog() == true)
+        {
+            var entity = dlg.Model;
+            entity.Id = DatabaseService.InsertAccount(entity);
+            ToastService.Success("Dodano rachunek.");
+            if (DataContext is AccountViewModel vm) vm.Refresh();
+            LoadAccountsIntoGrid();
+            RefreshMoney();
+        }
+    }
+
+    private void EditAccount_Click(object sender, RoutedEventArgs e)
+    {
+        var id = (sender as Button)?.Tag is int i ? i : 0;
+        if (id <= 0) { ToastService.Info("Nie udało się odczytać identyfikatora rachunku."); return; }
+
+        var src = AccountsGrid.ItemsSource as System.Collections.IEnumerable;
+        var item = src?.OfType<BankAccountModel>().FirstOrDefault(a => a.Id == id);
+        if (item == null) { ToastService.Info("Nie znaleziono rachunku."); return; }
+
+        var dlg = new EditAccountDialog(item) { Owner = Window.GetWindow(this) };
+        if (dlg.ShowDialog() == true)
+        {
+            DatabaseService.UpdateAccount(dlg.Model);
+            ToastService.Success("Zaktualizowano rachunek.");
+            if (DataContext is AccountViewModel vm) vm.Refresh();
+            LoadAccountsIntoGrid();
+            RefreshMoney();
+        }
+    }
+
+    private void DeleteAccount_Click(object sender, RoutedEventArgs e)
+    {
+        var id = (sender as Button)?.Tag is int i ? i : 0;
+        if (id <= 0) { ToastService.Info("Nie udało się odczytać identyfikatora rachunku."); return; }
+
+        var c = new ConfirmDialog("Usunąć ten rachunek? Operacja nieodwracalna.")
+        { Owner = Window.GetWindow(this) };
+
+        if (c.ShowDialog() == true && c.Result)
+        {
+            DatabaseService.DeleteAccount(id, UserService.GetCurrentUserId());
+            ToastService.Success("Usunięto rachunek.");
+            if (DataContext is AccountViewModel vm) vm.Refresh();
+            LoadAccountsIntoGrid();
+            RefreshMoney();
+        }
+    }
+
+    private void EditSelected_Click(object sender, RoutedEventArgs e)
+    {
+        if (AccountsGrid.SelectedItem is BankAccountModel m)
+            EditAccount_Click(new Button { Tag = m.Id }, new RoutedEventArgs());
+        else
+            ToastService.Info("Zaznacz rachunek do edycji.");
+    }
+
+    private void DeleteSelected_Click(object sender, RoutedEventArgs e)
+    {
+        if (AccountsGrid.SelectedItem is BankAccountModel m)
+            DeleteAccount_Click(new Button { Tag = m.Id }, new RoutedEventArgs());
+        else
+            ToastService.Info("Zaznacz rachunek do usunięcia.");
+    }
+
+    private void AccountsGrid_MouseDoubleClick(object sender, System.Windows.Input.MouseButtonEventArgs e)
+    {
+        if (AccountsGrid.SelectedItem is BankAccountModel m)
+            EditAccount_Click(new Button { Tag = m.Id }, new RoutedEventArgs());
+    }
+
+}
 }
 
 

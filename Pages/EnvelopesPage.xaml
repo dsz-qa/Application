@@ -44,7 +44,53 @@
 				</Grid>
 			</Border>
 
-			<!-- ==== LISTA KOPERT ==== -->
+            <!-- ==== PODGLĄD KART (galeria) ==== -->
+            <Border Margin="0,12,0,0"
+        Background="{DynamicResource Surface.Background}"
+        BorderBrush="{DynamicResource Surface.Border}"
+        BorderThickness="1" CornerRadius="10" Padding="16">
+                <StackPanel>
+                    <TextBlock Text="Koperty — podgląd" FontSize="18" FontWeight="SemiBold" Margin="0,0,0,8"/>
+                    <ItemsControl x:Name="EnvelopesCards">
+                        <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate>
+                                <WrapPanel ItemWidth="320" ItemHeight="Auto" MinWidth="320"/>
+                            </ItemsPanelTemplate>
+                        </ItemsControl.ItemsPanel>
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <Border Margin="6" Padding="12"
+                            Background="{DynamicResource Surface.Background}"
+                            BorderBrush="{DynamicResource Surface.Border}"
+                            BorderThickness="1" CornerRadius="12">
+                                    <StackPanel>
+                                        <!-- Nazwa -->
+                                        <StackPanel Orientation="Horizontal">
+                                            <TextBlock Text="✉ " FontSize="16" Margin="0,0,6,0"/>
+                                            <TextBlock Text="{Binding Row[Name]}" FontSize="16" FontWeight="Bold"/>
+                                        </StackPanel>
+
+                                        <!-- Cel (Target) -->
+                                        <TextBlock Text="Cel" FontWeight="SemiBold" Margin="0,8,0,0"/>
+                                        <TextBlock Text="{Binding Row[Target], StringFormat={}{0:N2} zł}"/>
+
+                                        <!-- Aktualne saldo (Allocated) -->
+                                        <TextBlock Text="Aktualne saldo" FontWeight="SemiBold" Margin="0,8,0,0"/>
+                                        <TextBlock Text="{Binding Row[Allocated], StringFormat={}{0:N2} zł}"/>
+
+                                        <!-- Notatka (na co zbierasz) -->
+                                        <TextBlock Text="Notatka" FontWeight="SemiBold" Margin="0,8,0,0"/>
+                                        <TextBlock Text="{Binding Row[Note]}" TextWrapping="Wrap" />
+                                    </StackPanel>
+                                </Border>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </StackPanel>
+            </Border>
+
+
+            <!-- ==== LISTA KOPERT ==== -->
 			<Border Margin="0,12,0,0"
                     Background="{DynamicResource Surface.Background}"
                     BorderBrush="{DynamicResource Surface.Border}"

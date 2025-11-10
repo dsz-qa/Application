@@ -159,38 +159,54 @@
                 </Grid>
             </Border>
 
-            <!-- ============ BANKI (skrót + link) ============ -->
+            <!-- ============ BANKI (zarządzanie jak w BanksPage) ============ -->
             <Border Margin="0,12,0,0"
-                    Background="{DynamicResource Surface.Background}"
-                    BorderBrush="{DynamicResource Surface.Border}"
-                    BorderThickness="1" CornerRadius="10">
+        Background="{DynamicResource Surface.Background}"
+        BorderBrush="{DynamicResource Surface.Border}"
+        BorderThickness="1" CornerRadius="10">
                 <StackPanel Margin="16">
                     <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                         <TextBlock Text="Połączone banki" FontSize="18" FontWeight="SemiBold"/>
-                        <Button Margin="12,0,0,0"
-                                Content="Zarządzaj bankami"
-                                Style="{StaticResource PrimaryButton}"
-                                Click="OpenBanks_Click"/>
+                        <Button Margin="12,0,0,0" Content="Dodaj konto" Click="AddAccount_Click"/>
+                        <Button Margin="8,0,0,0"  Content="Edytuj zaznaczone" Click="EditSelected_Click"/>
+                        <Button Margin="8,0,0,0"  Content="Usuń zaznaczone"  Click="DeleteSelected_Click"/>
+                        <Button Margin="12,0,0,0" Content="Otwórz stronę Rachunki" Style="{StaticResource PrimaryButton}"
+                    Click="OpenBanks_Click"/>
                     </StackPanel>
 
-                    <Expander Header="Rachunki (podgląd tylko do odczytu)" IsExpanded="False" Margin="0,8,0,0">
-                        <DataGrid ItemsSource="{Binding BankAccounts}"
-                                  AutoGenerateColumns="False"
-                                  HeadersVisibility="Column"
-                                  CanUserAddRows="False"
-                                  IsReadOnly="True"
-                                  Margin="0,8,0,0">
-                            <DataGrid.Columns>
-                                <DataGridTextColumn Header="Bank"           Binding="{Binding BankName}"    Width="*"/>
-                                <DataGridTextColumn Header="Nazwa rachunku" Binding="{Binding AccountName}" Width="*"/>
-                                <DataGridTextColumn Header="IBAN"           Binding="{Binding Iban}"        Width="2*"/>
-                                <DataGridTextColumn Header="Saldo"          Binding="{Binding Balance, StringFormat={}{0:N2}}" Width="*"/>
-                                <DataGridTextColumn Header="Waluta"         Binding="{Binding Currency}"    Width="80"/>
-                            </DataGrid.Columns>
-                        </DataGrid>
-                    </Expander>
+                    <DataGrid x:Name="AccountsGrid"
+                  Margin="0,8,0,0"
+                  AutoGenerateColumns="False"
+                  IsReadOnly="True"
+                  CanUserAddRows="False"
+                  SelectionMode="Single"
+                  SelectionUnit="FullRow"
+                  MouseDoubleClick="AccountsGrid_MouseDoubleClick">
+                        <DataGrid.Columns>
+                            <DataGridTextColumn Header="Bank"           Binding="{Binding BankName}"    Width="160"/>
+                            <DataGridTextColumn Header="Nazwa rachunku" Binding="{Binding AccountName}" Width="*"/>
+                            <DataGridTextColumn Header="IBAN"           Binding="{Binding Iban}"        Width="240"/>
+                            <DataGridTextColumn Header="Waluta"         Binding="{Binding Currency}"    Width="80"/>
+                            <DataGridTextColumn Header="Saldo"          Binding="{Binding Balance, StringFormat={}{0:N2}}" Width="120"/>
+                            <DataGridTemplateColumn Header="Akcje" Width="160" IsReadOnly="True">
+                                <DataGridTemplateColumn.CellTemplate>
+                                    <DataTemplate>
+                                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                                            <Button Content="Edytuj" Margin="0,0,8,0"
+                                        Tag="{Binding Id}"
+                                        Click="EditAccount_Click"/>
+                                            <Button Content="Usuń"
+                                        Tag="{Binding Id}"
+                                        Click="DeleteAccount_Click"/>
+                                        </StackPanel>
+                                    </DataTemplate>
+                                </DataGridTemplateColumn.CellTemplate>
+                            </DataGridTemplateColumn>
+                        </DataGrid.Columns>
+                    </DataGrid>
                 </StackPanel>
             </Border>
+
 
         </StackPanel>
     </ScrollViewer>
