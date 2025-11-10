@@ -19,7 +19,14 @@
 	  <Page Remove="Nowy folder\**" />
 	</ItemGroup>
 	<ItemGroup>
+	  <None Remove="Assets\Icons\add_24.png" />
+	  <None Remove="Assets\Icons\add_48.png" />
+	  <None Remove="Assets\Icons\budgets.png" />
+	  <None Remove="Assets\Icons\kategorie.png" />
+	  <None Remove="Assets\Icons\kredyty.png" />
 	  <None Remove="Assets\Icons\logoFinly.ico" />
+	  <None Remove="Assets\Icons\statistics_24.png" />
+	  <None Remove="Assets\Icons\statistics_48.png" />
 	  <None Remove="Assets\Images\logoFinly.png" />
 	</ItemGroup>
 
@@ -43,9 +50,16 @@
 		<Folder Include="Styles\" />
 	</ItemGroup>
 	<ItemGroup>
+	  <Resource Include="Assets\Icons\add_24.png" />
+	  <Resource Include="Assets\Icons\add_48.png" />
+	  <Resource Include="Assets\Icons\budgets.png" />
+	  <Resource Include="Assets\Icons\kategorie.png" />
+	  <Resource Include="Assets\Icons\kredyty.png" />
 	  <Resource Include="Assets\Icons\logoFinly.ico">
 	    <CopyToOutputDirectory>Never</CopyToOutputDirectory>
 	  </Resource>
+	  <Resource Include="Assets\Icons\statistics_24.png" />
+	  <Resource Include="Assets\Icons\statistics_48.png" />
 	  <Resource Include="Assets\Images\logoFinly.png">
 	    <CopyToOutputDirectory>Never</CopyToOutputDirectory>
 	  </Resource>

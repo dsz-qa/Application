@@ -1,12 +1,13 @@
-﻿using System;
+﻿using Finly.Models;
+using Finly.Services;
+using Finly.Views.Dialogs;
+using System;
 using System.Data;
 using System.Globalization;
 using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
-using Finly.Models;
-using Finly.Services;
-using Finly.Views.Dialogs;
+using System.Windows.Media;
 
 namespace Finly.Pages
 {
@@ -21,7 +22,7 @@ namespace Finly.Pages
             LoadAccounts();
         }
 
-        // === KPI snapshot ===
+        // === Snapshot ===
         private void RefreshMoney()
         {
             var s = DatabaseService.GetMoneySnapshot(_uid);
@@ -29,6 +30,124 @@ namespace Finly.Pages
             LblCash.Text = s.Cash.ToString("N2", CultureInfo.CurrentCulture) + " zł";
             LblEnvelopes.Text = s.Envelopes.ToString("N2", CultureInfo.CurrentCulture) + " zł";
             LblAvailable.Text = s.AvailableToAllocate.ToString("N2", CultureInfo.CurrentCulture) + " zł";
+        }
+
+        private static decimal? PromptAmount(Window owner, string title, string label = "Kwota (PLN):")
+        {
+            var win = new Window
+            {
+                Title = title,
+                Owner = owner,
+                WindowStartupLocation = WindowStartupLocation.CenterOwner,
+                SizeToContent = SizeToContent.WidthAndHeight,
+                ResizeMode = ResizeMode.NoResize,
+                ShowInTaskbar = false,
+                Background = (Brush)Application.Current.TryFindResource("Surface.Background") ?? Brushes.Black,
+                Foreground = (Brush)Application.Current.TryFindResource("Text.Primary") ?? Brushes.White
+            };
+
+            var lbl = new TextBlock
+            {
+                Text = label,
+                Margin = new Thickness(0, 0, 0, 6),
+                Foreground = win.Foreground
+            };
+
+            var tb = new TextBox
+            {
+                Width = 220,
+                HorizontalContentAlignment = HorizontalAlignment.Right,
+                Margin = new Thickness(0, 0, 0, 10),
+                Background = (Brush)Application.Current.TryFindResource("Surface.Field") ?? new SolidColorBrush(Color.FromRgb(40, 40, 40)),
+                Foreground = win.Foreground,
+                BorderBrush = (Brush)Application.Current.TryFindResource("Surface.Border")
+            };
+
+            var ok = new Button
+            {
+                Content = "OK",
+                Width = 100,
+                IsDefault = true,
+                Style = (Style)Application.Current.TryFindResource("PrimaryButton"),
+                Margin = new Thickness(0, 0, 8, 0)
+            };
+            var cancel = new Button
+            {
+                Content = "Anuluj",
+                Width = 100,
+                IsCancel = true
+            };
+
+            ok.Click += (_, __) => { win.DialogResult = true; };
+            cancel.Click += (_, __) => { win.DialogResult = false; };
+
+            var btns = new StackPanel
+            {
+                Orientation = Orientation.Horizontal,
+                HorizontalAlignment = HorizontalAlignment.Right,
+                Children = { ok, cancel }
+            };
+
+            var root = new StackPanel { Margin = new Thickness(16) };
+            root.Children.Add(lbl);
+            root.Children.Add(tb);
+            root.Children.Add(btns);
+
+            win.Content = root;
+
+            if (win.ShowDialog() == true)
+            {
+                var txt = (tb.Text ?? "").Replace(" ", "");
+                if (decimal.TryParse(txt, NumberStyles.Number, CultureInfo.CurrentCulture, out var v) && v > 0)
+                    return v;
+            }
+            return null;
+        }
+
+
+        // ===== WY/PŁATA =====
+
+        private void WithdrawToCash_Click(object sender, RoutedEventArgs e)
+        {
+            var id = TryGetIdFromTag((sender as Button)?.Tag);
+            if (id == null) { ToastService.Info("Nie udało się odczytać identyfikatora rachunku."); return; }
+
+            var amount = PromptAmount(Window.GetWindow(this)!, "Wypłać z konta");
+            if (amount == null) return;
+
+            try
+            {
+                DatabaseService.TransferBankToCash(_uid, id.Value, amount.Value);
+                ToastService.Success($"Wypłacono {amount.Value:N2} zł do gotówki.");
+                LoadAccounts();
+                RefreshMoney();
+            }
+            catch (Exception ex)
+            {
+                ToastService.Error("Nie udało się wykonać wypłaty: " + ex.Message);
+            }
+        }
+
+        private void DepositFromCash_Click(object sender, RoutedEventArgs e)
+        {
+            var id = TryGetIdFromTag((sender as Button)?.Tag);
+            if (id == null) { ToastService.Info("Nie udało się odczytać identyfikatora rachunku."); return; }
+
+            var amount = PromptAmount(Window.GetWindow(this)!, "Wpłać na konto");
+            if (amount == null) return;
+
+            try
+            {
+                // Wymaga DatabaseService.TransferCashToBank(...)
+                DatabaseService.TransferCashToBank(_uid, id.Value, amount.Value);
+                ToastService.Success($"Wpłacono {amount.Value:N2} zł na konto.");
+                LoadAccounts();
+                RefreshMoney();
+            }
+            catch (Exception ex)
+            {
+                ToastService.Error("Nie udało się wykonać wpłaty: " + ex.Message);
+            }
         }
 
         private void OpenEnvelopes_Click(object sender, RoutedEventArgs e)
@@ -45,7 +164,7 @@ namespace Finly.Pages
                 SizeToContent = SizeToContent.WidthAndHeight,
                 Content = BuildCashEditor(current)
             };
-            if (win.ShowDialog() == true) { RefreshMoney(); }
+            if (win.ShowDialog() == true) RefreshMoney();
         }
 
         private UIElement BuildCashEditor(decimal current)
@@ -72,7 +191,6 @@ namespace Finly.Pages
 
         private void WithdrawFromBank_Click(object sender, RoutedEventArgs e)
         {
-            // proste okienko: wybór rachunku + kwota
             var accs = DatabaseService.GetAccounts(_uid);
             if (accs.Count == 0) { MessageBox.Show("Brak rachunków bankowych.", "Info"); return; }
 
@@ -90,7 +208,7 @@ namespace Finly.Pages
 
             var win = new Window
             {
-                Title = "Wypłata z banku do gotówki",
+                Title = "Wypłata z konta",
                 Owner = Window.GetWindow(this),
                 WindowStartupLocation = WindowStartupLocation.CenterOwner,
                 SizeToContent = SizeToContent.WidthAndHeight,
@@ -121,7 +239,7 @@ namespace Finly.Pages
             win.ShowDialog();
         }
 
-        // === tabela rachunków (Twoje metody, bez zmian merytorycznych) ===
+        // === tabela rachunków ===
         private void LoadAccounts()
         {
             var dt = DatabaseService.GetAccountsTable(_uid);
@@ -244,5 +362,6 @@ namespace Finly.Pages
         }
     }
 }
+
 
 

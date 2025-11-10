@@ -3,12 +3,7 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
-             xmlns:conv="clr-namespace:Finly.Helpers.Converters"
              mc:Ignorable="d">
-
-    <UserControl.Resources>
-        <conv:BoolToVisibilityConverter x:Key="BoolToVisibility" CollapseWhenFalse="True"/>
-    </UserControl.Resources>
 
     <ScrollViewer VerticalScrollBarVisibility="Auto">
         <StackPanel Margin="24">
@@ -38,54 +33,6 @@
                                Text="Profil" FontSize="18" FontWeight="SemiBold"
                                Margin="0,0,0,8"/>
 
-                    <!-- ===== Snapshot pieniędzy ===== -->
-                    <Border Grid.Row="1" Grid.ColumnSpan="2" Margin="0,8,0,0"
-                            Background="{DynamicResource Surface.Background}"
-                            BorderBrush="{DynamicResource Surface.Border}"
-                            BorderThickness="1" CornerRadius="10">
-                        <Grid Margin="16">
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="*"/>
-                                <ColumnDefinition Width="*"/>
-                                <ColumnDefinition Width="*"/>
-                                <ColumnDefinition Width="*"/>
-                                <ColumnDefinition Width="Auto"/>
-                            </Grid.ColumnDefinitions>
-
-                            <StackPanel>
-                                <TextBlock Text="Banki" FontWeight="SemiBold"/>
-                                <TextBlock x:Name="LblBanks" FontSize="18" FontWeight="Bold"/>
-                            </StackPanel>
-
-                            <StackPanel Grid.Column="1">
-                                <TextBlock Text="Gotówka" FontWeight="SemiBold"/>
-                                <StackPanel Orientation="Horizontal">
-                                    <TextBlock x:Name="LblCash" FontSize="18" FontWeight="Bold"/>
-                                    <Button Content="Edytuj"
-                                            Margin="8,0,0,0"
-                                            Click="EditCash_Click"/>
-                                    <Button Content="Wypłać z banku"
-                                            Margin="8,0,0,0"
-                                            Click="WithdrawFromBank_Click"/>
-                                </StackPanel>
-                            </StackPanel>
-
-                            <StackPanel Grid.Column="2">
-                                <TextBlock Text="W kopertach" FontWeight="SemiBold"/>
-                                <TextBlock x:Name="LblEnvelopes" FontSize="18" FontWeight="Bold"/>
-                            </StackPanel>
-
-                            <StackPanel Grid.Column="3">
-                                <TextBlock Text="Do rozdysponowania" FontWeight="SemiBold"/>
-                                <TextBlock x:Name="LblAvailable" FontSize="18" FontWeight="Bold"/>
-                            </StackPanel>
-
-                            <Button Grid.Column="4"
-                                    Content="Koperty"
-                                    Style="{StaticResource PrimaryButton}"
-                                    Click="OpenEnvelopes_Click"/>
-                        </Grid>
-                    </Border>
 
                     <!-- Dane użytkownika -->
                     <StackPanel Grid.Row="2" Grid.Column="0" Margin="0,8,16,0">
@@ -159,29 +106,29 @@
                 </Grid>
             </Border>
 
-            <!-- ============ BANKI (zarządzanie jak w BanksPage) ============ -->
+            <!-- ============ BANKI (zarządzanie) ============ -->
             <Border Margin="0,12,0,0"
-        Background="{DynamicResource Surface.Background}"
-        BorderBrush="{DynamicResource Surface.Border}"
-        BorderThickness="1" CornerRadius="10">
+                    Background="{DynamicResource Surface.Background}"
+                    BorderBrush="{DynamicResource Surface.Border}"
+                    BorderThickness="1" CornerRadius="10">
                 <StackPanel Margin="16">
                     <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                         <TextBlock Text="Połączone banki" FontSize="18" FontWeight="SemiBold"/>
                         <Button Margin="12,0,0,0" Content="Dodaj konto" Click="AddAccount_Click"/>
                         <Button Margin="8,0,0,0"  Content="Edytuj zaznaczone" Click="EditSelected_Click"/>
                         <Button Margin="8,0,0,0"  Content="Usuń zaznaczone"  Click="DeleteSelected_Click"/>
-                        <Button Margin="12,0,0,0" Content="Otwórz stronę Rachunki" Style="{StaticResource PrimaryButton}"
-                    Click="OpenBanks_Click"/>
+                        <Button Margin="12,0,0,0" Content="Otwórz stronę Rachunki"
+                                Style="{StaticResource PrimaryButton}" Click="OpenBanks_Click"/>
                     </StackPanel>
 
                     <DataGrid x:Name="AccountsGrid"
-                  Margin="0,8,0,0"
-                  AutoGenerateColumns="False"
-                  IsReadOnly="True"
-                  CanUserAddRows="False"
-                  SelectionMode="Single"
-                  SelectionUnit="FullRow"
-                  MouseDoubleClick="AccountsGrid_MouseDoubleClick">
+                              Margin="0,8,0,0"
+                              AutoGenerateColumns="False"
+                              IsReadOnly="True"
+                              CanUserAddRows="False"
+                              SelectionMode="Single"
+                              SelectionUnit="FullRow"
+                              MouseDoubleClick="AccountsGrid_MouseDoubleClick">
                         <DataGrid.Columns>
                             <DataGridTextColumn Header="Bank"           Binding="{Binding BankName}"    Width="160"/>
                             <DataGridTextColumn Header="Nazwa rachunku" Binding="{Binding AccountName}" Width="*"/>
@@ -193,11 +140,9 @@
                                     <DataTemplate>
                                         <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
                                             <Button Content="Edytuj" Margin="0,0,8,0"
-                                        Tag="{Binding Id}"
-                                        Click="EditAccount_Click"/>
+                                                    Tag="{Binding Id}" Click="EditAccount_Click"/>
                                             <Button Content="Usuń"
-                                        Tag="{Binding Id}"
-                                        Click="DeleteAccount_Click"/>
+                                                    Tag="{Binding Id}" Click="DeleteAccount_Click"/>
                                         </StackPanel>
                                     </DataTemplate>
                                 </DataGridTemplateColumn.CellTemplate>
@@ -207,10 +152,10 @@
                 </StackPanel>
             </Border>
 
-
         </StackPanel>
     </ScrollViewer>
 </UserControl>
+
 
 
 

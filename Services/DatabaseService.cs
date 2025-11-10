@@ -751,7 +751,67 @@ SET Amount = CashOnHand.Amount + excluded.Amount,
             }
 
             tx.Commit();
+
         }
+
+
+        // == PRZELEWY GOTÓWKA <-> BANK ==
+
+        /// <summary>
+        /// Przelew z GOTÓWKI na wskazany rachunek bankowy.
+        /// Zmniejsza CashOnHand i zwiêksza saldo rachunku – wszystko w jednej transakcji.
+        /// </summary>
+        public static void TransferCashToBank(int userId, int accountId, decimal amount)
+        {
+            if (amount <= 0) throw new ArgumentException("Kwota musi byæ dodatnia.", nameof(amount));
+
+            using var c = OpenAndEnsureSchema();
+            using var tx = c.BeginTransaction();
+
+            // 1) SprawdŸ aktualn¹ gotówkê
+            decimal currentCash;
+            using (var q = c.CreateCommand())
+            {
+                q.Transaction = tx;
+                q.CommandText = "SELECT COALESCE(Amount,0) FROM CashOnHand WHERE UserId=@u LIMIT 1;";
+                q.Parameters.AddWithValue("@u", userId);
+                currentCash = Convert.ToDecimal(q.ExecuteScalar() ?? 0m);
+            }
+            if (currentCash < amount)
+                throw new InvalidOperationException("Za ma³o gotówki na tak¹ wp³atê.");
+
+            // 2) Odejmij z gotówki
+            using (var updCash = c.CreateCommand())
+            {
+                updCash.Transaction = tx;
+                updCash.CommandText = @"
+UPDATE CashOnHand
+   SET Amount = Amount - @a,
+       UpdatedAt = CURRENT_TIMESTAMP
+ WHERE UserId=@u;";
+                updCash.Parameters.AddWithValue("@a", amount);
+                updCash.Parameters.AddWithValue("@u", userId);
+                updCash.ExecuteNonQuery();
+            }
+
+            // 3) Dodaj do salda rachunku (konto musi byæ u¿ytkownika)
+            using (var updAcc = c.CreateCommand())
+            {
+                updAcc.Transaction = tx;
+                updAcc.CommandText = @"
+UPDATE BankAccounts
+   SET Balance = Balance + @a
+ WHERE Id=@id AND UserId=@u;";
+                updAcc.Parameters.AddWithValue("@a", amount);
+                updAcc.Parameters.AddWithValue("@id", accountId);
+                updAcc.Parameters.AddWithValue("@u", userId);
+                var rows = updAcc.ExecuteNonQuery();
+                if (rows == 0) throw new InvalidOperationException("Nie znaleziono rachunku lub nie nale¿y do u¿ytkownika.");
+            }
+
+            tx.Commit();
+        }
+
     }
 }
 

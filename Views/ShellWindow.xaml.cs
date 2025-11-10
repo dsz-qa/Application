@@ -20,14 +20,15 @@ namespace Finly.Views
         public ShellWindow()
         {
             InitializeComponent();
+            // start: dashboard albo auth (patrz NavigateTo)
             NavigateTo("dashboard");
         }
 
-        // ====== Hook WinAPI: „Maximized” = obszar roboczy (taskbar widoczny) ======
+        // ====== WinAPI: pełny ekran z poszanowaniem paska zadań ======
         protected override void OnSourceInitialized(EventArgs e)
         {
             base.OnSourceInitialized(e);
-            var src = (HwndSource)PresentationSource.FromVisual(this);
+            var src = (HwndSource)PresentationSource.FromVisual(this)!;
             src.AddHook(WndProc);
         }
 
@@ -49,11 +50,10 @@ namespace Finly.Views
             IntPtr monitor = MonitorFromWindow(hwnd, MONITOR_DEFAULTTONEAREST);
             if (monitor != IntPtr.Zero)
             {
-                MONITORINFO mi = new MONITORINFO();
-                mi.cbSize = Marshal.SizeOf(typeof(MONITORINFO));
+                MONITORINFO mi = new MONITORINFO { cbSize = Marshal.SizeOf(typeof(MONITORINFO)) };
                 if (GetMonitorInfo(monitor, ref mi))
                 {
-                    RECT wa = mi.rcWork;    // „work area” = bez paska zadań
+                    RECT wa = mi.rcWork;
                     RECT ma = mi.rcMonitor;
 
                     mmi.ptMaxPosition.x = Math.Abs(wa.left - ma.left);
@@ -71,9 +71,7 @@ namespace Finly.Views
         [DllImport("user32.dll")] private static extern IntPtr MonitorFromWindow(IntPtr hwnd, int dwFlags);
         [DllImport("user32.dll", SetLastError = true)] private static extern bool GetMonitorInfo(IntPtr hMonitor, ref MONITORINFO lpmi);
 
-        [StructLayout(LayoutKind.Sequential)]
-        private struct POINT { public int x, y; }
-
+        [StructLayout(LayoutKind.Sequential)] private struct POINT { public int x, y; }
         [StructLayout(LayoutKind.Sequential)]
         private struct MINMAXINFO
         {
@@ -83,10 +81,7 @@ namespace Finly.Views
             public POINT ptMinTrackSize;
             public POINT ptMaxTrackSize;
         }
-
-        [StructLayout(LayoutKind.Sequential)]
-        private struct RECT { public int left, top, right, bottom; }
-
+        [StructLayout(LayoutKind.Sequential)] private struct RECT { public int left, top, right, bottom; }
         [StructLayout(LayoutKind.Sequential)]
         private struct MONITORINFO
         {
@@ -110,13 +105,13 @@ namespace Finly.Views
             FitSidebar();
         }
 
-        private void SidebarHost_SizeChanged(object sender, SizeChangedEventArgs e) => FitSidebar();
+        private void SidebarHost_SizeChanged(object? sender, SizeChangedEventArgs e) => FitSidebar();
 
-        // ====== Pasek tytułu / kontrolki okna ======
+        // ====== Pasek tytułu ======
         private void TitleBar_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
         {
             if (e.ClickCount == 2) { MaxRestore_Click(sender, e); return; }
-            try { DragMove(); } catch { }
+            try { DragMove(); } catch { /* ignoruj */ }
         }
 
         private void Minimize_Click(object s, RoutedEventArgs e) => WindowState = WindowState.Minimized;
@@ -134,37 +129,47 @@ namespace Finly.Views
                 (width >= 1280 && height >= 800) ? "Sizes.Medium" :
                 "Sizes.Compact";
 
-            var dict = (ResourceDictionary)FindResource(key);
-            if (!ReferenceEquals(_activeSizesDict, dict))
+            // próbuj znaleźć słownik, ale nie zakładaj, że istnieje
+            var dict = TryFindResource(key) as ResourceDictionary;
+
+            if (dict != null && !ReferenceEquals(_activeSizesDict, dict))
             {
                 if (_activeSizesDict is not null)
                     Resources.MergedDictionaries.Remove(_activeSizesDict);
 
                 Resources.MergedDictionaries.Insert(0, dict);
                 _activeSizesDict = dict;
+            }
 
-                // szerokość kolumny sidebara z klucza
-                if (TryFindResource("SidebarCol.Width") is string s &&
-                    double.TryParse(s, NumberStyles.Float, CultureInfo.InvariantCulture, out var w))
-                {
-                    SidebarCol.Width = new GridLength(w);
-                }
+            // SidebarCol.Width – jeżeli jest w słowniku, użyj; jeśli nie, ustaw domyślnie
+            double fallback = (key == "Sizes.Large") ? 380 :
+                              (key == "Sizes.Medium") ? 340 : 300;
+
+            if (TryFindResource("SidebarCol.Width") is string s &&
+                double.TryParse(s, NumberStyles.Float, CultureInfo.InvariantCulture, out var w))
+            {
+                SidebarCol.Width = new GridLength(w);
+            }
+            else
+            {
+                SidebarCol.Width = new GridLength(fallback);
             }
         }
+
 
         /// <summary>Skaluje zawartość sidebara tak, by całość mieściła się bez scrolla.</summary>
         private void FitSidebar()
         {
             if (SidebarRoot == null || SidebarHost == null || SidebarScale == null) return;
 
-            // pomiar naturalnej wysokości
             SidebarRoot.LayoutTransform = null;
             SidebarRoot.Measure(new Size(SidebarHost.ActualWidth, double.PositiveInfinity));
             double needed = SidebarRoot.DesiredSize.Height;
             double available = SidebarHost.ActualHeight;
 
             double scale = 1.0;
-            if (available > 0 && needed > available) scale = available / needed;
+            if (available > 0 && needed > available)
+                scale = available / needed;
 
             if (scale < 0.7) scale = 0.7;
             if (scale > 1.0) scale = 1.0;
@@ -173,7 +178,7 @@ namespace Finly.Views
             SidebarRoot.LayoutTransform = SidebarScale;
         }
 
-        // ====== Nawigacja główna (JEDYNA wersja) ======
+        // ====== Nawigacja ======
         public void NavigateTo(string route)
         {
             var uid = UserService.CurrentUserId;
@@ -200,14 +205,13 @@ namespace Finly.Views
                 "reports" => new ReportsPage(),
                 "settings" => new SettingsPage(),
                 "banks" => new BanksPage(),
-                "envelopes" => new EnvelopesPage(uid),   // NOWA TRASA
+                "envelopes" => new EnvelopesPage(uid),
                 _ => new DashboardPage(uid),
             };
 
             RightHost.Content = view;
         }
 
-        // ====== Logo => dashboard ======
         private void Logo_Click(object s, RoutedEventArgs e) => NavigateToDashboard();
 
         private void NavigateToDashboard()
@@ -218,7 +222,7 @@ namespace Finly.Views
             SetActiveFooter(null);
         }
 
-        // ====== Kliknięcia nawigacji ======
+        // Kliknięcia NAV
         private void Nav_Add_Click(object s, RoutedEventArgs e)
         { RightHost.Content = new AddExpensePage(UserService.CurrentUserId); SetActiveNav(NavAdd); SetActiveFooter(null); }
 
@@ -247,10 +251,10 @@ namespace Finly.Views
         { RightHost.Content = new ImportPage(); SetActiveNav(NavImport); SetActiveFooter(null); }
 
         private void Nav_Banks_Click(object s, RoutedEventArgs e)
-        { NavigateTo("banks"); SetActiveNav(null); SetActiveFooter(null); }
+        { NavigateTo("banks"); SetActiveNav(NavBanks); SetActiveFooter(null); }
 
         private void Nav_Envelopes_Click(object s, RoutedEventArgs e)
-        { NavigateTo("envelopes"); SetActiveNav(null); SetActiveFooter(null); }
+        { NavigateTo("envelopes"); SetActiveNav(NavEnvelopes); SetActiveFooter(null); }
 
         // ====== Stopka ======
         private void OpenProfile_Click(object s, RoutedEventArgs e)
@@ -270,11 +274,13 @@ namespace Finly.Views
             Close();
         }
 
-        // ====== Podświetlenia ======
+        // ====== Podświetlenia (bezpieczne) ======
         private void SetActiveNav(ToggleButton? active)
         {
+            if (NavContainer == null) return;
             foreach (var child in NavContainer.Children)
-                if (child is ToggleButton tb) tb.IsChecked = tb == active;
+                if (child is ToggleButton tb)
+                    tb.IsChecked = (tb == active);
         }
 
         private void SetActiveFooter(ToggleButton? active)

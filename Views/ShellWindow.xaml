@@ -17,55 +17,15 @@
         Icon="/Assets/Icons/logoFinly.ico"
         SizeChanged="Window_SizeChanged">
 
-    <!-- =================== RESOURCES =================== -->
     <Window.Resources>
-
-        <!-- Fallback (nadpisywane przez Sizes.*) -->
-        <sys:Double x:Key="NavButton.Width">240</sys:Double>
-        <sys:Double x:Key="NavButton.Height">56</sys:Double>
+        <!-- Rozmiary podstawowe -->
         <sys:Double x:Key="NavButton.FontSize">16</sys:Double>
-
         <sys:Double x:Key="FooterButton.Width">220</sys:Double>
         <sys:Double x:Key="FooterButton.Height">48</sys:Double>
         <sys:Double x:Key="FooterButton.FontSize">14</sys:Double>
-
         <sys:Double x:Key="Logo.Size">180</sys:Double>
 
-        <!-- Breakpointy -->
-        <ResourceDictionary x:Key="Sizes.Large">
-            <sys:String x:Key="SidebarCol.Width">380</sys:String>
-            <sys:Double x:Key="NavButton.Width">240</sys:Double>
-            <sys:Double x:Key="NavButton.Height">56</sys:Double>
-            <sys:Double x:Key="NavButton.FontSize">16</sys:Double>
-            <sys:Double x:Key="FooterButton.Width">220</sys:Double>
-            <sys:Double x:Key="FooterButton.Height">48</sys:Double>
-            <sys:Double x:Key="FooterButton.FontSize">14</sys:Double>
-            <sys:Double x:Key="Logo.Size">180</sys:Double>
-        </ResourceDictionary>
-
-        <ResourceDictionary x:Key="Sizes.Medium">
-            <sys:String x:Key="SidebarCol.Width">340</sys:String>
-            <sys:Double x:Key="NavButton.Width">220</sys:Double>
-            <sys:Double x:Key="NavButton.Height">52</sys:Double>
-            <sys:Double x:Key="NavButton.FontSize">15</sys:Double>
-            <sys:Double x:Key="FooterButton.Width">210</sys:Double>
-            <sys:Double x:Key="FooterButton.Height">46</sys:Double>
-            <sys:Double x:Key="FooterButton.FontSize">13</sys:Double>
-            <sys:Double x:Key="Logo.Size">160</sys:Double>
-        </ResourceDictionary>
-
-        <ResourceDictionary x:Key="Sizes.Compact">
-            <sys:String x:Key="SidebarCol.Width">300</sys:String>
-            <sys:Double x:Key="NavButton.Width">200</sys:Double>
-            <sys:Double x:Key="NavButton.Height">46</sys:Double>
-            <sys:Double x:Key="NavButton.FontSize">14</sys:Double>
-            <sys:Double x:Key="FooterButton.Width">200</sys:Double>
-            <sys:Double x:Key="FooterButton.Height">44</sys:Double>
-            <sys:Double x:Key="FooterButton.FontSize">13</sys:Double>
-            <sys:Double x:Key="Logo.Size">130</sys:Double>
-        </ResourceDictionary>
-
-        <!-- Pasek tytułu -->
+        <!-- Przycisk paska tytułu -->
         <Style x:Key="TitleBarIconButton" TargetType="Button">
             <Setter Property="Background" Value="Transparent"/>
             <Setter Property="BorderBrush" Value="{x:Null}"/>
@@ -76,41 +36,69 @@
             <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
         </Style>
 
-        <!-- NAV -->
-        <Style x:Key="NavButton" TargetType="{x:Type ToggleButton}">
-            <Setter Property="HorizontalAlignment" Value="Center"/>
-            <Setter Property="Width"     Value="{DynamicResource NavButton.Width}"/>
-            <Setter Property="Height"    Value="{DynamicResource NavButton.Height}"/>
-            <Setter Property="Padding"   Value="16,10"/>
-            <Setter Property="Margin"    Value="0,8"/>
-            <Setter Property="FontSize"  Value="{DynamicResource NavButton.FontSize}"/>
-            <Setter Property="FontWeight" Value="Bold"/>
-            <Setter Property="HorizontalContentAlignment" Value="Center"/>
-            <Setter Property="Cursor" Value="Hand"/>
+        <!-- NAV: pełna szerokość, separator, pomarańczowe obramowania po zaznaczeniu -->
+        <Style x:Key="NavItem" TargetType="{x:Type ToggleButton}">
+            <Setter Property="HorizontalAlignment" Value="Stretch"/>
+            <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+            <Setter Property="Padding" Value="12,10"/>
+            <Setter Property="Margin" Value="0,2"/>
+            <Setter Property="FontSize" Value="{DynamicResource NavButton.FontSize}"/>
+            <Setter Property="Foreground" Value="{DynamicResource App.Foreground}"/>
             <Setter Property="Background" Value="Transparent"/>
-            <Setter Property="BorderBrush" Value="{DynamicResource Brand.Orange}"/>
-            <Setter Property="BorderThickness" Value="2"/>
-            <Setter Property="Foreground" Value="#FFFFFF"/>
+            <Setter Property="BorderBrush" Value="Transparent"/>
+            <Setter Property="Cursor" Value="Hand"/>
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="{x:Type ToggleButton}">
-                        <Border x:Name="bg"
-                                Background="{TemplateBinding Background}"
-                                BorderBrush="{TemplateBinding BorderBrush}"
-                                BorderThickness="{TemplateBinding BorderThickness}"
-                                CornerRadius="12">
-                            <ContentPresenter Margin="12,0"
-                                              HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
-                                              VerticalAlignment="Center"/>
-                        </Border>
+                        <Grid>
+                            <!-- delikatne tło hover/active -->
+                            <Border x:Name="bg" Background="{TemplateBinding Background}" CornerRadius="10"/>
+
+                            <!-- Pomarańczowe paski lewy/prawy (domyślnie ukryte) -->
+                            <Rectangle x:Name="leftBar"  Width="2" Fill="{DynamicResource Brand.Orange}"
+                                       HorizontalAlignment="Left"  RadiusX="1" RadiusY="1"
+                                       Opacity=".9" Visibility="Collapsed"/>
+                            <Rectangle x:Name="rightBar" Width="2" Fill="{DynamicResource Brand.Orange}"
+                                       HorizontalAlignment="Right" RadiusX="1" RadiusY="1"
+                                       Opacity=".9" Visibility="Collapsed"/>
+
+                            <!-- Ikona + tekst -->
+                            <Grid Margin="10,0">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="10"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+
+                                <!-- Ikona z Tag (pack URI do PNG) -->
+                                <Image Grid.Column="0" Width="18" Height="18"
+                                       Source="{Binding RelativeSource={RelativeSource TemplatedParent}, Path=Tag}"
+                                       RenderOptions.BitmapScalingMode="HighQuality"
+                                       SnapsToDevicePixels="True"
+                                       VerticalAlignment="Center"/>
+
+                                <ContentPresenter Grid.Column="2"
+                                                  VerticalAlignment="Center"
+                                                  TextElement.FontWeight="SemiBold"/>
+                            </Grid>
+
+                            <!-- Szary separator na dole -->
+                            <Rectangle Height="1" VerticalAlignment="Bottom"
+                                       Fill="{DynamicResource Surface.Border}" Opacity=".8"/>
+                        </Grid>
+
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="bg" Property="Background" Value="#33ED7A1A"/>
+                                <Setter TargetName="bg" Property="Background" Value="#1AFFFFFF"/>
                             </Trigger>
                             <Trigger Property="IsChecked" Value="True">
-                                <Setter TargetName="bg" Property="Background" Value="#33ED7A1A"/>
-                                <Setter Property="BorderBrush" Value="{DynamicResource Brand.Orange}"/>
+                                <Setter TargetName="bg" Property="Background" Value="#26ED7A1A"/>
+                                <Setter TargetName="leftBar"  Property="Visibility" Value="Visible"/>
+                                <Setter TargetName="rightBar" Property="Visibility" Value="Visible"/>
                                 <Setter Property="Foreground" Value="#FFFFFF"/>
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter Property="Opacity" Value=".5"/>
                             </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
@@ -157,10 +145,9 @@
                 </Setter.Value>
             </Setter>
         </Style>
-
     </Window.Resources>
 
-    <!-- WindowChrome (własny pasek tytułu) -->
+    <!-- Własny pasek tytułu -->
     <shell:WindowChrome.WindowChrome>
         <shell:WindowChrome CaptionHeight="48"
                             ResizeBorderThickness="6"
@@ -168,7 +155,7 @@
                             UseAeroCaptionButtons="False"/>
     </shell:WindowChrome.WindowChrome>
 
-    <!-- =================== LAYOUT =================== -->
+    <!-- ============== LAYOUT ============== -->
     <Grid>
         <Grid.RowDefinitions>
             <RowDefinition Height="48"/>
@@ -189,7 +176,8 @@
                        Width="40" Height="40" Stretch="Uniform" Margin="0,0,8,0"
                        RenderOptions.BitmapScalingMode="HighQuality"
                        shell:WindowChrome.IsHitTestVisibleInChrome="True"/>
-                <TextBlock Text="Logowanie / Rejestracja"
+                <!-- TUTAJ stały tytuł „Finly” -->
+                <TextBlock Text="Finly"
                            Foreground="{DynamicResource App.Foreground}"
                            FontSize="14" VerticalAlignment="Center"/>
             </StackPanel>
@@ -224,7 +212,7 @@
             </StackPanel>
         </Grid>
 
-        <!-- Treść -->
+        <!-- Główna siatka -->
         <Grid Grid.Row="1">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition x:Name="SidebarCol" Width="380" MinWidth="260"/>
@@ -235,7 +223,6 @@
             <Border x:Name="SidebarHost" Grid.Column="0"
                     Background="{DynamicResource Sidebar.Background}"
                     SizeChanged="SidebarHost_SizeChanged">
-                <!-- zawartość, która skaluje się przez LayoutTransform -->
                 <Grid x:Name="SidebarRoot">
                     <Grid.LayoutTransform>
                         <ScaleTransform x:Name="SidebarScale" ScaleX="1" ScaleY="1"/>
@@ -243,7 +230,7 @@
 
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto"/>
-                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
                         <RowDefinition Height="Auto"/>
                     </Grid.RowDefinitions>
 
@@ -259,25 +246,66 @@
                                        DockPanel.Dock="Left"/>
                             </DockPanel>
                         </Button>
+                        <!-- SZARY separator pod logo -->
                         <Separator Margin="0,12,0,8" Background="{DynamicResource Surface.Border}"/>
                     </StackPanel>
 
-                    <!-- nawigacja -->
-                    <StackPanel Grid.Row="1" Margin="8,0,8,8" x:Name="NavContainer">
-                        <ToggleButton x:Name="NavAdd"            Style="{StaticResource NavButton}" Content="Dodaj wydatek"  Click="Nav_Add_Click"/>
-                        <ToggleButton x:Name="NavTransactions"   Style="{StaticResource NavButton}" Content="Transakcje"     Click="Nav_Transactions_Click"/>
-                        <ToggleButton x:Name="NavCharts"         Style="{StaticResource NavButton}" Content="Wykresy"        Click="Nav_Charts_Click"/>
-                        <ToggleButton x:Name="NavBudgets"        Style="{StaticResource NavButton}" Content="Budżety"        Click="Nav_Budgets_Click"/>
-                        <ToggleButton x:Name="NavSubscriptions"  Style="{StaticResource NavButton}" Content="Subskrypcje"    Click="Nav_Subscriptions_Click"/>
-                        <ToggleButton x:Name="NavGoals"          Style="{StaticResource NavButton}" Content="Cele"           Click="Nav_Goals_Click"/>
-                        <ToggleButton x:Name="NavCategories"     Style="{StaticResource NavButton}" Content="Kategorie"      Click="Nav_Categories_Click"/>
-                        <ToggleButton x:Name="NavReports"        Style="{StaticResource NavButton}" Content="Raporty"        Click="Nav_Reports_Click"/>
-                        <ToggleButton x:Name="NavImport"         Style="{StaticResource NavButton}" Content="Import / Sync"  Click="Nav_Import_Click"/>
-                        <ToggleButton x:Name="NavEnvelopes" Style="{StaticResource NavButton}"
-              Content="Koperty" Click="Nav_Envelopes_Click"/>
-                        <ToggleButton x:Name="NavBanks" Style="{StaticResource NavButton}"
-              Content="Rachunki bankowe" Click="Nav_Banks_Click"/>
+                    <!-- NAV -->
+                    <StackPanel Grid.Row="1" x:Name="NavContainer" Margin="0,0,0,8" HorizontalAlignment="Stretch">
+                        <ToggleButton x:Name="NavAdd"            Style="{StaticResource NavItem}"
+                                      Content="Dodaj wydatek"
+                                      Tag="pack://application:,,,/Assets/Icons/Dark/add_24.png"
+                                      Click="Nav_Add_Click"/>
 
+                        <ToggleButton x:Name="NavTransactions"   Style="{StaticResource NavItem}"
+                                      Content="Transakcje"
+                                      Tag="pack://application:,,,/Assets/Icons/Dark/transactions_24.png"
+                                      Click="Nav_Transactions_Click"/>
+
+                        <ToggleButton x:Name="NavCharts"         Style="{StaticResource NavItem}"
+                                      Content="Wykresy"
+                                      Tag="pack://application:,,,/Assets/Icons/Dark/statistics_24.png"
+                                      Click="Nav_Charts_Click"/>
+
+                        <ToggleButton x:Name="NavBudgets"        Style="{StaticResource NavItem}"
+                                      Content="Budżety"
+                                      Tag="pack://application:,,,/Assets/Icons/Dark/budgets_24.png"
+                                      Click="Nav_Budgets_Click"/>
+
+                        <ToggleButton x:Name="NavSubscriptions"  Style="{StaticResource NavItem}"
+                                      Content="Subskrypcje"
+                                      Tag="pack://application:,,,/Assets/Icons/Dark/subscriptions_24.png"
+                                      Click="Nav_Subscriptions_Click"/>
+
+                        <ToggleButton x:Name="NavGoals"          Style="{StaticResource NavItem}"
+                                      Content="Cele"
+                                      Tag="pack://application:,,,/Assets/Icons/Dark/goals_24.png"
+                                      Click="Nav_Goals_Click"/>
+
+                        <ToggleButton x:Name="NavCategories"     Style="{StaticResource NavItem}"
+                                      Content="Kategorie"
+                                      Tag="pack://application:,,,/Assets/Icons/Dark/categories_24.png"
+                                      Click="Nav_Categories_Click"/>
+
+                        <ToggleButton x:Name="NavReports"        Style="{StaticResource NavItem}"
+                                      Content="Raporty"
+                                      Tag="pack://application:,,,/Assets/Icons/Dark/reports_24.png"
+                                      Click="Nav_Reports_Click"/>
+
+                        <ToggleButton x:Name="NavImport"         Style="{StaticResource NavItem}"
+                                      Content="Import / Sync"
+                                      Tag="pack://application:,,,/Assets/Icons/Dark/import_24.png"
+                                      Click="Nav_Import_Click"/>
+
+                        <ToggleButton x:Name="NavEnvelopes"      Style="{StaticResource NavItem}"
+                                      Content="Koperty"
+                                      Tag="pack://application:,,,/Assets/Icons/Dark/envelopes_24.png"
+                                      Click="Nav_Envelopes_Click"/>
+
+                        <ToggleButton x:Name="NavBanks"          Style="{StaticResource NavItem}"
+                                      Content="Rachunki bankowe"
+                                      Tag="pack://application:,,,/Assets/Icons/Dark/bank_accounts_24.png"
+                                      Click="Nav_Banks_Click"/>
                     </StackPanel>
 
                     <!-- stopka -->
@@ -330,7 +358,7 @@
                 </Grid>
             </Border>
 
-            <!-- CONTENT (ważne: ZIndex i HitTest) -->
+            <!-- CONTENT -->
             <Grid Grid.Column="1" Background="{DynamicResource App.Background}" ClipToBounds="True">
                 <ContentControl x:Name="RightHost"
                                 Panel.ZIndex="0"
@@ -344,6 +372,9 @@
         </Grid>
     </Grid>
 </Window>
+
+
+
 
 
 
