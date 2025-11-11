@@ -106,6 +106,28 @@
             </Setter>
         </Style>
 
+        <!-- NAV: wariant wyśrodkowany (ikona nad napisem) do zapełnienia całej kolumny -->
+        <Style x:Key="NavItemCentered" TargetType="ToggleButton" BasedOn="{StaticResource NavItem}">
+            <Setter Property="HorizontalContentAlignment" Value="Center"/>
+            <Setter Property="VerticalContentAlignment"   Value="Center"/>
+            <Setter Property="Padding" Value="0"/>
+            <Setter Property="Margin"  Value="0,2"/>
+            <Setter Property="MinHeight" Value="32"/>
+            <Setter Property="ContentTemplate">
+                <Setter.Value>
+                    <DataTemplate>
+                        <StackPanel Orientation="Vertical"
+                                    HorizontalAlignment="Center"
+                                    VerticalAlignment="Center">
+                            <Image Width="18" Height="18" Margin="0,0,0,6"
+                                   Source="{Binding RelativeSource={RelativeSource AncestorType=ToggleButton}, Path=Tag}"/>
+                            <TextBlock Text="{Binding}" TextAlignment="Center"/>
+                        </StackPanel>
+                    </DataTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
         <!-- Stopka -->
         <Style x:Key="SidebarActionToggle.Blue" TargetType="{x:Type ToggleButton}">
             <Setter Property="Foreground" Value="{DynamicResource Sidebar.Foreground}"/>
@@ -176,7 +198,6 @@
                        Width="40" Height="40" Stretch="Uniform" Margin="0,0,8,0"
                        RenderOptions.BitmapScalingMode="HighQuality"
                        shell:WindowChrome.IsHitTestVisibleInChrome="True"/>
-                <!-- TUTAJ stały tytuł „Finly” -->
                 <TextBlock Text="Finly"
                            Foreground="{DynamicResource App.Foreground}"
                            FontSize="14" VerticalAlignment="Center"/>
@@ -250,63 +271,71 @@
                         <Separator Margin="0,12,0,8" Background="{DynamicResource Surface.Border}"/>
                     </StackPanel>
 
-                    <!-- NAV -->
-                    <StackPanel Grid.Row="1" x:Name="NavContainer" Margin="0,0,0,8" HorizontalAlignment="Stretch">
-                        <ToggleButton x:Name="NavAdd"            Style="{StaticResource NavItem}"
-                                      Content="Dodaj wydatek"
-                                      Tag="pack://application:,,,/Assets/Icons/dodaj.png"
+                    <!-- NAV: równe wiersze wypełniające całą przestrzeń -->
+                    <Grid Grid.Row="1" x:Name="NavContainer" Margin="0,0,0,8" VerticalAlignment="Stretch">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="*"/>
+                            <RowDefinition Height="*"/>
+                            <RowDefinition Height="*"/>
+                            <RowDefinition Height="*"/>
+                            <RowDefinition Height="*"/>
+                            <RowDefinition Height="*"/>
+                            <RowDefinition Height="*"/>
+                            <RowDefinition Height="*"/>
+                            <RowDefinition Height="*"/>
+                            <RowDefinition Height="*"/>
+                            <RowDefinition Height="*"/>
+                            <RowDefinition Height="*"/>
+                        </Grid.RowDefinitions>
+
+                        <ToggleButton Grid.Row="0"  x:Name="NavAdd"           Style="{StaticResource NavItemCentered}"
+                                      Content="Dodaj"           Tag="pack://application:,,,/Assets/Icons/dodaj.png"
                                       Click="Nav_Add_Click"/>
 
-                        <ToggleButton x:Name="NavTransactions"   Style="{StaticResource NavItem}"
-                                      Content="Transakcje"
-                                      Tag="pack://application:,,,/Assets/Icons/budzety.png"
-                                      Click="Nav_Transactions_Click"/>
-
-                        <ToggleButton x:Name="NavCharts"         Style="{StaticResource NavItem}"
-                                      Content="Wykresy"
-                                      Tag="pack://application:,,,/Assets/Icons/budzety.png"
-                                      Click="Nav_Charts_Click"/>
-
-                        <ToggleButton x:Name="NavBudgets"        Style="{StaticResource NavItem}"
-                                      Content="Budżety"
-                                      Tag="pack://application:,,,/Assets/Icons/budzety.png"
+                        <ToggleButton Grid.Row="1"  x:Name="NavBudgets"       Style="{StaticResource NavItemCentered}"
+                                      Content="Budżety"         Tag="pack://application:,,,/Assets/Icons/budzety.png"
                                       Click="Nav_Budgets_Click"/>
 
-                        <ToggleButton x:Name="NavSubscriptions"  Style="{StaticResource NavItem}"
-                                      Content="Subskrypcje"
-                                      Tag="pack://application:,,,/Assets/Icons/budzety.png"
-                                      Click="Nav_Subscriptions_Click"/>
-
-                        <ToggleButton x:Name="NavGoals"          Style="{StaticResource NavItem}"
-                                      Content="Cele"
-                                      Tag="pack://application:,,,/Assets/Icons/cele.png"
+                        <ToggleButton Grid.Row="2"  x:Name="NavGoals"         Style="{StaticResource NavItemCentered}"
+                                      Content="Cele"            Tag="pack://application:,,,/Assets/Icons/cele.png"
                                       Click="Nav_Goals_Click"/>
 
-                        <ToggleButton x:Name="NavCategories"     Style="{StaticResource NavItem}"
-                                      Content="Kategorie"
-                                      Tag="pack://application:,,,/Assets/Icons/kategorie.png"
+                        <ToggleButton Grid.Row="3"  x:Name="NavCategories"    Style="{StaticResource NavItemCentered}"
+                                      Content="Kategorie"       Tag="pack://application:,,,/Assets/Icons/kategorie.png"
                                       Click="Nav_Categories_Click"/>
 
-                        <ToggleButton x:Name="NavReports"        Style="{StaticResource NavItem}"
-                                      Content="Raporty"
-                                      Tag="pack://application:,,,/Assets/Icons/raporty.png"
+                        <ToggleButton Grid.Row="4"  x:Name="NavCharts"        Style="{StaticResource NavItemCentered}"
+                                      Content="Statystyki"      Tag="pack://application:,,,/Assets/Icons/statystyki.png"
+                                      Click="Nav_Charts_Click"/>
+
+                        <ToggleButton Grid.Row="5"  x:Name="NavReports"       Style="{StaticResource NavItemCentered}"
+                                      Content="Raporty"         Tag="pack://application:,,,/Assets/Icons/raporty.png"
                                       Click="Nav_Reports_Click"/>
 
-                        <ToggleButton x:Name="NavImport"         Style="{StaticResource NavItem}"
-                                      Content="Import / Sync"
-                                      Tag="pack://application:,,,/Assets/Icons/budzety.png"
-                                      Click="Nav_Import_Click"/>
+                        <ToggleButton Grid.Row="6"  x:Name="NavLoans"         Style="{StaticResource NavItemCentered}"
+                                      Content="Kredyty"         Tag="pack://application:,,,/Assets/Icons/kredyty.png"
+                                      Click="Nav_Loans_Click"/>
 
-                        <ToggleButton x:Name="NavEnvelopes"      Style="{StaticResource NavItem}"
-                                      Content="Koperty"
-                                      Tag="pack://application:,,,/Assets/Icons/koperty.png"
+                        <ToggleButton Grid.Row="7"  x:Name="NavInvestments"   Style="{StaticResource NavItemCentered}"
+                                      Content="Inwestycje"      Tag="pack://application:,,,/Assets/Icons/inwestycje.png"
+                                      Click="Nav_Investments_Click"/>
+
+                        <ToggleButton Grid.Row="8"  x:Name="NavEnvelopes"     Style="{StaticResource NavItemCentered}"
+                                      Content="Koperty"         Tag="pack://application:,,,/Assets/Icons/koperty.png"
                                       Click="Nav_Envelopes_Click"/>
 
-                        <ToggleButton x:Name="NavBanks"          Style="{StaticResource NavItem}"
-                                      Content="Rachunki bankowe"
-                                      Tag="pack://application:,,,/Assets/Icons/kontabankowe.png"
+                        <ToggleButton Grid.Row="9"  x:Name="NavBanks"         Style="{StaticResource NavItemCentered}"
+                                      Content="Konta bankowe"   Tag="pack://application:,,,/Assets/Icons/kontabankowe.png"
                                       Click="Nav_Banks_Click"/>
-                    </StackPanel>
+
+                        <ToggleButton Grid.Row="10" x:Name="NavTransactions"  Style="{StaticResource NavItemCentered}"
+                                      Content="Transakcje"      Tag="pack://application:,,,/Assets/Icons/transakcje.png"
+                                      Click="Nav_Transactions_Click"/>
+
+                        <ToggleButton Grid.Row="11" x:Name="NavImport"        Style="{StaticResource NavItemCentered}"
+                                      Content="Import / Sync"   Tag="pack://application:,,,/Assets/Icons/import.png"
+                                      Click="Nav_Import_Click"/>
+                    </Grid>
 
                     <!-- stopka -->
                     <Grid Grid.Row="2" Margin="8,8,8,16">
@@ -372,6 +401,7 @@
         </Grid>
     </Grid>
 </Window>
+
 
 
 

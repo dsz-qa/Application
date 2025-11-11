@@ -1,0 +1,23 @@
+﻿<UserControl x:Class="Finly.Pages.InvestmentsPage"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+	<Grid Margin="16">
+		<Grid.RowDefinitions>
+			<RowDefinition Height="Auto"/>
+			<RowDefinition Height="*"/>
+		</Grid.RowDefinitions>
+
+		<TextBlock Text="Inwestycje" FontSize="20" FontWeight="Bold"
+                   Foreground="{DynamicResource App.Foreground}"/>
+
+		<Border Grid.Row="1" Margin="0,12,0,0"
+                Background="{DynamicResource Surface.Background}"
+                BorderBrush="{DynamicResource Surface.Border}" BorderThickness="1"
+                CornerRadius="10" Padding="12">
+			<TextBlock Text="Tu wstawimy tabelę/wykresy portfela inwestycyjnego."
+                       Foreground="{DynamicResource App.Foreground}"/>
+		</Border>
+	</Grid>
+</UserControl>
+
+

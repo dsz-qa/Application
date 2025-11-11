@@ -198,7 +198,7 @@ namespace Finly.Views
                 "transactions" => new TransactionsPage(),
                 "budget" or "budgets" => new BudgetsPage(),
                 "categories" => new CategoriesPage(),
-                "subscriptions" => new SubscriptionsPage(),
+                "subscriptions" => new InvestmentsPage(),
                 "goals" => new GoalsPage(),
                 "charts" => new ChartsPage(uid),
                 "import" => new ImportPage(),
@@ -235,9 +235,6 @@ namespace Finly.Views
         private void Nav_Budgets_Click(object s, RoutedEventArgs e)
         { RightHost.Content = new BudgetsPage(); SetActiveNav(NavBudgets); SetActiveFooter(null); }
 
-        private void Nav_Subscriptions_Click(object s, RoutedEventArgs e)
-        { RightHost.Content = new SubscriptionsPage(); SetActiveNav(NavSubscriptions); SetActiveFooter(null); }
-
         private void Nav_Goals_Click(object s, RoutedEventArgs e)
         { RightHost.Content = new GoalsPage(); SetActiveNav(NavGoals); SetActiveFooter(null); }
 
@@ -256,8 +253,20 @@ namespace Finly.Views
         private void Nav_Envelopes_Click(object s, RoutedEventArgs e)
         { NavigateTo("envelopes"); SetActiveNav(NavEnvelopes); SetActiveFooter(null); }
 
-        // ====== Stopka ======
-        private void OpenProfile_Click(object s, RoutedEventArgs e)
+private void Nav_Loans_Click(object sender, System.Windows.RoutedEventArgs e)
+    {
+        // odznacz inne przyciski nawigacji jeżeli masz taką logikę
+        RightHost.Content = new LoansPage();
+    }
+
+    private void Nav_Investments_Click(object sender, System.Windows.RoutedEventArgs e)
+    {
+        RightHost.Content = new InvestmentsPage();
+    }
+
+
+    // ====== Stopka ======
+    private void OpenProfile_Click(object s, RoutedEventArgs e)
         {
             RightHost.Content = new AccountPage(UserService.CurrentUserId);
             SetActiveNav(null); SetActiveFooter(FooterAccount);
