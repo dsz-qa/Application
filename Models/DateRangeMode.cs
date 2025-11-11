@@ -1,5 +1,12 @@
-﻿// Finly/Models/DateRangeMode.cs
-namespace Finly.Models
+﻿namespace Finly.Models
 {
-    public enum DateRangeMode { Day, Month, Quarter, Year }
+    // Używaj TYLKO tego enumu w całym projekcie
+    public enum DateRangeMode
+    {
+        Day,
+        Month,
+        Quarter,
+        Year,
+        Custom    // potrzebne dla zakresu ręcznego
+    }
 }

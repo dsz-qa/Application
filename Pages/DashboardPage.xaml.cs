@@ -36,31 +36,60 @@ namespace Finly.Pages
             KpiFreeCash.Text = freeCash.ToString("N2", CultureInfo.CurrentCulture) + " zł";
             KpiEnvelopes.Text = s.Envelopes.ToString("N2", CultureInfo.CurrentCulture) + " zł";
 
-            // W nagłówku Expandera pokaż kwotę łączną kont bankowych:
-            var banksHeader = s.Banks.ToString("N2", CultureInfo.CurrentCulture) + " zł";
-            BanksExpander.Header = banksHeader;
+            // Nagłówek expandera
+            BanksExpander.Header = s.Banks.ToString("N2", CultureInfo.CurrentCulture) + " zł";
         }
 
         private void LoadBanks()
         {
-            // Jeżeli metoda zwraca List<BankAccountModel> – użyj wprost:
             var list = DatabaseService.GetAccounts(_uid) ?? new List<BankAccountModel>();
-
-            BanksList.ItemsSource = list.Select(a => new
-            {
-                a.AccountName,
-                a.Balance
-            }).ToList();
+            BanksList.ItemsSource = list.Select(a => new { a.AccountName, a.Balance }).ToList();
         }
 
         private void PeriodBar_RangeChanged(object? sender, EventArgs e)
         {
-            // Tu kiedyś: filtrowanie po dacie
+            // Tu w przyszłości filtruj dane po zakresie
             RefreshKpis();
             LoadBanks();
         }
+
+        // Presety
+        private void QuickToday_Click(object sender, RoutedEventArgs e)
+        {
+            var d = DateTime.Today;
+            PeriodBar.Mode = DateRangeMode.Day;
+            PeriodBar.StartDate = d;
+            PeriodBar.EndDate = d;
+        }
+
+        private void QuickMonth_Click(object sender, RoutedEventArgs e)
+        {
+            var now = DateTime.Today;
+            PeriodBar.Mode = DateRangeMode.Month;
+            PeriodBar.StartDate = new DateTime(now.Year, now.Month, 1);
+            PeriodBar.EndDate = PeriodBar.StartDate.AddMonths(1).AddDays(-1);
+        }
+
+        private void QuickQuarter_Click(object sender, RoutedEventArgs e)
+        {
+            var now = DateTime.Today;
+            int qStartMonth = ((now.Month - 1) / 3) * 3 + 1;
+            PeriodBar.Mode = DateRangeMode.Quarter;
+            PeriodBar.StartDate = new DateTime(now.Year, qStartMonth, 1);
+            PeriodBar.EndDate = PeriodBar.StartDate.AddMonths(3).AddDays(-1);
+        }
+
+        private void QuickYear_Click(object sender, RoutedEventArgs e)
+        {
+            var now = DateTime.Today;
+            PeriodBar.Mode = DateRangeMode.Year;
+            PeriodBar.StartDate = new DateTime(now.Year, 1, 1);
+            PeriodBar.EndDate = new DateTime(now.Year, 12, 31);
+        }
     }
 }
+
+
 
 
 

@@ -1,9 +1,15 @@
 ﻿<UserControl x:Class="Finly.Pages.DashboardPage"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-             xmlns:controls="clr-namespace:Finly.Views.Controls">
+             xmlns:controls="clr-namespace:Finly.Views.Controls"
+             xmlns:conv="clr-namespace:Finly.Helpers.Converters">
 
     <UserControl.Resources>
+
+        <!-- Konwerter równości (string/enum->bool) -->
+        <conv:EqualsToStringConverter x:Key="EqualsToString"/>
+
+        <!-- Karty -->
         <Style x:Key="Card" TargetType="Border">
             <Setter Property="Background" Value="{DynamicResource Surface.Background}"/>
             <Setter Property="BorderBrush" Value="{DynamicResource Surface.Border}"/>
@@ -31,27 +37,88 @@
             <Setter Property="Foreground" Value="{DynamicResource App.Foreground}"/>
         </Style>
 
-        <!-- Nagłówek Expandera: tytuł + kwota (string z Header) + biała strzałka -->
+        <!-- Baza przycisków presetów -->
+        <Style x:Key="QuickBaseButton" TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
+            <Setter Property="Padding" Value="12,6"/>
+            <Setter Property="Margin"  Value="4"/>
+        </Style>
+
+        <!-- AKTYWNE presetowe style (bez MultiBinding!) -->
+        <Style x:Key="QuickTodayStyle" TargetType="Button" BasedOn="{StaticResource QuickBaseButton}">
+            <Style.Triggers>
+                <DataTrigger Value="True">
+                    <DataTrigger.Binding>
+                        <Binding ElementName="PeriodBar" Path="Mode"
+                                 Converter="{StaticResource EqualsToString}" ConverterParameter="Day"/>
+                    </DataTrigger.Binding>
+                    <Setter Property="Background" Value="{DynamicResource Brand.Blue}"/>
+                    <Setter Property="Foreground" Value="White"/>
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+
+        <Style x:Key="QuickMonthStyle" TargetType="Button" BasedOn="{StaticResource QuickBaseButton}">
+            <Style.Triggers>
+                <DataTrigger Value="True">
+                    <DataTrigger.Binding>
+                        <Binding ElementName="PeriodBar" Path="Mode"
+                                 Converter="{StaticResource EqualsToString}" ConverterParameter="Month"/>
+                    </DataTrigger.Binding>
+                    <Setter Property="Background" Value="{DynamicResource Brand.Blue}"/>
+                    <Setter Property="Foreground" Value="White"/>
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+
+        <Style x:Key="QuickQuarterStyle" TargetType="Button" BasedOn="{StaticResource QuickBaseButton}">
+            <Style.Triggers>
+                <DataTrigger Value="True">
+                    <DataTrigger.Binding>
+                        <Binding ElementName="PeriodBar" Path="Mode"
+                                 Converter="{StaticResource EqualsToString}" ConverterParameter="Quarter"/>
+                    </DataTrigger.Binding>
+                    <Setter Property="Background" Value="{DynamicResource Brand.Blue}"/>
+                    <Setter Property="Foreground" Value="White"/>
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+
+        <Style x:Key="QuickYearStyle" TargetType="Button" BasedOn="{StaticResource QuickBaseButton}">
+            <Style.Triggers>
+                <DataTrigger Value="True">
+                    <DataTrigger.Binding>
+                        <Binding ElementName="PeriodBar" Path="Mode"
+                                 Converter="{StaticResource EqualsToString}" ConverterParameter="Year"/>
+                    </DataTrigger.Binding>
+                    <Setter Property="Background" Value="{DynamicResource Brand.Blue}"/>
+                    <Setter Property="Foreground" Value="White"/>
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+
+        <!-- Niebieska ramka DatePickerów -->
+        <Style TargetType="DatePicker">
+            <Setter Property="BorderBrush"     Value="{DynamicResource Brand.Blue}"/>
+            <Setter Property="BorderThickness" Value="1.5"/>
+        </Style>
+
+        <!-- Header expandera: tytuł + kwota -->
         <DataTemplate x:Key="BanksHeaderTemplate">
             <Grid>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*"/>
                     <ColumnDefinition Width="Auto"/>
                 </Grid.ColumnDefinitions>
-
                 <StackPanel>
                     <TextBlock Text="Konta bankowe" Style="{StaticResource CardHeader}"/>
                     <TextBlock Text="{Binding}" Style="{StaticResource KpiValueStyle}"/>
                 </StackPanel>
-
-                <TextBlock Grid.Column="1"
-                           Text="▼"
-                           Foreground="White"
-                           FontSize="14"
-                           VerticalAlignment="Center"
-                           Margin="8,0,0,0"/>
+                <!-- Ikonka (możesz usunąć jeśli nie chcesz strzałki) -->
+                <TextBlock Grid.Column="1" Text="▼" Foreground="White"
+                           FontSize="14" VerticalAlignment="Center" Margin="8,0,0,0"/>
             </Grid>
         </DataTemplate>
+
     </UserControl.Resources>
 
     <ScrollViewer VerticalScrollBarVisibility="Auto">
@@ -65,12 +132,7 @@
                 <RowDefinition Height="*"/>
             </Grid.RowDefinitions>
 
-            <TextBlock Grid.Row="0"
-                       Text="Saldo"
-                       FontSize="24"
-                       FontWeight="Bold"
-                       Foreground="{DynamicResource App.Foreground}"/>
-
+            <!-- Pasek KPI (4 kafle) -->
             <Grid Grid.Row="2">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*"/>
@@ -86,11 +148,9 @@
                     </StackPanel>
                 </Border>
 
-                <!-- Uwaga: HeaderTemplate = BanksHeaderTemplate (bez podkreślenia) -->
                 <Border Grid.Column="1" Style="{StaticResource Card}" Margin="0,0,12,0">
                     <Expander x:Name="BanksExpander"
-                              Background="Transparent"
-                              BorderBrush="{x:Null}"
+                              Background="Transparent" BorderBrush="{x:Null}"
                               IsExpanded="False"
                               HeaderTemplate="{StaticResource BanksHeaderTemplate}">
                         <ItemsControl x:Name="BanksList" Margin="0,10,0,0">
@@ -130,6 +190,7 @@
                 </Border>
             </Grid>
 
+            <!-- WYŚRODKOWANY blok zakresu -->
             <Grid Grid.Row="4">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*"/>
@@ -139,23 +200,44 @@
 
                 <Border Grid.Column="1"
                         Style="{StaticResource AccentCard}"
-                        Padding="12"
-                        MinWidth="720"
-                        MaxWidth="980">
+                        Padding="16" Width="560"
+                        Margin="0,24,0,0"
+                        HorizontalAlignment="Center">
                     <StackPanel>
                         <TextBlock Text="Wybierz okres, z którego chcesz zobaczyć dane."
                                    FontWeight="SemiBold"
                                    Foreground="{DynamicResource App.Foreground}"
-                                   Margin="0,0,0,6"/>
+                                   Margin="0,0,0,10"
+                                   TextAlignment="Center"
+                                   HorizontalAlignment="Center"/>
+
+                        <!-- PASEK (bez strzałek, jeśli je ukryłaś w samym kontrolku) -->
                         <controls:PeriodBarControl x:Name="PeriodBar"
-                                                   Margin="0,8,0,0"
+                                                   Width="520"
+                                                   Margin="0,4,0,10"
                                                    RangeChanged="PeriodBar_RangeChanged"/>
+
+                        <!-- Presety -->
+                        <UniformGrid Rows="1" Columns="4" HorizontalAlignment="Center">
+                            <Button Content="Dzisiaj"     Style="{StaticResource QuickTodayStyle}"   Click="QuickToday_Click"/>
+                            <Button Content="Ten miesiąc" Style="{StaticResource QuickMonthStyle}"   Click="QuickMonth_Click"/>
+                            <Button Content="Ten kwartał" Style="{StaticResource QuickQuarterStyle}" Click="QuickQuarter_Click"/>
+                            <Button Content="Ten rok"     Style="{StaticResource QuickYearStyle}"    Click="QuickYear_Click"/>
+                        </UniformGrid>
+
+                        <!-- Kalendarze (dwukierunkowo z paskiem) -->
+                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                            <DatePicker SelectedDate="{Binding StartDate, ElementName=PeriodBar, Mode=TwoWay}" Margin="0,0,8,0"/>
+                            <TextBlock Text="—" VerticalAlignment="Center" Margin="4,0"/>
+                            <DatePicker SelectedDate="{Binding EndDate, ElementName=PeriodBar, Mode=TwoWay}"   Margin="8,0,0,0"/>
+                        </StackPanel>
                     </StackPanel>
                 </Border>
             </Grid>
         </Grid>
     </ScrollViewer>
 </UserControl>
+
 
 
 

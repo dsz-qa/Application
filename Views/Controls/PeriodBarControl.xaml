@@ -2,93 +2,44 @@
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              x:Name="Root">
-	<Border Background="{DynamicResource Brand.Blue}" CornerRadius="12" Padding="8">
-		<Grid>
-			<Grid.ColumnDefinitions>
-				<ColumnDefinition Width="Auto"/>
-				<ColumnDefinition Width="*"/>
-				<ColumnDefinition Width="Auto"/>
-			</Grid.ColumnDefinitions>
+    <Grid>
+        <!-- NIEBIESKI PASEK -->
+        <Border Background="{DynamicResource Brand.Blue}" CornerRadius="12" Padding="8">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
 
-			<!-- ◀ -->
-			<Button Grid.Column="0"
-                    Click="Prev_Click"
-                    Background="#22FFFFFF"
-                    Foreground="White"
-                    BorderBrush="{x:Null}"
-                    Padding="12,6"
-                    Margin="0,0,6,0"
-                    Cursor="Hand">
-				<TextBlock Text="◀" FontSize="14"/>
-			</Button>
+                <!-- ◀ -->
+                <Button Grid.Column="0" Click="Prev_Click"
+                        Background="#22FFFFFF" Foreground="White" BorderBrush="{x:Null}"
+                        Padding="12,6" Margin="0,0,6,0" Cursor="Hand">
+                    <TextBlock Text="◀" FontSize="14"/>
+                </Button>
 
-			<!-- Środek: widoczna etykieta + klik rozwija popup -->
-			<Border Grid.Column="1"
-                    Background="#22FFFFFF"
-                    CornerRadius="8"
-                    MouseLeftButtonUp="Center_Click"
-                    Cursor="Hand">
-				<DockPanel LastChildFill="False" Margin="10,6">
-					<TextBlock Text="{Binding PeriodLabel, ElementName=Root}"
-                               Foreground="White"
-                               FontWeight="SemiBold"/>
-					<TextBlock Text="▼" Foreground="White" Margin="8,0,0,0"/>
-				</DockPanel>
-			</Border>
+                <!-- ŚRODEK: tylko etykieta -->
+                <Border Grid.Column="1" Background="#22FFFFFF" CornerRadius="8"
+                        Cursor="Arrow">
+                    <DockPanel LastChildFill="False" Margin="10,6" HorizontalAlignment="Center">
+                        <TextBlock Text="{Binding PeriodLabel, ElementName=Root}"
+                                   Foreground="White" FontWeight="SemiBold" />
+                    </DockPanel>
+                </Border>
 
-			<!-- ▶ -->
-			<Button Grid.Column="2"
-                    Click="Next_Click"
-                    Background="#22FFFFFF"
-                    Foreground="White"
-                    BorderBrush="{x:Null}"
-                    Padding="12,6"
-                    Cursor="Hand"
-                    HorizontalAlignment="Right">
-				<TextBlock Text="▶" FontSize="14"/>
-			</Button>
-
-			<!-- Popup z wyborem zakresu i trybu -->
-			<Popup x:Name="PickerPopup"
-                   Placement="Bottom"
-                   PlacementTarget="{Binding ElementName=Root}"
-                   StaysOpen="False"
-                   AllowsTransparency="True">
-				<Border Background="{DynamicResource Surface.Background}"
-                        BorderBrush="{DynamicResource Surface.Border}"
-                        BorderThickness="1"
-                        CornerRadius="10"
-                        Padding="12">
-					<StackPanel>
-						<TextBlock Text="Wybierz okres"
-                                   FontWeight="SemiBold"
-                                   Margin="0,0,0,6"/>
-						<UniformGrid Columns="2" Rows="2" Margin="0,4,0,8">
-							<Button Content="Dzisiaj"      Click="Pick_Today"        Margin="4"/>
-							<Button Content="Ten miesiąc"  Click="Pick_ThisMonth"    Margin="4"/>
-							<Button Content="Ten kwartał"  Click="Pick_ThisQuarter"  Margin="4"/>
-							<Button Content="Ten rok"      Click="Pick_ThisYear"     Margin="4"/>
-						</UniformGrid>
-
-						<!-- Tryb grupowania – bez converterów -->
-						<StackPanel Orientation="Horizontal" Margin="0,4,0,0">
-							<RadioButton Content="Dzień"   Tag="Day"     Margin="0,0,8,0" Checked="Mode_Checked"/>
-							<RadioButton Content="Miesiąc" Tag="Month"   Margin="0,0,8,0" Checked="Mode_Checked"/>
-							<RadioButton Content="Kwartał" Tag="Quarter" Margin="0,0,8,0" Checked="Mode_Checked"/>
-							<RadioButton Content="Rok"     Tag="Year"                 Checked="Mode_Checked"/>
-						</StackPanel>
-
-						<StackPanel Orientation="Horizontal" Margin="0,8,0,0">
-							<DatePicker SelectedDate="{Binding StartDate, ElementName=Root, Mode=TwoWay}"/>
-							<TextBlock Text="—" Margin="8,0" VerticalAlignment="Center"/>
-							<DatePicker SelectedDate="{Binding EndDate, ElementName=Root, Mode=TwoWay}"/>
-							<Button Content="OK" Margin="8,0,0,0" Click="ClosePopup_Click"/>
-						</StackPanel>
-					</StackPanel>
-				</Border>
-			</Popup>
-		</Grid>
-	</Border>
+                <!-- ▶ -->
+                <Button Grid.Column="2" Click="Next_Click"
+                        Background="#22FFFFFF" Foreground="White" BorderBrush="{x:Null}"
+                        Padding="12,6" Cursor="Hand" HorizontalAlignment="Right">
+                    <TextBlock Text="▶" FontSize="14"/>
+                </Button>
+            </Grid>
+        </Border>
+    </Grid>
 </UserControl>
+
+
+
 
 
