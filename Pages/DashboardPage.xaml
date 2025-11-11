@@ -96,11 +96,22 @@
             </Style.Triggers>
         </Style>
 
-        <!-- Niebieska ramka DatePickerów -->
+        <!-- Niebiesza ramka DatePickerów -->
         <Style TargetType="DatePicker">
-            <Setter Property="BorderBrush"     Value="{DynamicResource Brand.Blue}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource Brand.Blue}"/>
+            <Setter Property="BorderThickness" Value="1.5"/>
+            <Setter Property="Foreground" Value="{DynamicResource App.Foreground}"/>
+            <Setter Property="Background" Value="{DynamicResource Surface.Background}"/>
+        </Style>
+
+        <!-- Tekst w polu edycyjnym DatePickera na biało -->
+        <Style TargetType="{x:Type DatePickerTextBox}">
+            <Setter Property="Foreground" Value="{DynamicResource App.Foreground}"/>
+            <Setter Property="Background" Value="{DynamicResource Surface.Background}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource Brand.Blue}"/>
             <Setter Property="BorderThickness" Value="1.5"/>
         </Style>
+
 
         <!-- Header expandera: tytuł + kwota -->
         <DataTemplate x:Key="BanksHeaderTemplate">
@@ -211,26 +222,26 @@
                                    TextAlignment="Center"
                                    HorizontalAlignment="Center"/>
 
+
                         <!-- PASEK (bez strzałek, jeśli je ukryłaś w samym kontrolku) -->
                         <controls:PeriodBarControl x:Name="PeriodBar"
                                                    Width="520"
                                                    Margin="0,4,0,10"
                                                    RangeChanged="PeriodBar_RangeChanged"/>
 
-                        <!-- Presety -->
-                        <UniformGrid Rows="1" Columns="4" HorizontalAlignment="Center">
-                            <Button Content="Dzisiaj"     Style="{StaticResource QuickTodayStyle}"   Click="QuickToday_Click"/>
-                            <Button Content="Ten miesiąc" Style="{StaticResource QuickMonthStyle}"   Click="QuickMonth_Click"/>
-                            <Button Content="Ten kwartał" Style="{StaticResource QuickQuarterStyle}" Click="QuickQuarter_Click"/>
-                            <Button Content="Ten rok"     Style="{StaticResource QuickYearStyle}"    Click="QuickYear_Click"/>
-                        </UniformGrid>
 
                         <!-- Kalendarze (dwukierunkowo z paskiem) -->
+                        <!-- KALENDARZE -->
                         <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
-                            <DatePicker SelectedDate="{Binding StartDate, ElementName=PeriodBar, Mode=TwoWay}" Margin="0,0,8,0"/>
+                            <DatePicker SelectedDate="{Binding StartDate, ElementName=PeriodBar, Mode=TwoWay}"
+                SelectedDateChanged="ManualDateChanged"
+                Margin="0,0,8,0"/>
                             <TextBlock Text="—" VerticalAlignment="Center" Margin="4,0"/>
-                            <DatePicker SelectedDate="{Binding EndDate, ElementName=PeriodBar, Mode=TwoWay}"   Margin="8,0,0,0"/>
+                            <DatePicker SelectedDate="{Binding EndDate, ElementName=PeriodBar, Mode=TwoWay}"
+                SelectedDateChanged="ManualDateChanged"
+                Margin="8,0,0,0"/>
                         </StackPanel>
+
                     </StackPanel>
                 </Border>
             </Grid>

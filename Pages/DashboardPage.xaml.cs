@@ -86,6 +86,16 @@ namespace Finly.Pages
             PeriodBar.StartDate = new DateTime(now.Year, 1, 1);
             PeriodBar.EndDate = new DateTime(now.Year, 12, 31);
         }
+
+
+        private void ManualDateChanged(object? sender, SelectionChangedEventArgs e)
+        {
+            PeriodBar.Mode = DateRangeMode.Custom;
+            if (PeriodBar.StartDate > PeriodBar.EndDate)
+                (PeriodBar.StartDate, PeriodBar.EndDate) = (PeriodBar.EndDate, PeriodBar.StartDate);
+        }
+
+
     }
 }
 
