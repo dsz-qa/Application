@@ -223,6 +223,15 @@ namespace Finly.Views
         }
 
         // Kliknięcia NAV
+        private void Nav_Home_Click(object sender, RoutedEventArgs e)
+        {
+            // Tu ładujesz stronę główną (DashboardPage). Jeśli masz już metodę SelectNav,
+            // użyj jej – ważne, by odznaczyć inne ToggleButtony i wstawić zawartość.
+            UncheckAllNav();
+            NavHome.IsChecked = true;
+            RightHost.Content = new Finly.Pages.DashboardPage(UserService.GetCurrentUserId());
+        }
+
         private void Nav_Add_Click(object s, RoutedEventArgs e)
         { RightHost.Content = new AddExpensePage(UserService.CurrentUserId); SetActiveNav(NavAdd); SetActiveFooter(null); }
 
