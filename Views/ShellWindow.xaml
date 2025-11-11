@@ -254,57 +254,57 @@
                     <StackPanel Grid.Row="1" x:Name="NavContainer" Margin="0,0,0,8" HorizontalAlignment="Stretch">
                         <ToggleButton x:Name="NavAdd"            Style="{StaticResource NavItem}"
                                       Content="Dodaj wydatek"
-                                      Tag="pack://application:,,,/Assets/Icons/Dark/add_24.png"
+                                      Tag="pack://application:,,,/Assets/Icons/dodaj.png"
                                       Click="Nav_Add_Click"/>
 
                         <ToggleButton x:Name="NavTransactions"   Style="{StaticResource NavItem}"
                                       Content="Transakcje"
-                                      Tag="pack://application:,,,/Assets/Icons/Dark/transactions_24.png"
+                                      Tag="pack://application:,,,/Assets/Icons/budzety.png"
                                       Click="Nav_Transactions_Click"/>
 
                         <ToggleButton x:Name="NavCharts"         Style="{StaticResource NavItem}"
                                       Content="Wykresy"
-                                      Tag="pack://application:,,,/Assets/Icons/Dark/statistics_24.png"
+                                      Tag="pack://application:,,,/Assets/Icons/budzety.png"
                                       Click="Nav_Charts_Click"/>
 
                         <ToggleButton x:Name="NavBudgets"        Style="{StaticResource NavItem}"
                                       Content="Budżety"
-                                      Tag="pack://application:,,,/Assets/Icons/Dark/budgets_24.png"
+                                      Tag="pack://application:,,,/Assets/Icons/budzety.png"
                                       Click="Nav_Budgets_Click"/>
 
                         <ToggleButton x:Name="NavSubscriptions"  Style="{StaticResource NavItem}"
                                       Content="Subskrypcje"
-                                      Tag="pack://application:,,,/Assets/Icons/Dark/subscriptions_24.png"
+                                      Tag="pack://application:,,,/Assets/Icons/budzety.png"
                                       Click="Nav_Subscriptions_Click"/>
 
                         <ToggleButton x:Name="NavGoals"          Style="{StaticResource NavItem}"
                                       Content="Cele"
-                                      Tag="pack://application:,,,/Assets/Icons/Dark/goals_24.png"
+                                      Tag="pack://application:,,,/Assets/Icons/cele.png"
                                       Click="Nav_Goals_Click"/>
 
                         <ToggleButton x:Name="NavCategories"     Style="{StaticResource NavItem}"
                                       Content="Kategorie"
-                                      Tag="pack://application:,,,/Assets/Icons/Dark/categories_24.png"
+                                      Tag="pack://application:,,,/Assets/Icons/kategorie.png"
                                       Click="Nav_Categories_Click"/>
 
                         <ToggleButton x:Name="NavReports"        Style="{StaticResource NavItem}"
                                       Content="Raporty"
-                                      Tag="pack://application:,,,/Assets/Icons/Dark/reports_24.png"
+                                      Tag="pack://application:,,,/Assets/Icons/raporty.png"
                                       Click="Nav_Reports_Click"/>
 
                         <ToggleButton x:Name="NavImport"         Style="{StaticResource NavItem}"
                                       Content="Import / Sync"
-                                      Tag="pack://application:,,,/Assets/Icons/Dark/import_24.png"
+                                      Tag="pack://application:,,,/Assets/Icons/budzety.png"
                                       Click="Nav_Import_Click"/>
 
                         <ToggleButton x:Name="NavEnvelopes"      Style="{StaticResource NavItem}"
                                       Content="Koperty"
-                                      Tag="pack://application:,,,/Assets/Icons/Dark/envelopes_24.png"
+                                      Tag="pack://application:,,,/Assets/Icons/koperty.png"
                                       Click="Nav_Envelopes_Click"/>
 
                         <ToggleButton x:Name="NavBanks"          Style="{StaticResource NavItem}"
                                       Content="Rachunki bankowe"
-                                      Tag="pack://application:,,,/Assets/Icons/Dark/bank_accounts_24.png"
+                                      Tag="pack://application:,,,/Assets/Icons/kontabankowe.png"
                                       Click="Nav_Banks_Click"/>
                     </StackPanel>
 

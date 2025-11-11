@@ -104,6 +104,8 @@
             <Setter Property="Background" Value="{DynamicResource Surface.Background}"/>
         </Style>
 
+
+
         <!-- Tekst w polu edycyjnym DatePickera na biało -->
         <Style TargetType="{x:Type DatePickerTextBox}">
             <Setter Property="Foreground" Value="{DynamicResource App.Foreground}"/>
@@ -234,13 +236,13 @@
                         <!-- KALENDARZE -->
                         <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
                             <DatePicker SelectedDate="{Binding StartDate, ElementName=PeriodBar, Mode=TwoWay}"
-                SelectedDateChanged="ManualDateChanged"
-                Margin="0,0,8,0"/>
+                SelectedDateChanged="ManualDateChanged" Margin="0,0,8,0"/>
                             <TextBlock Text="—" VerticalAlignment="Center" Margin="4,0"/>
                             <DatePicker SelectedDate="{Binding EndDate, ElementName=PeriodBar, Mode=TwoWay}"
-                SelectedDateChanged="ManualDateChanged"
-                Margin="8,0,0,0"/>
+                SelectedDateChanged="ManualDateChanged" Margin="8,0,0,0"/>
                         </StackPanel>
+
+
 
                     </StackPanel>
                 </Border>

@@ -22,12 +22,25 @@
 	  <None Remove="Assets\Icons\add_24.png" />
 	  <None Remove="Assets\Icons\add_48.png" />
 	  <None Remove="Assets\Icons\budgets.png" />
+	  <None Remove="Assets\Icons\budzety.png" />
+	  <None Remove="Assets\Icons\cele.png" />
+	  <None Remove="Assets\Icons\dodaj.png" />
+	  <None Remove="Assets\Icons\inwestycje.png" />
 	  <None Remove="Assets\Icons\kategorie.png" />
+	  <None Remove="Assets\Icons\kontabankowe.png" />
+	  <None Remove="Assets\Icons\koperty.png" />
 	  <None Remove="Assets\Icons\kredyty.png" />
 	  <None Remove="Assets\Icons\logoFinly.ico" />
+	  <None Remove="Assets\Icons\przychody.png" />
+	  <None Remove="Assets\Icons\raporty.png" />
 	  <None Remove="Assets\Icons\statistics_24.png" />
 	  <None Remove="Assets\Icons\statistics_48.png" />
+	  <None Remove="Assets\Icons\statystyki.png" />
+	  <None Remove="Assets\Icons\wydatki.png" />
 	  <None Remove="Assets\Images\logoFinly.png" />
+	</ItemGroup>
+	<ItemGroup>
+	  <Resource Include="Assets\Icons\kontabankowe.png" />
 	</ItemGroup>
 
 	<!-- Logo jako zasób -->
@@ -50,16 +63,20 @@
 		<Folder Include="Styles\" />
 	</ItemGroup>
 	<ItemGroup>
-	  <Resource Include="Assets\Icons\add_24.png" />
-	  <Resource Include="Assets\Icons\add_48.png" />
-	  <Resource Include="Assets\Icons\budgets.png" />
+	  <Resource Include="Assets\Icons\budzety.png" />
+	  <Resource Include="Assets\Icons\cele.png" />
+	  <Resource Include="Assets\Icons\dodaj.png" />
+	  <Resource Include="Assets\Icons\inwestycje.png" />
 	  <Resource Include="Assets\Icons\kategorie.png" />
+	  <Resource Include="Assets\Icons\koperty.png" />
 	  <Resource Include="Assets\Icons\kredyty.png" />
 	  <Resource Include="Assets\Icons\logoFinly.ico">
 	    <CopyToOutputDirectory>Never</CopyToOutputDirectory>
 	  </Resource>
-	  <Resource Include="Assets\Icons\statistics_24.png" />
-	  <Resource Include="Assets\Icons\statistics_48.png" />
+	  <Resource Include="Assets\Icons\przychody.png" />
+	  <Resource Include="Assets\Icons\raporty.png" />
+	  <Resource Include="Assets\Icons\statystyki.png" />
+	  <Resource Include="Assets\Icons\wydatki.png" />
 	  <Resource Include="Assets\Images\logoFinly.png">
 	    <CopyToOutputDirectory>Never</CopyToOutputDirectory>
 	  </Resource>

@@ -20,10 +20,14 @@ namespace Finly.Pages
 
             Loaded += (_, __) =>
             {
+                // domyślnie: Dzisiaj
+                PeriodBar.SetPreset(DateRangeMode.Day);
+
                 RefreshKpis();
                 LoadBanks();
             };
         }
+
 
         private void RefreshKpis()
         {
@@ -88,12 +92,12 @@ namespace Finly.Pages
         }
 
 
-        private void ManualDateChanged(object? sender, SelectionChangedEventArgs e)
+        private void ManualDateChanged(object sender, SelectionChangedEventArgs e)
         {
-            PeriodBar.Mode = DateRangeMode.Custom;
-            if (PeriodBar.StartDate > PeriodBar.EndDate)
-                (PeriodBar.StartDate, PeriodBar.EndDate) = (PeriodBar.EndDate, PeriodBar.StartDate);
+            if (PeriodBar.Mode != DateRangeMode.Custom)
+                PeriodBar.Mode = DateRangeMode.Custom;  // pokaż zakres dat na pasku
         }
+
 
 
     }

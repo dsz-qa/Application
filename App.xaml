@@ -25,6 +25,18 @@
             <FontFamily x:Key="App.FontFamily">Segoe UI</FontFamily>
             <sys:Double x:Key="App.FontSize">14</sys:Double>
 
+            <!-- Tekst DatePickera na jasno -->
+            <Style TargetType="{x:Type DatePickerTextBox}">
+                <Setter Property="Foreground" Value="{DynamicResource App.Foreground}"/>
+                <Setter Property="Background" Value="{DynamicResource Surface.Background}"/>
+            </Style>
+
+            <Style TargetType="DatePicker">
+                <Setter Property="BorderBrush" Value="{DynamicResource Brand.Blue}"/>
+                <Setter Property="BorderThickness" Value="1.5"/>
+                <Setter Property="Foreground" Value="{DynamicResource App.Foreground}"/>
+            </Style>
+
             <!-- Tekst -->
             <Style TargetType="TextBlock">
                 <Setter Property="Foreground" Value="{DynamicResource App.Foreground}"/>

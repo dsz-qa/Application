@@ -1,5 +1,4 @@
 ﻿using System;
-using System.Globalization;
 using System.Windows;
 using System.Windows.Controls;
 using Finly.Models;
@@ -8,34 +7,34 @@ namespace Finly.Views.Controls
 {
     public partial class PeriodBarControl : UserControl
     {
+        private static readonly DateRangeMode[] PresetOrder =
+            { DateRangeMode.Day, DateRangeMode.Week, DateRangeMode.Month, DateRangeMode.Quarter, DateRangeMode.Year };
+
         public PeriodBarControl()
         {
             InitializeComponent();
-            // start: Dzisiaj
-            SetMode(DateRangeMode.Day, DateTime.Today);
+            ApplyPreset(DateRangeMode.Day, DateTime.Today); // domyślnie: Dzisiaj
+            UpdateLabel();
         }
 
-        // ===== DependencyProperties =====
+        // ===== Dependency Properties =====
         public static readonly DependencyProperty StartDateProperty =
             DependencyProperty.Register(nameof(StartDate), typeof(DateTime), typeof(PeriodBarControl),
-                new FrameworkPropertyMetadata(DateTime.Today, FrameworkPropertyMetadataOptions.BindsTwoWayByDefault, OnRangeChanged));
+                new FrameworkPropertyMetadata(DateTime.Today, FrameworkPropertyMetadataOptions.BindsTwoWayByDefault, OnRangePropChanged));
 
         public static readonly DependencyProperty EndDateProperty =
             DependencyProperty.Register(nameof(EndDate), typeof(DateTime), typeof(PeriodBarControl),
-                new FrameworkPropertyMetadata(DateTime.Today, FrameworkPropertyMetadataOptions.BindsTwoWayByDefault, OnRangeChanged));
+                new FrameworkPropertyMetadata(DateTime.Today, FrameworkPropertyMetadataOptions.BindsTwoWayByDefault, OnRangePropChanged));
 
         public static readonly DependencyProperty ModeProperty =
             DependencyProperty.Register(nameof(Mode), typeof(DateRangeMode), typeof(PeriodBarControl),
-                new FrameworkPropertyMetadata(DateRangeMode.Day, OnRangeChanged));
+                new FrameworkPropertyMetadata(DateRangeMode.Day, OnRangePropChanged));
 
-        // ReadOnly DP – żeby binding Text na XAML reagował bez sztuczek z DataContext
-        private static readonly DependencyPropertyKey PeriodLabelPropertyKey =
-            DependencyProperty.RegisterReadOnly(nameof(PeriodLabel), typeof(string), typeof(PeriodBarControl),
-                new PropertyMetadata(""));
+        public static readonly DependencyProperty PeriodLabelProperty =
+            DependencyProperty.Register(nameof(PeriodLabel), typeof(string), typeof(PeriodBarControl),
+                new PropertyMetadata(string.Empty));
 
-        public static readonly DependencyProperty PeriodLabelProperty = PeriodLabelPropertyKey.DependencyProperty;
-
-        private static void OnRangeChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
+        private static void OnRangePropChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
         {
             var c = (PeriodBarControl)d;
             c.UpdateLabel();
@@ -63,19 +62,28 @@ namespace Finly.Views.Controls
         public string PeriodLabel
         {
             get => (string)GetValue(PeriodLabelProperty);
-            private set => SetValue(PeriodLabelPropertyKey, value);
+            set => SetValue(PeriodLabelProperty, value);
         }
 
         public event EventHandler? RangeChanged;
 
-        // ===== Helpers =====
-        private static DateTime StartOfWeek(DateTime day, DayOfWeek firstDay)
+        // ===== Etykieta na pasku =====
+        private void UpdateLabel()
         {
-            int diff = (7 + (int)day.DayOfWeek - (int)firstDay) % 7;
-            return day.AddDays(-diff).Date;
+            PeriodLabel = Mode switch
+            {
+                DateRangeMode.Day => "Dzisiaj",
+                DateRangeMode.Week => "Ten tydzień",
+                DateRangeMode.Month => "Ten miesiąc",
+                DateRangeMode.Quarter => "Ten kwartał",
+                DateRangeMode.Year => "Ten rok",
+                DateRangeMode.Custom => $"{StartDate:dd.MM.yyyy} – {EndDate:dd.MM.yyyy}",
+                _ => $"{StartDate:dd.MM.yyyy} – {EndDate:dd.MM.yyyy}"
+            };
         }
 
-        private void SetMode(DateRangeMode mode, DateTime anchor)
+        // Ustaw zakresy dla presetów
+        private void ApplyPreset(DateRangeMode mode, DateTime anchor)
         {
             Mode = mode;
 
@@ -86,8 +94,8 @@ namespace Finly.Views.Controls
                     break;
 
                 case DateRangeMode.Week:
-                    var first = CultureInfo.CurrentCulture.DateTimeFormat.FirstDayOfWeek; // w PL: Monday
-                    StartDate = StartOfWeek(anchor, first);
+                    int diff = ((int)anchor.DayOfWeek + 6) % 7; // pon=0
+                    StartDate = anchor.AddDays(-diff).Date;
                     EndDate = StartDate.AddDays(6);
                     break;
 
@@ -97,8 +105,8 @@ namespace Finly.Views.Controls
                     break;
 
                 case DateRangeMode.Quarter:
-                    int qStart = (((anchor.Month - 1) / 3) * 3) + 1;
-                    StartDate = new DateTime(anchor.Year, qStart, 1);
+                    int qStartMonth = (((anchor.Month - 1) / 3) * 3) + 1;
+                    StartDate = new DateTime(anchor.Year, qStartMonth, 1);
                     EndDate = StartDate.AddMonths(3).AddDays(-1);
                     break;
 
@@ -108,59 +116,36 @@ namespace Finly.Views.Controls
                     break;
 
                 case DateRangeMode.Custom:
-                    // pozostaw zakres taki jak jest
+                    // zakres ustawiany ręcznie w kalendarzach
                     break;
             }
 
             UpdateLabel();
         }
 
-        private void UpdateLabel()
-        {
-            var today = DateTime.Today;
-            string? friendly = Mode switch
-            {
-                DateRangeMode.Day when StartDate.Date == today => "Dzisiaj",
-                DateRangeMode.Week when StartDate == StartOfWeek(today, CultureInfo.CurrentCulture.DateTimeFormat.FirstDayOfWeek) => "Ten tydzień",
-                DateRangeMode.Month when StartDate.Year == today.Year && StartDate.Month == today.Month => "Ten miesiąc",
-                DateRangeMode.Quarter when StartDate.Year == today.Year && ((StartDate.Month - 1) / 3) == ((today.Month - 1) / 3) => "Ten kwartał",
-                DateRangeMode.Year when StartDate.Year == today.Year => "Ten rok",
-                _ => null
-            };
-
-            PeriodLabel = friendly ?? Mode switch
-            {
-                DateRangeMode.Day => StartDate.ToString("dd.MM.yyyy"),
-                DateRangeMode.Week => $"{StartDate:dd.MM} – {EndDate:dd.MM.yyyy}",
-                DateRangeMode.Month => StartDate.ToString("MMM yyyy"),
-                DateRangeMode.Quarter => $"Q{((StartDate.Month - 1) / 3) + 1} {StartDate:yyyy}",
-                DateRangeMode.Year => StartDate.ToString("yyyy"),
-                DateRangeMode.Custom => $"{StartDate:dd.MM.yyyy} – {EndDate:dd.MM.yyyy}",
-                _ => $"{StartDate:dd.MM.yyyy} – {EndDate:dd.MM.yyyy}"
-            };
-        }
-
-        // ===== Strzałki – zmiana TRYBU (nie przesuwanie dat) =====
-        private static readonly DateRangeMode[] ModeOrder =
-            { DateRangeMode.Day, DateRangeMode.Week, DateRangeMode.Month, DateRangeMode.Quarter, DateRangeMode.Year };
-
+        // ===== Strzałki – przełączają TYLKO presety (w pętli) =====
         private void Prev_Click(object s, RoutedEventArgs e)
         {
-            int i = Array.IndexOf(ModeOrder, Mode);
-            if (i < 0) i = 0;
-            i = (i - 1 + ModeOrder.Length) % ModeOrder.Length;
-            SetMode(ModeOrder[i], DateTime.Today);
+            var idx = Array.IndexOf(PresetOrder, Mode);
+            if (idx < 0) idx = 0;
+            idx = (idx - 1 + PresetOrder.Length) % PresetOrder.Length;
+            ApplyPreset(PresetOrder[idx], DateTime.Today);
         }
 
         private void Next_Click(object s, RoutedEventArgs e)
         {
-            int i = Array.IndexOf(ModeOrder, Mode);
-            if (i < 0) i = 0;
-            i = (i + 1) % ModeOrder.Length;
-            SetMode(ModeOrder[i], DateTime.Today);
+            var idx = Array.IndexOf(PresetOrder, Mode);
+            if (idx < 0) idx = 0;
+            idx = (idx + 1) % PresetOrder.Length;
+            ApplyPreset(PresetOrder[idx], DateTime.Today);
         }
+
+        // Publiczne API (przydaje się z zewnątrz)
+        public void SetPreset(DateRangeMode mode) => ApplyPreset(mode, DateTime.Today);
     }
 }
+
+
 
 
 
