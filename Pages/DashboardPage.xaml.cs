@@ -2,21 +2,33 @@
 using Finly.Services;
 using System;
 using System.Collections.Generic;
+using System.Collections.ObjectModel;
+using System.ComponentModel;
 using System.Globalization;
 using System.Linq;
+using System.Runtime.CompilerServices;
 using System.Windows;
 using System.Windows.Controls;
 
 namespace Finly.Pages
 {
-    public partial class DashboardPage : UserControl
+    public partial class DashboardPage : UserControl, INotifyPropertyChanged
     {
         private readonly int _uid;
+
+        // Dane do wykresów
+        public ObservableCollection<CategorySpend> CategorySpendingCurrent { get; } = new();
+        public ObservableCollection<CategorySpend> CategorySpendingLast30 { get; } = new();
+        private decimal _maxAmountCurrent;
+        public decimal MaxAmountCurrent { get => _maxAmountCurrent; set { _maxAmountCurrent = value; OnPropertyChanged(); } }
+        private decimal _maxAmountLast30;
+        public decimal MaxAmountLast30 { get => _maxAmountLast30; set { _maxAmountLast30 = value; OnPropertyChanged(); } }
 
         public DashboardPage(int userId)
         {
             InitializeComponent();
             _uid = userId;
+            DataContext = this;
 
             Loaded += (_, __) =>
             {
@@ -25,9 +37,9 @@ namespace Finly.Pages
 
                 RefreshKpis();
                 LoadBanks();
+                LoadCategoryCharts();   // wypełnij wykresy
             };
         }
-
 
         private void RefreshKpis()
         {
@@ -55,53 +67,60 @@ namespace Finly.Pages
             // Tu w przyszłości filtruj dane po zakresie
             RefreshKpis();
             LoadBanks();
+            LoadCategoryCharts();
         }
-
-        // Presety
-        private void QuickToday_Click(object sender, RoutedEventArgs e)
-        {
-            var d = DateTime.Today;
-            PeriodBar.Mode = DateRangeMode.Day;
-            PeriodBar.StartDate = d;
-            PeriodBar.EndDate = d;
-        }
-
-        private void QuickMonth_Click(object sender, RoutedEventArgs e)
-        {
-            var now = DateTime.Today;
-            PeriodBar.Mode = DateRangeMode.Month;
-            PeriodBar.StartDate = new DateTime(now.Year, now.Month, 1);
-            PeriodBar.EndDate = PeriodBar.StartDate.AddMonths(1).AddDays(-1);
-        }
-
-        private void QuickQuarter_Click(object sender, RoutedEventArgs e)
-        {
-            var now = DateTime.Today;
-            int qStartMonth = ((now.Month - 1) / 3) * 3 + 1;
-            PeriodBar.Mode = DateRangeMode.Quarter;
-            PeriodBar.StartDate = new DateTime(now.Year, qStartMonth, 1);
-            PeriodBar.EndDate = PeriodBar.StartDate.AddMonths(3).AddDays(-1);
-        }
-
-        private void QuickYear_Click(object sender, RoutedEventArgs e)
-        {
-            var now = DateTime.Today;
-            PeriodBar.Mode = DateRangeMode.Year;
-            PeriodBar.StartDate = new DateTime(now.Year, 1, 1);
-            PeriodBar.EndDate = new DateTime(now.Year, 12, 31);
-        }
-
 
         private void ManualDateChanged(object sender, SelectionChangedEventArgs e)
         {
             if (PeriodBar.Mode != DateRangeMode.Custom)
-                PeriodBar.Mode = DateRangeMode.Custom;  // pokaż zakres dat na pasku
+                PeriodBar.Mode = DateRangeMode.Custom;
         }
 
+        // ===== WYKRESY: prosta agregacja (na razie przykładowe dane) =====
+        private void LoadCategoryCharts()
+        {
+            // TODO: Podmienić na realne sumy z bazy w wybranym zakresie PeriodBar.StartDate/EndDate
+            var sampleNow = new[]
+            {
+                new CategorySpend("Jedzenie",     820.50m),
+                new CategorySpend("Transport",    210.00m),
+                new CategorySpend("Mieszkanie",  1450.00m),
+                new CategorySpend("Zdrowie",      90.00m),
+                new CategorySpend("Rozrywka",     160.00m),
+            };
 
+            var sample30 = new[]
+            {
+                new CategorySpend("Jedzenie",     970.10m),
+                new CategorySpend("Transport",    260.00m),
+                new CategorySpend("Mieszkanie",  1450.00m),
+                new CategorySpend("Zdrowie",     120.00m),
+                new CategorySpend("Inne",         80.00m),
+            };
 
+            CategorySpendingCurrent.Clear();
+            foreach (var x in sampleNow) CategorySpendingCurrent.Add(x);
+            MaxAmountCurrent = CategorySpendingCurrent.Any() ? CategorySpendingCurrent.Max(s => s.Amount) : 1m;
+
+            CategorySpendingLast30.Clear();
+            foreach (var x in sample30) CategorySpendingLast30.Add(x);
+            MaxAmountLast30 = CategorySpendingLast30.Any() ? CategorySpendingLast30.Max(s => s.Amount) : 1m;
+        }
+
+        // ===== INotifyPropertyChanged =====
+        public event PropertyChangedEventHandler? PropertyChanged;
+        private void OnPropertyChanged([CallerMemberName] string? name = null)
+            => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
+    }
+
+    public sealed class CategorySpend
+    {
+        public string Name { get; }
+        public decimal Amount { get; }
+        public CategorySpend(string name, decimal amount) { Name = name; Amount = amount; }
     }
 }
+
 
 
 

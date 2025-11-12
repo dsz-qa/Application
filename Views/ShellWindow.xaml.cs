@@ -21,8 +21,7 @@ namespace Finly.Views
         public ShellWindow()
         {
             InitializeComponent();
-            // domyślnie: Panel główny
-            GoHome();
+            GoHome(); // domyślnie: Panel główny
         }
 
         // ===== WinAPI – pełny ekran z poszanowaniem paska zadań =====
@@ -105,11 +104,16 @@ namespace Finly.Views
             FitSidebar();
         }
 
-        private void SidebarHost_SizeChanged(object sender, SizeChangedEventArgs e) => FitSidebar();
+        private void SidebarHost_SizeChanged(object? sender, SizeChangedEventArgs e) => FitSidebar();
 
         // ===== Pasek tytułu =====
         private void TitleBar_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
         {
+            // Nie przeciągaj, jeśli kliknięto kontrolkę
+            if (e.OriginalSource is DependencyObject d &&
+                (FindParent<Button>(d) != null || FindParent<TextBlock>(d) != null || FindParent<Image>(d) != null))
+                return;
+
             if (e.ClickCount == 2) { MaxRestore_Click(sender, e); return; }
             try { DragMove(); } catch { /* ignoruj */ }
         }
@@ -207,8 +211,6 @@ namespace Finly.Views
             RightHost.Content = view;
         }
 
-        private void Logo_Click(object s, RoutedEventArgs e) => GoHome();
-
         private void GoHome()
         {
             UncheckAllNav();
@@ -304,7 +306,20 @@ namespace Finly.Views
                     yield return sub;
             }
         }
+
+        private static T? FindParent<T>(DependencyObject child) where T : DependencyObject
+        {
+            while (child != null)
+            {
+                var parent = VisualTreeHelper.GetParent(child);
+                if (parent is T p) return p;
+                child = parent;
+            }
+            return null;
+        }
     }
 }
+
+
 
 

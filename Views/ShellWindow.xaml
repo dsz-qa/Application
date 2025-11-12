@@ -36,9 +36,10 @@
             <Setter Property="Foreground" Value="{DynamicResource App.Foreground}"/>
             <Setter Property="Cursor" Value="Hand"/>
             <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
+            <Setter Property="shell:WindowChrome.IsHitTestVisibleInChrome" Value="True"/>
         </Style>
 
-        <!-- NAV: standard – ikona po lewej, tekst wyśrodkowany w pasie -->
+        <!-- NAV: standard -->
         <Style x:Key="NavItemCentered" TargetType="{x:Type ToggleButton}">
             <Setter Property="HorizontalAlignment" Value="Stretch"/>
             <Setter Property="HorizontalContentAlignment" Value="Center"/>
@@ -56,7 +57,6 @@
                     <ControlTemplate TargetType="{x:Type ToggleButton}">
                         <Grid>
                             <Border x:Name="bg" Background="{TemplateBinding Background}" CornerRadius="10"/>
-                            <!-- słupki (aktywny) -->
                             <Rectangle x:Name="leftBar"  Width="2" Fill="{DynamicResource Brand.Orange}"
                                        HorizontalAlignment="Left"  Opacity=".9" Visibility="Collapsed"/>
                             <Rectangle x:Name="rightBar" Width="2" Fill="{DynamicResource Brand.Orange}"
@@ -69,7 +69,7 @@
                                     <ColumnDefinition Width="*"/>
                                 </Grid.ColumnDefinitions>
 
-                                <!-- Ikona: PNG jako maska, kolorujemy Fill -->
+                                <!-- Ikona jako maska -->
                                 <Rectangle x:Name="iconShape"
                                            Grid.Column="0"
                                            Width="{DynamicResource Nav.IconSize}"
@@ -187,7 +187,7 @@
             </Setter>
         </Style>
 
-        <!-- Stopka: przyciski -->
+        <!-- Stopka -->
         <Style x:Key="SidebarActionToggle.Blue" TargetType="{x:Type ToggleButton}">
             <Setter Property="Foreground" Value="{DynamicResource Sidebar.Foreground}"/>
             <Setter Property="Background" Value="Transparent"/>
@@ -252,18 +252,16 @@
                 <ColumnDefinition Width="Auto"/>
             </Grid.ColumnDefinitions>
 
+            <!-- Logo + tytuł – BEZ nawigacji -->
             <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="12,0,0,0">
-                <Button Click="Logo_Click" Background="Transparent" BorderBrush="{x:Null}" Cursor="Hand">
-                    <DockPanel LastChildFill="False" VerticalAlignment="Center">
-                        <Image Source="/Assets/Images/logoFinly.png"
-                               Width="40" Height="40" Stretch="Uniform" Margin="0,0,8,0"
-                               RenderOptions.BitmapScalingMode="HighQuality"
-                               shell:WindowChrome.IsHitTestVisibleInChrome="True"/>
-                        <TextBlock Text="Finly"
-                                   Foreground="{DynamicResource App.Foreground}"
-                                   FontSize="14" VerticalAlignment="Center"/>
-                    </DockPanel>
-                </Button>
+                <Image Source="/Assets/Images/logoFinly.png"
+                       Width="40" Height="40" Stretch="Uniform" Margin="0,0,8,0"
+                       RenderOptions.BitmapScalingMode="HighQuality"
+                       shell:WindowChrome.IsHitTestVisibleInChrome="True"/>
+                <TextBlock Text="Finly"
+                           Foreground="{DynamicResource App.Foreground}"
+                           FontSize="14" VerticalAlignment="Center"
+                           shell:WindowChrome.IsHitTestVisibleInChrome="True"/>
             </StackPanel>
 
             <StackPanel Grid.Column="1" Orientation="Horizontal">
@@ -301,22 +299,20 @@
                         <RowDefinition Height="Auto"/>
                     </Grid.RowDefinitions>
 
-                    <!-- Logo w sidebarze -->
+                    <!-- Logo (bez Click) -->
                     <StackPanel Grid.Row="0" Margin="16,16,16,8">
-                        <Button Click="Logo_Click" Background="Transparent" BorderBrush="{x:Null}" Cursor="Hand">
-                            <DockPanel LastChildFill="False" VerticalAlignment="Center">
-                                <Image Width="{DynamicResource Logo.Size}" Height="{DynamicResource Logo.Size}"
-                                       SnapsToDevicePixels="True"
-                                       RenderOptions.BitmapScalingMode="HighQuality"
-                                       Stretch="Uniform"
-                                       Source="pack://application:,,,/Assets/Images/logoFinly.png"
-                                       DockPanel.Dock="Left"/>
-                            </DockPanel>
-                        </Button>
+                        <DockPanel VerticalAlignment="Center">
+                            <Image Width="{DynamicResource Logo.Size}" Height="{DynamicResource Logo.Size}"
+                                   SnapsToDevicePixels="True"
+                                   RenderOptions.BitmapScalingMode="HighQuality"
+                                   Stretch="Uniform"
+                                   Source="pack://application:,,,/Assets/Images/logoFinly.png"
+                                   DockPanel.Dock="Left"/>
+                        </DockPanel>
                         <Separator Margin="0,12,0,8" Background="{DynamicResource Surface.Border}"/>
                     </StackPanel>
 
-                    <!-- NAV: równe wiersze wypełniające przestrzeń -->
+                    <!-- NAV -->
                     <Grid Grid.Row="1" x:Name="NavContainer" Margin="0,0,0,8" VerticalAlignment="Stretch">
                         <Grid.RowDefinitions>
                             <RowDefinition Height="*"/>
@@ -333,13 +329,11 @@
                             <RowDefinition Height="*"/>
                         </Grid.RowDefinitions>
 
-                        <!-- 0: PANEL GŁÓWNY (wyróżniony) -->
                         <ToggleButton Grid.Row="0" x:Name="NavHome" Style="{StaticResource NavItemPrimary}"
                                       Content="Panel główny"
                                       Tag="pack://application:,,,/Assets/Icons/stronaglowna.png"
                                       Click="Nav_Home_Click"/>
 
-                        <!-- 1.. pozostałe zakładki -->
                         <ToggleButton Grid.Row="1" x:Name="NavAdd" Style="{StaticResource NavItemCentered}"
                                       Content="Dodaj"
                                       Tag="pack://application:,,,/Assets/Icons/dodaj.png"
@@ -457,6 +451,7 @@
         </Grid>
     </Grid>
 </Window>
+
 
 
 
