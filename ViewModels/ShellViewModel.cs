@@ -11,10 +11,8 @@ using Finly.Services;
 
 namespace Finly.ViewModels
 {
-    /// <summary>
-    /// ViewModel powłoki (ShellWindow): utrzymuje listę zakładek i bieżący widok.
-    /// </summary>
-    public class ShellWViewModel : INotifyPropertyChanged
+    /// <summary>ViewModel powłoki (ShellWindow): nawigacja i bieżący widok.</summary>
+    public class ShellViewModel : INotifyPropertyChanged
     {
         public ObservableCollection<NavItem> NavItems { get; }
 
@@ -27,38 +25,37 @@ namespace Finly.ViewModels
 
         public string DisplayName => UserService.CurrentUserName ?? "Użytkownik";
 
-        // Komendy
         public ICommand NavigateToCommand { get; }
         public ICommand OpenSettingsCommand { get; }
         public ICommand LogoutCommand { get; }
 
-        public ShellWViewModel()
+        public ShellViewModel()
         {
-            // Zdefiniuj nawigację (klucz musi odpowiadać temu, czego użyjesz w XAML)
+            int uid = UserService.GetCurrentUserId(); // bezpiecznie, gdyby CurrentUserId nie był ustawiony
+
             NavItems = new ObservableCollection<NavItem>
             {
-                new("add",          "Dodaj wydatek",     () => new AddExpensePage()),
-                new("transactions", "Transakcje",        () => new TransactionsPage()),
-                new("charts",       "Wykresy",           () => new ChartsPage()),
-                new("budgets",      "Budżety",           () => new BudgetsPage()),
-                new("subscriptions","Subskrypcje",       () => new InvestmentsPage()),
-                new("goals",        "Cele",              () => new GoalsPage()),
-                new("categories",   "Kategorie",         () => new CategoriesPage()),
-                new("reports",      "Raporty",           () => new ReportsPage()),
-                // jeśli masz ImportPage.xaml (albo ImportSyncPage.xaml) – dopasuj tutaj:
-                new("import",       "Import / Sync",     () => new ImportPage()),
-                new("settings",     "Ustawienia",        () => new SettingsPage())
+                new("add",          "Dodaj",            () => new AddExpensePage(uid)),
+                new("transactions", "Transakcje",       () => new TransactionsPage()),
+                new("charts",       "Wykresy",          () => new ChartsPage()),
+                new("budgets",      "Budżety",          () => new BudgetsPage()),
+                new("subscriptions","Subskrypcje",      () => new InvestmentsPage()),
+                new("goals",        "Cele",             () => new GoalsPage()),
+                new("categories",   "Kategorie",        () => new CategoriesPage()),
+                new("reports",      "Raporty",          () => new ReportsPage()),
+                new("import",       "Import / Sync",    () => new ImportPage()),
+                new("settings",     "Ustawienia",       () => new SettingsPage())
             };
 
             NavigateToCommand = new RelayCommand(p => NavigateTo(p?.ToString()));
             OpenSettingsCommand = new RelayCommand(() => NavigateTo("settings"));
             LogoutCommand = new RelayCommand(() => OnLogoutRequested());
 
-            // startowy ekran
-            NavigateTo("transactions");
+            // Ekran startowy – wybierz, co wolisz:
+            NavigateTo("add");          // od razu formularz Dodaj
+            // NavigateTo("transactions");
         }
 
-        /// <summary>Zmienia aktywną zakładkę po kluczu (np. "charts").</summary>
         public void NavigateTo(string? key)
         {
             var item = NavItems.FirstOrDefault(i => string.Equals(i.Key, key, StringComparison.OrdinalIgnoreCase))
@@ -68,13 +65,12 @@ namespace Finly.ViewModels
             CurrentView = item.Factory();
         }
 
-        // ===== sygnał do okna (np. zamknij sesję i wróć do AuthWindow) =====
         public event EventHandler? LogoutRequested;
         private void OnLogoutRequested() => LogoutRequested?.Invoke(this, EventArgs.Empty);
 
-        // ===== INotifyPropertyChanged =====
         public event PropertyChangedEventHandler? PropertyChanged;
         protected void OnPropertyChanged([CallerMemberName] string? name = null)
             => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
     }
 }
+

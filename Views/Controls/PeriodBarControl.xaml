@@ -1,6 +1,7 @@
 ﻿<UserControl x:Class="Finly.Views.Controls.PeriodBarControl"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:controls="clr-namespace:Finly.Views.Controls"
              x:Name="Root">
     <Grid>
         <!-- NIEBIESKI PASEK -->

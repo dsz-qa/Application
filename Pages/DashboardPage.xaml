@@ -266,7 +266,69 @@
                     </Border>
                 </Grid>
 
-                <!-- PRAWO: zostawione puste na przyszłość (Grid.Column=2) -->
+                <!-- PRAWO: paskowe wykresy -->
+                <StackPanel Grid.Column="2" Margin="16,0,0,0">
+                    <!-- KATEGORIE -->
+                    <Border Style="{StaticResource Card}" Margin="0,0,0,12">
+                        <StackPanel>
+                            <TextBlock Text="Najwyższe wydatki — kategorie"
+                 Style="{StaticResource CardHeader}" Margin="0,0,0,8"/>
+                            <ItemsControl x:Name="TopCategoryBars">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <StackPanel Margin="0,4,0,6">
+                                            <Grid>
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*"/>
+                                                    <ColumnDefinition Width="Auto"/>
+                                                </Grid.ColumnDefinitions>
+                                                <TextBlock Text="{Binding Name}"
+                           Foreground="{DynamicResource App.Foreground}"
+                           Margin="0,0,8,2" />
+                                                <TextBlock Grid.Column="1"
+                           Text="{Binding PercentStr}"
+                           Foreground="{DynamicResource App.Foreground}"/>
+                                            </Grid>
+                                            <ProgressBar Minimum="0" Maximum="100" Height="10"
+                           Value="{Binding Percent}" />
+                                        </StackPanel>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- SKLEPY -->
+                    <Border Style="{StaticResource Card}">
+                        <StackPanel>
+                            <TextBlock Text="Najwyższe wydatki — sklepy"
+                 Style="{StaticResource CardHeader}" Margin="0,0,0,8"/>
+                            <ItemsControl x:Name="TopMerchantBars">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <StackPanel Margin="0,4,0,6">
+                                            <Grid>
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*"/>
+                                                    <ColumnDefinition Width="Auto"/>
+                                                </Grid.ColumnDefinitions>
+                                                <TextBlock Text="{Binding Name}"
+                           Foreground="{DynamicResource App.Foreground}"
+                           Margin="0,0,8,2" />
+                                                <TextBlock Grid.Column="1"
+                           Text="{Binding PercentStr}"
+                           Foreground="{DynamicResource App.Foreground}"/>
+                                            </Grid>
+                                            <ProgressBar Minimum="0" Maximum="100" Height="10"
+                           Value="{Binding Percent}" />
+                                        </StackPanel>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </StackPanel>
+                    </Border>
+                </StackPanel>
+
             </Grid>
         </Grid>
     </ScrollViewer>

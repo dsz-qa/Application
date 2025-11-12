@@ -78,7 +78,7 @@ namespace Finly.Pages
 
         private void LoadCharts()
         {
-            // StartDate/EndDate są DateTime (nie-nullable) → bez operatora ??
+            // StartDate/EndDate są DateTime (nie-nullable)
             DateTime start = PeriodBar.StartDate;
             DateTime end = PeriodBar.EndDate;
 
@@ -93,50 +93,90 @@ namespace Finly.Pages
             var incomes = DatabaseService.GetIncomeBySourceSafe(_uid, start, end);
             BuildPie(PieIncome, incomes);
 
-            // TABELKI (po wyrenderowaniu drzewa wizualnego)
+            // TABELKI + paski po prawej (po wyrenderowaniu drzewa wizualnego)
             Dispatcher.BeginInvoke(new Action(() =>
             {
                 BindExpenseTable(expenses);
                 BindIncomeTable(incomes);
+                BindMerchantBars(start, end);   // prawa kolumna: „sklepy”
             }), DispatcherPriority.Loaded);
         }
 
         private void BindExpenseTable(IEnumerable<DatabaseService.CategoryAmountDto> data)
         {
-            var sum = data?.Sum(x => x.Amount) ?? 0m;
-            var rows = (data ?? Enumerable.Empty<DatabaseService.CategoryAmountDto>())
+            var list = (data ?? Enumerable.Empty<DatabaseService.CategoryAmountDto>()).ToList();
+            var sum = list.Sum(x => x.Amount);
+
+            var rows = list
                 .OrderByDescending(x => x.Amount)
                 .Select(x => new TableRow
                 {
                     Name = x.Name,
                     Amount = x.Amount,
-                    PercentStr = sum > 0 ? Math.Round((x.Amount / sum) * 100m, 0) + "%" : "0%"
+                    Percent = sum > 0 ? (double)(x.Amount / sum) * 100.0 : 0.0
                 })
                 .ToList();
 
-            var lv = ExpenseTable ?? (ListView)FindName("ExpenseTable");
-            if (lv != null) lv.ItemsSource = rows;
+            if (FindName("ExpenseTable") is ListView lv)
+                lv.ItemsSource = rows;
+
+            // prawa kolumna – „Najwyższe wydatki — kategorie”
+            if (FindName("TopCategoryBars") is ItemsControl catBars)
+                catBars.ItemsSource = rows.Take(5).ToList();
         }
 
         private void BindIncomeTable(IEnumerable<DatabaseService.CategoryAmountDto> data)
         {
-            var sum = data?.Sum(x => x.Amount) ?? 0m;
-            var rows = (data ?? Enumerable.Empty<DatabaseService.CategoryAmountDto>())
+            var list = (data ?? Enumerable.Empty<DatabaseService.CategoryAmountDto>()).ToList();
+            var sum = list.Sum(x => x.Amount);
+
+            var rows = list
                 .OrderByDescending(x => x.Amount)
                 .Select(x => new TableRow
                 {
                     Name = x.Name,
                     Amount = x.Amount,
-                    PercentStr = sum > 0 ? Math.Round((x.Amount / sum) * 100m, 0) + "%" : "0%"
+                    Percent = sum > 0 ? (double)(x.Amount / sum) * 100.0 : 0.0
                 })
                 .ToList();
 
-            var lv = IncomeTable ?? (ListView)FindName("IncomeTable");
-            if (lv != null) lv.ItemsSource = rows;
+            if (FindName("IncomeTable") is ListView lv)
+                lv.ItemsSource = rows;
         }
 
-        private void BuildPie(ObservableCollection<PieSlice> target,
-                              IEnumerable<DatabaseService.CategoryAmountDto> source)
+        private void BindMerchantBars(DateTime start, DateTime end)
+        {
+            if (FindName("TopMerchantBars") is not ItemsControl shopBars)
+                return;
+
+            try
+            {
+                var shops = DatabaseService.GetSpendingByMerchantSafe(_uid, start, end);
+                var sum = shops.Sum(x => x.Amount);
+
+                var rows = shops
+                    .OrderByDescending(x => x.Amount)
+                    .Take(5)
+                    .Select(x => new TableRow
+                    {
+                        Name = x.Name,
+                        Amount = x.Amount,
+                        Percent = sum > 0 ? (double)(x.Amount / sum) * 100.0 : 0.0
+                    })
+                    .ToList();
+
+                shopBars.ItemsSource = rows;
+            }
+            catch
+            {
+                // bezpieczny fallback
+                shopBars.ItemsSource = Array.Empty<TableRow>();
+            }
+        }
+
+        private void BuildPie(
+            ObservableCollection<PieSlice> target,
+            IEnumerable<DatabaseService.CategoryAmountDto> source)
         {
             target.Clear();
 
@@ -228,9 +268,11 @@ namespace Finly.Pages
         public string Name { get; set; } = "";
         public decimal Amount { get; set; }
         public string AmountStr => Amount.ToString("N2") + " zł";
-        public string PercentStr { get; set; } = "0%";
+        public double Percent { get; set; }          // 0..100
+        public string PercentStr => Math.Round(Percent, 0) + "%";
     }
 }
+
 
 
 

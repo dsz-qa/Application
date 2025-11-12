@@ -5,6 +5,7 @@ using System.Collections.Generic;
 using System.Data;
 using System.Globalization;
 using System.IO;
+using System.Linq;
 using System.Text;
 
 namespace Finly.Services
@@ -42,7 +43,6 @@ namespace Finly.Services
             var con = new SqliteConnection(cs);
             con.Open();
 
-            // FK musz¹ byæ W£¥CZONE na KA¯DYM po³¹czeniu
             using var pragma = con.CreateCommand();
             pragma.CommandText = "PRAGMA foreign_keys = ON;";
             pragma.ExecuteNonQuery();
@@ -187,9 +187,6 @@ namespace Finly.Services
         // ========================= KONTA =========================
         // =========================================================
 
-        /// <summary>
-        /// Widok listy rachunków. Kolumna BankName to placeholder (na przysz³oœæ JOIN).
-        /// </summary>
         public static DataTable GetAccountsTable(int userId)
         {
             using var c = OpenAndEnsureSchema();
@@ -243,8 +240,6 @@ ORDER BY AccountName;";
         {
             using var c = OpenAndEnsureSchema();
 
-            // Je¿eli podano ConnectionId, ale taki rekord nie istnieje – wyzeruj,
-            // aby nie z³apaæ FK na INSERT.
             if (a.ConnectionId is int cid)
             {
                 using var chk = c.CreateCommand();
@@ -267,24 +262,18 @@ SELECT last_insert_rowid();";
             return Convert.ToInt32(cmd.ExecuteScalar());
         }
 
-        /// <summary>
-        /// Stabilny UPDATE z ochron¹ przed 'FOREIGN KEY constraint failed'
-        /// (sieroty w ConnectionId -> SET NULL).
-        /// </summary>
         public static void UpdateAccount(BankAccountModel a)
         {
             using var c = OpenAndEnsureSchema();
 
-            // 1) Napraw ewentualne „sieroty” w istniej¹cym rekordzie
             EnsureValidConnectionId(c, a.Id);
 
-            // 2) Jeœli przychodzi nowe ConnectionId – sprawdŸ, czy istnieje.
             if (a.ConnectionId is int cid)
             {
                 using var chk = c.CreateCommand();
                 chk.CommandText = "SELECT 1 FROM BankConnections WHERE Id=@cid LIMIT 1;";
                 chk.Parameters.AddWithValue("@cid", cid);
-                if (chk.ExecuteScalar() is null) a.ConnectionId = null; // miêkkie wyzerowanie
+                if (chk.ExecuteScalar() is null) a.ConnectionId = null;
             }
 
             using var cmd = c.CreateCommand();
@@ -306,7 +295,6 @@ WHERE Id=@id AND UserId=@u;";
             }
             catch (SqliteException ex) when (ex.SqliteErrorCode == 19) // FK failed
             {
-                // Wyœcig? Zmiêkcz FK do NULL i spróbuj ponownie.
                 EnsureValidConnectionId(c, a.Id);
                 cmd.Parameters["@conn"].Value = (object?)a.ConnectionId ?? DBNull.Value;
                 cmd.ExecuteNonQuery();
@@ -524,8 +512,7 @@ VALUES (@u, @a, @d, @desc, @c);";
         // ===== FK helper =====
 
         /// <summary>
-        /// Jeœli BankAccounts.ConnectionId wskazuje na nieistniej¹cy rekord – ustawia NULL,
-        /// aby nie wywalaæ 'FOREIGN KEY constraint failed' przy UPDATE/DELETE.
+        /// Jeœli BankAccounts.ConnectionId wskazuje na nieistniej¹cy rekord – ustawia NULL.
         /// </summary>
         private static void EnsureValidConnectionId(SqliteConnection c, int accountId)
         {
@@ -534,7 +521,7 @@ VALUES (@u, @a, @d, @desc, @c);";
             get.Parameters.AddWithValue("@id", accountId);
             var raw = get.ExecuteScalar();
 
-            if (raw is null || raw == DBNull.Value) return;  // ju¿ NULL
+            if (raw is null || raw == DBNull.Value) return;
 
             var cid = Convert.ToInt32(raw);
 
@@ -640,7 +627,6 @@ WHERE Id=@id AND UserId=@u;";
         {
             using var c = OpenAndEnsureSchema();
             using var up = c.CreateCommand();
-            // UPSERT – wstawi nowy wiersz lub zaktualizuje istniej¹cy
             up.CommandText = @"
 INSERT INTO CashOnHand(UserId, Amount, UpdatedAt)
 VALUES (@u, @a, CURRENT_TIMESTAMP)
@@ -673,14 +659,12 @@ SET Amount=excluded.Amount, UpdatedAt=CURRENT_TIMESTAMP;";
             return Convert.ToDecimal(cmd.ExecuteScalar());
         }
 
-        // ======================= PODSUMOWANIA / PRZELEWY =======================
-
         public sealed class MoneySnapshot
         {
             public decimal Banks { get; set; }
             public decimal Cash { get; set; }
-            public decimal Envelopes { get; set; }              // suma przydzielona w kopertach
-            public decimal AvailableToAllocate => Cash - Envelopes; // tylko gotówka do podzia³u
+            public decimal Envelopes { get; set; }
+            public decimal AvailableToAllocate => Cash - Envelopes;
             public decimal Total => Banks + Cash;
         }
 
@@ -698,10 +682,8 @@ SET Amount=excluded.Amount, UpdatedAt=CURRENT_TIMESTAMP;";
             };
         }
 
-        /// <summary>
-        /// Przelew z rachunku bankowego do gotówki.
-        /// Zmniejsza saldo konta i zwiêksza CashOnHand — w jednej transakcji.
-        /// </summary>
+        // == PRZELEWY ==
+
         public static void TransferBankToCash(int userId, int accountId, decimal amount)
         {
             if (amount <= 0) throw new ArgumentException("Kwota musi byæ dodatnia.", nameof(amount));
@@ -709,7 +691,6 @@ SET Amount=excluded.Amount, UpdatedAt=CURRENT_TIMESTAMP;";
             using var c = OpenAndEnsureSchema();
             using var tx = c.BeginTransaction();
 
-            // SprawdŸ saldo
             decimal currentBal;
             using (var chk = c.CreateCommand())
             {
@@ -725,7 +706,6 @@ SET Amount=excluded.Amount, UpdatedAt=CURRENT_TIMESTAMP;";
             if (currentBal < amount)
                 throw new InvalidOperationException("Na rachunku brakuje œrodków na tak¹ wyp³atê.");
 
-            // Odejmij z banku
             using (var up = c.CreateCommand())
             {
                 up.Transaction = tx;
@@ -736,7 +716,6 @@ SET Amount=excluded.Amount, UpdatedAt=CURRENT_TIMESTAMP;";
                 up.ExecuteNonQuery();
             }
 
-            // Dodaj do gotówki (UPSERT: kumuluje kwotê)
             using (var cash = c.CreateCommand())
             {
                 cash.Transaction = tx;
@@ -752,16 +731,8 @@ SET Amount = CashOnHand.Amount + excluded.Amount,
             }
 
             tx.Commit();
-
         }
 
-
-        // == PRZELEWY GOTÓWKA <-> BANK ==
-
-        /// <summary>
-        /// Przelew z GOTÓWKI na wskazany rachunek bankowy.
-        /// Zmniejsza CashOnHand i zwiêksza saldo rachunku – wszystko w jednej transakcji.
-        /// </summary>
         public static void TransferCashToBank(int userId, int accountId, decimal amount)
         {
             if (amount <= 0) throw new ArgumentException("Kwota musi byæ dodatnia.", nameof(amount));
@@ -769,7 +740,6 @@ SET Amount = CashOnHand.Amount + excluded.Amount,
             using var c = OpenAndEnsureSchema();
             using var tx = c.BeginTransaction();
 
-            // 1) SprawdŸ aktualn¹ gotówkê
             decimal currentCash;
             using (var q = c.CreateCommand())
             {
@@ -781,7 +751,6 @@ SET Amount = CashOnHand.Amount + excluded.Amount,
             if (currentCash < amount)
                 throw new InvalidOperationException("Za ma³o gotówki na tak¹ wp³atê.");
 
-            // 2) Odejmij z gotówki
             using (var updCash = c.CreateCommand())
             {
                 updCash.Transaction = tx;
@@ -795,7 +764,6 @@ UPDATE CashOnHand
                 updCash.ExecuteNonQuery();
             }
 
-            // 3) Dodaj do salda rachunku (konto musi byæ u¿ytkownika)
             using (var updAcc = c.CreateCommand())
             {
                 updAcc.Transaction = tx;
@@ -813,20 +781,10 @@ UPDATE BankAccounts
             tx.Commit();
         }
 
+        // =========================================================
+        // ====================== ZESTAWIENIA ======================
+        // =========================================================
 
-        public sealed class CategoryAmountDto
-        {
-            public string Name { get; set; } = "";
-            public decimal Amount { get; set; }
-        }
-
-        /// <summary>
-        /// WYDATKI wg kategorii (bie¿¹cy zakres) – bezpieczna metoda.
-        /// Stara siê dopasowaæ do 2 typowych schematów:
-        ///  A) tabela Transactions(Type='expense', CategoryId, Amount, Date, UserId) + Categories(Id, Name)
-        ///  B) tabela Expenses(CategoryId, Amount, Date, UserId) + Categories(Id, Name)
-        /// Kwoty ujemne s¹ brane bezwzglêdnie.
-        /// </summary>
         private static bool TableExists(SqliteConnection con, string name)
         {
             using var cmd = con.CreateCommand();
@@ -835,13 +793,32 @@ UPDATE BankAccounts
             return cmd.ExecuteScalar() != null;
         }
 
+        private static bool ColumnExists(SqliteConnection con, string table, string column)
+        {
+            using var cmd = con.CreateCommand();
+            cmd.CommandText = $"PRAGMA table_info({table});";
+            using var r = cmd.ExecuteReader();
+            while (r.Read())
+            {
+                if (string.Equals(r.GetString(1), column, StringComparison.OrdinalIgnoreCase))
+                    return true;
+            }
+            return false;
+        }
+
+        public sealed class CategoryAmountDto
+        {
+            public string Name { get; set; } = "";
+            public decimal Amount { get; set; }
+        }
+
         public static List<CategoryAmountDto> GetSpendingByCategorySafe(int userId, DateTime start, DateTime end)
         {
             using var con = GetConnection();
 
             bool hasTrans = TableExists(con, "Transactions");
             bool hasExpenses = TableExists(con, "Expenses");
-            bool hasCats = TableExists(con, "Categories"); // nie wymagane, ale ³adniejsze nazwy
+            bool hasCats = TableExists(con, "Categories");
 
             if (!hasTrans && !hasExpenses)
                 return new List<CategoryAmountDto>();
@@ -972,8 +949,198 @@ HAVING SUM(ABS(i.Amount)) > 0
                        .ToList();
         }
 
+        /// <summary>
+        /// Najwy¿sze wydatki wg „sklepu/kontrahenta” – SAFE:
+        /// Transactions: u¿ywa kolumn (w kolejnoœci priorytetu): Merchant, Payee, Title, Note.
+        /// Expenses: u¿ywa Description.
+        /// Uwzglêdnia tylko wydatki i sumuje wartoœci bezwzglêdne.
+        /// </summary>
+        public static List<CategoryAmountDto> GetSpendingByMerchantSafe(int userId, DateTime start, DateTime end)
+        {
+            using var con = GetConnection();
+
+            bool hasTrans = TableExists(con, "Transactions");
+            bool hasExpenses = TableExists(con, "Expenses");
+
+            if (!hasTrans && !hasExpenses)
+                return new List<CategoryAmountDto>();
+
+            string TxCol(SqliteConnection c)
+            {
+                // wybierz najlepsz¹ dostêpn¹ kolumnê opisuj¹c¹ „sklep”
+                if (ColumnExists(c, "Transactions", "Merchant")) return "t.Merchant";
+                if (ColumnExists(c, "Transactions", "Payee")) return "t.Payee";
+                if (ColumnExists(c, "Transactions", "Title")) return "t.Title";
+                if (ColumnExists(c, "Transactions", "Note")) return "t.Note";
+                return "NULL";
+            }
+
+            string ExCol(SqliteConnection c)
+            {
+                if (ColumnExists(c, "Expenses", "Description")) return "e.Description";
+                if (ColumnExists(c, "Expenses", "Title")) return "e.Title";
+                return "NULL";
+            }
+
+            string txNameExpr = $"COALESCE(NULLIF({TxCol(con)},''), '(brak sklepu)')";
+            string exNameExpr = $"COALESCE(NULLIF({ExCol(con)},''), '(brak sklepu)')";
+
+            var sb = new StringBuilder();
+            void AppendUnionIfNeeded()
+            {
+                if (sb.Length > 0) sb.AppendLine("UNION ALL");
+            }
+
+            if (hasTrans)
+            {
+                AppendUnionIfNeeded();
+                sb.AppendLine($@"
+SELECT {txNameExpr} AS Name,
+       SUM(ABS(t.Amount)) AS Amount
+FROM Transactions t
+WHERE t.UserId = $uid
+  AND date(t.Date) BETWEEN date($start) AND date($end)
+  AND (LOWER(t.Type) = 'expense' OR t.Type = 0)
+GROUP BY {txNameExpr}
+HAVING SUM(ABS(t.Amount)) > 0
+");
+            }
+
+            if (hasExpenses)
+            {
+                AppendUnionIfNeeded();
+                sb.AppendLine($@"
+SELECT {exNameExpr} AS Name,
+       SUM(ABS(e.Amount)) AS Amount
+FROM Expenses e
+WHERE e.UserId = $uid
+  AND date(e.Date) BETWEEN date($start) AND date($end)
+GROUP BY {exNameExpr}
+HAVING SUM(ABS(e.Amount)) > 0
+");
+            }
+
+            using var cmd = con.CreateCommand();
+            cmd.CommandText = sb.ToString();
+            cmd.Parameters.AddWithValue("$uid", userId);
+            cmd.Parameters.AddWithValue("$start", start.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture));
+            cmd.Parameters.AddWithValue("$end", end.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture));
+
+            var dict = new Dictionary<string, decimal>(StringComparer.OrdinalIgnoreCase);
+            using var r = cmd.ExecuteReader();
+            while (r.Read())
+            {
+                var name = r.IsDBNull(0) ? "(brak sklepu)" : r.GetString(0);
+                var amt = r.IsDBNull(1) ? 0m : r.GetDecimal(1);
+                if (amt <= 0) continue;
+                if (dict.ContainsKey(name)) dict[name] += amt; else dict[name] = amt;
+            }
+
+            return dict.Select(kv => new CategoryAmountDto { Name = kv.Key, Amount = kv.Value })
+                       .OrderByDescending(x => x.Amount)
+                       .ToList();
+        }
+
+
+        public sealed class Income
+        {
+            public int Id { get; set; }
+            public int UserId { get; set; }
+            public double Amount { get; set; }
+            public DateTime Date { get; set; }
+            public string? Description { get; set; }
+            public string? Source { get; set; }   // opcjonalne pole
+        }
+
+        public static int InsertIncome(Income i)
+        {
+            using var c = OpenAndEnsureSchema();
+            using var cmd = c.CreateCommand();
+            cmd.CommandText = @"
+INSERT INTO Incomes(UserId, Amount, Date, Description, Source)
+VALUES (@u,@a,@d,@desc,@s);
+SELECT last_insert_rowid();";
+            cmd.Parameters.AddWithValue("@u", i.UserId);
+            cmd.Parameters.AddWithValue("@a", i.Amount);
+            cmd.Parameters.AddWithValue("@d", i.Date.ToString("yyyy-MM-dd"));
+            cmd.Parameters.AddWithValue("@desc", (object?)i.Description ?? DBNull.Value);
+            cmd.Parameters.AddWithValue("@s", (object?)i.Source ?? DBNull.Value);
+            return Convert.ToInt32((long)(cmd.ExecuteScalar() ?? 0L));
+        }
+
+        public static void UpdateIncome(Income i)
+        {
+            using var c = OpenAndEnsureSchema();
+            using var cmd = c.CreateCommand();
+            cmd.CommandText = @"
+UPDATE Incomes SET
+  UserId=@u, Amount=@a, Date=@d, Description=@desc, Source=@s
+WHERE Id=@id;";
+            cmd.Parameters.AddWithValue("@id", i.Id);
+            cmd.Parameters.AddWithValue("@u", i.UserId);
+            cmd.Parameters.AddWithValue("@a", i.Amount);
+            cmd.Parameters.AddWithValue("@d", i.Date.ToString("yyyy-MM-dd"));
+            cmd.Parameters.AddWithValue("@desc", (object?)i.Description ?? DBNull.Value);
+            cmd.Parameters.AddWithValue("@s", (object?)i.Source ?? DBNull.Value);
+            cmd.ExecuteNonQuery();
+        }
+
+        public static void DeleteIncome(int id)
+        {
+            using var c = OpenAndEnsureSchema();
+            using var cmd = c.CreateCommand();
+            cmd.CommandText = "DELETE FROM Incomes WHERE Id=@id;";
+            cmd.Parameters.AddWithValue("@id", id);
+            cmd.ExecuteNonQuery();
+        }
+
+        public static DataTable GetIncomes(
+            int userId, DateTime? from = null, DateTime? to = null, string? search = null)
+        {
+            using var c = OpenAndEnsureSchema();
+            using var cmd = c.CreateCommand();
+            var sb = new System.Text.StringBuilder(@"
+SELECT Id, UserId, Amount, Date, Description, Source
+FROM Incomes
+WHERE UserId=@u");
+            cmd.Parameters.AddWithValue("@u", userId);
+
+            if (from != null) { sb.Append(" AND date(Date) >= date(@f)"); cmd.Parameters.AddWithValue("@f", from.Value.ToString("yyyy-MM-dd")); }
+            if (to != null) { sb.Append(" AND date(Date) <= date(@t)"); cmd.Parameters.AddWithValue("@t", to.Value.ToString("yyyy-MM-dd")); }
+            if (!string.IsNullOrWhiteSpace(search))
+            {
+                sb.Append(" AND (lower(Description) LIKE @q OR lower(Source) LIKE @q)");
+                cmd.Parameters.AddWithValue("@q", "%" + search.Trim().ToLower() + "%");
+            }
+
+            sb.Append(" ORDER BY date(Date) DESC, Id DESC;");
+            cmd.CommandText = sb.ToString();
+
+            var dt = new DataTable();
+            using var r = cmd.ExecuteReader();
+            dt.Load(r);
+            return dt;
+        }
+
+        public static void InsertIncome(int userId, decimal amount, DateTime date, string source, string? note)
+        {
+            using var c = OpenAndEnsureSchema();
+            using var cmd = c.CreateCommand();
+            cmd.CommandText = @"
+        INSERT INTO Incomes(UserId, Amount, Date, Source, Note)
+        VALUES (@u, @a, @d, @s, @n);";
+            cmd.Parameters.AddWithValue("@u", userId);
+            cmd.Parameters.AddWithValue("@a", amount);
+            cmd.Parameters.AddWithValue("@d", date.ToString("yyyy-MM-dd"));
+            cmd.Parameters.AddWithValue("@s", source ?? "Przychód");
+            cmd.Parameters.AddWithValue("@n", (object?)note ?? DBNull.Value);
+            cmd.ExecuteNonQuery();
+        }
+
+
     }
 }
+
 
 
 
