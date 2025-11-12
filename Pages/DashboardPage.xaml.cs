@@ -8,6 +8,7 @@ using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
+using System.Windows.Threading;
 
 namespace Finly.Pages
 {
@@ -26,14 +27,14 @@ namespace Finly.Pages
 
             Loaded += (_, __) =>
             {
-                // jeśli PeriodBar ma preset – ustaw Dzisiaj; w razie czego ignoruj
-                try { PeriodBar.SetPreset(DateRangeMode.Day); } catch { }
-
+                try { PeriodBar.SetPreset(DateRangeMode.Day); } catch { /* ignoruj jeśli brak */ }
                 RefreshKpis();
                 LoadBanks();
                 LoadCharts();
             };
         }
+
+        // ========================= KPI / BANKI =========================
 
         private void RefreshKpis()
         {
@@ -53,6 +54,8 @@ namespace Finly.Pages
             BanksList.ItemsSource = list.Select(a => new { a.AccountName, a.Balance }).ToList();
         }
 
+        // ========================= ZAKRES DAT =========================
+
         private void PeriodBar_RangeChanged(object? sender, EventArgs e)
         {
             RefreshKpis();
@@ -66,45 +69,81 @@ namespace Finly.Pages
             {
                 if (PeriodBar.Mode != DateRangeMode.Custom)
                     PeriodBar.Mode = DateRangeMode.Custom;
+                LoadCharts();
             }
-            catch { }
+            catch { /* nic */ }
         }
 
-        // ===== WYKRESY =====
+        // ========================= WYKRESY I TABELKI =========================
+
         private void LoadCharts()
         {
-            // U Ciebie StartDate/EndDate są DateTime (nie-nullable),
-            // więc NIE używamy '??'. Zabezpieczenie przez '== default'.
+            // StartDate/EndDate są DateTime (nie-nullable) → bez operatora ??
             DateTime start = PeriodBar.StartDate;
             DateTime end = PeriodBar.EndDate;
 
-            if (start == default) start = DateTime.Today;
-            if (end == default) end = DateTime.Today;
-            if (start > end) { var t = start; start = end; end = t; }
+            if (start == default || start == DateTime.MinValue) start = DateTime.Today;
+            if (end == default || end == DateTime.MinValue) end = DateTime.Today;
+            if (start > end) (start, end) = (end, start);
 
-            // Wydatki
+            // KOŁA
             var expenses = DatabaseService.GetSpendingByCategorySafe(_uid, start, end);
             BuildPie(PieCurrent, expenses);
-            if (NoDataPieCurrent != null)
-                NoDataPieCurrent.Visibility = PieCurrent.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
 
-            // Przychody
             var incomes = DatabaseService.GetIncomeBySourceSafe(_uid, start, end);
             BuildPie(PieIncome, incomes);
-            if (NoDataPieIncome != null)
-                NoDataPieIncome.Visibility = PieIncome.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
+
+            // TABELKI (po wyrenderowaniu drzewa wizualnego)
+            Dispatcher.BeginInvoke(new Action(() =>
+            {
+                BindExpenseTable(expenses);
+                BindIncomeTable(incomes);
+            }), DispatcherPriority.Loaded);
         }
 
-        private void BuildPie(
-            ObservableCollection<PieSlice> target,
-            IEnumerable<DatabaseService.CategoryAmountDto> source)
+        private void BindExpenseTable(IEnumerable<DatabaseService.CategoryAmountDto> data)
+        {
+            var sum = data?.Sum(x => x.Amount) ?? 0m;
+            var rows = (data ?? Enumerable.Empty<DatabaseService.CategoryAmountDto>())
+                .OrderByDescending(x => x.Amount)
+                .Select(x => new TableRow
+                {
+                    Name = x.Name,
+                    Amount = x.Amount,
+                    PercentStr = sum > 0 ? Math.Round((x.Amount / sum) * 100m, 0) + "%" : "0%"
+                })
+                .ToList();
+
+            var lv = ExpenseTable ?? (ListView)FindName("ExpenseTable");
+            if (lv != null) lv.ItemsSource = rows;
+        }
+
+        private void BindIncomeTable(IEnumerable<DatabaseService.CategoryAmountDto> data)
+        {
+            var sum = data?.Sum(x => x.Amount) ?? 0m;
+            var rows = (data ?? Enumerable.Empty<DatabaseService.CategoryAmountDto>())
+                .OrderByDescending(x => x.Amount)
+                .Select(x => new TableRow
+                {
+                    Name = x.Name,
+                    Amount = x.Amount,
+                    PercentStr = sum > 0 ? Math.Round((x.Amount / sum) * 100m, 0) + "%" : "0%"
+                })
+                .ToList();
+
+            var lv = IncomeTable ?? (ListView)FindName("IncomeTable");
+            if (lv != null) lv.ItemsSource = rows;
+        }
+
+        private void BuildPie(ObservableCollection<PieSlice> target,
+                              IEnumerable<DatabaseService.CategoryAmountDto> source)
         {
             target.Clear();
 
             var data = (source ?? Enumerable.Empty<DatabaseService.CategoryAmountDto>())
-                      .Where(x => x.Amount > 0m)
-                      .OrderByDescending(x => x.Amount)
-                      .ToList();
+                .Where(x => x.Amount > 0m)
+                .OrderByDescending(x => x.Amount)
+                .ToList();
             if (data.Count == 0) return;
 
             var sum = data.Sum(x => x.Amount);
@@ -146,6 +185,8 @@ namespace Finly.Pages
         private static Color Hex(string s) => (Color)ColorConverter.ConvertFromString(s)!;
     }
 
+    // ========================= MODELE POMOCNICZE =========================
+
     public sealed class PieSlice
     {
         public string Name { get; init; } = "";
@@ -181,7 +222,16 @@ namespace Finly.Pages
 
         private static double DegToRad(double deg) => Math.PI / 180 * deg;
     }
+
+    public sealed class TableRow
+    {
+        public string Name { get; set; } = "";
+        public decimal Amount { get; set; }
+        public string AmountStr => Amount.ToString("N2") + " zł";
+        public string PercentStr { get; set; } = "0%";
+    }
 }
+
 
 
 
