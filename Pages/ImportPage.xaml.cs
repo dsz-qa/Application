@@ -37,14 +37,13 @@ namespace Finly.Pages
         {
             PreviewGrid.ItemsSource = null;
 
-            if (!File.Exists(FilePathBox.Text)) return;
+            if (!File.Exists(FilePathBox.Text))
+                return;
 
             char delimiter = ',';
-            switch ((DelimiterBox.SelectedItem as ComboBoxItem)?.Content?.ToString())
-            {
-                case ";": delimiter = ';'; break;
-                case "Tab": delimiter = '\t'; break;
-            }
+            var delimStr = (DelimiterBox.SelectedItem as ComboBoxItem)?.Content?.ToString();
+            if (delimStr == ";") delimiter = ';';
+            else if (delimStr == "Tab") delimiter = '\t';
 
             var dt = new DataTable();
             using (var sr = new StreamReader(FilePathBox.Text, Encoding.UTF8, true))
@@ -56,18 +55,21 @@ namespace Finly.Pages
                 {
                     headers = ReadCsvLine(sr, delimiter);
                     if (headers == null) return;
-                    foreach (var h in headers) dt.Columns.Add(h);
+                    foreach (var h in headers) dt.Columns.Add(string.IsNullOrWhiteSpace(h) ? "Kolumna" + (dt.Columns.Count + 1) : h);
                 }
 
                 while ((line = sr.ReadLine()) != null)
                 {
                     var cells = SplitCsv(line, delimiter);
+
                     if (headers == null)
                     {
-                        // brak nagłówków – utwórz je dynamicznie
+                        // Brak nagłówków – utwórz kolumny do wielkości najdłuższego wiersza
                         if (dt.Columns.Count < cells.Length)
+                        {
                             for (int i = dt.Columns.Count; i < cells.Length; i++)
                                 dt.Columns.Add($"Col{i + 1}");
+                        }
                     }
 
                     var row = dt.NewRow();
@@ -79,7 +81,7 @@ namespace Finly.Pages
 
             PreviewGrid.ItemsSource = dt.DefaultView;
 
-            // zasil listy kolumn
+            // Zasilenie list kolumn
             var names = dt.Columns.Cast<DataColumn>().Select(c => c.ColumnName).ToList();
             AmountCol.ItemsSource = names;
             DateCol.ItemsSource = names;
@@ -96,7 +98,7 @@ namespace Finly.Pages
             return line == null ? null : SplitCsv(line, delimiter);
         }
 
-        // Prosty parser CSV (obsługa cudzysłowów)
+        // Prosty parser CSV (obsługa cudzysłowów i tabulatora)
         private static string[] SplitCsv(string line, char delimiter)
         {
             var list = new System.Collections.Generic.List<string>();
@@ -153,6 +155,7 @@ namespace Finly.Pages
 
             var fmt = DateFormatBox.Text?.Trim();
             var culture = CultureInfo.InvariantCulture;
+            int uid = Finly.Services.UserService.CurrentUserId;
 
             int imported = 0;
             foreach (DataRow row in dv.Table.Rows)
@@ -165,26 +168,47 @@ namespace Finly.Pages
                 if (!TryParseDate(row[colDate]?.ToString(), fmt, culture, out var date))
                     continue;
 
-                var catName = !string.IsNullOrWhiteSpace(colCat) ? row[colCat]?.ToString() : defaultCat;
+                // Kategoria: z kolumny lub domyślna
+                string? catName = null;
+                if (!string.IsNullOrWhiteSpace(colCat))
+                    catName = row[colCat]?.ToString();
+                if (string.IsNullOrWhiteSpace(catName))
+                    catName = defaultCat;
+
+                int? categoryId = null;
+                if (!string.IsNullOrWhiteSpace(catName))
+                {
+                    try
+                    {
+                        // Utwórz jeśli nie istnieje
+                        categoryId = Finly.Services.DatabaseService.GetOrCreateCategoryId(uid, catName!.Trim());
+                    }
+                    catch
+                    {
+                        categoryId = null; // w razie błędu wstawiamy NULL
+                    }
+                }
+
                 var desc = !string.IsNullOrWhiteSpace(colDesc) ? row[colDesc]?.ToString() : null;
 
-                // Zapis do bazy: korzystamy z istniejącej tabeli Expenses
                 try
                 {
                     using var c = Finly.Services.DatabaseService.GetConnection();
                     using var cmd = c.CreateCommand();
-                    cmd.CommandText = @"INSERT INTO Expenses(Amount, CategoryId, Date, Description, UserId)
-                                        VALUES (@a, NULL, @d, @desc, @u);";
+                    cmd.CommandText = @"INSERT INTO Expenses(UserId, Amount, Date, Description, CategoryId)
+                                        VALUES (@u, @a, @d, @desc, @c);";
+                    cmd.Parameters.AddWithValue("@u", uid);
                     cmd.Parameters.AddWithValue("@a", amount);
                     cmd.Parameters.AddWithValue("@d", date.ToString("yyyy-MM-dd"));
                     cmd.Parameters.AddWithValue("@desc", (object?)desc ?? DBNull.Value);
-                    cmd.Parameters.AddWithValue("@u", Finly.Services.UserService.CurrentUserId);
+                    if (categoryId is int cid) cmd.Parameters.AddWithValue("@c", cid);
+                    else cmd.Parameters.AddWithValue("@c", DBNull.Value);
                     cmd.ExecuteNonQuery();
                     imported++;
                 }
                 catch
                 {
-                    // pomiń rekord, lecimy dalej
+                    // Pomijamy wadliwy wiersz i lecimy dalej
                 }
             }
 
@@ -193,11 +217,12 @@ namespace Finly.Pages
 
         private static bool TryParseDecimal(string? s, out decimal value)
         {
-            // obsługa przecinka/kropki
+            // Obsługa kropki/przecinka
             if (decimal.TryParse(s, NumberStyles.Any, CultureInfo.InvariantCulture, out value))
                 return true;
             if (decimal.TryParse(s, NumberStyles.Any, CultureInfo.GetCultureInfo("pl-PL"), out value))
                 return true;
+            value = 0m;
             return false;
         }
 
@@ -207,9 +232,9 @@ namespace Finly.Pages
                 DateTime.TryParseExact(s, format, culture, DateTimeStyles.None, out date))
                 return true;
 
-            // fallback
             return DateTime.TryParse(s, culture, DateTimeStyles.None, out date);
         }
     }
 }
+
 

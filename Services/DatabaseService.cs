@@ -3,6 +3,7 @@ using Microsoft.Data.Sqlite;
 using System;
 using System.Collections.Generic;
 using System.Data;
+using System.Globalization;
 using System.IO;
 using System.Text;
 
@@ -810,6 +811,165 @@ UPDATE BankAccounts
             }
 
             tx.Commit();
+        }
+
+
+        public sealed class CategoryAmountDto
+        {
+            public string Name { get; set; } = "";
+            public decimal Amount { get; set; }
+        }
+
+        /// <summary>
+        /// WYDATKI wg kategorii (bie¿¹cy zakres) – bezpieczna metoda.
+        /// Stara siê dopasowaæ do 2 typowych schematów:
+        ///  A) tabela Transactions(Type='expense', CategoryId, Amount, Date, UserId) + Categories(Id, Name)
+        ///  B) tabela Expenses(CategoryId, Amount, Date, UserId) + Categories(Id, Name)
+        /// Kwoty ujemne s¹ brane bezwzglêdnie.
+        /// </summary>
+        private static bool TableExists(SqliteConnection con, string name)
+        {
+            using var cmd = con.CreateCommand();
+            cmd.CommandText = "SELECT 1 FROM sqlite_master WHERE type='table' AND name=@n LIMIT 1;";
+            cmd.Parameters.AddWithValue("@n", name);
+            return cmd.ExecuteScalar() != null;
+        }
+
+        public static List<CategoryAmountDto> GetSpendingByCategorySafe(int userId, DateTime start, DateTime end)
+        {
+            using var con = GetConnection();
+
+            bool hasTrans = TableExists(con, "Transactions");
+            bool hasExpenses = TableExists(con, "Expenses");
+            bool hasCats = TableExists(con, "Categories"); // nie wymagane, ale ³adniejsze nazwy
+
+            if (!hasTrans && !hasExpenses)
+                return new List<CategoryAmountDto>();
+
+            var sb = new StringBuilder();
+            void AppendUnionIfNeeded()
+            {
+                if (sb.Length > 0) sb.AppendLine("UNION ALL");
+            }
+
+            if (hasTrans)
+            {
+                AppendUnionIfNeeded();
+                sb.AppendLine(@"
+SELECT COALESCE(" + (hasCats ? "c.Name" : "NULL") + @", '(brak kategorii)') AS Name,
+       SUM(ABS(t.Amount)) AS Amount
+FROM Transactions t
+" + (hasCats ? "LEFT JOIN Categories c ON c.Id = t.CategoryId" : "") + @"
+WHERE t.UserId = $uid
+  AND date(t.Date) BETWEEN date($start) AND date($end)
+  AND (LOWER(t.Type) = 'expense' OR t.Type = 0)
+GROUP BY COALESCE(" + (hasCats ? "c.Name" : "NULL") + @", '(brak kategorii)') 
+HAVING SUM(ABS(t.Amount)) > 0
+");
+            }
+
+            if (hasExpenses)
+            {
+                AppendUnionIfNeeded();
+                sb.AppendLine(@"
+SELECT COALESCE(" + (hasCats ? "c.Name" : "NULL") + @", '(brak kategorii)') AS Name,
+       SUM(ABS(e.Amount)) AS Amount
+FROM Expenses e
+" + (hasCats ? "LEFT JOIN Categories c ON c.Id = e.CategoryId" : "") + @"
+WHERE e.UserId = $uid
+  AND date(e.Date) BETWEEN date($start) AND date($end)
+GROUP BY COALESCE(" + (hasCats ? "c.Name" : "NULL") + @", '(brak kategorii)') 
+HAVING SUM(ABS(e.Amount)) > 0
+");
+            }
+
+            using var cmd = con.CreateCommand();
+            cmd.CommandText = sb.ToString();
+            cmd.Parameters.AddWithValue("$uid", userId);
+            cmd.Parameters.AddWithValue("$start", start.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture));
+            cmd.Parameters.AddWithValue("$end", end.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture));
+
+            var dict = new Dictionary<string, decimal>(StringComparer.OrdinalIgnoreCase);
+            using var r = cmd.ExecuteReader();
+            while (r.Read())
+            {
+                var name = r.IsDBNull(0) ? "(brak kategorii)" : r.GetString(0);
+                var amt = r.IsDBNull(1) ? 0m : r.GetDecimal(1);
+                if (amt <= 0) continue;
+                if (dict.ContainsKey(name)) dict[name] += amt; else dict[name] = amt;
+            }
+
+            return dict.Select(kv => new CategoryAmountDto { Name = kv.Key, Amount = kv.Value })
+                       .OrderByDescending(x => x.Amount)
+                       .ToList();
+        }
+
+        public static List<CategoryAmountDto> GetIncomeBySourceSafe(int userId, DateTime start, DateTime end)
+        {
+            using var con = GetConnection();
+
+            bool hasTrans = TableExists(con, "Transactions");
+            bool hasIncomes = TableExists(con, "Incomes");
+            bool hasCats = TableExists(con, "Categories");
+
+            if (!hasTrans && !hasIncomes)
+                return new List<CategoryAmountDto>();
+
+            var sb = new StringBuilder();
+            void AppendUnionIfNeeded()
+            {
+                if (sb.Length > 0) sb.AppendLine("UNION ALL");
+            }
+
+            if (hasTrans)
+            {
+                AppendUnionIfNeeded();
+                sb.AppendLine(@"
+SELECT COALESCE(t.Source, " + (hasCats ? "COALESCE(c.Name,'Przychody')" : "'Przychody'") + @") AS Name,
+       SUM(ABS(t.Amount)) AS Amount
+FROM Transactions t
+" + (hasCats ? "LEFT JOIN Categories c ON c.Id = t.CategoryId" : "") + @"
+WHERE t.UserId = $uid
+  AND date(t.Date) BETWEEN date($start) AND date($end)
+  AND (LOWER(t.Type) = 'income' OR t.Type = 1)
+GROUP BY COALESCE(t.Source, " + (hasCats ? "COALESCE(c.Name,'Przychody')" : "'Przychody'") + @")
+HAVING SUM(ABS(t.Amount)) > 0
+");
+            }
+
+            if (hasIncomes)
+            {
+                AppendUnionIfNeeded();
+                sb.AppendLine(@"
+SELECT COALESCE(i.Source,'Przychody') AS Name,
+       SUM(ABS(i.Amount)) AS Amount
+FROM Incomes i
+WHERE i.UserId = $uid
+  AND date(i.Date) BETWEEN date($start) AND date($end)
+GROUP BY COALESCE(i.Source,'Przychody')
+HAVING SUM(ABS(i.Amount)) > 0
+");
+            }
+
+            using var cmd = con.CreateCommand();
+            cmd.CommandText = sb.ToString();
+            cmd.Parameters.AddWithValue("$uid", userId);
+            cmd.Parameters.AddWithValue("$start", start.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture));
+            cmd.Parameters.AddWithValue("$end", end.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture));
+
+            var dict = new Dictionary<string, decimal>(StringComparer.OrdinalIgnoreCase);
+            using var r = cmd.ExecuteReader();
+            while (r.Read())
+            {
+                var name = r.IsDBNull(0) ? "Przychody" : r.GetString(0);
+                var amt = r.IsDBNull(1) ? 0m : r.GetDecimal(1);
+                if (amt <= 0) continue;
+                if (dict.ContainsKey(name)) dict[name] += amt; else dict[name] = amt;
+            }
+
+            return dict.Select(kv => new CategoryAmountDto { Name = kv.Key, Amount = kv.Value })
+                       .OrderByDescending(x => x.Amount)
+                       .ToList();
         }
 
     }

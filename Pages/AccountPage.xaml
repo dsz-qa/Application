@@ -6,7 +6,7 @@
              mc:Ignorable="d">
 
     <ScrollViewer VerticalScrollBarVisibility="Auto">
-        <StackPanel Margin="24">
+        <StackPanel Margin="24" Orientation="Vertical" >
 
             <TextBlock Text="Konto" FontSize="24" FontWeight="Bold"/>
 
@@ -16,9 +16,8 @@
                     BorderBrush="{DynamicResource Surface.Border}"
                     BorderThickness="1" CornerRadius="10">
                 <Grid Margin="16">
-                    <!-- 4 wiersze: nagłówek / snapshot / dane+przycisk / zmiana hasła -->
+                    <!-- 3 sekcje: nagłówek / dane + przycisk / zmiana hasła -->
                     <Grid.RowDefinitions>
-                        <RowDefinition Height="Auto"/>
                         <RowDefinition Height="Auto"/>
                         <RowDefinition Height="Auto"/>
                         <RowDefinition Height="Auto"/>
@@ -33,9 +32,8 @@
                                Text="Profil" FontSize="18" FontWeight="SemiBold"
                                Margin="0,0,0,8"/>
 
-
                     <!-- Dane użytkownika -->
-                    <StackPanel Grid.Row="2" Grid.Column="0" Margin="0,8,16,0">
+                    <StackPanel Grid.Row="1" Grid.Column="0" Margin="0,8,16,0">
                         <TextBlock Text="Dane użytkownika" FontWeight="SemiBold" Margin="0,0,0,6"/>
                         <StackPanel Orientation="Horizontal" Margin="0,2,0,0">
                             <TextBlock Text="E-mail:" Width="160"/>
@@ -59,42 +57,37 @@
                         </StackPanel>
                     </StackPanel>
 
-                    <!-- Edycja danych osobowych -->
-                    <Button Grid.Row="2" Grid.Column="1"
-                            Content="Uzupełnij / edytuj dane osobowe"
+                    <!-- Przycisk edycji danych -->
+                    <Button Grid.Row="1" Grid.Column="1"
+                            Content="Edytuj dane osobowe"
                             VerticalAlignment="Top" Width="260"
                             Style="{StaticResource PrimaryButton}"
                             Click="EditPersonal_Click"/>
 
-                    <!-- Zmiana hasła -->
-                    <StackPanel Grid.Row="3" Grid.ColumnSpan="2" Margin="0,16,0,0">
+                    <!-- Zmiana hasła (pola JEDNO POD DRUGIM) -->
+                    <StackPanel Grid.Row="2" Grid.ColumnSpan="2" Margin="0,16,0,0">
                         <TextBlock Text="Zmiana hasła" FontSize="16" FontWeight="SemiBold"/>
 
-                        <Grid Margin="8,8,0,0">
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="220"/>
-                                <ColumnDefinition Width="*"/>
-                                <ColumnDefinition Width="220"/>
-                                <ColumnDefinition Width="*"/>
-                            </Grid.ColumnDefinitions>
+                        <!-- Aktualne hasło -->
+                        <StackPanel Margin="0,8,0,0">
+                            <TextBlock Text="Wpisz aktualne hasło:" Margin="0,0,0,4"/>
+                            <PasswordBox x:Name="PwdOld"/>
+                        </StackPanel>
 
-                            <TextBlock Grid.Column="0" Text="Wpisz aktualne hasło:" VerticalAlignment="Center"/>
-                            <PasswordBox x:Name="PwdOld" Grid.Column="1"/>
+                        <!-- Nowe hasło -->
+                        <StackPanel Margin="0,8,0,0">
+                            <TextBlock Text="Nowe hasło:" Margin="0,0,0,4"/>
+                            <PasswordBox x:Name="PwdNew"/>
+                        </StackPanel>
 
-                            <TextBlock Grid.Column="2" Text="Nowe hasło:" VerticalAlignment="Center" Margin="16,0,0,0"/>
-                            <PasswordBox x:Name="PwdNew" Grid.Column="3"/>
-                        </Grid>
+                        <!-- Powtórz nowe hasło -->
+                        <StackPanel Margin="0,8,0,0">
+                            <TextBlock Text="Powtórz nowe hasło:" Margin="0,0,0,4"/>
+                            <PasswordBox x:Name="PwdNew2"/>
+                        </StackPanel>
 
-                        <Grid Margin="0,6,0,0">
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="220"/>
-                                <ColumnDefinition Width="*"/>
-                            </Grid.ColumnDefinitions>
-                            <TextBlock Grid.Column="0" Text="Powtórz nowe hasło:" VerticalAlignment="Center"/>
-                            <PasswordBox x:Name="PwdNew2" Grid.Column="1"/>
-                        </Grid>
-
-                        <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
+                        <!-- Akcja -->
+                        <StackPanel Orientation="Horizontal" Margin="0,12,0,0">
                             <Button Content="Zmień hasło"
                                     Click="ChangePassword_Click"
                                     Style="{StaticResource PrimaryButton}"/>
@@ -155,6 +148,7 @@
         </StackPanel>
     </ScrollViewer>
 </UserControl>
+
 
 
 

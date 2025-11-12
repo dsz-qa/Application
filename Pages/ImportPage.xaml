@@ -3,7 +3,6 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
-             xmlns:util="clr-namespace:Finly.Helpers"
              mc:Ignorable="d">
 
     <Grid Margin="16">
@@ -16,32 +15,29 @@
         <!-- Pasek opcji -->
         <Border Grid.Row="0" Padding="12" CornerRadius="8"
                 Background="{DynamicResource Surface.Background}"
-                BorderBrush="{DynamicResource Surface.Border}" BorderThickness="1">
+                BorderBrush="{DynamicResource Surface.Border}"
+                BorderThickness="1">
             <Grid>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*"/>
                     <ColumnDefinition Width="Auto"/>
                 </Grid.ColumnDefinitions>
 
-                <!-- LEWA: wybór pliku + separator + nagłówki + format daty -->
-                <StackPanel Orientation="Horizontal"
-                            VerticalAlignment="Center"
-                            util:StackPanelSpacing.Spacing="10">
+                <!-- LEWA: plik + delimiter + nagłówki + format daty -->
+                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
 
                     <!-- Plik -->
-                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center"
-                                util:StackPanelSpacing.Spacing="6">
-                        <TextBlock Text="Plik CSV:" VerticalAlignment="Center"/>
-                        <TextBox x:Name="FilePathBox" Width="308" IsReadOnly="True"/>
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,12,0">
+                        <TextBlock Text="Plik CSV:" VerticalAlignment="Center" Margin="0,0,6,0"/>
+                        <TextBox x:Name="FilePathBox" Width="308" IsReadOnly="True" Margin="0,0,6,0"/>
                         <Button Content="Wybierz..." Click="Browse_Click"/>
                     </StackPanel>
 
-                    <Separator Width="1" Height="24"/>
+                    <Separator Width="1" Height="24" Margin="12,0"/>
 
-                    <!-- Separator pól w pliku -->
-                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center"
-                                util:StackPanelSpacing.Spacing="6">
-                        <TextBlock Text="Separator:" VerticalAlignment="Center"/>
+                    <!-- Separator pól -->
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,12,0">
+                        <TextBlock Text="Separator:" VerticalAlignment="Center" Margin="0,0,6,0"/>
                         <ComboBox x:Name="DelimiterBox" Width="90" SelectedIndex="0">
                             <ComboBoxItem Content=","/>
                             <ComboBoxItem Content=";"/>
@@ -53,38 +49,36 @@
                     <CheckBox x:Name="HasHeaderCheckBox"
                               Content="Pierwszy wiersz to nagłówki"
                               IsChecked="True"
-                              VerticalAlignment="Center"/>
+                              VerticalAlignment="Center" Margin="0,0,12,0"/>
 
                     <!-- Format daty -->
-                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center"
-                                util:StackPanelSpacing.Spacing="6">
-                        <TextBlock Text="Format daty:" VerticalAlignment="Center"/>
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                        <TextBlock Text="Format daty:" VerticalAlignment="Center" Margin="0,0,6,0"/>
                         <TextBox x:Name="DateFormatBox" Width="120" Text="yyyy-MM-dd"/>
                     </StackPanel>
                 </StackPanel>
 
                 <!-- PRAWA: mapowanie kolumn -->
-                <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center"
-                            util:StackPanelSpacing.Spacing="8">
-                    <StackPanel>
-                        <TextBlock Text="Kwota" FontSize="11" Opacity="0.8"/>
-                        <ComboBox x:Name="AmountCol" Width="120"/>
+                <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                    <StackPanel Margin="0,0,12,0">
+                        <TextBlock Text="Kwota" FontSize="11" Opacity="0.8" Margin="0,0,0,2"/>
+                        <ComboBox x:Name="AmountCol" Width="140"/>
+                    </StackPanel>
+                    <StackPanel Margin="0,0,12,0">
+                        <TextBlock Text="Data" FontSize="11" Opacity="0.8" Margin="0,0,0,2"/>
+                        <ComboBox x:Name="DateCol" Width="160"/>
+                    </StackPanel>
+                    <StackPanel Margin="0,0,12,0">
+                        <TextBlock Text="Kategoria (kolumna)" FontSize="11" Opacity="0.8" Margin="0,0,0,2"/>
+                        <ComboBox x:Name="CatCol" Width="180"/>
+                    </StackPanel>
+                    <StackPanel Margin="0,0,12,0">
+                        <TextBlock Text="Opis (kolumna)" FontSize="11" Opacity="0.8" Margin="0,0,0,2"/>
+                        <ComboBox x:Name="DescCol" Width="200"/>
                     </StackPanel>
                     <StackPanel>
-                        <TextBlock Text="Data" FontSize="11" Opacity="0.8"/>
-                        <ComboBox x:Name="DateCol" Width="140"/>
-                    </StackPanel>
-                    <StackPanel>
-                        <TextBlock Text="Kategoria (kolumna)" FontSize="11" Opacity="0.8"/>
-                        <ComboBox x:Name="CatCol" Width="140"/>
-                    </StackPanel>
-                    <StackPanel>
-                        <TextBlock Text="Opis (kolumna)" FontSize="11" Opacity="0.8"/>
-                        <ComboBox x:Name="DescCol" Width="160"/>
-                    </StackPanel>
-                    <StackPanel>
-                        <TextBlock Text="Domyślna kategoria (gdy brak w CSV)" FontSize="11" Opacity="0.8"/>
-                        <TextBox x:Name="DefaultCategoryBox" Width="160"/>
+                        <TextBlock Text="Domyślna kategoria (gdy brak w CSV)" FontSize="11" Opacity="0.8" Margin="0,0,0,2"/>
+                        <TextBox x:Name="DefaultCategoryBox" Width="200"/>
                     </StackPanel>
                 </StackPanel>
             </Grid>
@@ -99,11 +93,11 @@
                   CanUserDeleteRows="False"/>
 
         <!-- Akcje -->
-        <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Right"
-                    util:StackPanelSpacing.Spacing="8">
-            <Button Content="Odśwież podgląd" Click="ReloadPreview_Click"/>
+        <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Right">
+            <Button Content="Odśwież podgląd" Click="ReloadPreview_Click" Margin="0,0,8,0"/>
             <Button Content="Importuj" Click="Import_Click"/>
         </StackPanel>
     </Grid>
 </UserControl>
+
 
