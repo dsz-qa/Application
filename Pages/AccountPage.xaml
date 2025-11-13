@@ -6,17 +6,16 @@
              mc:Ignorable="d">
 
     <ScrollViewer VerticalScrollBarVisibility="Auto">
-        <StackPanel Margin="24" Orientation="Vertical" >
+        <StackPanel Margin="24" Orientation="Vertical">
 
-            <TextBlock Text="Konto" FontSize="24" FontWeight="Bold"/>
+            <TextBlock Text="Dane konta" FontSize="24" FontWeight="Bold"/>
 
-            <!-- ============ PROFIL ============ -->
+            <!-- ============ PROFIL + ZMIANA HASŁA ============ -->
             <Border Margin="0,12,0,0"
                     Background="{DynamicResource Surface.Background}"
                     BorderBrush="{DynamicResource Surface.Border}"
                     BorderThickness="1" CornerRadius="10">
                 <Grid Margin="16">
-                    <!-- 3 sekcje: nagłówek / dane + przycisk / zmiana hasła -->
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto"/>
                         <RowDefinition Height="Auto"/>
@@ -29,12 +28,11 @@
 
                     <!-- Nagłówek -->
                     <TextBlock Grid.Row="0" Grid.ColumnSpan="2"
-                               Text="Profil" FontSize="18" FontWeight="SemiBold"
+                               Text="Dane użytkownika" FontSize="18" FontWeight="SemiBold"
                                Margin="0,0,0,8"/>
 
                     <!-- Dane użytkownika -->
                     <StackPanel Grid.Row="1" Grid.Column="0" Margin="0,8,16,0">
-                        <TextBlock Text="Dane użytkownika" FontWeight="SemiBold" Margin="0,0,0,6"/>
                         <StackPanel Orientation="Horizontal" Margin="0,2,0,0">
                             <TextBlock Text="E-mail:" Width="160"/>
                             <TextBlock Text="{Binding EmailDisplay}" FontWeight="SemiBold"/>
@@ -64,29 +62,28 @@
                             Style="{StaticResource PrimaryButton}"
                             Click="EditPersonal_Click"/>
 
-                    <!-- Zmiana hasła (pola JEDNO POD DRUGIM) -->
+                    <!-- Zmiana hasła -->
                     <StackPanel Grid.Row="2" Grid.ColumnSpan="2" Margin="0,16,0,0">
-                        <TextBlock Text="Zmiana hasła" FontSize="16" FontWeight="SemiBold"/>
+                        <TextBlock Text="Zmiana hasła"
+                                   FontSize="16"
+                                   FontWeight="SemiBold"
+                                   Margin="0,0,0,8"/>
 
-                        <!-- Aktualne hasło -->
                         <StackPanel Margin="0,8,0,0">
                             <TextBlock Text="Wpisz aktualne hasło:" Margin="0,0,0,4"/>
                             <PasswordBox x:Name="PwdOld"/>
                         </StackPanel>
 
-                        <!-- Nowe hasło -->
                         <StackPanel Margin="0,8,0,0">
                             <TextBlock Text="Nowe hasło:" Margin="0,0,0,4"/>
                             <PasswordBox x:Name="PwdNew"/>
                         </StackPanel>
 
-                        <!-- Powtórz nowe hasło -->
                         <StackPanel Margin="0,8,0,0">
                             <TextBlock Text="Powtórz nowe hasło:" Margin="0,0,0,4"/>
                             <PasswordBox x:Name="PwdNew2"/>
                         </StackPanel>
 
-                        <!-- Akcja -->
                         <StackPanel Orientation="Horizontal" Margin="0,12,0,0">
                             <Button Content="Zmień hasło"
                                     Click="ChangePassword_Click"
@@ -99,8 +96,34 @@
                 </Grid>
             </Border>
 
+            <!-- ============ USUNIĘCIE KONTA UŻYTKOWNIKA ============ -->
+            <Border Margin="0,16,0,0"
+                    Background="{DynamicResource Surface.Background}"
+                    BorderBrush="{DynamicResource Surface.Border}"
+                    BorderThickness="1" CornerRadius="10">
+                <StackPanel Margin="16">
+                    <TextBlock Text="Usunięcie konta"
+                               FontSize="16"
+                               FontWeight="SemiBold"
+                               Foreground="#D9534F"/>
+
+                    <TextBlock Margin="0,4,0,8"
+                               Text="Jeżeli chcesz trwale usunąć swoje konto i wszystkie zapisane dane (rachunki, budżety, koperty itd.), kliknij przycisk poniżej."
+                               TextWrapping="Wrap"/>
+
+                    <Button Content="Usuń konto"
+                            HorizontalAlignment="Stretch"
+                            Margin="0,4,0,0"
+                            Padding="12,6"
+                            Foreground="White"
+                            Background="#D9534F"
+                            BorderBrush="#D43F3A"
+                            Click="DeleteUser_Click"/>
+                </StackPanel>
+            </Border>
+
             <!-- ============ BANKI (zarządzanie) ============ -->
-            <Border Margin="0,12,0,0"
+            <Border Margin="0,16,0,0"
                     Background="{DynamicResource Surface.Background}"
                     BorderBrush="{DynamicResource Surface.Border}"
                     BorderThickness="1" CornerRadius="10">
@@ -123,19 +146,35 @@
                               SelectionUnit="FullRow"
                               MouseDoubleClick="AccountsGrid_MouseDoubleClick">
                         <DataGrid.Columns>
-                            <DataGridTextColumn Header="Bank"           Binding="{Binding BankName}"    Width="160"/>
-                            <DataGridTextColumn Header="Nazwa rachunku" Binding="{Binding AccountName}" Width="*"/>
-                            <DataGridTextColumn Header="IBAN"           Binding="{Binding Iban}"        Width="240"/>
-                            <DataGridTextColumn Header="Waluta"         Binding="{Binding Currency}"    Width="80"/>
-                            <DataGridTextColumn Header="Saldo"          Binding="{Binding Balance, StringFormat={}{0:N2}}" Width="120"/>
-                            <DataGridTemplateColumn Header="Akcje" Width="160" IsReadOnly="True">
+                            <DataGridTextColumn Header="Bank"
+                                                Binding="{Binding BankName}"
+                                                Width="160"/>
+                            <DataGridTextColumn Header="Nazwa rachunku"
+                                                Binding="{Binding AccountName}"
+                                                Width="*"/>
+                            <DataGridTextColumn Header="IBAN"
+                                                Binding="{Binding Iban}"
+                                                Width="240"/>
+                            <DataGridTextColumn Header="Waluta"
+                                                Binding="{Binding Currency}"
+                                                Width="80"/>
+                            <DataGridTextColumn Header="Saldo"
+                                                Binding="{Binding Balance, StringFormat={}{0:N2}}"
+                                                Width="120"/>
+                            <DataGridTemplateColumn Header="Akcje"
+                                                    Width="160"
+                                                    IsReadOnly="True">
                                 <DataGridTemplateColumn.CellTemplate>
                                     <DataTemplate>
-                                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
-                                            <Button Content="Edytuj" Margin="0,0,8,0"
-                                                    Tag="{Binding Id}" Click="EditAccount_Click"/>
+                                        <StackPanel Orientation="Horizontal"
+                                                    HorizontalAlignment="Center">
+                                            <Button Content="Edytuj"
+                                                    Margin="0,0,8,0"
+                                                    Tag="{Binding Id}"
+                                                    Click="EditAccount_Click"/>
                                             <Button Content="Usuń"
-                                                    Tag="{Binding Id}" Click="DeleteAccount_Click"/>
+                                                    Tag="{Binding Id}"
+                                                    Click="DeleteBankAccount_Click"/>
                                         </StackPanel>
                                     </DataTemplate>
                                 </DataGridTemplateColumn.CellTemplate>
@@ -148,6 +187,8 @@
         </StackPanel>
     </ScrollViewer>
 </UserControl>
+
+
 
 
 

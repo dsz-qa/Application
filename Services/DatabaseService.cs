@@ -78,6 +78,65 @@ namespace Finly.Services
             return GetConnection();
         }
 
+        public static void DeleteUserCascade(int userId)
+        {
+            if (userId <= 0) return;
+
+            using var con = OpenAndEnsureSchema();
+            using var tx = con.BeginTransaction();
+            using var cmd = con.CreateCommand();
+            cmd.Transaction = tx;
+
+            void Exec(string sql)
+            {
+                cmd.CommandText = sql;
+                cmd.Parameters.Clear();
+                cmd.Parameters.AddWithValue("@uid", userId);
+                cmd.ExecuteNonQuery();
+            }
+
+            bool Has(string tableName) => TableExists(con, tableName);
+
+            // ===== Tabele opcjonalne / legacy =====
+            if (Has("Transactions"))
+                Exec("DELETE FROM Transactions WHERE UserId = @uid;");
+
+            // ===== Tabele z danymi u¿ytkownika =====
+            if (Has("Incomes"))
+                Exec("DELETE FROM Incomes WHERE UserId = @uid;");
+
+            if (Has("Expenses"))
+                Exec("DELETE FROM Expenses WHERE UserId = @uid;");
+
+            if (Has("Envelopes"))
+                Exec("DELETE FROM Envelopes WHERE UserId = @uid;");
+
+            if (Has("CashOnHand"))
+                Exec("DELETE FROM CashOnHand WHERE UserId = @uid;");
+
+            if (Has("BankAccounts"))
+                Exec("DELETE FROM BankAccounts WHERE UserId = @uid;");
+
+            if (Has("BankConnections"))
+                Exec("DELETE FROM BankConnections WHERE UserId = @uid;");
+
+            if (Has("Categories"))
+                Exec("DELETE FROM Categories WHERE UserId = @uid;");
+
+            if (Has("PersonalProfiles"))
+                Exec("DELETE FROM PersonalProfiles WHERE UserId = @uid;");
+
+            if (Has("CompanyProfiles"))
+                Exec("DELETE FROM CompanyProfiles WHERE UserId = @uid;");
+
+            // ===== Na koñcu sam u¿ytkownik =====
+            if (Has("Users"))
+                Exec("DELETE FROM Users WHERE Id = @uid;");
+
+            tx.Commit();
+        }
+
+
         private static string ToIsoDate(DateTime dt) => dt.ToString("yyyy-MM-dd");
 
         // ==== helpery odczytu z DataReadera ====

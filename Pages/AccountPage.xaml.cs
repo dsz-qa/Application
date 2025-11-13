@@ -1,8 +1,8 @@
 ﻿using Finly.Models;
 using Finly.Services;
 using Finly.ViewModels;
-using Finly.Views;
-using Finly.Views.Dialogs;
+using Finly.Views;              // ShellWindow, AuthWindow
+using Finly.Views.Dialogs;      // ConfirmDialog
 using System;
 using System.Globalization;
 using System.Linq;
@@ -29,6 +29,7 @@ namespace Finly.Pages
                 LoadAccountsIntoGrid();
             };
         }
+
         private void RefreshMoney()
         {
             var uid = UserService.GetCurrentUserId();
@@ -45,7 +46,6 @@ namespace Finly.Pages
             SetLabel("LblEnvelopes", s.Envelopes);
             SetLabel("LblAvailable", s.AvailableToAllocate);
         }
-
 
         private void OpenEnvelopes_Click(object sender, RoutedEventArgs e)
             => (Application.Current.MainWindow as ShellWindow)?.NavigateTo("envelopes");
@@ -76,11 +76,21 @@ namespace Finly.Pages
                 Text = current.ToString(CultureInfo.CurrentCulture),
                 Margin = new Thickness(0, 6, 0, 12)
             };
-            var okBtn = new Button { Content = "OK", Width = 80, IsDefault = true, Margin = new Thickness(0, 0, 8, 0) };
+            var okBtn = new Button
+            {
+                Content = "OK",
+                Width = 80,
+                IsDefault = true,
+                Margin = new Thickness(0, 0, 8, 0)
+            };
 
             panel.Children.Add(new TextBlock { Text = "Stan gotówki (zł):" });
             panel.Children.Add(tb);
-            panel.Children.Add(new StackPanel { Orientation = Orientation.Horizontal, Children = { okBtn } });
+            panel.Children.Add(new StackPanel
+            {
+                Orientation = Orientation.Horizontal,
+                Children = { okBtn }
+            });
 
             okBtn.Click += (_, __) =>
             {
@@ -88,12 +98,13 @@ namespace Finly.Pages
                 {
                     var uid = UserService.GetCurrentUserId();
                     DatabaseService.SetCashOnHand(uid, v);
-                    (Window.GetWindow(okBtn))?.Close();
+                    Window.GetWindow(okBtn)?.Close();
                     RefreshMoney();
                 }
                 else
                 {
-                    MessageBox.Show("Podaj poprawną kwotę ≥ 0.", "Błąd", MessageBoxButton.OK, MessageBoxImage.Warning);
+                    MessageBox.Show("Podaj poprawną kwotę ≥ 0.", "Błąd",
+                        MessageBoxButton.OK, MessageBoxImage.Warning);
                 }
             };
             return panel;
@@ -126,7 +137,7 @@ namespace Finly.Pages
         private void OpenBanks_Click(object sender, RoutedEventArgs e)
             => (Window.GetWindow(this) as ShellWindow)?.NavigateTo("banks");
 
-        // ===== Bank grid on Account page =====
+        // ====== BANKI (grid) ======
 
         private void LoadAccountsIntoGrid()
         {
@@ -136,7 +147,13 @@ namespace Finly.Pages
 
         private void AddAccount_Click(object sender, RoutedEventArgs e)
         {
-            var model = new BankAccountModel { UserId = UserService.GetCurrentUserId(), Currency = "PLN", Balance = 0m };
+            var model = new BankAccountModel
+            {
+                UserId = UserService.GetCurrentUserId(),
+                Currency = "PLN",
+                Balance = 0m
+            };
+
             var dlg = new EditAccountDialog(model) { Owner = Window.GetWindow(this) };
             if (dlg.ShowDialog() == true)
             {
@@ -152,11 +169,19 @@ namespace Finly.Pages
         private void EditAccount_Click(object sender, RoutedEventArgs e)
         {
             var id = (sender as Button)?.Tag is int i ? i : 0;
-            if (id <= 0) { ToastService.Info("Nie udało się odczytać identyfikatora rachunku."); return; }
+            if (id <= 0)
+            {
+                ToastService.Info("Nie udało się odczytać identyfikatora rachunku.");
+                return;
+            }
 
             var src = AccountsGrid.ItemsSource as System.Collections.IEnumerable;
             var item = src?.OfType<BankAccountModel>().FirstOrDefault(a => a.Id == id);
-            if (item == null) { ToastService.Info("Nie znaleziono rachunku."); return; }
+            if (item == null)
+            {
+                ToastService.Info("Nie znaleziono rachunku.");
+                return;
+            }
 
             var dlg = new EditAccountDialog(item) { Owner = Window.GetWindow(this) };
             if (dlg.ShowDialog() == true)
@@ -169,13 +194,19 @@ namespace Finly.Pages
             }
         }
 
-        private void DeleteAccount_Click(object sender, RoutedEventArgs e)
+        private void DeleteBankAccount_Click(object sender, RoutedEventArgs e)
         {
             var id = (sender as Button)?.Tag is int i ? i : 0;
-            if (id <= 0) { ToastService.Info("Nie udało się odczytać identyfikatora rachunku."); return; }
+            if (id <= 0)
+            {
+                ToastService.Info("Nie udało się odczytać identyfikatora rachunku.");
+                return;
+            }
 
             var c = new ConfirmDialog("Usunąć ten rachunek? Operacja nieodwracalna.")
-            { Owner = Window.GetWindow(this) };
+            {
+                Owner = Window.GetWindow(this)
+            };
 
             if (c.ShowDialog() == true && c.Result)
             {
@@ -198,7 +229,7 @@ namespace Finly.Pages
         private void DeleteSelected_Click(object sender, RoutedEventArgs e)
         {
             if (AccountsGrid.SelectedItem is BankAccountModel m)
-                DeleteAccount_Click(new Button { Tag = m.Id }, new RoutedEventArgs());
+                DeleteBankAccount_Click(new Button { Tag = m.Id }, new RoutedEventArgs());
             else
                 ToastService.Info("Zaznacz rachunek do usunięcia.");
         }
@@ -208,8 +239,50 @@ namespace Finly.Pages
             if (AccountsGrid.SelectedItem is BankAccountModel m)
                 EditAccount_Click(new Button { Tag = m.Id }, new RoutedEventArgs());
         }
+
+        // ===== USUWANIE KONTA UŻYTKOWNIKA (profilu) =====
+        private void DeleteUser_Click(object sender, RoutedEventArgs e)
+        {
+            var uid = UserService.GetCurrentUserId();
+            if (uid <= 0)
+            {
+                ToastService.Error("Brak zalogowanego użytkownika.");
+                return;
+            }
+
+            var dlg = new ConfirmDialog(
+                "Usunąć konto użytkownika?\n\n" +
+                "Tej operacji nie można cofnąć. Zostaną usunięte wszystkie Twoje dane: " +
+                "rachunki, transakcje, budżety, kategorie itp.")
+            {
+                Owner = Window.GetWindow(this)
+            };
+
+            if (dlg.ShowDialog() == true && dlg.Result)
+            {
+                try
+                {
+                    DatabaseService.DeleteUserCascade(uid);
+                    UserService.ClearCurrentUser();
+                    ToastService.Success("Twoje konto zostało usunięte.");
+
+                    var auth = new AuthWindow();
+                    Application.Current.MainWindow = auth;
+                    auth.Show();
+
+                    Window.GetWindow(this)?.Close();
+                }
+                catch (Exception ex)
+                {
+                    ToastService.Error("Nie udało się usunąć konta: " + ex.Message);
+                }
+            }
+        }
     }
 }
+
+
+
 
 
 
