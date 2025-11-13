@@ -136,6 +136,27 @@ namespace Finly.Services
             tx.Commit();
         }
 
+        //=== strona po pierwszym logowaniu na nowe konto===
+        public static bool IsUserOnboarded(int userId)
+        {
+            using var c = OpenAndEnsureSchema();
+            using var cmd = c.CreateCommand();
+            cmd.CommandText = "SELECT IsOnboarded FROM Users WHERE Id=@id LIMIT 1;";
+            cmd.Parameters.AddWithValue("@id", userId);
+            var obj = cmd.ExecuteScalar();
+            return obj != null && obj != DBNull.Value && Convert.ToInt32(obj) == 1;
+        }
+
+        public static void MarkUserOnboarded(int userId)
+        {
+            using var c = OpenAndEnsureSchema();
+            using var cmd = c.CreateCommand();
+            cmd.CommandText = "UPDATE Users SET IsOnboarded = 1 WHERE Id=@id;";
+            cmd.Parameters.AddWithValue("@id", userId);
+            cmd.ExecuteNonQuery();
+        }
+
+
 
         private static string ToIsoDate(DateTime dt) => dt.ToString("yyyy-MM-dd");
 

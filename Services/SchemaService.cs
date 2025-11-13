@@ -32,6 +32,9 @@ namespace Finly.Services
                     return c;
                 }
 
+                AddColumnIfMissing(con, tx, "Users", "IsOnboarded", "INTEGER", "NOT NULL DEFAULT 0");
+
+
                 bool ColExists(string table, string col) => ColumnExists(con, tx, table, col);
 
                 // ===== Tabele (idempotentnie) =====
