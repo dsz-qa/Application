@@ -39,31 +39,17 @@
             <Setter Property="Foreground"      Value="{DynamicResource App.Foreground}"/>
             <Setter Property="Background"      Value="{DynamicResource Surface.Background}"/>
         </Style>
+
         <Style TargetType="{x:Type DatePickerTextBox}">
             <Setter Property="Foreground"      Value="{DynamicResource App.Foreground}"/>
             <Setter Property="Background"      Value="{DynamicResource Surface.Background}"/>
             <Setter Property="BorderBrush"     Value="{DynamicResource Brand.Blue}"/>
             <Setter Property="BorderThickness" Value="1.5"/>
         </Style>
-
-        <!-- Nagłówek expandera kont -->
-        <DataTemplate x:Key="BanksHeaderTemplate">
-            <Grid>
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="*"/>
-                    <ColumnDefinition Width="Auto"/>
-                </Grid.ColumnDefinitions>
-                <StackPanel>
-                    <TextBlock Text="Konta bankowe" Style="{StaticResource CardHeader}"/>
-                    <TextBlock Text="{Binding}" Style="{StaticResource KpiValueStyle}"/>
-                </StackPanel>
-                <TextBlock Grid.Column="1" Text="▼" Foreground="White"
-                           FontSize="14" VerticalAlignment="Center" Margin="8,0,0,0"/>
-            </Grid>
-        </DataTemplate>
     </UserControl.Resources>
 
-    <ScrollViewer VerticalScrollBarVisibility="Auto">
+    <ScrollViewer VerticalScrollBarVisibility="Auto"
+                  HorizontalScrollBarVisibility="Auto">
         <Grid Margin="16">
             <!-- 0: KPI, 1: DateRange, 2: Treść pod spodem -->
             <Grid.RowDefinitions>
@@ -74,121 +60,152 @@
 
             <!-- ========== KPI (rząd 0) ========== -->
             <Grid Grid.Row="0" Margin="0,0,0,12">
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="*"/>
-                    <ColumnDefinition Width="*"/>
-                    <ColumnDefinition Width="*"/>
-                    <ColumnDefinition Width="*"/>
-                </Grid.ColumnDefinitions>
+                <WrapPanel Margin="0,0,0,16">
+                    <!-- Cały majątek -->
+                    <Border Margin="0,0,16,0" MinWidth="220" Style="{StaticResource Card}">
+                        <StackPanel>
+                            <TextBlock Text="Cały majątek"
+                                       FontSize="14"
+                                       Opacity="0.8"/>
+                            <TextBlock x:Name="TotalWealthText"
+                                       Style="{StaticResource KpiValueStyle}"
+                                       Text="0,00 zł"/>
+                        </StackPanel>
+                    </Border>
 
-                <Border Grid.Column="0" Style="{StaticResource Card}" Margin="0,0,12,0">
-                    <StackPanel>
-                        <TextBlock Text="Cały majątek" Style="{StaticResource CardHeader}"/>
-                        <TextBlock x:Name="KpiTotal" Style="{StaticResource KpiValueStyle}"/>
-                    </StackPanel>
-                </Border>
+                    <!-- Konta bankowe -->
+                    <Border Margin="0,0,16,0" MinWidth="220" Style="{StaticResource Card}">
+                        <StackPanel>
+                            <TextBlock Text="Konta bankowe"
+                                       FontSize="14"
+                                       Opacity="0.8"/>
+                            <TextBlock x:Name="BanksText"
+                                       Style="{StaticResource KpiValueStyle}"
+                                       Text="0,00 zł"/>
+                        </StackPanel>
+                    </Border>
 
-                <Border Grid.Column="1" Style="{StaticResource Card}" Margin="0,0,12,0">
-                    <Expander x:Name="BanksExpander" Background="Transparent" BorderBrush="{x:Null}"
-                              IsExpanded="False" HeaderTemplate="{StaticResource BanksHeaderTemplate}">
-                        <ItemsControl x:Name="BanksList" Margin="0,10,0,0">
-                            <ItemsControl.ItemTemplate>
-                                <DataTemplate>
-                                    <Grid Margin="0,2">
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="*"/>
-                                            <ColumnDefinition Width="Auto"/>
-                                        </Grid.ColumnDefinitions>
-                                        <TextBlock Text="{Binding AccountName}"
-                                                   TextTrimming="CharacterEllipsis"
-                                                   Foreground="{DynamicResource App.Foreground}"/>
-                                        <TextBlock Grid.Column="1"
-                                                   Text="{Binding Balance, StringFormat={}{0:N2} zł}"
-                                                   FontWeight="SemiBold"
-                                                   Foreground="{DynamicResource App.Foreground}"/>
-                                    </Grid>
-                                </DataTemplate>
-                            </ItemsControl.ItemTemplate>
-                        </ItemsControl>
-                    </Expander>
-                </Border>
+                    <!-- Wolna gotówka -->
+                    <Border Margin="0,0,16,0" MinWidth="220" Style="{StaticResource Card}">
+                        <StackPanel>
+                            <TextBlock Text="Wolna gotówka"
+                                       FontSize="14"
+                                       Opacity="0.8"/>
+                            <TextBlock x:Name="FreeCashDashboardText"
+                                       Style="{StaticResource KpiValueStyle}"
+                                       Text="0,00 zł"/>
+                        </StackPanel>
+                    </Border>
 
-                <Border Grid.Column="2" Style="{StaticResource Card}" Margin="0,0,12,0">
-                    <StackPanel>
-                        <TextBlock Text="Wolna gotówka" Style="{StaticResource CardHeader}"/>
-                        <TextBlock x:Name="KpiFreeCash" Style="{StaticResource KpiValueStyle}"/>
-                    </StackPanel>
-                </Border>
+                    <!-- Odłożona gotówka do rozdysponowania -->
+                    <Border Margin="0,0,16,0" MinWidth="220" Style="{StaticResource Card}">
+                        <StackPanel>
+                            <TextBlock Text="Odłożona gotówka (do rozdysponowania)"
+                                       FontSize="14"
+                                       Opacity="0.8"
+                                       TextWrapping="Wrap"/>
+                            <TextBlock x:Name="SavedToAllocateText"
+                                       Style="{StaticResource KpiValueStyle}"
+                                       Text="0,00 zł"/>
+                        </StackPanel>
+                    </Border>
 
-                <Border Grid.Column="3" Style="{StaticResource Card}">
-                    <StackPanel>
-                        <TextBlock Text="Odłożona gotówka" Style="{StaticResource CardHeader}"/>
-                        <TextBlock x:Name="KpiEnvelopes" Style="{StaticResource KpiValueStyle}"/>
-                    </StackPanel>
-                </Border>
+                    <!-- Gotówka w kopertach -->
+                    <Border Margin="0,0,16,0" MinWidth="220" Style="{StaticResource Card}">
+                        <StackPanel>
+                            <TextBlock Text="Gotówka w kopertach"
+                                       FontSize="14"
+                                       Opacity="0.8"/>
+                            <TextBlock x:Name="EnvelopesDashboardText"
+                                       Style="{StaticResource KpiValueStyle}"
+                                       Text="0,00 zł"/>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- Inwestycje -->
+                    <Border Margin="0,0,16,0" MinWidth="220" Style="{StaticResource Card}">
+                        <StackPanel>
+                            <TextBlock Text="Inwestycje"
+                                       FontSize="14"
+                                       Opacity="0.8"/>
+                            <TextBlock x:Name="InvestmentsText"
+                                       Style="{StaticResource KpiValueStyle}"
+                                       Text="0,00 zł"/>
+                        </StackPanel>
+                    </Border>
+                </WrapPanel>
             </Grid>
 
             <!-- ========== WYBÓR OKRESU (rząd 1) ========== -->
-            <Border Grid.Row="1" Style="{StaticResource AccentCard}"
-                    Padding="16" Width="560" HorizontalAlignment="Center" Margin="0,0,0,16">
+            <Border Grid.Row="1"
+                    Style="{StaticResource AccentCard}"
+                    Padding="16"
+                    HorizontalAlignment="Center"
+                    Margin="0,0,0,16">
                 <StackPanel>
                     <TextBlock Text="Wybierz okres, z którego chcesz zobaczyć dane."
                                FontWeight="SemiBold"
                                Foreground="{DynamicResource App.Foreground}"
                                Margin="0,0,0,10"
                                TextAlignment="Center"/>
+
                     <controls:PeriodBarControl x:Name="PeriodBar"
-                                               Width="520"
                                                Margin="0,4,0,10"
                                                RangeChanged="PeriodBar_RangeChanged"/>
-                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+
+                    <StackPanel Orientation="Horizontal"
+                                HorizontalAlignment="Center">
                         <DatePicker SelectedDate="{Binding StartDate, ElementName=PeriodBar, Mode=TwoWay}"
-                                    SelectedDateChanged="ManualDateChanged" Margin="0,0,8,0"/>
-                        <TextBlock Text="—" VerticalAlignment="Center" Margin="4,0"/>
+                                    SelectedDateChanged="ManualDateChanged"
+                                    Margin="0,0,8,0"/>
+                        <TextBlock Text="—"
+                                   VerticalAlignment="Center"
+                                   Margin="4,0"/>
                         <DatePicker SelectedDate="{Binding EndDate, ElementName=PeriodBar, Mode=TwoWay}"
-                                    SelectedDateChanged="ManualDateChanged" Margin="8,0,0,0"/>
+                                    SelectedDateChanged="ManualDateChanged"
+                                    Margin="8,0,0,0"/>
                     </StackPanel>
                 </StackPanel>
             </Border>
 
             <!-- ========== TREŚĆ POD OKRESEM (rząd 2) ========== -->
-            <!-- 3 kolumny: lewa (koła), środkowa (tabele), prawa (puste na przyszłość) -->
             <Grid Grid.Row="2">
                 <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="440"/>
-                    <!-- lewa: koła -->
+                    <ColumnDefinition Width="*" />
                     <ColumnDefinition Width="Auto"/>
-                    <!-- środek: tabele (centrowane) -->
-                    <ColumnDefinition Width="*"/>
-                    <!-- prawa: wolna przestrzeń -->
+                    <ColumnDefinition Width="*" />
                 </Grid.ColumnDefinitions>
 
-                <!-- LEWO: dwa koła, kolumna 0 -->
-                <StackPanel Grid.Column="0" Width="420" Margin="0,0,16,0">
+                <!-- LEWO: dwa koła -->
+                <StackPanel Grid.Column="0" Margin="0,0,16,0">
                     <!-- Koło: WYDATKI -->
                     <Border Style="{StaticResource Card}" Margin="0,0,0,12">
                         <StackPanel>
                             <TextBlock Text="Wydatki wg kategorii — bieżący okres"
-                                       Style="{StaticResource CardHeader}" Margin="0,0,0,8"/>
-                            <Grid>
-                                <Ellipse Width="360" Height="360" Fill="#11000000"
-                                         Stroke="{DynamicResource Surface.Border}" StrokeThickness="1"/>
-                                <ItemsControl ItemsSource="{Binding PieCurrent}">
-                                    <ItemsControl.ItemsPanel>
-                                        <ItemsPanelTemplate>
-                                            <Canvas Width="360" Height="360"/>
-                                        </ItemsPanelTemplate>
-                                    </ItemsControl.ItemsPanel>
-                                    <ItemsControl.ItemTemplate>
-                                        <DataTemplate>
-                                            <Path Data="{Binding Geometry}"
-                                                  Fill="{Binding Brush}"
-                                                  Stroke="{DynamicResource Surface.Background}"
-                                                  StrokeThickness="1"/>
-                                        </DataTemplate>
-                                    </ItemsControl.ItemTemplate>
-                                </ItemsControl>
-                            </Grid>
+                                       Style="{StaticResource CardHeader}"
+                                       Margin="0,0,0,8"/>
+                            <Viewbox Stretch="Uniform" MaxHeight="360">
+                                <Grid Width="360" Height="360">
+                                    <Ellipse Fill="#11000000"
+                                             Stroke="{DynamicResource Surface.Border}"
+                                             StrokeThickness="1"/>
+                                    <ItemsControl ItemsSource="{Binding PieCurrent}">
+                                        <ItemsControl.ItemsPanel>
+                                            <ItemsPanelTemplate>
+                                                <Canvas Width="360" Height="360"/>
+                                            </ItemsPanelTemplate>
+                                        </ItemsControl.ItemsPanel>
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate>
+                                                <Path Data="{Binding Geometry}"
+                                                      Fill="{Binding Brush}"
+                                                      Stroke="{DynamicResource Surface.Background}"
+                                                      StrokeThickness="1"/>
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+                                </Grid>
+                            </Viewbox>
                         </StackPanel>
                     </Border>
 
@@ -196,50 +213,54 @@
                     <Border Style="{StaticResource Card}">
                         <StackPanel>
                             <TextBlock Text="Źródła przychodu — bieżący okres"
-                                       Style="{StaticResource CardHeader}" Margin="0,0,0,8"/>
-                            <Grid>
-                                <Ellipse Width="360" Height="360" Fill="#11000000"
-                                         Stroke="{DynamicResource Surface.Border}" StrokeThickness="1"/>
-                                <ItemsControl ItemsSource="{Binding PieIncome}">
-                                    <ItemsControl.ItemsPanel>
-                                        <ItemsPanelTemplate>
-                                            <Canvas Width="360" Height="360"/>
-                                        </ItemsPanelTemplate>
-                                    </ItemsControl.ItemsPanel>
-                                    <ItemsControl.ItemTemplate>
-                                        <DataTemplate>
-                                            <Path Data="{Binding Geometry}"
-                                                  Fill="{Binding Brush}"
-                                                  Stroke="{DynamicResource Surface.Background}"
-                                                  StrokeThickness="1"/>
-                                        </DataTemplate>
-                                    </ItemsControl.ItemTemplate>
-                                </ItemsControl>
-                            </Grid>
+                                       Style="{StaticResource CardHeader}"
+                                       Margin="0,0,0,8"/>
+                            <Viewbox Stretch="Uniform" MaxHeight="360">
+                                <Grid Width="360" Height="360">
+                                    <Ellipse Fill="#11000000"
+                                             Stroke="{DynamicResource Surface.Border}"
+                                             StrokeThickness="1"/>
+                                    <ItemsControl ItemsSource="{Binding PieIncome}">
+                                        <ItemsControl.ItemsPanel>
+                                            <ItemsPanelTemplate>
+                                                <Canvas Width="360" Height="360"/>
+                                            </ItemsPanelTemplate>
+                                        </ItemsControl.ItemsPanel>
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate>
+                                                <Path Data="{Binding Geometry}"
+                                                      Fill="{Binding Brush}"
+                                                      Stroke="{DynamicResource Surface.Background}"
+                                                      StrokeThickness="1"/>
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+                                </Grid>
+                            </Viewbox>
                         </StackPanel>
                     </Border>
                 </StackPanel>
 
-                <!-- ŚRODEK: dwie TABELKI pod „Wybierz okres” -->
-                <Grid Grid.Column="1" HorizontalAlignment="Center">
-                    <Grid.RowDefinitions>
-                        <RowDefinition Height="*"/>
-                    </Grid.RowDefinitions>
+                <!-- ŚRODEK: PRZYCHODY / WYDATKI (tabelki) -->
+                <Grid Grid.Column="1"
+                      Margin="0,0,0,0"
+                      HorizontalAlignment="Center">
                     <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="420"/>
+                        <ColumnDefinition Width="*" MinWidth="300"/>
                         <ColumnDefinition Width="24"/>
-                        <ColumnDefinition Width="420"/>
+                        <ColumnDefinition Width="*" MinWidth="300"/>
                     </Grid.ColumnDefinitions>
 
                     <!-- PRZYCHODY -->
                     <Border Grid.Column="0" Style="{StaticResource Card}">
                         <StackPanel>
                             <TextBlock Text="Przychody — bieżący okres"
-                                       Style="{StaticResource CardHeader}" Margin="0,0,0,8"/>
-                            <ListView x:Name="IncomeTable">
+                                       Style="{StaticResource CardHeader}"
+                                       Margin="0,0,0,8"/>
+                            <ListView x:Name="IncomeTable" HorizontalContentAlignment="Stretch">
                                 <ListView.View>
                                     <GridView>
-                                        <GridViewColumn Header="Kategoria/Źródło" Width="240" DisplayMemberBinding="{Binding Name}"/>
+                                        <GridViewColumn Header="Kategoria/Źródło" Width="200" DisplayMemberBinding="{Binding Name}"/>
                                         <GridViewColumn Header="Kwota" Width="100" DisplayMemberBinding="{Binding AmountStr}"/>
                                         <GridViewColumn Header="%" Width="60" DisplayMemberBinding="{Binding PercentStr}"/>
                                     </GridView>
@@ -252,11 +273,12 @@
                     <Border Grid.Column="2" Style="{StaticResource Card}">
                         <StackPanel>
                             <TextBlock Text="Wydatki — bieżący okres"
-                                       Style="{StaticResource CardHeader}" Margin="0,0,0,8"/>
-                            <ListView x:Name="ExpenseTable">
+                                       Style="{StaticResource CardHeader}"
+                                       Margin="0,0,0,8"/>
+                            <ListView x:Name="ExpenseTable" HorizontalContentAlignment="Stretch">
                                 <ListView.View>
                                     <GridView>
-                                        <GridViewColumn Header="Kategoria" Width="240" DisplayMemberBinding="{Binding Name}"/>
+                                        <GridViewColumn Header="Kategoria" Width="200" DisplayMemberBinding="{Binding Name}"/>
                                         <GridViewColumn Header="Kwota" Width="100" DisplayMemberBinding="{Binding AmountStr}"/>
                                         <GridViewColumn Header="%" Width="60" DisplayMemberBinding="{Binding PercentStr}"/>
                                     </GridView>
@@ -266,13 +288,14 @@
                     </Border>
                 </Grid>
 
-                <!-- PRAWO: paskowe wykresy -->
+                <!-- PRAWO: paski kategorii i sklepów -->
                 <StackPanel Grid.Column="2" Margin="16,0,0,0">
                     <!-- KATEGORIE -->
                     <Border Style="{StaticResource Card}" Margin="0,0,0,12">
                         <StackPanel>
                             <TextBlock Text="Najwyższe wydatki — kategorie"
-                 Style="{StaticResource CardHeader}" Margin="0,0,0,8"/>
+                                       Style="{StaticResource CardHeader}"
+                                       Margin="0,0,0,8"/>
                             <ItemsControl x:Name="TopCategoryBars">
                                 <ItemsControl.ItemTemplate>
                                     <DataTemplate>
@@ -283,14 +306,16 @@
                                                     <ColumnDefinition Width="Auto"/>
                                                 </Grid.ColumnDefinitions>
                                                 <TextBlock Text="{Binding Name}"
-                           Foreground="{DynamicResource App.Foreground}"
-                           Margin="0,0,8,2" />
+                                                           Foreground="{DynamicResource App.Foreground}"
+                                                           Margin="0,0,8,2" />
                                                 <TextBlock Grid.Column="1"
-                           Text="{Binding PercentStr}"
-                           Foreground="{DynamicResource App.Foreground}"/>
+                                                           Text="{Binding PercentStr}"
+                                                           Foreground="{DynamicResource App.Foreground}"/>
                                             </Grid>
-                                            <ProgressBar Minimum="0" Maximum="100" Height="10"
-                           Value="{Binding Percent}" />
+                                            <ProgressBar Minimum="0"
+                                                         Maximum="100"
+                                                         Height="10"
+                                                         Value="{Binding Percent}" />
                                         </StackPanel>
                                     </DataTemplate>
                                 </ItemsControl.ItemTemplate>
@@ -302,7 +327,8 @@
                     <Border Style="{StaticResource Card}">
                         <StackPanel>
                             <TextBlock Text="Najwyższe wydatki — sklepy"
-                 Style="{StaticResource CardHeader}" Margin="0,0,0,8"/>
+                                       Style="{StaticResource CardHeader}"
+                                       Margin="0,0,0,8"/>
                             <ItemsControl x:Name="TopMerchantBars">
                                 <ItemsControl.ItemTemplate>
                                     <DataTemplate>
@@ -313,14 +339,16 @@
                                                     <ColumnDefinition Width="Auto"/>
                                                 </Grid.ColumnDefinitions>
                                                 <TextBlock Text="{Binding Name}"
-                           Foreground="{DynamicResource App.Foreground}"
-                           Margin="0,0,8,2" />
+                                                           Foreground="{DynamicResource App.Foreground}"
+                                                           Margin="0,0,8,2" />
                                                 <TextBlock Grid.Column="1"
-                           Text="{Binding PercentStr}"
-                           Foreground="{DynamicResource App.Foreground}"/>
+                                                           Text="{Binding PercentStr}"
+                                                           Foreground="{DynamicResource App.Foreground}"/>
                                             </Grid>
-                                            <ProgressBar Minimum="0" Maximum="100" Height="10"
-                           Value="{Binding Percent}" />
+                                            <ProgressBar Minimum="0"
+                                                         Maximum="100"
+                                                         Height="10"
+                                                         Value="{Binding Percent}" />
                                         </StackPanel>
                                     </DataTemplate>
                                 </ItemsControl.ItemTemplate>
@@ -328,11 +356,12 @@
                         </StackPanel>
                     </Border>
                 </StackPanel>
-
             </Grid>
         </Grid>
     </ScrollViewer>
 </UserControl>
+
+
 
 
 

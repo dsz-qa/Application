@@ -1,7 +1,6 @@
 ﻿using Finly.Models;
 using Finly.Services;
 using System;
-using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Globalization;
 using System.Linq;
@@ -27,19 +26,26 @@ namespace Finly.Pages
 
             Loaded += (_, __) =>
             {
-                try { PeriodBar.SetPreset(DateRangeMode.Day); } catch { /* ignoruj jeśli brak */ }
-                RefreshKpis();
-                LoadBanks();
+                try
+                {
+                    PeriodBar.SetPreset(DateRangeMode.Day);
+                }
+                catch
+                {
+                    // ignorujemy, jeśli coś z designera
+                }
+
+                RefreshMoneySummary();
                 LoadCharts();
             };
         }
 
-        // ========================= KPI / BANKI =========================
+        // ========================= KPI =========================
 
-        private void RefreshKpis()
+        private void SetKpiText(string name, decimal value)
         {
-            // na razie KPI = podsumowanie pieniędzy
-            RefreshMoneySummary();
+            if (FindName(name) is TextBlock tb)
+                tb.Text = value.ToString("N2", CultureInfo.CurrentCulture) + " zł";
         }
 
         private void RefreshMoneySummary()
@@ -49,43 +55,22 @@ namespace Finly.Pages
 
             var snap = DatabaseService.GetMoneySnapshot(uid);
 
-            void SetText(string name, string value)
-            {
-                if (FindName(name) is TextBlock tb)
-                    tb.Text = value;
-            }
-
             // Cały majątek = konta + wolna gotówka + cała odłożona gotówka
-            SetText("TotalWealthText", snap.Total.ToString("N2") + " zł");
+            SetKpiText("TotalWealthText", snap.Total);
+            SetKpiText("BanksText", snap.Banks);
+            SetKpiText("FreeCashDashboardText", snap.Cash);
+            SetKpiText("SavedToAllocateText", snap.SavedUnallocated);
+            SetKpiText("EnvelopesDashboardText", snap.Envelopes);
 
-            // Konta bankowe
-            SetText("BanksText", snap.Banks.ToString("N2") + " zł");
-
-            // Wolna gotówka (do wydawania)
-            SetText("FreeCashDashboardText", snap.Cash.ToString("N2") + " zł");
-
-            // Odłożona gotówka do rozdysponowania
-            SetText("SavedToAllocateText", snap.SavedUnallocated.ToString("N2") + " zł");
-
-            // Gotówka rozdysponowana w kopertach
-            SetText("EnvelopesDashboardText", snap.Envelopes.ToString("N2") + " zł");
-
-            // Inwestycje – na razie 0, później podepniemy pod tabelę inwestycji
-            SetText("InvestmentsText", "0,00 zł");
-        }
-
-        private void LoadBanks()
-        {
-            var list = DatabaseService.GetAccounts(_uid) ?? new List<BankAccountModel>();
-            BanksList.ItemsSource = list.Select(a => new { a.AccountName, a.Balance }).ToList();
+            // Inwestycje – na razie 0
+            SetKpiText("InvestmentsText", 0m);
         }
 
         // ========================= ZAKRES DAT =========================
 
         private void PeriodBar_RangeChanged(object? sender, EventArgs e)
         {
-            RefreshKpis();
-            LoadBanks();
+            RefreshMoneySummary();
             LoadCharts();
         }
 
@@ -95,16 +80,19 @@ namespace Finly.Pages
             {
                 if (PeriodBar.Mode != DateRangeMode.Custom)
                     PeriodBar.Mode = DateRangeMode.Custom;
+
                 LoadCharts();
             }
-            catch { /* nic */ }
+            catch
+            {
+                // nic
+            }
         }
 
         // ========================= WYKRESY I TABELKI =========================
 
         private void LoadCharts()
         {
-            // StartDate/EndDate są DateTime (nie-nullable)
             DateTime start = PeriodBar.StartDate;
             DateTime end = PeriodBar.EndDate;
 
@@ -112,23 +100,22 @@ namespace Finly.Pages
             if (end == default || end == DateTime.MinValue) end = DateTime.Today;
             if (start > end) (start, end) = (end, start);
 
-            // KOŁA
             var expenses = DatabaseService.GetSpendingByCategorySafe(_uid, start, end);
             BuildPie(PieCurrent, expenses);
 
             var incomes = DatabaseService.GetIncomeBySourceSafe(_uid, start, end);
             BuildPie(PieIncome, incomes);
 
-            // TABELKI + paski po prawej (po wyrenderowaniu drzewa wizualnego)
             Dispatcher.BeginInvoke(new Action(() =>
             {
                 BindExpenseTable(expenses);
                 BindIncomeTable(incomes);
-                BindMerchantBars(start, end);   // prawa kolumna: „sklepy”
+                BindMerchantBars(start, end);
             }), DispatcherPriority.Loaded);
         }
 
-        private void BindExpenseTable(IEnumerable<DatabaseService.CategoryAmountDto> data)
+        private void BindExpenseTable(
+            System.Collections.Generic.IEnumerable<DatabaseService.CategoryAmountDto> data)
         {
             var list = (data ?? Enumerable.Empty<DatabaseService.CategoryAmountDto>()).ToList();
             var sum = list.Sum(x => x.Amount);
@@ -146,12 +133,12 @@ namespace Finly.Pages
             if (FindName("ExpenseTable") is ListView lv)
                 lv.ItemsSource = rows;
 
-            // prawa kolumna – „Najwyższe wydatki — kategorie”
             if (FindName("TopCategoryBars") is ItemsControl catBars)
                 catBars.ItemsSource = rows.Take(5).ToList();
         }
 
-        private void BindIncomeTable(IEnumerable<DatabaseService.CategoryAmountDto> data)
+        private void BindIncomeTable(
+            System.Collections.Generic.IEnumerable<DatabaseService.CategoryAmountDto> data)
         {
             var list = (data ?? Enumerable.Empty<DatabaseService.CategoryAmountDto>()).ToList();
             var sum = list.Sum(x => x.Amount);
@@ -195,14 +182,13 @@ namespace Finly.Pages
             }
             catch
             {
-                // bezpieczny fallback
                 shopBars.ItemsSource = Array.Empty<TableRow>();
             }
         }
 
         private void BuildPie(
             ObservableCollection<PieSlice> target,
-            IEnumerable<DatabaseService.CategoryAmountDto> source)
+            System.Collections.Generic.IEnumerable<DatabaseService.CategoryAmountDto> source)
         {
             target.Clear();
 
@@ -210,7 +196,9 @@ namespace Finly.Pages
                 .Where(x => x.Amount > 0m)
                 .OrderByDescending(x => x.Amount)
                 .ToList();
-            if (data.Count == 0) return;
+
+            if (data.Count == 0)
+                return;
 
             var sum = data.Sum(x => x.Amount);
             double start = 0;
@@ -234,7 +222,7 @@ namespace Finly.Pages
 
         private Brush DefaultBrush(int i)
         {
-            Color[] palette = new[]
+            Color[] palette =
             {
                 Hex("#FFED7A1A"), // brand orange
                 Hex("#FF3FA7D6"),
@@ -260,9 +248,10 @@ namespace Finly.Pages
         public Brush Brush { get; init; } = Brushes.Gray;
         public Geometry Geometry { get; init; } = Geometry.Empty;
 
-        public static PieSlice Create(double centerX, double centerY, double radius,
-                                      double startAngle, double sweepAngle,
-                                      Brush brush, string name, decimal amount)
+        public static PieSlice Create(
+            double centerX, double centerY, double radius,
+            double startAngle, double sweepAngle,
+            Brush brush, string name, decimal amount)
         {
             if (sweepAngle <= 0) sweepAngle = 0.1;
             if (sweepAngle >= 360) sweepAngle = 359.999;
@@ -283,7 +272,13 @@ namespace Finly.Pages
             }
             g.Freeze();
 
-            return new PieSlice { Name = name, Amount = amount, Brush = brush, Geometry = g };
+            return new PieSlice
+            {
+                Name = name,
+                Amount = amount,
+                Brush = brush,
+                Geometry = g
+            };
         }
 
         private static double DegToRad(double deg) => Math.PI / 180 * deg;
@@ -294,10 +289,13 @@ namespace Finly.Pages
         public string Name { get; set; } = "";
         public decimal Amount { get; set; }
         public string AmountStr => Amount.ToString("N2") + " zł";
-        public double Percent { get; set; }          // 0..100
+        public double Percent { get; set; }
         public string PercentStr => Math.Round(Percent, 0) + "%";
     }
 }
+
+
+
 
 
 

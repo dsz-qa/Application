@@ -8,7 +8,13 @@ namespace Finly.Views.Controls
     public partial class PeriodBarControl : UserControl
     {
         private static readonly DateRangeMode[] PresetOrder =
-            { DateRangeMode.Day, DateRangeMode.Week, DateRangeMode.Month, DateRangeMode.Quarter, DateRangeMode.Year };
+        {
+            DateRangeMode.Day,
+            DateRangeMode.Week,
+            DateRangeMode.Month,
+            DateRangeMode.Quarter,
+            DateRangeMode.Year
+        };
 
         public PeriodBarControl()
         {
@@ -18,20 +24,41 @@ namespace Finly.Views.Controls
         }
 
         // ===== Dependency Properties =====
+
         public static readonly DependencyProperty StartDateProperty =
-            DependencyProperty.Register(nameof(StartDate), typeof(DateTime), typeof(PeriodBarControl),
-                new FrameworkPropertyMetadata(DateTime.Today, FrameworkPropertyMetadataOptions.BindsTwoWayByDefault, OnRangePropChanged));
+            DependencyProperty.Register(
+                nameof(StartDate),
+                typeof(DateTime),
+                typeof(PeriodBarControl),
+                new FrameworkPropertyMetadata(
+                    DateTime.Today,
+                    FrameworkPropertyMetadataOptions.BindsTwoWayByDefault,
+                    OnRangePropChanged));
 
         public static readonly DependencyProperty EndDateProperty =
-            DependencyProperty.Register(nameof(EndDate), typeof(DateTime), typeof(PeriodBarControl),
-                new FrameworkPropertyMetadata(DateTime.Today, FrameworkPropertyMetadataOptions.BindsTwoWayByDefault, OnRangePropChanged));
+            DependencyProperty.Register(
+                nameof(EndDate),
+                typeof(DateTime),
+                typeof(PeriodBarControl),
+                new FrameworkPropertyMetadata(
+                    DateTime.Today,
+                    FrameworkPropertyMetadataOptions.BindsTwoWayByDefault,
+                    OnRangePropChanged));
 
         public static readonly DependencyProperty ModeProperty =
-            DependencyProperty.Register(nameof(Mode), typeof(DateRangeMode), typeof(PeriodBarControl),
-                new FrameworkPropertyMetadata(DateRangeMode.Day, OnRangePropChanged));
+            DependencyProperty.Register(
+                nameof(Mode),
+                typeof(DateRangeMode),
+                typeof(PeriodBarControl),
+                new FrameworkPropertyMetadata(
+                    DateRangeMode.Day,
+                    OnRangePropChanged));
 
         public static readonly DependencyProperty PeriodLabelProperty =
-            DependencyProperty.Register(nameof(PeriodLabel), typeof(string), typeof(PeriodBarControl),
+            DependencyProperty.Register(
+                nameof(PeriodLabel),
+                typeof(string),
+                typeof(PeriodBarControl),
                 new PropertyMetadata(string.Empty));
 
         private static void OnRangePropChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
@@ -68,6 +95,7 @@ namespace Finly.Views.Controls
         public event EventHandler? RangeChanged;
 
         // ===== Etykieta na pasku =====
+
         private void UpdateLabel()
         {
             PeriodLabel = Mode switch
@@ -82,7 +110,8 @@ namespace Finly.Views.Controls
             };
         }
 
-        // Ustaw zakresy dla presetów
+        // ===== Presety =====
+
         private void ApplyPreset(DateRangeMode mode, DateTime anchor)
         {
             Mode = mode;
@@ -116,14 +145,15 @@ namespace Finly.Views.Controls
                     break;
 
                 case DateRangeMode.Custom:
-                    // zakres ustawiany ręcznie w kalendarzach
+                    // ustawiane ręcznie
                     break;
             }
 
             UpdateLabel();
         }
 
-        // ===== Strzałki – przełączają TYLKO presety (w pętli) =====
+        // ===== Strzałki =====
+
         private void Prev_Click(object s, RoutedEventArgs e)
         {
             var idx = Array.IndexOf(PresetOrder, Mode);
@@ -140,10 +170,11 @@ namespace Finly.Views.Controls
             ApplyPreset(PresetOrder[idx], DateTime.Today);
         }
 
-        // Publiczne API (przydaje się z zewnątrz)
+        // Publiczne API
         public void SetPreset(DateRangeMode mode) => ApplyPreset(mode, DateTime.Today);
     }
 }
+
 
 
 
