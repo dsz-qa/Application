@@ -18,26 +18,34 @@ namespace Finly.Pages
         public ObservableCollection<PieSlice> PieCurrent { get; } = new();
         public ObservableCollection<PieSlice> PieIncome { get; } = new();
 
+        // Presety okresu
+        private static readonly DateRangeMode[] PresetOrder =
+        {
+            DateRangeMode.Day,
+            DateRangeMode.Week,
+            DateRangeMode.Month,
+            DateRangeMode.Quarter,
+            DateRangeMode.Year
+        };
+
+        private DateRangeMode _mode = DateRangeMode.Day;
+        private DateTime _startDate;
+        private DateTime _endDate;
+
         public DashboardPage(int userId)
         {
             InitializeComponent();
             _uid = userId;
             DataContext = this;
 
-            Loaded += (_, __) =>
-            {
-                try
-                {
-                    PeriodBar.SetPreset(DateRangeMode.Day);
-                }
-                catch
-                {
-                    // ignorujemy, jeśli coś z designera
-                }
+            Loaded += DashboardPage_Loaded;
+        }
 
-                RefreshMoneySummary();
-                LoadCharts();
-            };
+        private void DashboardPage_Loaded(object sender, RoutedEventArgs e)
+        {
+            ApplyPreset(DateRangeMode.Day, DateTime.Today);
+            RefreshMoneySummary();
+            LoadCharts();
         }
 
         // ========================= KPI =========================
@@ -55,7 +63,6 @@ namespace Finly.Pages
 
             var snap = DatabaseService.GetMoneySnapshot(uid);
 
-            // Cały majątek = konta + wolna gotówka + cała odłożona gotówka
             SetKpiText("TotalWealthText", snap.Total);
             SetKpiText("BanksText", snap.Banks);
             SetKpiText("FreeCashDashboardText", snap.Cash);
@@ -66,35 +73,120 @@ namespace Finly.Pages
             SetKpiText("InvestmentsText", 0m);
         }
 
-        // ========================= ZAKRES DAT =========================
+        // ========================= OKRES DAT =========================
 
-        private void PeriodBar_RangeChanged(object? sender, EventArgs e)
+        private void ApplyPreset(DateRangeMode mode, DateTime anchor)
         {
-            RefreshMoneySummary();
+            _mode = mode;
+
+            switch (mode)
+            {
+                case DateRangeMode.Day:
+                    _startDate = _endDate = anchor.Date;
+                    break;
+
+                case DateRangeMode.Week:
+                    int diff = ((int)anchor.DayOfWeek + 6) % 7; // pon = 0
+                    _startDate = anchor.AddDays(-diff).Date;
+                    _endDate = _startDate.AddDays(6);
+                    break;
+
+                case DateRangeMode.Month:
+                    _startDate = new DateTime(anchor.Year, anchor.Month, 1);
+                    _endDate = _startDate.AddMonths(1).AddDays(-1);
+                    break;
+
+                case DateRangeMode.Quarter:
+                    int qStartMonth = (((anchor.Month - 1) / 3) * 3) + 1;
+                    _startDate = new DateTime(anchor.Year, qStartMonth, 1);
+                    _endDate = _startDate.AddMonths(3).AddDays(-1);
+                    break;
+
+                case DateRangeMode.Year:
+                    _startDate = new DateTime(anchor.Year, 1, 1);
+                    _endDate = new DateTime(anchor.Year, 12, 31);
+                    break;
+
+                case DateRangeMode.Custom:
+                    // ręcznie z kalendarzy
+                    break;
+            }
+
+            UpdatePeriodLabel();
+
+            var startPicker = FindName("StartPicker") as DatePicker;
+            var endPicker = FindName("EndPicker") as DatePicker;
+
+            if (startPicker != null)
+                startPicker.SelectedDate = _startDate;
+            if (endPicker != null)
+                endPicker.SelectedDate = _endDate;
+        }
+
+        private void UpdatePeriodLabel()
+        {
+            if (FindName("PeriodLabelText") is not TextBlock label)
+                return;
+
+            string text = _mode switch
+            {
+                DateRangeMode.Day => "Dzisiaj",
+                DateRangeMode.Week => "Ten tydzień",
+                DateRangeMode.Month => "Ten miesiąc",
+                DateRangeMode.Quarter => "Ten kwartał",
+                DateRangeMode.Year => "Ten rok",
+                DateRangeMode.Custom => $"{_startDate:dd.MM.yyyy} – {_endDate:dd.MM.yyyy}",
+                _ => $"{_startDate:dd.MM.yyyy} – {_endDate:dd.MM.yyyy}"
+            };
+
+            label.Text = text;
+        }
+
+        private void PrevPeriod_Click(object sender, RoutedEventArgs e)
+        {
+            int idx = Array.IndexOf(PresetOrder, _mode);
+            if (idx < 0) idx = 0;
+            idx = (idx - 1 + PresetOrder.Length) % PresetOrder.Length;
+
+            ApplyPreset(PresetOrder[idx], DateTime.Today);
+            LoadCharts();
+        }
+
+        private void NextPeriod_Click(object sender, RoutedEventArgs e)
+        {
+            int idx = Array.IndexOf(PresetOrder, _mode);
+            if (idx < 0) idx = 0;
+            idx = (idx + 1) % PresetOrder.Length;
+
+            ApplyPreset(PresetOrder[idx], DateTime.Today);
             LoadCharts();
         }
 
         private void ManualDateChanged(object sender, SelectionChangedEventArgs e)
         {
-            try
-            {
-                if (PeriodBar.Mode != DateRangeMode.Custom)
-                    PeriodBar.Mode = DateRangeMode.Custom;
+            var startPicker = FindName("StartPicker") as DatePicker;
+            var endPicker = FindName("EndPicker") as DatePicker;
 
-                LoadCharts();
-            }
-            catch
-            {
-                // nic
-            }
+            if (startPicker?.SelectedDate == null || endPicker?.SelectedDate == null)
+                return;
+
+            _startDate = startPicker.SelectedDate.Value.Date;
+            _endDate = endPicker.SelectedDate.Value.Date;
+
+            if (_startDate > _endDate)
+                (_startDate, _endDate) = (_endDate, _startDate);
+
+            _mode = DateRangeMode.Custom;
+            UpdatePeriodLabel();
+            LoadCharts();
         }
 
         // ========================= WYKRESY I TABELKI =========================
 
         private void LoadCharts()
         {
-            DateTime start = PeriodBar.StartDate;
-            DateTime end = PeriodBar.EndDate;
+            DateTime start = _startDate;
+            DateTime end = _endDate;
 
             if (start == default || start == DateTime.MinValue) start = DateTime.Today;
             if (end == default || end == DateTime.MinValue) end = DateTime.Today;
@@ -196,9 +288,7 @@ namespace Finly.Pages
                 .Where(x => x.Amount > 0m)
                 .OrderByDescending(x => x.Amount)
                 .ToList();
-
-            if (data.Count == 0)
-                return;
+            if (data.Count == 0) return;
 
             var sum = data.Sum(x => x.Amount);
             double start = 0;
@@ -248,10 +338,9 @@ namespace Finly.Pages
         public Brush Brush { get; init; } = Brushes.Gray;
         public Geometry Geometry { get; init; } = Geometry.Empty;
 
-        public static PieSlice Create(
-            double centerX, double centerY, double radius,
-            double startAngle, double sweepAngle,
-            Brush brush, string name, decimal amount)
+        public static PieSlice Create(double centerX, double centerY, double radius,
+                                      double startAngle, double sweepAngle,
+                                      Brush brush, string name, decimal amount)
         {
             if (sweepAngle <= 0) sweepAngle = 0.1;
             if (sweepAngle >= 360) sweepAngle = 359.999;
@@ -268,17 +357,12 @@ namespace Finly.Pages
             {
                 ctx.BeginFigure(new Point(centerX, centerY), true, true);
                 ctx.LineTo(p0, true, true);
-                ctx.ArcTo(p1, new Size(radius, radius), 0, large, SweepDirection.Clockwise, true, true);
+                ctx.ArcTo(p1, new Size(radius, radius), 0, large,
+                          SweepDirection.Clockwise, true, true);
             }
             g.Freeze();
 
-            return new PieSlice
-            {
-                Name = name,
-                Amount = amount,
-                Brush = brush,
-                Geometry = g
-            };
+            return new PieSlice { Name = name, Amount = amount, Brush = brush, Geometry = g };
         }
 
         private static double DegToRad(double deg) => Math.PI / 180 * deg;
@@ -293,6 +377,9 @@ namespace Finly.Pages
         public string PercentStr => Math.Round(Percent, 0) + "%";
     }
 }
+
+
+
 
 
 

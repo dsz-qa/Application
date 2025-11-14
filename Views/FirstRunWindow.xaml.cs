@@ -3,6 +3,7 @@ using Finly.Services;
 using System;
 using System.Globalization;
 using System.Windows;
+using System.Windows.Controls;
 using System.Windows.Input;
 
 namespace Finly.Views
@@ -16,6 +17,32 @@ namespace Finly.Views
             InitializeComponent();
             _userId = userId;
         }
+
+        // Czyści "0,00" po kliknięciu w pole, a gdy puste – przywraca
+        private void AmountBox_GotFocus(object sender, RoutedEventArgs e)
+        {
+            if (sender is TextBox tb)
+            {
+                var text = tb.Text.Trim();
+                if (text == "0" || text == "0,0" || text == "0,00" || text == "0.00")
+                {
+                    tb.Text = string.Empty;
+                }
+                tb.SelectAll();
+            }
+        }
+
+        private void AmountBox_LostFocus(object sender, RoutedEventArgs e)
+        {
+            if (sender is TextBox tb)
+            {
+                if (string.IsNullOrWhiteSpace(tb.Text))
+                {
+                    tb.Text = "0,00";
+                }
+            }
+        }
+
 
         // =================== Pasek tytułu ===================
 
@@ -81,9 +108,9 @@ namespace Finly.Views
             }
 
             // Gotówka odłożona (na koperty)
-            if (!string.IsNullOrWhiteSpace(SavedCashBox.Text))
+            if (!string.IsNullOrWhiteSpace(EnvelopeCashBox.Text))
             {
-                if (!decimal.TryParse(SavedCashBox.Text, NumberStyles.Any, culture, out savedCash) || savedCash < 0)
+                if (!decimal.TryParse(EnvelopeCashBox.Text, NumberStyles.Any, culture, out savedCash) || savedCash < 0)
                 {
                     ok = false;
                     errors += "\n• Podaj poprawną kwotę gotówki odłożonej (≥ 0).";
@@ -91,9 +118,9 @@ namespace Finly.Views
             }
 
             // Środki na kontach bankowych
-            if (!string.IsNullOrWhiteSpace(BankTotalBox.Text))
+            if (!string.IsNullOrWhiteSpace(MainBankBox.Text))
             {
-                if (!decimal.TryParse(BankTotalBox.Text, NumberStyles.Any, culture, out bankTotal) || bankTotal < 0)
+                if (!decimal.TryParse(MainBankBox.Text, NumberStyles.Any, culture, out bankTotal) || bankTotal < 0)
                 {
                     ok = false;
                     errors += "\n• Podaj poprawną łączną kwotę na kontach bankowych (≥ 0).";
