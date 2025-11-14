@@ -156,7 +156,6 @@ namespace Finly.Views
             }
         }
 
-
         private void ClearLoginError()
         {
             VM.LoginIsError = false;
@@ -172,9 +171,20 @@ namespace Finly.Views
             UserService.CurrentUserName = VM.Username;
             UserService.CurrentUserEmail = UserService.GetEmail(userId);
 
-            var shell = new ShellWindow();
-            Application.Current.MainWindow = shell;
-            shell.Show();
+            Window next;
+
+            // jeśli użytkownik NIE przeszedł jeszcze pierwszej konfiguracji – pokaż FirstRunWindow
+            if (!UserService.IsOnboarded(userId))
+            {
+                next = new FirstRunWindow(userId);
+            }
+            else
+            {
+                next = new ShellWindow();
+            }
+
+            Application.Current.MainWindow = next;
+            next.Show();
             Close();
         }
 

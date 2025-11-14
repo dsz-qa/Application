@@ -30,6 +30,26 @@ namespace Finly.Services
             CurrentUserEmail = null;
         }
 
+        public static bool IsOnboarded(int userId)
+        {
+            using var con = DatabaseService.GetConnection();
+            using var cmd = con.CreateCommand();
+            cmd.CommandText = "SELECT COALESCE(IsOnboarded,0) FROM Users WHERE Id=@id LIMIT 1;";
+            cmd.Parameters.AddWithValue("@id", userId);
+            var obj = cmd.ExecuteScalar();
+            return obj != null && obj != DBNull.Value && Convert.ToInt32(obj) != 0;
+        }
+
+        public static void MarkOnboarded(int userId)
+        {
+            using var con = DatabaseService.GetConnection();
+            using var cmd = con.CreateCommand();
+            cmd.CommandText = "UPDATE Users SET IsOnboarded = 1 WHERE Id=@id;";
+            cmd.Parameters.AddWithValue("@id", userId);
+            cmd.ExecuteNonQuery();
+        }
+
+
         // ===== Typ konta =====
         public static AccountType GetAccountType(int userId)
         {

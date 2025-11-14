@@ -265,13 +265,18 @@ namespace Finly.Views
         private void OpenSettings_Click(object s, RoutedEventArgs e)
         { NavigateTo("settings"); SetActiveNav(null); SetActiveFooter(FooterSettings); }
 
-        public void Nav_Logout_Click(object s, RoutedEventArgs e)
+        private void Nav_Logout_Click(object sender, RoutedEventArgs e)
         {
+            UserService.ClearCurrentUser();
+
             var auth = new AuthWindow();
             Application.Current.MainWindow = auth;
             auth.Show();
+
+            // 🔹 to jest ważne – zamykamy aktualne okno, żeby się nie dublowało
             Close();
         }
+
 
         // ===== Podświetlenia / pomocnicze =====
         private void SetActiveNav(ToggleButton? active)

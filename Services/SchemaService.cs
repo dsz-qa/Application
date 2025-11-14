@@ -32,9 +32,6 @@ namespace Finly.Services
                     return c;
                 }
 
-                AddColumnIfMissing(con, tx, "Users", "IsOnboarded", "INTEGER", "NOT NULL DEFAULT 0");
-
-
                 bool ColExists(string table, string col) => ColumnExists(con, tx, table, col);
 
                 // ===== Tabele (idempotentnie) =====
@@ -64,7 +61,6 @@ CREATE TABLE IF NOT EXISTS Incomes(
   Description TEXT NULL,
   Source TEXT NULL
 );
-
 
 CREATE TABLE IF NOT EXISTS Categories(
     Id      INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -169,7 +165,7 @@ CREATE TABLE IF NOT EXISTS CashOnHand(
                 AddColumnIfMissing(con, tx, "Users", "LastName", "TEXT");
                 AddColumnIfMissing(con, tx, "Users", "Address", "TEXT");
                 AddColumnIfMissing(con, tx, "Users", "CreatedAt", "TEXT", "NOT NULL DEFAULT CURRENT_TIMESTAMP");
-                // (celowo: BRAK kolumny Users.CashOnHand – używamy osobnej tabeli CashOnHand)
+                AddColumnIfMissing(con, tx, "Users", "IsOnboarded", "INTEGER", "NOT NULL DEFAULT 0");
 
                 // Categories
                 AddColumnIfMissing(con, tx, "Categories", "UserId", "INTEGER NULL");
@@ -305,6 +301,7 @@ FROM BankAccounts;";
         }
     }
 }
+
 
 
 
