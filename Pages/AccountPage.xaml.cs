@@ -44,7 +44,8 @@ namespace Finly.Pages
             SetLabel("LblBanks", s.Banks);
             SetLabel("LblCash", s.Cash);
             SetLabel("LblEnvelopes", s.Envelopes);
-            SetLabel("LblAvailable", s.AvailableToAllocate);
+            // tutaj wcześniej było s.AvailableToAllocate – zmienione na SavedUnallocated
+            SetLabel("LblAvailable", s.SavedUnallocated);
         }
 
         private void OpenEnvelopes_Click(object sender, RoutedEventArgs e)
@@ -280,6 +281,8 @@ namespace Finly.Pages
         }
     }
 }
+
+
 
 
 

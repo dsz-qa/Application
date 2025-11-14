@@ -1,14 +1,13 @@
 ﻿using Finly.Models;
 using Finly.Services;
-using Finly.Views;
 using Finly.ViewModels;
 using System;
 using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
-using System.Windows.Media;
 using System.Windows.Interop;
+using System.Windows.Media;
 
 namespace Finly.Views
 {
@@ -100,7 +99,6 @@ namespace Finly.Views
             return false;
         }
 
-        // znajdź rodzica typu T (do przewinięcia)
         private static T? FindParent<T>(DependencyObject start) where T : DependencyObject
         {
             var p = VisualTreeHelper.GetParent(start);
@@ -113,7 +111,6 @@ namespace Finly.Views
         {
             AccountTypeChooser.Visibility = Visibility.Visible;
 
-            // przewiń subtelnie do wyboru
             Dispatcher.InvokeAsync(() =>
             {
                 AccountTypeChooser.UpdateLayout();
@@ -145,8 +142,10 @@ namespace Finly.Views
             var pwd = PwdLoginText.Visibility == Visibility.Visible ? PwdLoginText.Text : PwdLogin.Password;
             if (VM.Login(pwd))
             {
-                // Mamy to już w VM.LoggedInUserId
-                var userId = VM.LoggedInUserId > 0 ? VM.LoggedInUserId : UserService.GetUserIdByLogin(VM.Username);
+                var userId = VM.LoggedInUserId > 0
+                    ? VM.LoggedInUserId
+                    : UserService.GetUserIdByLogin(VM.Username);
+
                 OnLoginSuccess(userId);
             }
             else
@@ -167,21 +166,22 @@ namespace Finly.Views
 
         private void OnLoginSuccess(int userId)
         {
+            if (userId <= 0)
+            {
+                VM.LoginIsError = true;
+                VM.LoginMessage = "Nie udało się odczytać identyfikatora użytkownika.";
+                return;
+            }
+
             UserService.CurrentUserId = userId;
             UserService.CurrentUserName = VM.Username;
             UserService.CurrentUserEmail = UserService.GetEmail(userId);
 
-            Window next;
+            bool onboarded = DatabaseService.IsUserOnboarded(userId);
 
-            // jeśli użytkownik NIE przeszedł jeszcze pierwszej konfiguracji – pokaż FirstRunWindow
-            if (!UserService.IsOnboarded(userId))
-            {
-                next = new FirstRunWindow(userId);
-            }
-            else
-            {
-                next = new ShellWindow();
-            }
+            Window next = onboarded
+                ? new ShellWindow()
+                : new FirstRunWindow(userId);
 
             Application.Current.MainWindow = next;
             next.Show();
@@ -301,6 +301,7 @@ namespace Finly.Views
         }
     }
 }
+
 
 
 

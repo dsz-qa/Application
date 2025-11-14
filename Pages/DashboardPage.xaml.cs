@@ -38,14 +38,40 @@ namespace Finly.Pages
 
         private void RefreshKpis()
         {
-            var s = DatabaseService.GetMoneySnapshot(_uid);
-            var freeCash = Math.Max(0m, s.Cash - s.Envelopes);
-            var total = s.Banks + freeCash + s.Envelopes;
+            // na razie KPI = podsumowanie pieniędzy
+            RefreshMoneySummary();
+        }
 
-            KpiTotal.Text = total.ToString("N2", CultureInfo.CurrentCulture) + " zł";
-            KpiFreeCash.Text = freeCash.ToString("N2", CultureInfo.CurrentCulture) + " zł";
-            KpiEnvelopes.Text = s.Envelopes.ToString("N2", CultureInfo.CurrentCulture) + " zł";
-            BanksExpander.Header = s.Banks.ToString("N2", CultureInfo.CurrentCulture) + " zł";
+        private void RefreshMoneySummary()
+        {
+            var uid = UserService.GetCurrentUserId();
+            if (uid <= 0) return;
+
+            var snap = DatabaseService.GetMoneySnapshot(uid);
+
+            void SetText(string name, string value)
+            {
+                if (FindName(name) is TextBlock tb)
+                    tb.Text = value;
+            }
+
+            // Cały majątek = konta + wolna gotówka + cała odłożona gotówka
+            SetText("TotalWealthText", snap.Total.ToString("N2") + " zł");
+
+            // Konta bankowe
+            SetText("BanksText", snap.Banks.ToString("N2") + " zł");
+
+            // Wolna gotówka (do wydawania)
+            SetText("FreeCashDashboardText", snap.Cash.ToString("N2") + " zł");
+
+            // Odłożona gotówka do rozdysponowania
+            SetText("SavedToAllocateText", snap.SavedUnallocated.ToString("N2") + " zł");
+
+            // Gotówka rozdysponowana w kopertach
+            SetText("EnvelopesDashboardText", snap.Envelopes.ToString("N2") + " zł");
+
+            // Inwestycje – na razie 0, później podepniemy pod tabelę inwestycji
+            SetText("InvestmentsText", "0,00 zł");
         }
 
         private void LoadBanks()
@@ -272,6 +298,7 @@ namespace Finly.Pages
         public string PercentStr => Math.Round(Percent, 0) + "%";
     }
 }
+
 
 
 

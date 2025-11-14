@@ -1,41 +1,77 @@
-﻿using System;
+﻿using Finly.Services;
+using Finly.Views;
+using System;
 using System.Data;
 using System.Globalization;
 using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
-using System.Windows.Media;            // Brushes
-using Finly.Services;
+using System.Windows.Media;
 
 namespace Finly.Pages
 {
     public partial class EnvelopesPage : UserControl
     {
-        private readonly int _userId;
+        private int _userId;
         private DataTable? _dt;
         private int? _editingId = null;
 
-        public EnvelopesPage(int userId)
+        public EnvelopesPage()
         {
             InitializeComponent();
+            Loaded += EnvelopesPage_Loaded;
+        }
+
+        // opcjonalnie – jeśli gdzieś tworzysz stronę z userId:
+        public EnvelopesPage(int userId) : this()
+        {
             _userId = userId;
+        }
+
+        private void EnvelopesPage_Loaded(object sender, RoutedEventArgs e)
+        {
+            // jeśli nie został przekazany w konstruktorze – bierzemy z UserService
+            if (_userId <= 0)
+                _userId = UserService.GetCurrentUserId();
+
+            if (_userId <= 0)
+                return;
+
+            // 1) ekran powitalny tylko raz na użytkownika
+            if (!UserService.HasSeenEnvelopesIntro(_userId))
+            {
+                var dlg = new EnvelopesIntroWindow
+                {
+                    Owner = Application.Current.MainWindow
+                };
+
+                if (dlg.ShowDialog() == true)
+                {
+                    UserService.MarkEnvelopesIntroSeen(_userId);
+                }
+            }
+
+            // 2) normalne załadowanie danych
             LoadAll();
             SetAddMode();
         }
 
-        // ====== Load ======
+        // ================= LOAD ==================
+
         private void LoadAll()
         {
             try
             {
-                // 1) Gotówka
-                var cash = DatabaseService.GetCashOnHand(_userId);
-                CashBox.Text = cash.ToString("N2");
+                // 1) Wolna gotówka + odłożona gotówka
+                var freeCash = DatabaseService.GetCashOnHand(_userId);  // możesz wydawać
+                var savedTotal = DatabaseService.GetSavedCash(_userId);   // cała odłożona pula
+
+                // w textboxie edytujesz CAŁĄ odłożoną gotówkę
+                CashBox.Text = savedTotal.ToString("N2");
 
                 // 2) Koperty
                 _dt = DatabaseService.GetEnvelopesTable(_userId);
 
-                // Kolumna Remaining = Target - Allocated (tworzymy/aktualizujemy)
                 if (_dt != null)
                 {
                     if (!_dt.Columns.Contains("Remaining"))
@@ -50,17 +86,19 @@ namespace Finly.Pages
                 }
 
                 EnvelopesGrid.ItemsSource = _dt?.DefaultView;
-
-
-                EnvelopesGrid.ItemsSource = _dt?.DefaultView;
+                EnvelopesCards.ItemsSource = _dt?.DefaultView;
 
                 // 3) Sumy
                 var allocated = _dt?.AsEnumerable().Sum(r => SafeDec(r["Allocated"])) ?? 0m;
-                AllocatedSumText.Text = allocated.ToString("N2");
+                var unassigned = savedTotal - allocated;   // odłożona, ale nie w kopertach
 
-                var unassigned = cash - allocated;
-                UnassignedText.Text = unassigned.ToString("N2");
-                UnassignedText.Foreground = unassigned >= 0 ? SystemColors.ControlTextBrush : Brushes.IndianRed;
+                FreeCashText.Text = freeCash.ToString("N2") + " zł";
+                EnvelopesSumText.Text = allocated.ToString("N2") + " zł";
+                UnassignedText.Text = unassigned.ToString("N2") + " zł";
+
+                UnassignedText.Foreground = unassigned >= 0
+                    ? SystemColors.ControlTextBrush
+                    : Brushes.IndianRed;
             }
             catch (Exception ex)
             {
@@ -68,7 +106,9 @@ namespace Finly.Pages
             }
         }
 
-        // ====== Helpers ======
+
+        // ================= HELPERS ==================
+
         private static decimal SafeParse(string? s)
         {
             if (string.IsNullOrWhiteSpace(s)) return 0m;
@@ -108,15 +148,23 @@ namespace Finly.Pages
             SaveEnvelopeBtn.Content = "Zapisz zmiany";
         }
 
-        // ====== Cash ======
+        // ================= GOTÓWKA ==================
+
+        // przycisk w sekcji „Gotówka odłożona”
         private void SaveCash_Click(object sender, RoutedEventArgs e)
         {
             try
             {
-                var cash = SafeParse(CashBox.Text);
-                DatabaseService.SetCashOnHand(_userId, cash);
+                var saved = SafeParse(CashBox.Text);
+                if (saved < 0)
+                {
+                    FormMessage.Text = "Kwota odłożonej gotówki nie może być ujemna.";
+                    return;
+                }
+
+                DatabaseService.SetSavedCash(_userId, saved);
                 LoadAll();
-                FormMessage.Text = "Zapisano gotówkę.";
+                FormMessage.Text = "Zapisano odłożoną gotówkę.";
             }
             catch (Exception ex)
             {
@@ -124,7 +172,8 @@ namespace Finly.Pages
             }
         }
 
-        // ====== Grid actions ======
+        // ================= GRID / AKCJE ==================
+
         private void StartAdd_Click(object sender, RoutedEventArgs e) => SetAddMode();
 
         private void EditEnvelope_Click(object sender, RoutedEventArgs e)
@@ -154,7 +203,6 @@ namespace Finly.Pages
 
             try
             {
-                // Jeśli masz wersję z userId, użyj: DatabaseService.DeleteEnvelope(id, _userId);
                 DatabaseService.DeleteEnvelope(id);
                 LoadAll();
                 SetAddMode();
@@ -174,7 +222,8 @@ namespace Finly.Pages
             SetEditMode(id, drv.Row);
         }
 
-        // ====== Form save/cancel ======
+        // ================= FORMULARZ ==================
+
         private void SaveEnvelope_Click(object sender, RoutedEventArgs e)
         {
             var name = (NameBox.Text ?? "").Trim();
@@ -218,5 +267,6 @@ namespace Finly.Pages
         private void CancelEdit_Click(object sender, RoutedEventArgs e) => SetAddMode();
     }
 }
+
 
 

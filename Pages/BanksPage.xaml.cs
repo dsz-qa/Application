@@ -29,7 +29,8 @@ namespace Finly.Pages
             LblBanks.Text = s.Banks.ToString("N2", CultureInfo.CurrentCulture) + " zł";
             LblCash.Text = s.Cash.ToString("N2", CultureInfo.CurrentCulture) + " zł";
             LblEnvelopes.Text = s.Envelopes.ToString("N2", CultureInfo.CurrentCulture) + " zł";
-            LblAvailable.Text = s.AvailableToAllocate.ToString("N2", CultureInfo.CurrentCulture) + " zł";
+            // tu wcześniej było s.AvailableToAllocate
+            LblAvailable.Text = s.SavedUnallocated.ToString("N2", CultureInfo.CurrentCulture) + " zł";
         }
 
         private static decimal? PromptAmount(Window owner, string title, string label = "Kwota (PLN):")
@@ -104,7 +105,6 @@ namespace Finly.Pages
             return null;
         }
 
-
         // ===== WY/PŁATA =====
 
         private void WithdrawToCash_Click(object sender, RoutedEventArgs e)
@@ -138,7 +138,6 @@ namespace Finly.Pages
 
             try
             {
-                // Wymaga DatabaseService.TransferCashToBank(...)
                 DatabaseService.TransferCashToBank(_uid, id.Value, amount.Value);
                 ToastService.Success($"Wpłacono {amount.Value:N2} zł na konto.");
                 LoadAccounts();

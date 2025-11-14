@@ -30,6 +30,24 @@ namespace Finly.Services
             CurrentUserEmail = null;
         }
 
+        public static bool HasSeenEnvelopesIntro(int userId)
+        {
+            using var con = DatabaseService.GetConnection();
+            using var cmd = con.CreateCommand();
+            cmd.CommandText = "SELECT HasSeenEnvelopesIntro FROM Users WHERE Id=@id LIMIT 1;";
+            cmd.Parameters.AddWithValue("@id", userId);
+            var obj = cmd.ExecuteScalar();
+            return obj != null && obj != DBNull.Value && Convert.ToInt32(obj) != 0;
+        }
+
+        public static void MarkEnvelopesIntroSeen(int userId)
+        {
+            using var con = DatabaseService.GetConnection();
+            using var cmd = con.CreateCommand();
+            cmd.CommandText = "UPDATE Users SET HasSeenEnvelopesIntro=1 WHERE Id=@id;";
+            cmd.Parameters.AddWithValue("@id", userId);
+            cmd.ExecuteNonQuery();
+        }
         public static bool IsOnboarded(int userId)
         {
             using var con = DatabaseService.GetConnection();
@@ -48,6 +66,38 @@ namespace Finly.Services
             cmd.Parameters.AddWithValue("@id", userId);
             cmd.ExecuteNonQuery();
         }
+
+        public static bool GetIsOnboarded(int userId)
+        {
+            using var con = DatabaseService.GetConnection();
+            using var cmd = con.CreateCommand();
+            cmd.CommandText = "SELECT IsOnboarded FROM Users WHERE Id=@id;";
+            cmd.Parameters.AddWithValue("@id", userId);
+            var v = cmd.ExecuteScalar();
+            return v != null && v != DBNull.Value && Convert.ToInt32(v) != 0;
+        }
+
+        public static void SetIsOnboarded(int userId, bool value)
+        {
+            using var con = DatabaseService.GetConnection();
+            using var cmd = con.CreateCommand();
+            cmd.CommandText = "UPDATE Users SET IsOnboarded=@v WHERE Id=@id;";
+            cmd.Parameters.AddWithValue("@v", value ? 1 : 0);
+            cmd.Parameters.AddWithValue("@id", userId);
+            cmd.ExecuteNonQuery();
+        }
+
+
+        public static void SetHasSeenEnvelopesIntro(int userId, bool value)
+        {
+            using var con = DatabaseService.GetConnection();
+            using var cmd = con.CreateCommand();
+            cmd.CommandText = "UPDATE Users SET HasSeenEnvelopesIntro=@v WHERE Id=@id;";
+            cmd.Parameters.AddWithValue("@v", value ? 1 : 0);
+            cmd.Parameters.AddWithValue("@id", userId);
+            cmd.ExecuteNonQuery();
+        }
+
 
 
         // ===== Typ konta =====

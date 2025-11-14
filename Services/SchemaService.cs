@@ -147,13 +147,22 @@ CREATE TABLE IF NOT EXISTS CashOnHand(
     UpdatedAt  TEXT    NOT NULL DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY(UserId) REFERENCES Users(Id) ON DELETE CASCADE
 );
+
+CREATE TABLE IF NOT EXISTS SavedCash(
+    UserId     INTEGER PRIMARY KEY,
+    Amount     NUMERIC NOT NULL DEFAULT 0,
+    UpdatedAt  TEXT    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY(UserId) REFERENCES Users(Id) ON DELETE CASCADE
+);
+
 "))
                 {
                     cmd.ExecuteNonQuery();
                 }
 
                 // ===== Migracje (idempotentne) =====
-                // Users
+
+                // Users – wszystkie kolumny, których używa UserService + onboarding
                 AddColumnIfMissing(con, tx, "Users", "AccountType", "TEXT", "DEFAULT 'Personal'");
                 AddColumnIfMissing(con, tx, "Users", "CompanyName", "TEXT");
                 AddColumnIfMissing(con, tx, "Users", "NIP", "TEXT");
@@ -166,6 +175,7 @@ CREATE TABLE IF NOT EXISTS CashOnHand(
                 AddColumnIfMissing(con, tx, "Users", "Address", "TEXT");
                 AddColumnIfMissing(con, tx, "Users", "CreatedAt", "TEXT", "NOT NULL DEFAULT CURRENT_TIMESTAMP");
                 AddColumnIfMissing(con, tx, "Users", "IsOnboarded", "INTEGER", "NOT NULL DEFAULT 0");
+                AddColumnIfMissing(con, tx, "Users", "HasSeenEnvelopesIntro", "INTEGER", "NOT NULL DEFAULT 0");
 
                 // Categories
                 AddColumnIfMissing(con, tx, "Categories", "UserId", "INTEGER NULL");
@@ -176,6 +186,10 @@ CREATE TABLE IF NOT EXISTS CashOnHand(
                 AddColumnIfMissing(con, tx, "Expenses", "CategoryId", "INTEGER NULL");
                 AddColumnIfMissing(con, tx, "Expenses", "AccountId", "INTEGER NULL");
                 AddColumnIfMissing(con, tx, "Expenses", "Note", "TEXT");
+
+                // Incomes – dopilnuj Description / Source przy starych bazach
+                AddColumnIfMissing(con, tx, "Incomes", "Description", "TEXT");
+                AddColumnIfMissing(con, tx, "Incomes", "Source", "TEXT");
 
                 // Envelopes – gdy baza była starsza
                 AddColumnIfMissing(con, tx, "Envelopes", "Target", "NUMERIC", "NOT NULL DEFAULT 0");
@@ -301,6 +315,7 @@ FROM BankAccounts;";
         }
     }
 }
+
 
 
 

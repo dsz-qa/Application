@@ -8,7 +8,7 @@
 	<ScrollViewer VerticalScrollBarVisibility="Auto">
 		<StackPanel Margin="24">
 
-			<TextBlock Text="Koperty gotówka" FontSize="24" FontWeight="Bold"/>
+			<TextBlock Text="Koperty" FontSize="24" FontWeight="Bold"/>
 
 			<!-- ==== GOTÓWKA ==== -->
 			<Border Margin="0,12,0,0"
@@ -22,26 +22,32 @@
 					</Grid.ColumnDefinitions>
 
 					<StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-						<TextBlock Text="Gotówka w portfelu:" VerticalAlignment="Center"/>
-						<TextBox x:Name="CashBox" Width="140" HorizontalContentAlignment="Right" Margin="12,0,0,0"/>
-						<Button Content="Zapisz"
+                        <TextBlock Text="Odłożona gotówka (całkowita):" VerticalAlignment="Center"/>
+                        <TextBox x:Name="CashBox" Width="140" HorizontalContentAlignment="Right" Margin="12,0,0,0"/>
+
+                        <Button Content="Zapisz"
                                 Width="120"
                                 Style="{StaticResource PrimaryButton}"
                                 Click="SaveCash_Click"
                                 Margin="12,0,0,0"/>
 					</StackPanel>
 
-					<StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
-						<StackPanel Margin="24,0,0,0">
-							<TextBlock Text="Przydzielono do kopert" FontSize="12" Opacity="0.8"/>
-							<TextBlock x:Name="AllocatedSumText" FontWeight="SemiBold"/>
-						</StackPanel>
-						<StackPanel Margin="24,0,0,0">
-							<TextBlock Text="Nierozdzielona gotówka" FontSize="12" Opacity="0.8"/>
-							<TextBlock x:Name="UnassignedText" FontWeight="SemiBold"/>
-						</StackPanel>
-					</StackPanel>
-				</Grid>
+                    <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                        <StackPanel Margin="24,0,0,0">
+                            <TextBlock Text="Wolna gotówka" FontSize="12" Opacity="0.8"/>
+                            <TextBlock x:Name="FreeCashText" FontWeight="SemiBold"/>
+                        </StackPanel>
+                        <StackPanel Margin="24,0,0,0">
+                            <TextBlock Text="Gotówka w kopertach" FontSize="12" Opacity="0.8"/>
+                            <TextBlock x:Name="EnvelopesSumText" FontWeight="SemiBold"/>
+                        </StackPanel>
+                        <StackPanel Margin="24,0,0,0">
+                            <TextBlock Text="Gotówka do rozdysponowania" FontSize="12" Opacity="0.8"/>
+                            <TextBlock x:Name="UnassignedText" FontWeight="SemiBold"/>
+                        </StackPanel>
+                    </StackPanel>
+
+                </Grid>
 			</Border>
 
             <!-- ==== PODGLĄD KART (galeria) ==== -->

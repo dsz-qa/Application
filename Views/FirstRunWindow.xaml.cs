@@ -55,29 +55,32 @@ namespace Finly.Views
 
         // =================== Logika formularza ===================
 
+        /// <summary>
+        /// Czyta wartości z pól tekstowych.
+        /// Zawsze przypisuje coś do parametrów out, żeby nie było CS0177.
+        /// Zwraca false, jeśli są błędy walidacji.
+        /// </summary>
         private bool TryReadValues(out decimal freeCash, out decimal savedCash, out decimal bankTotal)
         {
-            // Żeby nie było CS0177 – ustawiamy wartości startowe:
             freeCash = 0m;
             savedCash = 0m;
             bankTotal = 0m;
 
             var culture = CultureInfo.CurrentCulture;
-
             bool ok = true;
             string errors = "";
 
-            // Gotówka do dyspozycji
+            // Wolna gotówka (np. w portfelu)
             if (!string.IsNullOrWhiteSpace(FreeCashBox.Text))
             {
                 if (!decimal.TryParse(FreeCashBox.Text, NumberStyles.Any, culture, out freeCash) || freeCash < 0)
                 {
                     ok = false;
-                    errors += "\n• Podaj poprawną kwotę gotówki do dyspozycji (≥ 0).";
+                    errors += "\n• Podaj poprawną kwotę wolnej gotówki (≥ 0).";
                 }
             }
 
-            // Gotówka odłożona
+            // Gotówka odłożona (na koperty)
             if (!string.IsNullOrWhiteSpace(SavedCashBox.Text))
             {
                 if (!decimal.TryParse(SavedCashBox.Text, NumberStyles.Any, culture, out savedCash) || savedCash < 0)
@@ -120,51 +123,41 @@ namespace Finly.Views
             if (!TryReadValues(out var freeCash, out var savedCash, out var bankTotal))
                 return;
 
-            // 1) Gotówka w portfelu + oszczędności w gotówce
-            decimal totalCash = freeCash + savedCash;
-            DatabaseService.SetCashOnHand(_userId, totalCash);
+            // 1) Zapisujemy:
+            //    - CashOnHand = wolna gotówka (którą możesz wydawać)
+            //    - SavedCash  = cała odłożona gotówka (pula pod koperty)
+            DatabaseService.SetCashOnHand(_userId, freeCash);
+            DatabaseService.SetSavedCash(_userId, savedCash);
 
-            // 2) Oszczędności w kopercie
-            if (savedCash > 0)
-            {
-                DatabaseService.InsertEnvelope(
-                    _userId,
-                    "Oszczędności",
-                    target: savedCash,
-                    allocated: savedCash,
-                    note: "Kwota startowa z pierwszej konfiguracji");
-            }
-
-            // 3) Konto bankowe
+            // 2) Jeśli użytkownik wpisał kwotę na kontach bankowych – tworzymy konto startowe
             if (bankTotal > 0)
             {
                 var acc = new BankAccountModel
                 {
                     UserId = _userId,
-                    AccountName = "Konto startowe",
-                    Iban = string.Empty,
+                    AccountName = "Rachunek startowy",
+                    Iban = "",
                     Currency = "PLN",
                     Balance = bankTotal
                 };
-
                 DatabaseService.InsertAccount(acc);
             }
 
-            // 🔹 kluczowe: oznaczamy jako skonfigurowanego
-            UserService.MarkOnboarded(_userId);
+            // 3) Oznaczamy użytkownika jako „po konfiguracji”
+            DatabaseService.MarkUserOnboarded(_userId);
 
             var shell = new ShellWindow();
             Application.Current.MainWindow = shell;
             shell.Show();
             Close();
         }
+
 
         private void Skip_Click(object sender, RoutedEventArgs e)
         {
             if (_userId > 0)
             {
-                // nawet jeśli pominie konfigurację – traktujemy jako skonfigurowanego
-                UserService.MarkOnboarded(_userId);
+                DatabaseService.MarkUserOnboarded(_userId);
             }
 
             var shell = new ShellWindow();
@@ -172,8 +165,8 @@ namespace Finly.Views
             shell.Show();
             Close();
         }
-
     }
 }
+
 
 

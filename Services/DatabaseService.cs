@@ -114,6 +114,9 @@ namespace Finly.Services
             if (Has("CashOnHand"))
                 Exec("DELETE FROM CashOnHand WHERE UserId = @uid;");
 
+            if (Has("SavedCash"))
+                Exec("DELETE FROM SavedCash WHERE UserId = @uid;");
+
             if (Has("BankAccounts"))
                 Exec("DELETE FROM BankAccounts WHERE UserId = @uid;");
 
@@ -155,8 +158,6 @@ namespace Finly.Services
             cmd.Parameters.AddWithValue("@id", userId);
             cmd.ExecuteNonQuery();
         }
-
-
 
         private static string ToIsoDate(DateTime dt) => dt.ToString("yyyy-MM-dd");
 
@@ -691,7 +692,7 @@ WHERE Id=@id AND UserId=@u;";
 
         // =========================================================
         // ======================== GOTÓWKA ========================
-        // =========================================================
+
 
         public static decimal GetCashOnHand(int userId)
         {
@@ -717,49 +718,85 @@ SET Amount=excluded.Amount, UpdatedAt=CURRENT_TIMESTAMP;";
             up.ExecuteNonQuery();
         }
 
-        // =========================================================
-        // ======================= PODSUMOWANIA ====================
-        // =========================================================
+        // ===== GOTÓWKA OD£O¯ONA (SavedCash) =====
 
-        public static decimal GetTotalBanksBalance(int userId)
+        public static decimal GetSavedCash(int userId)
         {
             using var c = OpenAndEnsureSchema();
             using var cmd = c.CreateCommand();
-            cmd.CommandText = "SELECT COALESCE(SUM(Balance),0) FROM BankAccounts WHERE UserId=@u;";
+            cmd.CommandText = "SELECT Amount FROM SavedCash WHERE UserId=@u LIMIT 1;";
             cmd.Parameters.AddWithValue("@u", userId);
-            return Convert.ToDecimal(cmd.ExecuteScalar());
+            var obj = cmd.ExecuteScalar();
+            return (obj == null || obj == DBNull.Value) ? 0m : Convert.ToDecimal(obj);
         }
 
-        private static decimal GetTotalAllocatedInEnvelopes(int userId)
+        public static void SetSavedCash(int userId, decimal amount)
+        {
+            using var c = OpenAndEnsureSchema();
+            using var cmd = c.CreateCommand();
+            cmd.CommandText = @"
+INSERT INTO SavedCash(UserId, Amount, UpdatedAt)
+VALUES (@u, @a, CURRENT_TIMESTAMP)
+ON CONFLICT(UserId) DO UPDATE 
+SET Amount = excluded.Amount,
+    UpdatedAt = CURRENT_TIMESTAMP;";
+            cmd.Parameters.AddWithValue("@u", userId);
+            cmd.Parameters.AddWithValue("@a", amount);
+            cmd.ExecuteNonQuery();
+        }
+
+        // =========================================================
+        // ======================= PODSUMOWANIA ====================
+
+        public static decimal GetTotalAllocatedInEnvelopesForUser(int userId)
         {
             using var c = OpenAndEnsureSchema();
             using var cmd = c.CreateCommand();
             cmd.CommandText = "SELECT COALESCE(SUM(Allocated),0) FROM Envelopes WHERE UserId=@u;";
             cmd.Parameters.AddWithValue("@u", userId);
-            return Convert.ToDecimal(cmd.ExecuteScalar());
+            return Convert.ToDecimal(cmd.ExecuteScalar() ?? 0m);
         }
 
         public sealed class MoneySnapshot
         {
-            public decimal Banks { get; set; }
-            public decimal Cash { get; set; }
-            public decimal Envelopes { get; set; }
-            public decimal AvailableToAllocate => Cash - Envelopes;
-            public decimal Total => Banks + Cash;
+            public decimal Banks { get; set; }      // konta bankowe
+            public decimal Cash { get; set; }       // wolna gotówka
+            public decimal Saved { get; set; }      // od³o¿ona gotówka (ca³a pula)
+            public decimal Envelopes { get; set; }  // przydzielona do kopert
+
+            public decimal SavedUnallocated => Saved - Envelopes;
+            public decimal Total => Banks + Cash + Saved;
         }
 
         public static MoneySnapshot GetMoneySnapshot(int userId)
         {
             var banks = GetTotalBanksBalance(userId);
-            var cash = GetCashOnHand(userId);
-            var envelopes = GetTotalAllocatedInEnvelopes(userId);
+
+            // W bazie CashOnHand = ca³a fizyczna gotówka (wolna + od³o¿ona).
+            var allCash = GetCashOnHand(userId);
+            var savedCash = GetSavedCash(userId);
+
+            // Wolna gotówka = wszystko, co nie jest oznaczone jako „od³o¿one”.
+            var freeCash = Math.Max(0m, allCash - savedCash);
+
+            var allocated = GetTotalAllocatedInEnvelopesForUser(userId);
 
             return new MoneySnapshot
             {
                 Banks = banks,
-                Cash = cash,
-                Envelopes = envelopes
+                Cash = freeCash,
+                Saved = savedCash,
+                Envelopes = allocated
             };
+        }
+
+        private static decimal GetTotalBanksBalance(int userId)
+        {
+            using var c = OpenAndEnsureSchema();
+            using var cmd = c.CreateCommand();
+            cmd.CommandText = "SELECT COALESCE(SUM(Balance),0) FROM BankAccounts WHERE UserId=@u;";
+            cmd.Parameters.AddWithValue("@u", userId);
+            return Convert.ToDecimal(cmd.ExecuteScalar() ?? 0m);
         }
 
         // == PRZELEWY ==
@@ -863,7 +900,6 @@ UPDATE BankAccounts
 
         // =========================================================
         // ====================== ZESTAWIENIA ======================
-        // =========================================================
 
         private static bool TableExists(SqliteConnection con, string name)
         {
@@ -894,7 +930,7 @@ UPDATE BankAccounts
 
         public static List<CategoryAmountDto> GetSpendingByCategorySafe(int userId, DateTime start, DateTime end)
         {
-            using var con = GetConnection();
+            using var con = OpenAndEnsureSchema();
 
             bool hasTrans = TableExists(con, "Transactions");
             bool hasExpenses = TableExists(con, "Expenses");
@@ -963,7 +999,7 @@ HAVING SUM(ABS(e.Amount)) > 0
 
         public static List<CategoryAmountDto> GetIncomeBySourceSafe(int userId, DateTime start, DateTime end)
         {
-            using var con = GetConnection();
+            using var con = OpenAndEnsureSchema();
 
             bool hasTrans = TableExists(con, "Transactions");
             bool hasIncomes = TableExists(con, "Incomes");
@@ -1037,7 +1073,7 @@ HAVING SUM(ABS(i.Amount)) > 0
         /// </summary>
         public static List<CategoryAmountDto> GetSpendingByMerchantSafe(int userId, DateTime start, DateTime end)
         {
-            using var con = GetConnection();
+            using var con = OpenAndEnsureSchema();
 
             bool hasTrans = TableExists(con, "Transactions");
             bool hasExpenses = TableExists(con, "Expenses");
@@ -1121,6 +1157,8 @@ HAVING SUM(ABS(e.Amount)) > 0
                        .ToList();
         }
 
+        // =========================================================
+        // ======================== PRZYCHODY ======================
 
         public sealed class Income
         {
@@ -1202,24 +1240,26 @@ WHERE UserId=@u");
             return dt;
         }
 
+        /// <summary>
+        /// Prostszy insert przychodów – mapuje parametr note na Description.
+        /// </summary>
         public static void InsertIncome(int userId, decimal amount, DateTime date, string source, string? note)
         {
             using var c = OpenAndEnsureSchema();
             using var cmd = c.CreateCommand();
             cmd.CommandText = @"
-        INSERT INTO Incomes(UserId, Amount, Date, Source, Note)
-        VALUES (@u, @a, @d, @s, @n);";
+INSERT INTO Incomes(UserId, Amount, Date, Description, Source)
+VALUES (@u, @a, @d, @desc, @s);";
             cmd.Parameters.AddWithValue("@u", userId);
             cmd.Parameters.AddWithValue("@a", amount);
             cmd.Parameters.AddWithValue("@d", date.ToString("yyyy-MM-dd"));
+            cmd.Parameters.AddWithValue("@desc", (object?)note ?? DBNull.Value);
             cmd.Parameters.AddWithValue("@s", source ?? "Przychód");
-            cmd.Parameters.AddWithValue("@n", (object?)note ?? DBNull.Value);
             cmd.ExecuteNonQuery();
         }
-
-
     }
 }
+
 
 
 
