@@ -119,8 +119,10 @@ namespace Finly.Views
         }
 
         private void Minimize_Click(object s, RoutedEventArgs e) => WindowState = WindowState.Minimized;
+
         private void MaxRestore_Click(object s, RoutedEventArgs e) =>
             WindowState = WindowState == WindowState.Maximized ? WindowState.Normal : WindowState.Maximized;
+
         private void Close_Click(object s, RoutedEventArgs e) => Close();
 
         // ===== Breakpointy =====
@@ -155,7 +157,7 @@ namespace Finly.Views
             }
         }
 
-        /// Skaluje zawartość sidebara tak, by całość mieściła się bez scrolla.
+        /// <summary>Skaluje zawartość sidebara tak, by całość mieściła się bez scrolla.</summary>
         private void FitSidebar()
         {
             if (SidebarRoot == null || SidebarHost == null || SidebarScale == null) return;
@@ -213,57 +215,116 @@ namespace Finly.Views
 
         private void GoHome()
         {
-            UncheckAllNav();
-            if (NavHome != null) NavHome.IsChecked = true;
             RightHost.Content = new DashboardPage(UserService.GetCurrentUserId());
+            SetActiveNav(NavHome);
             SetActiveFooter(null);
         }
 
-        // ===== Kliknięcia NAV =====
-        private void Nav_Home_Click(object sender, RoutedEventArgs e) => GoHome();
+
+        // ===== Kliknięcia NAV (lewy sidebar) =====
+        private void Nav_Home_Click(object sender, RoutedEventArgs e)
+        {
+            GoHome();
+        }
 
         private void Nav_Add_Click(object s, RoutedEventArgs e)
-        { RightHost.Content = new AddExpensePage(UserService.CurrentUserId); SetActiveNav(NavAdd); SetActiveFooter(null); }
+        {
+            RightHost.Content = new AddExpensePage(UserService.CurrentUserId);
+            SetActiveNav(NavAdd);
+            SetActiveFooter(null);
+        }
 
         private void Nav_Transactions_Click(object s, RoutedEventArgs e)
-        { RightHost.Content = new TransactionsPage(); SetActiveNav(NavTransactions); SetActiveFooter(null); }
+        {
+            RightHost.Content = new TransactionsPage();
+            SetActiveNav(NavTransactions);
+            SetActiveFooter(null);
+        }
 
         private void Nav_Charts_Click(object s, RoutedEventArgs e)
-        { RightHost.Content = new ChartsPage(UserService.CurrentUserId); SetActiveNav(NavCharts); SetActiveFooter(null); }
+        {
+            RightHost.Content = new ChartsPage(UserService.CurrentUserId);
+            SetActiveNav(NavCharts);
+            SetActiveFooter(null);
+        }
 
         private void Nav_Budgets_Click(object s, RoutedEventArgs e)
-        { RightHost.Content = new BudgetsPage(); SetActiveNav(NavBudgets); SetActiveFooter(null); }
+        {
+            RightHost.Content = new BudgetsPage();
+            SetActiveNav(NavBudgets);
+            SetActiveFooter(null);
+        }
 
         private void Nav_Goals_Click(object s, RoutedEventArgs e)
-        { RightHost.Content = new GoalsPage(); SetActiveNav(NavGoals); SetActiveFooter(null); }
+        {
+            RightHost.Content = new GoalsPage();
+            SetActiveNav(NavGoals);
+            SetActiveFooter(null);
+        }
 
         private void Nav_Categories_Click(object s, RoutedEventArgs e)
-        { RightHost.Content = new CategoriesPage(); SetActiveNav(NavCategories); SetActiveFooter(null); }
+        {
+            RightHost.Content = new CategoriesPage();
+            SetActiveNav(NavCategories);
+            SetActiveFooter(null);
+        }
 
         private void Nav_Reports_Click(object s, RoutedEventArgs e)
-        { RightHost.Content = new ReportsPage(); SetActiveNav(NavReports); SetActiveFooter(null); }
+        {
+            RightHost.Content = new ReportsPage();
+            SetActiveNav(NavReports);
+            SetActiveFooter(null);
+        }
 
         private void Nav_Import_Click(object s, RoutedEventArgs e)
-        { RightHost.Content = new ImportPage(); SetActiveNav(null); SetActiveFooter(null); }
+        {
+            RightHost.Content = new ImportPage();
+            SetActiveNav(null);
+            SetActiveFooter(null);
+        }
 
         private void Nav_Banks_Click(object s, RoutedEventArgs e)
-        { NavigateTo("banks"); SetActiveNav(NavBanks); SetActiveFooter(null); }
+        {
+            NavigateTo("banks");
+            SetActiveNav(NavBanks);
+            SetActiveFooter(null);
+        }
 
         private void Nav_Envelopes_Click(object s, RoutedEventArgs e)
-        { NavigateTo("envelopes"); SetActiveNav(NavEnvelopes); SetActiveFooter(null); }
+        {
+            NavigateTo("envelopes");
+            SetActiveNav(NavEnvelopes);
+            SetActiveFooter(null);
+        }
 
         private void Nav_Loans_Click(object s, RoutedEventArgs e)
-        { RightHost.Content = new LoansPage(); SetActiveNav(NavLoans); SetActiveFooter(null); }
+        {
+            RightHost.Content = new LoansPage();
+            SetActiveNav(NavLoans);
+            SetActiveFooter(null);
+        }
 
         private void Nav_Investments_Click(object s, RoutedEventArgs e)
-        { RightHost.Content = new InvestmentsPage(); SetActiveNav(NavInvestments); SetActiveFooter(null); }
+        {
+            RightHost.Content = new InvestmentsPage();
+            SetActiveNav(NavInvestments);
+            SetActiveFooter(null);
+        }
 
         // ===== Stopka =====
         private void OpenProfile_Click(object s, RoutedEventArgs e)
-        { RightHost.Content = new AccountPage(UserService.CurrentUserId); SetActiveNav(null); SetActiveFooter(FooterAccount); }
+        {
+            RightHost.Content = new AccountPage(UserService.CurrentUserId);
+            SetActiveNav(null);
+            SetActiveFooter(FooterAccount);
+        }
 
         private void OpenSettings_Click(object s, RoutedEventArgs e)
-        { NavigateTo("settings"); SetActiveNav(null); SetActiveFooter(FooterSettings); }
+        {
+            NavigateTo("settings");
+            SetActiveNav(null);
+            SetActiveFooter(FooterSettings);
+        }
 
         private void Nav_Logout_Click(object sender, RoutedEventArgs e)
         {
@@ -273,31 +334,44 @@ namespace Finly.Views
             Application.Current.MainWindow = auth;
             auth.Show();
 
-            // 🔹 to jest ważne – zamykamy aktualne okno, żeby się nie dublowało
             Close();
         }
-
 
         // ===== Podświetlenia / pomocnicze =====
         private void SetActiveNav(ToggleButton? active)
         {
             if (NavContainer == null) return;
+
+            // najpierw wszystko odznaczamy
             foreach (var tb in FindVisualChildren<ToggleButton>(NavContainer))
-                tb.IsChecked = (tb == active) || (tb == NavHome && active == null && RightHost.Content is DashboardPage);
+                tb.IsChecked = false;
+
+            // jeśli ktoś podał konkretny przycisk – zaznaczamy go
+            if (active != null)
+            {
+                active.IsChecked = true;
+                return;
+            }
+
+            // jeśli nie ma konkretnego, ale na RightHost siedzi DashboardPage => zaznacz Panel główny
+            if (RightHost.Content is DashboardPage && NavHome != null)
+            {
+                NavHome.IsChecked = true;
+            }
         }
+
 
         private void SetActiveFooter(ToggleButton? active)
         {
             if (FooterAccount != null) FooterAccount.IsChecked = active == FooterAccount;
             if (FooterSettings != null) FooterSettings.IsChecked = active == FooterSettings;
+
             if (FooterLogout != null) FooterLogout.IsChecked = false;
         }
 
         private void UncheckAllNav()
         {
-            if (NavContainer == null) return;
-            foreach (var tb in FindVisualChildren<ToggleButton>(NavContainer))
-                tb.IsChecked = false;
+            SetActiveNav(null);
         }
 
         public static IEnumerable<T> FindVisualChildren<T>(DependencyObject depObj) where T : DependencyObject
@@ -324,6 +398,7 @@ namespace Finly.Views
         }
     }
 }
+
 
 
 

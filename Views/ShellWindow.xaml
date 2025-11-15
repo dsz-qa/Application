@@ -39,7 +39,7 @@
             <Setter Property="shell:WindowChrome.IsHitTestVisibleInChrome" Value="True"/>
         </Style>
 
-        <!-- NAV: standard -->
+        <!-- NAV: standardowy przycisk nawigacji -->
         <Style x:Key="NavItemCentered" TargetType="{x:Type ToggleButton}">
             <Setter Property="HorizontalAlignment" Value="Stretch"/>
             <Setter Property="HorizontalContentAlignment" Value="Center"/>
@@ -51,16 +51,26 @@
             <Setter Property="BorderBrush" Value="Transparent"/>
             <Setter Property="Cursor" Value="Hand"/>
             <Setter Property="ContentTemplate" Value="{x:Null}"/>
-            <Setter Property="ContentTemplateSelector" Value="{x:Null}"/>
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="{x:Type ToggleButton}">
                         <Grid>
-                            <Border x:Name="bg" Background="{TemplateBinding Background}" CornerRadius="10"/>
-                            <Rectangle x:Name="leftBar"  Width="2" Fill="{DynamicResource Brand.Orange}"
-                                       HorizontalAlignment="Left"  Opacity=".9" Visibility="Collapsed"/>
-                            <Rectangle x:Name="rightBar" Width="2" Fill="{DynamicResource Brand.Orange}"
-                                       HorizontalAlignment="Right" Opacity=".9" Visibility="Collapsed"/>
+                            <Border x:Name="bg"
+                                    Background="{TemplateBinding Background}"
+                                    CornerRadius="10"/>
+
+                            <Rectangle x:Name="leftBar"
+                                       Width="2"
+                                       Fill="{DynamicResource Brand.Orange}"
+                                       HorizontalAlignment="Left"
+                                       Opacity=".9"
+                                       Visibility="Collapsed"/>
+                            <Rectangle x:Name="rightBar"
+                                       Width="2"
+                                       Fill="{DynamicResource Brand.Orange}"
+                                       HorizontalAlignment="Right"
+                                       Opacity=".9"
+                                       Visibility="Collapsed"/>
 
                             <Grid Margin="16,0">
                                 <Grid.ColumnDefinitions>
@@ -105,7 +115,7 @@
                                 <Setter TargetName="leftBar"  Property="Visibility" Value="Visible"/>
                                 <Setter TargetName="rightBar" Property="Visibility" Value="Visible"/>
                                 <Setter Property="FontWeight" Value="SemiBold"/>
-                                <Setter Property="Foreground"  Value="{DynamicResource Brand.Orange}"/>
+                                <Setter Property="Foreground" Value="{DynamicResource Brand.Orange}"/>
                                 <Setter TargetName="iconShape" Property="Fill" Value="{DynamicResource Brand.Orange}"/>
                             </Trigger>
                             <Trigger Property="IsEnabled" Value="False">
@@ -117,7 +127,7 @@
             </Setter>
         </Style>
 
-        <!-- NAV: wyróżniony „Panel główny” -->
+        <!-- NAV: wyróżniony „Panel główny” (wygląda inaczej, ale TEŻ tylko przy IsChecked=True) -->
         <Style x:Key="NavItemPrimary" TargetType="{x:Type ToggleButton}">
             <Setter Property="HorizontalAlignment" Value="Stretch"/>
             <Setter Property="HorizontalContentAlignment" Value="Center"/>
@@ -133,11 +143,22 @@
                 <Setter.Value>
                     <ControlTemplate TargetType="{x:Type ToggleButton}">
                         <Grid>
-                            <Border x:Name="bg" Background="{TemplateBinding Background}" CornerRadius="10"/>
-                            <Rectangle x:Name="leftBar"  Width="2" Fill="{DynamicResource Brand.Orange}"
-                                       HorizontalAlignment="Left"  Opacity=".9" Visibility="Collapsed"/>
-                            <Rectangle x:Name="rightBar" Width="2" Fill="{DynamicResource Brand.Orange}"
-                                       HorizontalAlignment="Right" Opacity=".9" Visibility="Collapsed"/>
+                            <Border x:Name="bg"
+                                    Background="{TemplateBinding Background}"
+                                    CornerRadius="10"/>
+
+                            <Rectangle x:Name="leftBar"
+                                       Width="2"
+                                       Fill="{DynamicResource Brand.Orange}"
+                                       HorizontalAlignment="Left"
+                                       Opacity=".9"
+                                       Visibility="Collapsed"/>
+                            <Rectangle x:Name="rightBar"
+                                       Width="2"
+                                       Fill="{DynamicResource Brand.Orange}"
+                                       HorizontalAlignment="Right"
+                                       Opacity=".9"
+                                       Visibility="Collapsed"/>
 
                             <Grid Margin="16,0">
                                 <Grid.ColumnDefinitions>
@@ -164,8 +185,10 @@
                                                   TextElement.FontWeight="SemiBold"/>
                             </Grid>
 
-                            <Rectangle Height="1" VerticalAlignment="Bottom"
-                                       Fill="{DynamicResource Surface.Border}" Opacity=".8"/>
+                            <Rectangle Height="1"
+                                       VerticalAlignment="Bottom"
+                                       Fill="{DynamicResource Surface.Border}"
+                                       Opacity=".8"/>
                         </Grid>
 
                         <ControlTemplate.Triggers>
@@ -252,7 +275,7 @@
                 <ColumnDefinition Width="Auto"/>
             </Grid.ColumnDefinitions>
 
-            <!-- Logo + tytuł – BEZ nawigacji -->
+            <!-- Logo + tytuł -->
             <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="12,0,0,0">
                 <Image Source="/Assets/Images/logoFinly.png"
                        Width="40" Height="40" Stretch="Uniform" Margin="0,0,8,0"
@@ -299,7 +322,7 @@
                         <RowDefinition Height="Auto"/>
                     </Grid.RowDefinitions>
 
-                    <!-- Logo (bez Click) -->
+                    <!-- Logo -->
                     <StackPanel Grid.Row="0" Margin="16,16,16,8">
                         <DockPanel VerticalAlignment="Center">
                             <Image Width="{DynamicResource Logo.Size}" Height="{DynamicResource Logo.Size}"
@@ -451,6 +474,7 @@
         </Grid>
     </Grid>
 </Window>
+
 
 
 

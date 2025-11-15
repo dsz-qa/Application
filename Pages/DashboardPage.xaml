@@ -31,13 +31,7 @@
             <Setter Property="Foreground"  Value="{DynamicResource App.Foreground}"/>
         </Style>
 
-        <!-- DatePicker -->
-        <Style TargetType="DatePicker">
-            <Setter Property="BorderBrush"     Value="{DynamicResource Brand.Blue}"/>
-            <Setter Property="BorderThickness" Value="1.5"/>
-            <Setter Property="Foreground"      Value="{DynamicResource App.Foreground}"/>
-            <Setter Property="Background"      Value="{DynamicResource Surface.Background}"/>
-        </Style>
+
         <Style TargetType="{x:Type DatePickerTextBox}">
             <Setter Property="Foreground"      Value="{DynamicResource App.Foreground}"/>
             <Setter Property="Background"      Value="{DynamicResource Surface.Background}"/>

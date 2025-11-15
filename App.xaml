@@ -16,6 +16,7 @@
             </ResourceDictionary.MergedDictionaries>
 
             <!-- ========= KONWERTERY ========= -->
+            <!-- Upewnij się, że klasy są w namespace: Finly.Helpers.Converters -->
             <conv:BoolToBrushConverter             x:Key="BoolToBrush"/>
             <conv:BoolToSymbolConverter            x:Key="BoolToSymbol"/>
             <conv:BoolToVisibilityConverter        x:Key="BoolToVisibility"/>
@@ -70,11 +71,13 @@
                                               ClickMode="Press"
                                               Background="{TemplateBinding Background}"
                                               BorderBrush="{TemplateBinding BorderBrush}"
-                                              BorderThickness="{TemplateBinding BorderThickness}">
+                                              BorderThickness="{TemplateBinding BorderThickness}"
+                                              HorizontalContentAlignment="Stretch"
+                                              HorizontalAlignment="Stretch">
                                     <Grid>
                                         <Grid.ColumnDefinitions>
                                             <ColumnDefinition Width="*"/>
-                                            <ColumnDefinition Width="Auto"/>
+                                            <ColumnDefinition Width="24"/>
                                         </Grid.ColumnDefinitions>
 
                                         <!-- Wybrana wartość -->
@@ -86,10 +89,11 @@
                                             ContentTemplate="{TemplateBinding SelectionBoxItemTemplate}"
                                             RecognizesAccessKey="True"/>
 
-                                        <!-- Strzałka skrajnie po prawej -->
+                                        <!-- Strzałka SKRAJNIE po prawej -->
                                         <Border Grid.Column="1"
                                                 Background="#33000000"
-                                                HorizontalAlignment="Right">
+                                                HorizontalAlignment="Right"
+                                                Margin="0">
                                             <Path HorizontalAlignment="Center"
                                                   VerticalAlignment="Center"
                                                   Data="M 0 0 L 4 4 L 8 0 Z"
@@ -130,7 +134,7 @@
                                 <Trigger Property="IsEnabled" Value="False">
                                     <Setter Property="Opacity" Value="0.5"/>
                                 </Trigger>
-                                <!-- Bez niebieskiego wypełnienia – tylko ramka -->
+                                <!-- brak niebieskiego wypełnienia; tylko ramka może być niebieska -->
                                 <Trigger Property="IsMouseOver" Value="True">
                                     <Setter TargetName="ToggleButton"
                                             Property="BorderBrush"
@@ -152,7 +156,7 @@
                 </Setter>
             </Style>
 
-            <!-- ========= DATEPICKER z własnym TEMPLATE ========= -->
+            <!-- ========= DATEPICKER – własny szablon, DZIAŁAJĄCY ========= -->
 
             <!-- Tekst DatePickera -->
             <Style TargetType="{x:Type DatePickerTextBox}">
@@ -187,6 +191,7 @@
                                                    Foreground="{TemplateBinding Foreground}"/>
 
                                 <!-- Przycisk z ikonką kalendarza -->
+                                <!-- UWAGA: BEZ żadnego Command – DatePicker sam ogarnia PART_Button -->
                                 <Button x:Name="PART_Button"
                                         Grid.Column="1"
                                         Margin="0"
@@ -196,10 +201,38 @@
                                         BorderThickness="0"
                                         Cursor="Hand">
                                     <Image Source="/Assets/Icons/kalendarz.png"
-                                           Width="16" Height="16"
+                                           Width="22"
+                                           Height="22"
                                            Stretch="Uniform"
                                            RenderOptions.BitmapScalingMode="HighQuality"/>
                                 </Button>
+
+                                <!-- Popup z kalendarzem -->
+                                <Popup x:Name="PART_Popup"
+                                       Placement="Bottom"
+                                       IsOpen="{Binding IsDropDownOpen,
+                                                        RelativeSource={RelativeSource TemplatedParent}}"
+                                       AllowsTransparency="True"
+                                       Focusable="False"
+                                       PopupAnimation="Fade">
+                                    <Border Margin="0,2,0,0"
+                                            Background="{DynamicResource Surface.Background}"
+                                            BorderBrush="{DynamicResource Surface.Border}"
+                                            BorderThickness="1"
+                                            CornerRadius="4"
+                                            SnapsToDevicePixels="True">
+                                        <Calendar x:Name="PART_Calendar"
+                                                  Background="{DynamicResource Surface.Background}"
+                                                  Foreground="{DynamicResource App.Foreground}"
+                                                  BorderThickness="0"
+                                                  SelectedDate="{Binding SelectedDate,
+                                                                         RelativeSource={RelativeSource TemplatedParent},
+                                                                         Mode=TwoWay}"
+                                                  DisplayDate="{Binding DisplayDate,
+                                                                        RelativeSource={RelativeSource TemplatedParent},
+                                                                        Mode=TwoWay}"/>
+                                    </Border>
+                                </Popup>
                             </Grid>
                         </ControlTemplate>
                     </Setter.Value>
@@ -238,6 +271,49 @@
                 <Setter Property="AlternatingRowBackground" Value="#272727"/>
                 <Setter Property="HorizontalGridLinesBrush" Value="#444444"/>
                 <Setter Property="VerticalGridLinesBrush"   Value="#444444"/>
+            </Style>
+
+            <!-- ========= CIEMNY TABCONTROL (Wydatek / Przychód / Transfer) ========= -->
+            <Style TargetType="TabControl">
+                <Setter Property="Background"      Value="{DynamicResource Surface.Background}"/>
+                <Setter Property="BorderBrush"     Value="{DynamicResource Surface.Border}"/>
+                <Setter Property="BorderThickness" Value="1"/>
+                <Setter Property="Padding"         Value="0"/>
+            </Style>
+
+            <Style TargetType="TabItem">
+                <Setter Property="Foreground" Value="{DynamicResource App.Foreground}"/>
+                <Setter Property="Background" Value="Transparent"/>
+                <Setter Property="Padding"    Value="12,4"/>
+                <Setter Property="Margin"     Value="0,0,4,0"/>
+                <Setter Property="Template">
+                    <Setter.Value>
+                        <ControlTemplate TargetType="TabItem">
+                            <Border x:Name="Bd"
+                                    Background="{TemplateBinding Background}"
+                                    BorderBrush="{DynamicResource Surface.Border}"
+                                    BorderThickness="1"
+                                    CornerRadius="6,6,0,0"
+                                    Padding="{TemplateBinding Padding}">
+                                <ContentPresenter HorizontalAlignment="Center"
+                                                  VerticalAlignment="Center"/>
+                            </Border>
+                            <ControlTemplate.Triggers>
+                                <Trigger Property="IsSelected" Value="True">
+                                    <Setter TargetName="Bd" Property="Background"  Value="#303030"/>
+                                    <Setter TargetName="Bd" Property="BorderBrush" Value="{DynamicResource Brand.Blue}"/>
+                                    <Setter Property="FontWeight" Value="SemiBold"/>
+                                </Trigger>
+                                <Trigger Property="IsMouseOver" Value="True">
+                                    <Setter TargetName="Bd" Property="Background" Value="#262626"/>
+                                </Trigger>
+                                <Trigger Property="IsEnabled" Value="False">
+                                    <Setter Property="Opacity" Value="0.6"/>
+                                </Trigger>
+                            </ControlTemplate.Triggers>
+                        </ControlTemplate>
+                    </Setter.Value>
+                </Setter>
             </Style>
 
             <!-- ========= FONTY / TEKST ========= -->
@@ -330,6 +406,8 @@
         </ResourceDictionary>
     </Application.Resources>
 </Application>
+
+
 
 
 
