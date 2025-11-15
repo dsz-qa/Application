@@ -4,56 +4,129 @@
              xmlns:lvc="http://livecharts.com"
              xmlns:lvcwpf="clr-namespace:LiveChartsCore.SkiaSharpView.WPF;assembly=LiveChartsCore.SkiaSharpView.WPF">
 
-	<Grid Margin="10">
-		<Grid.RowDefinitions>
-			<RowDefinition Height="Auto"/>
-			<!-- Pasek filtrów -->
-			<RowDefinition Height="*"/>
-			<!-- Wykresy -->
-		</Grid.RowDefinitions>
+    <UserControl.Resources>
+        <!-- Ten sam styl kart co na Dashboardzie -->
+        <Style x:Key="Card" TargetType="Border">
+            <Setter Property="Background"      Value="{DynamicResource Surface.Background}"/>
+            <Setter Property="BorderBrush"     Value="{DynamicResource Surface.Border}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="CornerRadius"    Value="10"/>
+            <Setter Property="Padding"         Value="12"/>
+        </Style>
 
-		<!-- Pasek filtrów u góry -->
-		<StackPanel Orientation="Horizontal" Margin="0,0,0,10" VerticalAlignment="Top">
-			<TextBlock Text="Sortuj:" VerticalAlignment="Center" Margin="0,0,5,0"/>
-			<ComboBox x:Name="SortComboBox" Width="150" SelectionChanged="SortComboBox_SelectionChanged" Margin="0,0,10,0">
-				<ComboBoxItem Content="Kategoria A-Z" />
-				<ComboBoxItem Content="Kategoria Z-A" />
-				<ComboBoxItem Content="Suma rosnąco" />
-				<ComboBoxItem Content="Suma malejąco" />
-			</ComboBox>
+        <Style x:Key="CardHeader" TargetType="TextBlock">
+            <Setter Property="FontSize"   Value="14"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Opacity"    Value="0.9"/>
+            <Setter Property="Foreground" Value="{DynamicResource App.Foreground}"/>
+        </Style>
+    </UserControl.Resources>
 
-			<TextBlock Text="Sortowanie wg daty:" VerticalAlignment="Center" Margin="0,0,5,0"/>
-			<ComboBox x:Name="DateSortComboBox" Width="140" SelectionChanged="DateSortComboBox_SelectionChanged" Margin="0,0,10,0">
-				<ComboBoxItem Content="Data rosnąco" />
-				<ComboBoxItem Content="Data malejąco" />
-			</ComboBox>
+    <ScrollViewer VerticalScrollBarVisibility="Auto"
+                  HorizontalScrollBarVisibility="Auto">
+        <Grid Margin="16">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <!-- Filtry -->
+                <RowDefinition Height="*"/>
+                <!-- Wykresy -->
+            </Grid.RowDefinitions>
 
-			<TextBlock Text="Od:" VerticalAlignment="Center" Margin="0,0,5,0"/>
-			<DatePicker x:Name="FromDatePicker" Width="120" Margin="0,0,10,0"/>
+            <!-- ========= FILTRY U GÓRY ========= -->
+            <Border Grid.Row="0"
+                    Style="{StaticResource Card}"
+                    Margin="0,0,0,12">
+                <StackPanel Orientation="Horizontal"
+                            VerticalAlignment="Center">
+                    <TextBlock Text="Sortuj:"
+                               VerticalAlignment="Center"
+                               Margin="0,0,5,0"/>
+                    <ComboBox x:Name="SortComboBox"
+                              Width="150"
+                              Margin="0,0,10,0"
+                              SelectionChanged="SortComboBox_SelectionChanged">
+                        <ComboBoxItem Content="Kategoria A-Z" />
+                        <ComboBoxItem Content="Kategoria Z-A" />
+                        <ComboBoxItem Content="Suma rosnąco" />
+                        <ComboBoxItem Content="Suma malejąco" />
+                    </ComboBox>
 
-			<TextBlock Text="Do:" VerticalAlignment="Center" Margin="0,0,5,0"/>
-			<DatePicker x:Name="ToDatePicker" Width="120" Margin="0,0,10,0"/>
+                    <TextBlock Text="Sortowanie wg daty:"
+                               VerticalAlignment="Center"
+                               Margin="0,0,5,0"/>
+                    <ComboBox x:Name="DateSortComboBox"
+                              Width="140"
+                              Margin="0,0,10,0"
+                              SelectionChanged="DateSortComboBox_SelectionChanged">
+                        <ComboBoxItem Content="Data rosnąco" />
+                        <ComboBoxItem Content="Data malejąco" />
+                    </ComboBox>
 
-			<Button Content="Filtruj" Width="80" Click="FilterButton_Click" Margin="0,0,10,0"/>
-			<Button Content="Eksportuj oba wykresy do PNG" Click="ExportChartsToPng_Click" Margin="5"/>
-			<Button Content="Eksportuj do PDF" Click="ExportChartToPdf_Click" Margin="5"/>
-		</StackPanel>
+                    <TextBlock Text="Od:"
+                               VerticalAlignment="Center"
+                               Margin="0,0,5,0"/>
+                    <DatePicker x:Name="FromDatePicker"
+                                Width="120"
+                                Margin="0,0,10,0"/>
 
-		<!-- Wykresy -->
-		<Grid Grid.Row="1">
-			<Grid.RowDefinitions>
-				<RowDefinition Height="*"/>
-				<RowDefinition Height="*"/>
-			</Grid.RowDefinitions>
+                    <TextBlock Text="Do:"
+                               VerticalAlignment="Center"
+                               Margin="0,0,5,0"/>
+                    <DatePicker x:Name="ToDatePicker"
+                                Width="120"
+                                Margin="0,0,10,0"/>
 
-			<GroupBox Header="Wydatki wg kategorii" Grid.Row="0" Margin="0,5,0,5">
-				<lvcwpf:PieChart x:Name="pieChart"/>
-			</GroupBox>
+                    <Button Content="Filtruj"
+                            Width="80"
+                            Margin="0,0,10,0"
+                            Click="FilterButton_Click"/>
 
-			<GroupBox Header="Wydatki wg daty" Grid.Row="1">
-				<lvcwpf:CartesianChart x:Name="lineChart"/>
-			</GroupBox>
-		</Grid>
-	</Grid>
+                    <Button Content="Eksportuj oba wykresy do PNG"
+                            Margin="5,0"
+                            Click="ExportChartsToPng_Click"/>
+
+                    <Button Content="Eksportuj do PDF"
+                            Margin="5,0"
+                            Click="ExportChartToPdf_Click"/>
+                </StackPanel>
+            </Border>
+
+            <!-- ========= WYKRESY ========= -->
+            <Grid Grid.Row="1">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="*"/>
+                    <RowDefinition Height="*"/>
+                </Grid.RowDefinitions>
+
+                <!-- Wydatki wg kategorii -->
+                <Border Grid.Row="0"
+                        Style="{StaticResource Card}"
+                        Margin="0,0,0,8">
+                    <StackPanel>
+                        <TextBlock Text="Wydatki wg kategorii"
+                                   Style="{StaticResource CardHeader}"
+                                   Margin="0,0,0,8"/>
+                        <lvcwpf:PieChart x:Name="pieChart"
+                                         Background="{DynamicResource Surface.Background}"/>
+                    </StackPanel>
+                </Border>
+
+                <!-- Wydatki wg daty -->
+                <Border Grid.Row="1"
+                        Style="{StaticResource Card}">
+                    <StackPanel>
+                        <TextBlock Text="Wydatki wg daty"
+                                   Style="{StaticResource CardHeader}"
+                                   Margin="0,0,0,8"/>
+                        <lvcwpf:CartesianChart x:Name="lineChart"
+                                               Background="{DynamicResource Surface.Background}"/>
+                    </StackPanel>
+                </Border>
+            </Grid>
+        </Grid>
+    </ScrollViewer>
 </UserControl>
+
+
+
 

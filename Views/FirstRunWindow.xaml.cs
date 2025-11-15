@@ -43,7 +43,6 @@ namespace Finly.Views
             }
         }
 
-
         // =================== Pasek tytułu ===================
 
         private void Window_Loaded(object sender, RoutedEventArgs e)
@@ -82,11 +81,6 @@ namespace Finly.Views
 
         // =================== Logika formularza ===================
 
-        /// <summary>
-        /// Czyta wartości z pól tekstowych.
-        /// Zawsze przypisuje coś do parametrów out, żeby nie było CS0177.
-        /// Zwraca false, jeśli są błędy walidacji.
-        /// </summary>
         private bool TryReadValues(out decimal freeCash, out decimal savedCash, out decimal bankTotal)
         {
             freeCash = 0m;
@@ -97,7 +91,7 @@ namespace Finly.Views
             bool ok = true;
             string errors = "";
 
-            // Wolna gotówka (np. w portfelu)
+            // Wolna gotówka
             if (!string.IsNullOrWhiteSpace(FreeCashBox.Text))
             {
                 if (!decimal.TryParse(FreeCashBox.Text, NumberStyles.Any, culture, out freeCash) || freeCash < 0)
@@ -107,7 +101,7 @@ namespace Finly.Views
                 }
             }
 
-            // Gotówka odłożona (na koperty)
+            // Gotówka odłożona
             if (!string.IsNullOrWhiteSpace(EnvelopeCashBox.Text))
             {
                 if (!decimal.TryParse(EnvelopeCashBox.Text, NumberStyles.Any, culture, out savedCash) || savedCash < 0)
@@ -117,13 +111,13 @@ namespace Finly.Views
                 }
             }
 
-            // Środki na kontach bankowych
+            // Środki na głównym koncie bankowym
             if (!string.IsNullOrWhiteSpace(MainBankBox.Text))
             {
                 if (!decimal.TryParse(MainBankBox.Text, NumberStyles.Any, culture, out bankTotal) || bankTotal < 0)
                 {
                     ok = false;
-                    errors += "\n• Podaj poprawną łączną kwotę na kontach bankowych (≥ 0).";
+                    errors += "\n• Podaj poprawną kwotę na głównym koncie bankowym (≥ 0).";
                 }
             }
 
@@ -138,6 +132,16 @@ namespace Finly.Views
             return ok;
         }
 
+        private string GetSelectedMainBankName()
+        {
+            if (MainBankCombo.SelectedItem is ComboBoxItem item &&
+                item.Content is string s)
+            {
+                return s == "Inny bank" ? "" : s;
+            }
+            return "";
+        }
+
         private void SaveAndContinue_Click(object sender, RoutedEventArgs e)
         {
             if (_userId <= 0)
@@ -150,18 +154,19 @@ namespace Finly.Views
             if (!TryReadValues(out var freeCash, out var savedCash, out var bankTotal))
                 return;
 
-            // 1) Zapisujemy:
-            //    - CashOnHand = wolna gotówka (którą możesz wydawać)
-            //    - SavedCash  = cała odłożona gotówka (pula pod koperty)
+            // 1) Gotówka i gotówka odłożona
             DatabaseService.SetCashOnHand(_userId, freeCash);
             DatabaseService.SetSavedCash(_userId, savedCash);
 
-            // 2) Jeśli użytkownik wpisał kwotę na kontach bankowych – tworzymy konto startowe
+            // 2) Konto bankowe na start
+            var mainBankName = GetSelectedMainBankName();
+
             if (bankTotal > 0)
             {
                 var acc = new BankAccountModel
                 {
                     UserId = _userId,
+                    BankName = string.IsNullOrWhiteSpace(mainBankName) ? "Konto bankowe" : mainBankName,
                     AccountName = "Rachunek startowy",
                     Iban = "",
                     Currency = "PLN",
@@ -178,22 +183,11 @@ namespace Finly.Views
             shell.Show();
             Close();
         }
-
-
-        private void Skip_Click(object sender, RoutedEventArgs e)
-        {
-            if (_userId > 0)
-            {
-                DatabaseService.MarkUserOnboarded(_userId);
-            }
-
-            var shell = new ShellWindow();
-            Application.Current.MainWindow = shell;
-            shell.Show();
-            Close();
-        }
     }
 }
+
+
+
 
 
 

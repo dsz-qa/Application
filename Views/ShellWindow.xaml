@@ -331,7 +331,7 @@
 
                         <ToggleButton Grid.Row="0" x:Name="NavHome" Style="{StaticResource NavItemPrimary}"
                                       Content="Panel główny"
-                                      Tag="pack://application:,,,/Assets/Icons/stronagłowna.png"
+                                      Tag="pack://application:,,,/Assets/Icons/stronaglowna.png"
                                       Click="Nav_Home_Click"/>
 
                         <ToggleButton Grid.Row="1" x:Name="NavAdd" Style="{StaticResource NavItemCentered}"

@@ -15,240 +15,294 @@
         Loaded="Window_Loaded"
         Icon="/Assets/Icons/logoFinly.ico">
 
-	<!-- ====== Zasoby okna ====== -->
-	<Window.Resources>
-		<!-- Przycisk paska tytułu – jak w ShellWindow -->
-		<Style x:Key="TitleBarIconButton" TargetType="Button">
-			<Setter Property="Background" Value="Transparent"/>
-			<Setter Property="BorderBrush" Value="{x:Null}"/>
-			<Setter Property="Padding" Value="8"/>
-			<Setter Property="Margin" Value="4,0,0,0"/>
-			<Setter Property="Foreground" Value="{DynamicResource App.Foreground}"/>
-			<Setter Property="Cursor" Value="Hand"/>
-			<Setter Property="FocusVisualStyle" Value="{x:Null}"/>
-			<Setter Property="shell:WindowChrome.IsHitTestVisibleInChrome" Value="True"/>
-		</Style>
+    <!-- ====== Zasoby okna ====== -->
+    <Window.Resources>
+        <!-- Przycisk paska tytułu – jak w ShellWindow -->
+        <Style x:Key="TitleBarIconButton" TargetType="Button">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderBrush" Value="{x:Null}"/>
+            <Setter Property="Padding" Value="8"/>
+            <Setter Property="Margin" Value="4,0,0,0"/>
+            <Setter Property="Foreground" Value="{DynamicResource App.Foreground}"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
+            <Setter Property="shell:WindowChrome.IsHitTestVisibleInChrome" Value="True"/>
+        </Style>
 
-		<!-- Niebieski przycisk główny – niezależny od innych styli -->
-		<Style x:Key="FirstRunPrimaryButton" TargetType="Button">
-			<Setter Property="Background" Value="{DynamicResource Brand.Blue}"/>
-			<Setter Property="Foreground" Value="White"/>
-			<Setter Property="BorderBrush" Value="{x:Null}"/>
-			<Setter Property="Padding" Value="16,8"/>
-			<Setter Property="FontWeight" Value="SemiBold"/>
-			<Setter Property="Cursor" Value="Hand"/>
-			<Setter Property="HorizontalAlignment" Value="Center"/>
-			<Setter Property="Template">
-				<Setter.Value>
-					<ControlTemplate TargetType="Button">
-						<Border x:Name="border"
+        <!-- Ciemny ComboBox do first run -->
+        <Style x:Key="DarkComboBox" TargetType="ComboBox">
+            <Setter Property="Background" Value="{DynamicResource Surface.Field}"/>
+            <Setter Property="Foreground" Value="{DynamicResource App.Foreground}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource Surface.Border}"/>
+            <Setter Property="Padding" Value="6,2"/>
+            <Setter Property="HorizontalContentAlignment" Value="Left"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
+            <Setter Property="ItemContainerStyle">
+                <Setter.Value>
+                    <!-- Styl dla pozycji na liście -->
+                    <Style TargetType="ComboBoxItem">
+                        <Setter Property="Background" Value="{DynamicResource Surface.Field}"/>
+                        <Setter Property="Foreground" Value="{DynamicResource App.Foreground}"/>
+                        <Setter Property="Padding" Value="6,2"/>
+                        <Setter Property="HorizontalContentAlignment" Value="Left"/>
+                        <Setter Property="VerticalContentAlignment" Value="Center"/>
+                        <Setter Property="SnapsToDevicePixels" Value="True"/>
+                        <Style.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter Property="Background" Value="#303030"/>
+                            </Trigger>
+                            <Trigger Property="IsSelected" Value="True">
+                                <Setter Property="Background" Value="{DynamicResource Brand.Blue.HoverOverlay}"/>
+                                <Setter Property="Foreground" Value="White"/>
+                            </Trigger>
+                        </Style.Triggers>
+                    </Style>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+
+        <!-- Niebieski przycisk główny -->
+        <Style x:Key="FirstRunPrimaryButton" TargetType="Button">
+            <Setter Property="Background" Value="{DynamicResource Brand.Blue}"/>
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="BorderBrush" Value="{x:Null}"/>
+            <Setter Property="Padding" Value="16,8"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="HorizontalAlignment" Value="Center"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="border"
                                 Background="{TemplateBinding Background}"
                                 CornerRadius="10">
-							<ContentPresenter HorizontalAlignment="Center"
+                            <ContentPresenter HorizontalAlignment="Center"
                                               VerticalAlignment="Center"
                                               Margin="4,2"/>
-						</Border>
-						<ControlTemplate.Triggers>
-							<Trigger Property="IsMouseOver" Value="True">
-								<Setter TargetName="border" Property="Background"
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="border" Property="Background"
                                         Value="{DynamicResource Brand.Blue.HoverOverlay}"/>
-							</Trigger>
-							<Trigger Property="IsPressed" Value="True">
-								<Setter TargetName="border" Property="Background"
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="border" Property="Background"
                                         Value="{DynamicResource Brand.Blue.PressedOverlay}"/>
-							</Trigger>
-							<Trigger Property="IsEnabled" Value="False">
-								<Setter Property="Opacity" Value="0.6"/>
-							</Trigger>
-						</ControlTemplate.Triggers>
-					</ControlTemplate>
-				</Setter.Value>
-			</Setter>
-		</Style>
-	</Window.Resources>
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter Property="Opacity" Value="0.6"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+    </Window.Resources>
 
-	<!-- Taki sam WindowChrome jak w ShellWindow -->
-	<shell:WindowChrome.WindowChrome>
-		<shell:WindowChrome CaptionHeight="48"
+    <!-- Pasek tytułu systemowego -->
+    <shell:WindowChrome.WindowChrome>
+        <shell:WindowChrome CaptionHeight="48"
                             ResizeBorderThickness="6"
                             CornerRadius="0"
                             UseAeroCaptionButtons="False"/>
-	</shell:WindowChrome.WindowChrome>
+    </shell:WindowChrome.WindowChrome>
 
-	<!-- ====== Layout okna ====== -->
-	<Border BorderBrush="{DynamicResource Surface.Border}"
+    <!-- ====== Layout okna ====== -->
+    <Border BorderBrush="{DynamicResource Surface.Border}"
             BorderThickness="1">
-		<Grid>
-			<Grid.RowDefinitions>
-				<!-- Pasek tytułu -->
-				<RowDefinition Height="48"/>
-				<!-- Treść okna -->
-				<RowDefinition Height="*"/>
-			</Grid.RowDefinitions>
+        <Grid>
+            <Grid.RowDefinitions>
+                <!-- Pasek tytułu -->
+                <RowDefinition Height="48"/>
+                <!-- Treść okna -->
+                <RowDefinition Height="*"/>
+            </Grid.RowDefinitions>
 
-			<!-- ========== TITLE BAR (jak w ShellWindow) ========== -->
-			<Grid Grid.Row="0"
+            <!-- ========== TITLE BAR (jak w ShellWindow) ========== -->
+            <Grid Grid.Row="0"
                   Background="{DynamicResource TitleBar.Background}"
                   MouseLeftButtonDown="TitleBar_MouseLeftButtonDown">
-				<Grid.ColumnDefinitions>
-					<ColumnDefinition/>
-					<ColumnDefinition Width="Auto"/>
-				</Grid.ColumnDefinitions>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
 
-				<!-- Logo + tytuł -->
-				<StackPanel Orientation="Horizontal"
+                <!-- Logo + tytuł -->
+                <StackPanel Orientation="Horizontal"
                             VerticalAlignment="Center"
                             Margin="12,0,0,0">
-					<Image Source="/Assets/Images/logoFinly.png"
+                    <Image Source="/Assets/Images/logoFinly.png"
                            Width="32" Height="32"
                            Margin="0,0,8,0"
                            Stretch="Uniform"
                            RenderOptions.BitmapScalingMode="HighQuality"
                            shell:WindowChrome.IsHitTestVisibleInChrome="True"/>
-					<TextBlock Text="Finly – pierwsza konfiguracja"
+                    <TextBlock Text="Finly – pierwsza konfiguracja"
                                Foreground="{DynamicResource App.Foreground}"
                                FontSize="14"
                                VerticalAlignment="Center"
                                shell:WindowChrome.IsHitTestVisibleInChrome="True"/>
-				</StackPanel>
+                </StackPanel>
 
-				<!-- Przyciski okna -->
-				<StackPanel Grid.Column="1"
+                <!-- Przyciski okna -->
+                <StackPanel Grid.Column="1"
                             Orientation="Horizontal">
-					<Button Style="{StaticResource TitleBarIconButton}"
+                    <Button Style="{StaticResource TitleBarIconButton}"
                             Width="46" Height="32" Padding="0"
                             Click="Minimize_Click">
-						<TextBlock Text="—"
+                        <TextBlock Text="—"
                                    FontSize="16"
                                    HorizontalAlignment="Center"
                                    VerticalAlignment="Center"/>
-					</Button>
-					<Button Style="{StaticResource TitleBarIconButton}"
+                    </Button>
+                    <Button Style="{StaticResource TitleBarIconButton}"
                             Width="46" Height="32" Padding="0"
                             Click="MaxRestore_Click">
-						<TextBlock Text="⬜"
+                        <TextBlock Text="⬜"
                                    FontSize="12"
                                    HorizontalAlignment="Center"
                                    VerticalAlignment="Center"/>
-					</Button>
-					<Button Style="{StaticResource TitleBarIconButton}"
+                    </Button>
+                    <Button Style="{StaticResource TitleBarIconButton}"
                             Width="46" Height="32" Padding="0"
                             Click="Close_Click">
-						<TextBlock Text="✕"
+                        <TextBlock Text="✕"
                                    FontSize="12"
                                    HorizontalAlignment="Center"
                                    VerticalAlignment="Center"/>
-					</Button>
-				</StackPanel>
-			</Grid>
+                    </Button>
+                </StackPanel>
+            </Grid>
 
-			<!-- ========== TREŚĆ OKNA ========== -->
-			<Grid Grid.Row="1" Margin="24">
-				<!-- Jedna kolumna, wszystko wycentrowane -->
-				<Border Background="{DynamicResource Surface.Background}"
+            <!-- ========== TREŚĆ OKNA ========== -->
+            <Grid Grid.Row="1" Margin="24">
+                <Border Background="{DynamicResource Surface.Background}"
                         CornerRadius="18"
                         Padding="36"
                         SnapsToDevicePixels="True"
                         HorizontalAlignment="Center"
                         VerticalAlignment="Center"
                         MaxWidth="720">
-					<StackPanel HorizontalAlignment="Center">
+                    <StackPanel HorizontalAlignment="Center">
 
-						<!-- Logo NA ŚRODKU nad całym tekstem -->
-						<Image Source="/Assets/Images/logoFinly.png"
+                        <!-- Logo na środku -->
+                        <Image Source="/Assets/Images/logoFinly.png"
                                Width="180" Height="180"
                                Margin="0,0,0,16"
                                Stretch="Uniform"
                                RenderOptions.BitmapScalingMode="HighQuality"/>
 
-						<!-- Nagłówek + opis – na środku -->
-						<StackPanel Margin="0,0,0,24"
+                        <!-- Nagłówek + opis -->
+                        <StackPanel Margin="0,0,0,24"
                                     HorizontalAlignment="Center">
-							<TextBlock Text="Zacznijmy od ustawienia punktu startowego"
+                            <TextBlock Text="Zacznijmy od ustawienia punktu startowego"
                                        FontSize="24"
                                        FontWeight="Bold"
                                        Foreground="{DynamicResource App.Foreground}"
                                        Opacity="0.8"
                                        TextAlignment="Center"
                                        Margin="0,0,0,6"/>
-							<TextBlock Text="Te dane pomogą aplikacji poprawnie policzyć Twoje finanse od pierwszego dnia. W każdej chwili będziesz mogła je później zmienić w ustawieniach konta."
+                            <TextBlock Text="Te dane pomogą aplikacji poprawnie policzyć Twoje finanse od pierwszego dnia. W każdej chwili będziesz mogła je później zmienić w ustawieniach konta."
                                        TextWrapping="Wrap"
                                        Foreground="{DynamicResource App.Foreground}"
                                        Opacity="0.8"
                                        Width="520"
                                        TextAlignment="Center"/>
-						</StackPanel>
+                        </StackPanel>
 
-						<!-- Pole 1 -->
-						<StackPanel Margin="0,0,0,12">
-							<TextBlock Text="Wolna gotówka"
+                        <!-- Wolna gotówka -->
+                        <StackPanel Margin="0,0,0,12">
+                            <TextBlock Text="Wolna gotówka"
                                        FontWeight="SemiBold"
                                        Foreground="{DynamicResource App.Foreground}"/>
-							<TextBox x:Name="FreeCashBox"
+                            <TextBox x:Name="FreeCashBox"
                                      Margin="0,4,0,0"
                                      Height="32"
                                      Text="0,00"
                                      GotFocus="AmountBox_GotFocus"
                                      LostFocus="AmountBox_LostFocus"/>
-							<TextBlock Text="Gotówka do swobodnych, codziennych wydatków."
+                            <TextBlock Text="Gotówka do swobodnych, codziennych wydatków."
                                        FontSize="11"
                                        Margin="0,4,0,0"
                                        Opacity="0.7"
                                        Foreground="{DynamicResource App.Foreground}"/>
-						</StackPanel>
+                        </StackPanel>
 
-						<!-- Pole 2 -->
-						<StackPanel Margin="0,0,0,12">
-							<TextBlock Text="Gotówka odłożona"
+                        <!-- Gotówka odłożona -->
+                        <StackPanel Margin="0,0,0,12">
+                            <TextBlock Text="Gotówka odłożona"
                                        FontWeight="SemiBold"
                                        Foreground="{DynamicResource App.Foreground}"/>
-							<TextBox x:Name="EnvelopeCashBox"
+                            <TextBox x:Name="EnvelopeCashBox"
                                      Margin="0,4,0,0"
                                      Height="32"
                                      Text="0,00"
                                      GotFocus="AmountBox_GotFocus"
                                      LostFocus="AmountBox_LostFocus"/>
-							<TextBlock Text="Na przykład: poduszka finansowa, nadpłata kredytu itp."
+                            <TextBlock Text="Na przykład: poduszka finansowa, nadpłata kredytu itp."
                                        FontSize="11"
                                        Margin="0,4,0,0"
                                        Opacity="0.7"
                                        Foreground="{DynamicResource App.Foreground}"/>
-						</StackPanel>
+                        </StackPanel>
 
-						<!-- Pole 3 – GŁÓWNE KONTO -->
-						<StackPanel Margin="0,0,0,12">
-							<TextBlock Text="Kwota na Twoim głównym koncie bankowym:"
+                        <!-- Główne konto bankowe: wybór banku + kwota -->
+                        <StackPanel Margin="0,0,0,12">
+                            <TextBlock Text="Twój główny bank"
                                        FontWeight="SemiBold"
                                        Foreground="{DynamicResource App.Foreground}"/>
-							<TextBox x:Name="MainBankBox"
+
+                            <ComboBox x:Name="MainBankCombo"
+          Margin="0,4,0,4"
+          Height="32"
+          Style="{StaticResource DarkComboBox}">
+
+                                <ComboBoxItem Content="Revolut"/>
+                                <ComboBoxItem Content="PKO Bank Polski"/>
+                                <ComboBoxItem Content="mBank"/>
+                                <ComboBoxItem Content="Bank Pekao"/>
+                                <ComboBoxItem Content="ING Bank Śląski"/>
+                                <ComboBoxItem Content="Santander Bank Polska"/>
+                                <ComboBoxItem Content="Alior Bank"/>
+                                <ComboBoxItem Content="Millennium"/>
+                                <ComboBoxItem Content="Inny bank"/>
+                            </ComboBox>
+
+                            <TextBlock Text="Kwota na Twoim głównym koncie bankowym:"
+                                       FontWeight="SemiBold"
+                                       Margin="0,4,0,0"
+                                       Foreground="{DynamicResource App.Foreground}"/>
+                            <TextBox x:Name="MainBankBox"
                                      Margin="0,4,0,0"
                                      Height="32"
                                      Text="0,00"
                                      GotFocus="AmountBox_GotFocus"
                                      LostFocus="AmountBox_LostFocus"/>
-							<TextBlock Text="Jeśli masz więcej kont, możesz je później dodać w aplikacji."
+                            <TextBlock Text="Jeśli masz więcej kont, możesz je później dodać w aplikacji."
                                        FontSize="11"
                                        Margin="0,4,0,0"
                                        Opacity="0.7"
                                        Foreground="{DynamicResource App.Foreground}"/>
-						</StackPanel>
+                        </StackPanel>
 
-						<!-- PRZYCISK ZAPISU – WYŚRODKOWANY, NIEBIESKI -->
-						<StackPanel Margin="0,32,0,0"
+                        <!-- PRZYCISK ZAPISU -->
+                        <StackPanel Margin="0,32,0,0"
                                     HorizontalAlignment="Center">
-							<Button x:Name="SaveAndContinueButton"
+                            <Button x:Name="SaveAndContinueButton"
                                     Content="Zapisz i przejdź dalej"
                                     Width="260"
                                     Height="38"
                                     Click="SaveAndContinue_Click"
                                     Style="{StaticResource FirstRunPrimaryButton}"/>
-						</StackPanel>
-					</StackPanel>
-				</Border>
-			</Grid>
-		</Grid>
-	</Border>
+                        </StackPanel>
+                    </StackPanel>
+                </Border>
+            </Grid>
+        </Grid>
+    </Border>
 </Window>
+
 
 
 

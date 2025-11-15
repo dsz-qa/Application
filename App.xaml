@@ -9,48 +9,256 @@
     <Application.Resources>
         <ResourceDictionary>
 
-            <!-- Style + motyw -->
+            <!-- ========= STYLE + MOTYW ========= -->
             <ResourceDictionary.MergedDictionaries>
                 <ResourceDictionary Source="/Styles/_Index.xaml"/>
                 <ResourceDictionary Source="/Themes/Dark.xaml"/>
             </ResourceDictionary.MergedDictionaries>
 
-            <!-- (jeśli tych konwerterów nie masz – możesz na chwilę zakomentować) -->
-            <conv:BoolToBrushConverter x:Key="BoolToBrush"/>
-            <conv:BoolToSymbolConverter x:Key="BoolToSymbol"/>
-            <conv:BoolToVisibilityConverter x:Key="BoolToVisibility"/>
+            <!-- ========= KONWERTERY ========= -->
+            <conv:BoolToBrushConverter             x:Key="BoolToBrush"/>
+            <conv:BoolToSymbolConverter            x:Key="BoolToSymbol"/>
+            <conv:BoolToVisibilityConverter        x:Key="BoolToVisibility"/>
             <conv:InverseBoolToVisibilityConverter x:Key="InverseBoolToVisibility"/>
 
-            <!-- Klucze globalne -->
-            <FontFamily x:Key="App.FontFamily">Segoe UI</FontFamily>
-            <sys:Double x:Key="App.FontSize">14</sys:Double>
+            <!-- ========= COMBOBOX – CIEMNA LISTA ========= -->
 
-            <!-- Tekst DatePickera na jasno -->
+            <!-- Pozycje na liście -->
+            <Style x:Key="DarkComboBoxItemStyle" TargetType="ComboBoxItem">
+                <Setter Property="Background" Value="{DynamicResource Surface.Background}"/>
+                <Setter Property="Foreground" Value="{DynamicResource App.Foreground}"/>
+                <Setter Property="Padding"    Value="6,2"/>
+                <Setter Property="HorizontalContentAlignment" Value="Left"/>
+                <Setter Property="VerticalContentAlignment"   Value="Center"/>
+                <Setter Property="SnapsToDevicePixels"        Value="True"/>
+
+                <Style.Triggers>
+                    <Trigger Property="IsMouseOver" Value="True">
+                        <Setter Property="Background" Value="#303030"/>
+                    </Trigger>
+                    <Trigger Property="IsSelected" Value="True">
+                        <Setter Property="Background" Value="{DynamicResource Brand.Blue.HoverOverlay}"/>
+                        <Setter Property="Foreground" Value="White"/>
+                    </Trigger>
+                    <Trigger Property="IsEnabled" Value="False">
+                        <Setter Property="Opacity" Value="0.6"/>
+                    </Trigger>
+                </Style.Triggers>
+            </Style>
+
+            <!-- Pole ComboBoxa + popup -->
+            <Style TargetType="ComboBox">
+                <Setter Property="Foreground" Value="{DynamicResource App.Foreground}"/>
+                <Setter Property="Background" Value="{DynamicResource Surface.Background}"/>
+                <Setter Property="BorderBrush" Value="{DynamicResource Surface.Border}"/>
+                <Setter Property="BorderThickness" Value="1"/>
+                <Setter Property="Padding" Value="6,2"/>
+                <Setter Property="HorizontalContentAlignment" Value="Left"/>
+                <Setter Property="VerticalContentAlignment" Value="Center"/>
+                <Setter Property="SnapsToDevicePixels" Value="True"/>
+                <Setter Property="ItemContainerStyle" Value="{StaticResource DarkComboBoxItemStyle}"/>
+
+                <Setter Property="Template">
+                    <Setter.Value>
+                        <ControlTemplate TargetType="ComboBox">
+                            <Grid>
+                                <!-- Główne pole -->
+                                <ToggleButton x:Name="ToggleButton"
+                                              Focusable="False"
+                                              IsChecked="{Binding IsDropDownOpen, Mode=TwoWay,
+                                                                  RelativeSource={RelativeSource TemplatedParent}}"
+                                              ClickMode="Press"
+                                              Background="{TemplateBinding Background}"
+                                              BorderBrush="{TemplateBinding BorderBrush}"
+                                              BorderThickness="{TemplateBinding BorderThickness}">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+
+                                        <!-- Wybrana wartość -->
+                                        <ContentPresenter
+                                            Margin="4,2,4,2"
+                                            VerticalAlignment="Center"
+                                            HorizontalAlignment="Left"
+                                            Content="{TemplateBinding SelectionBoxItem}"
+                                            ContentTemplate="{TemplateBinding SelectionBoxItemTemplate}"
+                                            RecognizesAccessKey="True"/>
+
+                                        <!-- Strzałka skrajnie po prawej -->
+                                        <Border Grid.Column="1"
+                                                Background="#33000000"
+                                                HorizontalAlignment="Right">
+                                            <Path HorizontalAlignment="Center"
+                                                  VerticalAlignment="Center"
+                                                  Data="M 0 0 L 4 4 L 8 0 Z"
+                                                  Fill="{DynamicResource App.Foreground}"
+                                                  Stretch="Uniform"
+                                                  Width="10"
+                                                  Height="6"/>
+                                        </Border>
+                                    </Grid>
+                                </ToggleButton>
+
+                                <!-- Popup listy -->
+                                <Popup x:Name="Popup"
+                                       Placement="Bottom"
+                                       IsOpen="{TemplateBinding IsDropDownOpen}"
+                                       AllowsTransparency="True"
+                                       Focusable="False"
+                                       PopupAnimation="Fade">
+                                    <Border Margin="0,2,0,0"
+                                            Background="{DynamicResource Surface.Background}"
+                                            BorderBrush="{DynamicResource Surface.Border}"
+                                            BorderThickness="1"
+                                            CornerRadius="4"
+                                            SnapsToDevicePixels="True">
+                                        <ScrollViewer Margin="0,2"
+                                                      SnapsToDevicePixels="True">
+                                            <StackPanel IsItemsHost="True"
+                                                        KeyboardNavigation.DirectionalNavigation="Contained"/>
+                                        </ScrollViewer>
+                                    </Border>
+                                </Popup>
+                            </Grid>
+
+                            <ControlTemplate.Triggers>
+                                <Trigger Property="HasItems" Value="False">
+                                    <Setter TargetName="Popup" Property="MinHeight" Value="0"/>
+                                </Trigger>
+                                <Trigger Property="IsEnabled" Value="False">
+                                    <Setter Property="Opacity" Value="0.5"/>
+                                </Trigger>
+                                <!-- Bez niebieskiego wypełnienia – tylko ramka -->
+                                <Trigger Property="IsMouseOver" Value="True">
+                                    <Setter TargetName="ToggleButton"
+                                            Property="BorderBrush"
+                                            Value="{DynamicResource Brand.Blue}"/>
+                                </Trigger>
+                                <Trigger Property="IsKeyboardFocusWithin" Value="True">
+                                    <Setter TargetName="ToggleButton"
+                                            Property="BorderBrush"
+                                            Value="{DynamicResource Brand.Blue}"/>
+                                </Trigger>
+                                <Trigger Property="IsDropDownOpen" Value="True">
+                                    <Setter TargetName="ToggleButton"
+                                            Property="BorderBrush"
+                                            Value="{DynamicResource Brand.Blue}"/>
+                                </Trigger>
+                            </ControlTemplate.Triggers>
+                        </ControlTemplate>
+                    </Setter.Value>
+                </Setter>
+            </Style>
+
+            <!-- ========= DATEPICKER z własnym TEMPLATE ========= -->
+
+            <!-- Tekst DatePickera -->
             <Style TargetType="{x:Type DatePickerTextBox}">
                 <Setter Property="Foreground" Value="{DynamicResource App.Foreground}"/>
                 <Setter Property="Background" Value="{DynamicResource Surface.Background}"/>
+                <Setter Property="BorderThickness" Value="0"/>
+                <Setter Property="Padding" Value="4,2"/>
             </Style>
 
+            <!-- Sam DatePicker – ciemne pole + nasz kalendarz -->
             <Style TargetType="DatePicker">
-                <Setter Property="BorderBrush" Value="{DynamicResource Brand.Blue}"/>
+                <Setter Property="Foreground"      Value="{DynamicResource App.Foreground}"/>
+                <Setter Property="Background"      Value="{DynamicResource Surface.Background}"/>
+                <Setter Property="BorderBrush"     Value="{DynamicResource Brand.Blue}"/>
                 <Setter Property="BorderThickness" Value="1.5"/>
-                <Setter Property="Foreground" Value="{DynamicResource App.Foreground}"/>
+
+                <Setter Property="Template">
+                    <Setter.Value>
+                        <ControlTemplate TargetType="DatePicker">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+
+                                <!-- Pole tekstowe -->
+                                <DatePickerTextBox x:Name="PART_TextBox"
+                                                   Grid.Column="0"
+                                                   Margin="0"
+                                                   Focusable="False"
+                                                   Background="{TemplateBinding Background}"
+                                                   Foreground="{TemplateBinding Foreground}"/>
+
+                                <!-- Przycisk z ikonką kalendarza -->
+                                <Button x:Name="PART_Button"
+                                        Grid.Column="1"
+                                        Margin="0"
+                                        Padding="4"
+                                        Focusable="False"
+                                        Background="Transparent"
+                                        BorderThickness="0"
+                                        Cursor="Hand">
+                                    <Image Source="/Assets/Icons/kalendarz.png"
+                                           Width="16" Height="16"
+                                           Stretch="Uniform"
+                                           RenderOptions.BitmapScalingMode="HighQuality"/>
+                                </Button>
+                            </Grid>
+                        </ControlTemplate>
+                    </Setter.Value>
+                </Setter>
             </Style>
 
-            <!-- Tekst -->
+            <!-- ========= GLOBALNE POLA TEKSTOWE ========= -->
+            <Style TargetType="TextBox">
+                <Setter Property="Foreground"      Value="{DynamicResource App.Foreground}"/>
+                <Setter Property="Background"      Value="{DynamicResource Surface.Background}"/>
+                <Setter Property="BorderBrush"     Value="{DynamicResource Surface.Border}"/>
+                <Setter Property="BorderThickness" Value="1"/>
+                <Setter Property="Padding"         Value="4,2"/>
+            </Style>
+
+            <!-- ========= LISTY / TABELKI / GRUPY ========= -->
+            <Style TargetType="GroupBox">
+                <Setter Property="Foreground"      Value="{DynamicResource App.Foreground}"/>
+                <Setter Property="Background"      Value="{DynamicResource Surface.Background}"/>
+                <Setter Property="BorderBrush"     Value="{DynamicResource Surface.Border}"/>
+                <Setter Property="BorderThickness" Value="1"/>
+                <Setter Property="Margin"          Value="0,4,0,4"/>
+            </Style>
+
+            <Style TargetType="ListBox">
+                <Setter Property="Background"  Value="{DynamicResource Surface.Background}"/>
+                <Setter Property="BorderBrush" Value="{DynamicResource Surface.Border}"/>
+                <Setter Property="Foreground"  Value="{DynamicResource App.Foreground}"/>
+            </Style>
+
+            <Style TargetType="DataGrid">
+                <Setter Property="Background"               Value="{DynamicResource Surface.Background}"/>
+                <Setter Property="Foreground"               Value="{DynamicResource App.Foreground}"/>
+                <Setter Property="BorderBrush"              Value="{DynamicResource Surface.Border}"/>
+                <Setter Property="RowBackground"            Value="#232323"/>
+                <Setter Property="AlternatingRowBackground" Value="#272727"/>
+                <Setter Property="HorizontalGridLinesBrush" Value="#444444"/>
+                <Setter Property="VerticalGridLinesBrush"   Value="#444444"/>
+            </Style>
+
+            <!-- ========= FONTY / TEKST ========= -->
+            <FontFamily x:Key="App.FontFamily">Segoe UI</FontFamily>
+            <sys:Double x:Key="App.FontSize">14</sys:Double>
+
             <Style TargetType="TextBlock">
                 <Setter Property="Foreground" Value="{DynamicResource App.Foreground}"/>
                 <Setter Property="FontFamily" Value="{StaticResource App.FontFamily}"/>
                 <Setter Property="FontSize"   Value="{StaticResource App.FontSize}"/>
             </Style>
+
             <Style TargetType="Label">
                 <Setter Property="Foreground" Value="{DynamicResource App.Foreground}"/>
             </Style>
+
             <Style TargetType="{x:Type TextElement}">
                 <Setter Property="Foreground" Value="{DynamicResource App.Foreground}"/>
             </Style>
 
-            <!-- Okna / kontrolki bazowe -->
+            <!-- ========= BAZOWE OKNA / KONTROLKI ========= -->
             <Style TargetType="Window">
                 <Setter Property="Background" Value="{DynamicResource App.Background}"/>
                 <Setter Property="Foreground" Value="{DynamicResource App.Foreground}"/>
@@ -77,8 +285,10 @@
                 <Setter Property="CornerRadius"    Value="8"/>
             </Style>
 
-            <!-- Bezpieczny SidebarNavButton – żadnych brakujących zasobów -->
-            <Style x:Key="SidebarNavButton" TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
+            <!-- ========= SidebarNavButton ========= -->
+            <Style x:Key="SidebarNavButton"
+                   TargetType="Button"
+                   BasedOn="{StaticResource {x:Type Button}}">
                 <Setter Property="Foreground" Value="{DynamicResource App.Foreground}"/>
                 <Setter Property="Background" Value="Transparent"/>
                 <Setter Property="HorizontalContentAlignment" Value="Left"/>
@@ -90,7 +300,6 @@
                                     CornerRadius="8"
                                     BorderThickness="0">
                                 <StackPanel Orientation="Horizontal">
-                                    <!-- Ikona przekazywana przez Tag -->
                                     <Image Width="18" Height="18"
                                            Source="{Binding RelativeSource={RelativeSource TemplatedParent}, Path=Tag}"
                                            Stretch="Uniform"
@@ -121,3 +330,11 @@
         </ResourceDictionary>
     </Application.Resources>
 </Application>
+
+
+
+
+
+
+
+

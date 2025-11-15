@@ -1,31 +1,34 @@
 <ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
                     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
 
-    <!-- GŁÓWNE TŁO APLIKACJI (jak na screenie) -->
-    <!-- Themes/Dark.xaml -->
+    <!-- GŁÓWNE TŁO APLIKACJI -->
     <SolidColorBrush x:Key="App.Background" Color="#383838"/>
-    <SolidColorBrush x:Key="App.Foreground"     Color="#FFFFFF"/>
+    <SolidColorBrush x:Key="App.Foreground" Color="#FFFFFF"/>
 
-    <!-- Panele/karty/boxy (lekko jaśniejsze od tła) -->
+    <!-- PANELE / KARTY -->
     <SolidColorBrush x:Key="Surface.Background" Color="#323232"/>
     <SolidColorBrush x:Key="Surface.Border"     Color="#4B4B4B"/>
 
-    <!-- Kontrolki (textboxy, buttony w tle, itp.) -->
+    <!-- POLE WPROWADZANIA (textbox / combobox / datepicker) -->
+    <!-- używane w App.xaml jako Surface.Field -->
+    <SolidColorBrush x:Key="Surface.Field" Color="#262626"/>
+
+    <!-- Kontrolki (jeśli gdzieś jeszcze używasz tych kluczy) -->
     <SolidColorBrush x:Key="Control.Background" Color="#1C2027"/>
     <SolidColorBrush x:Key="Control.Border"     Color="#2B313B"/>
     <SolidColorBrush x:Key="Control.Foreground" Color="#EAEAEA"/>
 
-    <!-- Pasek tytułu i sidebar – spójne z głównym tłem -->
+    <!-- Pasek tytułu i sidebar -->
     <SolidColorBrush x:Key="TitleBar.Background"  Color="#2D2D2D"/>
     <SolidColorBrush x:Key="Sidebar.Background"   Color="#2F2F2F"/>
     <SolidColorBrush x:Key="Sidebar.Foreground"   Color="#DDE2E7"/>
 
-    <!-- Hover/aktywny outline (zostawiamy jak było) -->
-    <SolidColorBrush x:Key="Sidebar.Hover"          Color="#1A1E25"/>
-    <SolidColorBrush x:Key="Sidebar.ActiveBg"       Color="#1B1E24"/>
+    <!-- Hover/aktywny outline -->
+    <SolidColorBrush x:Key="Sidebar.Hover"           Color="#1A1E25"/>
+    <SolidColorBrush x:Key="Sidebar.ActiveBg"        Color="#1B1E24"/>
     <SolidColorBrush x:Key="Sidebar.ActiveIndicator" Color="#FF8A00"/>
 
-    <!-- Akcenty, jeśli ich używasz -->
+    <!-- Akcenty -->
     <SolidColorBrush x:Key="Brand.Orange"      Color="#FF8A00"/>
     <SolidColorBrush x:Key="Brand.Orange.Dark" Color="#E57A00"/>
     <SolidColorBrush x:Key="Brand.Blue"        Color="#2196F3"/>
