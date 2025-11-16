@@ -20,7 +20,7 @@ namespace Finly.Pages
         {
             public string Key { get; set; } = "";
             public string Name { get; set; } = "";
-            public int? AccountId { get; set; } // null = gotówka
+            public int? AccountId { get; set; }   // null = gotówka
             public override string ToString() => Name;
         }
 
@@ -36,6 +36,7 @@ namespace Finly.Pages
             {
                 LoadCategories();
                 LoadTransferAccounts();
+
                 // Domyślne daty: dziś
                 ExpenseDatePicker.SelectedDate = DateTime.Today;
                 IncomeDatePicker.SelectedDate = DateTime.Today;
@@ -50,7 +51,8 @@ namespace Finly.Pages
             {
                 var cats = DatabaseService.GetCategoriesByUser(_uid) ?? new List<string>();
                 ExpenseCategoryBox.ItemsSource = cats;
-                if (ExpenseCategoryBox.Items.Count > 0) ExpenseCategoryBox.SelectedIndex = 0;
+                if (ExpenseCategoryBox.Items.Count > 0)
+                    ExpenseCategoryBox.SelectedIndex = 0;
             }
             catch
             {
@@ -62,7 +64,12 @@ namespace Finly.Pages
         {
             var items = new List<AccountItem>
             {
-                new AccountItem { Key = CashKey, Name = "Gotówka (portfel)", AccountId = null }
+                new AccountItem
+                {
+                    Key = CashKey,
+                    Name = "Gotówka (portfel)",
+                    AccountId = null
+                }
             };
 
             try
@@ -75,7 +82,10 @@ namespace Finly.Pages
                     Name = $"{a.AccountName}  —  {a.Balance.ToString("N2", CultureInfo.CurrentCulture)} zł"
                 }));
             }
-            catch { /* pusto */ }
+            catch
+            {
+                // zostawiamy tylko gotówkę
+            }
 
             TransferFromBox.ItemsSource = items.ToList();
             TransferToBox.ItemsSource = items.ToList();
@@ -84,16 +94,16 @@ namespace Finly.Pages
             if (TransferToBox.Items.Count > 1) TransferToBox.SelectedIndex = 1;
         }
 
-        // ================== HANDLERY PRZYCISKÓW ==================
+        // ================== ANULUJ / CZYSZCZENIE ==================
         private void Cancel_Click(object sender, RoutedEventArgs e)
         {
-            // Czyścimy pola bieżącej zakładki
             if (IsTab(sender, "Wydatek"))
             {
                 ExpenseAmountBox.Clear();
                 ExpenseDescBox.Clear();
                 ExpenseDatePicker.SelectedDate = DateTime.Today;
-                if (ExpenseCategoryBox.Items.Count > 0) ExpenseCategoryBox.SelectedIndex = 0;
+                if (ExpenseCategoryBox.Items.Count > 0)
+                    ExpenseCategoryBox.SelectedIndex = 0;
             }
             else if (IsTab(sender, "Przychód"))
             {
@@ -114,7 +124,8 @@ namespace Finly.Pages
         {
             var btn = sender as DependencyObject;
             var tabItem = FindParent<TabItem>(btn);
-            return (tabItem?.Header as string)?.Equals(headerText, StringComparison.OrdinalIgnoreCase) == true;
+            return (tabItem?.Header as string)?
+                .Equals(headerText, StringComparison.OrdinalIgnoreCase) == true;
         }
 
         private static T? FindParent<T>(DependencyObject? child) where T : DependencyObject
@@ -128,7 +139,7 @@ namespace Finly.Pages
             return null;
         }
 
-        // --------- WYDATEK ---------
+        // ================== WYDATEK ==================
         private void SaveExpense_Click(object sender, RoutedEventArgs e)
         {
             if (!TryParseAmount(ExpenseAmountBox.Text, out var amount))
@@ -142,13 +153,12 @@ namespace Finly.Pages
             var desc = string.IsNullOrWhiteSpace(ExpenseDescBox.Text) ? null : ExpenseDescBox.Text.Trim();
             var catName = ExpenseCategoryBox.SelectedItem?.ToString();
 
-            // ZAWSZE int (bez int?)
             int categoryId = 0;
             if (!string.IsNullOrWhiteSpace(catName))
             {
                 try
                 {
-                    categoryId = DatabaseService.GetOrCreateCategoryId(_uid, catName!); // zwraca int
+                    categoryId = DatabaseService.GetOrCreateCategoryId(_uid, catName!);
                 }
                 catch
                 {
@@ -162,7 +172,7 @@ namespace Finly.Pages
                 Amount = (double)amount,
                 Date = date,
                 Description = desc,
-                CategoryId = categoryId  // int -> int
+                CategoryId = categoryId
             };
 
             try
@@ -178,7 +188,7 @@ namespace Finly.Pages
             }
         }
 
-        // --------- PRZYCHÓD ---------
+        // ================== PRZYCHÓD ==================
         private void SaveIncome_Click(object sender, RoutedEventArgs e)
         {
             if (!TryParseAmount(IncomeAmountBox.Text, out var amount))
@@ -187,9 +197,14 @@ namespace Finly.Pages
                     MessageBoxButton.OK, MessageBoxImage.Warning);
                 return;
             }
+
             var date = IncomeDatePicker.SelectedDate ?? DateTime.Today;
-            var source = string.IsNullOrWhiteSpace(IncomeSourceBox.Text) ? "Przychód" : IncomeSourceBox.Text.Trim();
-            var desc = string.IsNullOrWhiteSpace(IncomeDescBox.Text) ? null : IncomeDescBox.Text.Trim();
+            var source = string.IsNullOrWhiteSpace(IncomeSourceBox.Text)
+                ? "Przychód"
+                : IncomeSourceBox.Text.Trim();
+            var desc = string.IsNullOrWhiteSpace(IncomeDescBox.Text)
+                ? null
+                : IncomeDescBox.Text.Trim();
 
             try
             {
@@ -204,7 +219,7 @@ namespace Finly.Pages
             }
         }
 
-        // --------- TRANSFER ---------
+        // ================== TRANSFER ==================
         private void SaveTransfer_Click(object sender, RoutedEventArgs e)
         {
             if (!TryParseAmount(TransferAmountBox.Text, out var amount) || amount <= 0m)
@@ -223,6 +238,7 @@ namespace Finly.Pages
                     MessageBoxButton.OK, MessageBoxImage.Warning);
                 return;
             }
+
             if (from.Key == to.Key)
             {
                 MessageBox.Show("Konta źródłowe i docelowe nie mogą być takie same.", "Transfer",
@@ -234,16 +250,21 @@ namespace Finly.Pages
             {
                 if (from.AccountId is int accFrom && to.AccountId is null)
                 {
-                    DatabaseService.TransferBankToCash(_uid, accFrom, amount); // Bank -> Gotówka
+                    // Bank -> gotówka
+                    DatabaseService.TransferBankToCash(_uid, accFrom, amount);
                 }
                 else if (from.AccountId is null && to.AccountId is int accTo)
                 {
-                    DatabaseService.TransferCashToBank(_uid, accTo, amount);   // Gotówka -> Bank
+                    // Gotówka -> bank
+                    DatabaseService.TransferCashToBank(_uid, accTo, amount);
                 }
                 else
                 {
-                    MessageBox.Show("Na razie obsługiwane są transfery między bankiem a gotówką.", "Transfer",
-                        MessageBoxButton.OK, MessageBoxImage.Information);
+                    MessageBox.Show(
+                        "Na razie obsługiwane są transfery tylko między kontem bankowym a gotówką.",
+                        "Transfer",
+                        MessageBoxButton.OK,
+                        MessageBoxImage.Information);
                     return;
                 }
 
@@ -268,6 +289,11 @@ namespace Finly.Pages
         }
     }
 }
+
+
+
+
+
 
 
 

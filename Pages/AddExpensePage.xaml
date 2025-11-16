@@ -5,7 +5,18 @@
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              mc:Ignorable="d">
 
-    <Grid>
+    <UserControl.Resources>
+        <!-- Karta / panel -->
+        <Style x:Key="Card" TargetType="Border">
+            <Setter Property="Background"      Value="{DynamicResource Surface.Background}"/>
+            <Setter Property="BorderBrush"     Value="{DynamicResource Surface.Border}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="CornerRadius"    Value="10"/>
+            <Setter Property="Padding"         Value="16"/>
+        </Style>
+    </UserControl.Resources>
+
+    <Grid Margin="16">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
@@ -14,50 +25,69 @@
         <!-- Nagłówek -->
         <TextBlock Grid.Row="0"
                    Text="Dodaj"
-                   Margin="16"
                    FontSize="20"
                    FontWeight="Bold"
                    Foreground="{DynamicResource App.Foreground}"/>
 
-        <!-- Zakładki -->
+        <!-- DUŻE ZAKŁADKI NA ŚRODKU -->
         <TabControl Grid.Row="1"
-                    Margin="16"
-                    Background="{DynamicResource App.Background}"
-                    BorderBrush="{DynamicResource Surface.Border}">
-            <!-- WYDATEK -->
+                    Width="900"
+                    HorizontalAlignment="Center"
+                    VerticalAlignment="Top"
+                    Margin="0,24,0,0"
+                    Background="Transparent"
+                    BorderBrush="{DynamicResource Surface.Border}"
+                    BorderThickness="1"
+                    Padding="0">
+
+            <!-- Wygląd samych zakładek -->
+            <TabControl.Resources>
+                <Style TargetType="TabItem">
+                    <Setter Property="Padding" Value="40,10"/>
+                    <Setter Property="FontSize" Value="16"/>
+                    <Setter Property="FontWeight" Value="SemiBold"/>
+                    <Setter Property="Margin" Value="4,0"/>
+                    <Setter Property="Foreground" Value="{DynamicResource App.Foreground}"/>
+                </Style>
+            </TabControl.Resources>
+
+            <!-- ================= WYDATEK ================= -->
             <TabItem Header="Wydatek">
-                <Border Padding="16"
-                        Background="{DynamicResource Surface.Background}"
-                        BorderBrush="{DynamicResource Surface.Border}"
-                        BorderThickness="1"
-                        CornerRadius="10">
+                <Border Style="{StaticResource Card}" Margin="0,12,0,0">
                     <Grid>
                         <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="180"/>
+                            <ColumnDefinition Width="200"/>
                             <ColumnDefinition Width="*"/>
                         </Grid.ColumnDefinitions>
                         <Grid.RowDefinitions>
                             <RowDefinition Height="Auto"/>
-                            <RowDefinition Height="8"/>
+                            <RowDefinition Height="10"/>
                             <RowDefinition Height="Auto"/>
-                            <RowDefinition Height="8"/>
+                            <RowDefinition Height="10"/>
                             <RowDefinition Height="Auto"/>
-                            <RowDefinition Height="8"/>
+                            <RowDefinition Height="10"/>
                             <RowDefinition Height="Auto"/>
-                            <RowDefinition Height="16"/>
+                            <RowDefinition Height="20"/>
                             <RowDefinition Height="Auto"/>
                         </Grid.RowDefinitions>
 
-                        <TextBlock Grid.Row="0" Grid.Column="0" Text="Kwota:" VerticalAlignment="Center"/>
-                        <TextBox   x:Name="ExpenseAmountBox" Grid.Row="0" Grid.Column="1"/>
+                        <TextBlock Grid.Row="0" Grid.Column="0"
+                                   Text="Kwota:" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                        <TextBox   x:Name="ExpenseAmountBox"
+                                   Grid.Row="0" Grid.Column="1" Height="28"/>
 
-                        <TextBlock Grid.Row="2" Grid.Column="0" Text="Kategoria:" VerticalAlignment="Center"/>
-                        <ComboBox  x:Name="ExpenseCategoryBox" Grid.Row="2" Grid.Column="1"/>
+                        <TextBlock Grid.Row="2" Grid.Column="0"
+                                   Text="Kategoria:" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                        <ComboBox  x:Name="ExpenseCategoryBox"
+                                   Grid.Row="2" Grid.Column="1" Height="28"/>
 
-                        <TextBlock Grid.Row="4" Grid.Column="0" Text="Data:" VerticalAlignment="Center"/>
-                        <DatePicker x:Name="ExpenseDatePicker" Grid.Row="4" Grid.Column="1"/>
+                        <TextBlock Grid.Row="4" Grid.Column="0"
+                                   Text="Data:" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                        <DatePicker x:Name="ExpenseDatePicker"
+                                    Grid.Row="4" Grid.Column="1" Height="28"/>
 
-                        <TextBlock Grid.Row="6" Grid.Column="0" Text="Opis:" VerticalAlignment="Top"/>
+                        <TextBlock Grid.Row="6" Grid.Column="0"
+                                   Text="Opis:" VerticalAlignment="Top" Margin="0,4,8,0"/>
                         <TextBox   x:Name="ExpenseDescBox"
                                    Grid.Row="6" Grid.Column="1"
                                    Height="80"
@@ -65,8 +95,8 @@
                                    AcceptsReturn="True"
                                    VerticalScrollBarVisibility="Auto"/>
 
-                        <StackPanel Grid.Row="8"
-                                    Grid.ColumnSpan="2"
+                        <!-- Przyciski -->
+                        <StackPanel Grid.Row="8" Grid.ColumnSpan="2"
                                     Orientation="Horizontal"
                                     HorizontalAlignment="Right">
                             <Button Content="Dodaj"
@@ -80,40 +110,43 @@
                 </Border>
             </TabItem>
 
-            <!-- PRZYCHÓD -->
+            <!-- ================= PRZYCHÓD ================= -->
             <TabItem Header="Przychód">
-                <Border Padding="16"
-                        Background="{DynamicResource Surface.Background}"
-                        BorderBrush="{DynamicResource Surface.Border}"
-                        BorderThickness="1"
-                        CornerRadius="10">
+                <Border Style="{StaticResource Card}" Margin="0,12,0,0">
                     <Grid>
                         <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="180"/>
+                            <ColumnDefinition Width="200"/>
                             <ColumnDefinition Width="*"/>
                         </Grid.ColumnDefinitions>
                         <Grid.RowDefinitions>
                             <RowDefinition Height="Auto"/>
-                            <RowDefinition Height="8"/>
+                            <RowDefinition Height="10"/>
                             <RowDefinition Height="Auto"/>
-                            <RowDefinition Height="8"/>
+                            <RowDefinition Height="10"/>
                             <RowDefinition Height="Auto"/>
-                            <RowDefinition Height="8"/>
+                            <RowDefinition Height="10"/>
                             <RowDefinition Height="Auto"/>
-                            <RowDefinition Height="16"/>
+                            <RowDefinition Height="20"/>
                             <RowDefinition Height="Auto"/>
                         </Grid.RowDefinitions>
 
-                        <TextBlock Grid.Row="0" Grid.Column="0" Text="Kwota:" VerticalAlignment="Center"/>
-                        <TextBox   x:Name="IncomeAmountBox" Grid.Row="0" Grid.Column="1"/>
+                        <TextBlock Grid.Row="0" Grid.Column="0"
+                                   Text="Kwota:" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                        <TextBox   x:Name="IncomeAmountBox"
+                                   Grid.Row="0" Grid.Column="1" Height="28"/>
 
-                        <TextBlock Grid.Row="2" Grid.Column="0" Text="Źródło / kategoria:" VerticalAlignment="Center"/>
-                        <TextBox   x:Name="IncomeSourceBox" Grid.Row="2" Grid.Column="1"/>
+                        <TextBlock Grid.Row="2" Grid.Column="0"
+                                   Text="Źródło / kategoria:" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                        <TextBox   x:Name="IncomeSourceBox"
+                                   Grid.Row="2" Grid.Column="1" Height="28"/>
 
-                        <TextBlock Grid.Row="4" Grid.Column="0" Text="Data:" VerticalAlignment="Center"/>
-                        <DatePicker x:Name="IncomeDatePicker" Grid.Row="4" Grid.Column="1"/>
+                        <TextBlock Grid.Row="4" Grid.Column="0"
+                                   Text="Data:" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                        <DatePicker x:Name="IncomeDatePicker"
+                                    Grid.Row="4" Grid.Column="1" Height="28"/>
 
-                        <TextBlock Grid.Row="6" Grid.Column="0" Text="Opis:" VerticalAlignment="Top"/>
+                        <TextBlock Grid.Row="6" Grid.Column="0"
+                                   Text="Opis:" VerticalAlignment="Top" Margin="0,4,8,0"/>
                         <TextBox   x:Name="IncomeDescBox"
                                    Grid.Row="6" Grid.Column="1"
                                    Height="80"
@@ -121,8 +154,7 @@
                                    AcceptsReturn="True"
                                    VerticalScrollBarVisibility="Auto"/>
 
-                        <StackPanel Grid.Row="8"
-                                    Grid.ColumnSpan="2"
+                        <StackPanel Grid.Row="8" Grid.ColumnSpan="2"
                                     Orientation="Horizontal"
                                     HorizontalAlignment="Right">
                             <Button Content="Dodaj"
@@ -136,44 +168,47 @@
                 </Border>
             </TabItem>
 
-            <!-- TRANSFER -->
+            <!-- ================= TRANSFER ================= -->
             <TabItem Header="Transfer">
-                <Border Padding="16"
-                        Background="{DynamicResource Surface.Background}"
-                        BorderBrush="{DynamicResource Surface.Border}"
-                        BorderThickness="1"
-                        CornerRadius="10">
+                <Border Style="{StaticResource Card}" Margin="0,12,0,0">
                     <Grid>
                         <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="180"/>
+                            <ColumnDefinition Width="200"/>
                             <ColumnDefinition Width="*"/>
                         </Grid.ColumnDefinitions>
                         <Grid.RowDefinitions>
                             <RowDefinition Height="Auto"/>
-                            <RowDefinition Height="8"/>
+                            <RowDefinition Height="10"/>
                             <RowDefinition Height="Auto"/>
-                            <RowDefinition Height="8"/>
+                            <RowDefinition Height="10"/>
                             <RowDefinition Height="Auto"/>
-                            <RowDefinition Height="8"/>
+                            <RowDefinition Height="10"/>
                             <RowDefinition Height="Auto"/>
-                            <RowDefinition Height="16"/>
+                            <RowDefinition Height="20"/>
                             <RowDefinition Height="Auto"/>
                         </Grid.RowDefinitions>
 
-                        <TextBlock Grid.Row="0" Grid.Column="0" Text="Z konta:" VerticalAlignment="Center"/>
-                        <ComboBox  x:Name="TransferFromBox" Grid.Row="0" Grid.Column="1"/>
+                        <TextBlock Grid.Row="0" Grid.Column="0"
+                                   Text="Z konta:" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                        <ComboBox  x:Name="TransferFromBox"
+                                   Grid.Row="0" Grid.Column="1" Height="28"/>
 
-                        <TextBlock Grid.Row="2" Grid.Column="0" Text="Na konto:" VerticalAlignment="Center"/>
-                        <ComboBox  x:Name="TransferToBox" Grid.Row="2" Grid.Column="1"/>
+                        <TextBlock Grid.Row="2" Grid.Column="0"
+                                   Text="Na konto:" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                        <ComboBox  x:Name="TransferToBox"
+                                   Grid.Row="2" Grid.Column="1" Height="28"/>
 
-                        <TextBlock Grid.Row="4" Grid.Column="0" Text="Kwota:" VerticalAlignment="Center"/>
-                        <TextBox   x:Name="TransferAmountBox" Grid.Row="4" Grid.Column="1"/>
+                        <TextBlock Grid.Row="4" Grid.Column="0"
+                                   Text="Kwota:" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                        <TextBox   x:Name="TransferAmountBox"
+                                   Grid.Row="4" Grid.Column="1" Height="28"/>
 
-                        <TextBlock Grid.Row="6" Grid.Column="0" Text="Data:" VerticalAlignment="Center"/>
-                        <DatePicker x:Name="TransferDatePicker" Grid.Row="6" Grid.Column="1"/>
+                        <TextBlock Grid.Row="6" Grid.Column="0"
+                                   Text="Data:" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                        <DatePicker x:Name="TransferDatePicker"
+                                    Grid.Row="6" Grid.Column="1" Height="28"/>
 
-                        <StackPanel Grid.Row="8"
-                                    Grid.ColumnSpan="2"
+                        <StackPanel Grid.Row="8" Grid.ColumnSpan="2"
                                     Orientation="Horizontal"
                                     HorizontalAlignment="Right">
                             <Button Content="Zapisz transfer"
@@ -189,5 +224,11 @@
         </TabControl>
     </Grid>
 </UserControl>
+
+
+
+
+
+
 
 
