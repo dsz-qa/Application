@@ -5,33 +5,33 @@
     <UserControl.Resources>
         <!-- Karty -->
         <Style x:Key="Card" TargetType="Border">
-            <Setter Property="Background" Value="{DynamicResource Surface.Background}"/>
-            <Setter Property="BorderBrush"   Value="{DynamicResource Surface.Border}"/>
-            <Setter Property="BorderThickness" Value="1"/>
-            <Setter Property="CornerRadius"  Value="10"/>
-            <Setter Property="Padding"       Value="12"/>
+            <Setter Property="Background"       Value="{DynamicResource Surface.Background}"/>
+            <Setter Property="BorderBrush"      Value="{DynamicResource Surface.Border}"/>
+            <Setter Property="BorderThickness"  Value="1"/>
+            <Setter Property="CornerRadius"     Value="10"/>
+            <Setter Property="Padding"          Value="12"/>
         </Style>
 
         <Style x:Key="AccentCard" TargetType="Border" BasedOn="{StaticResource Card}">
-            <Setter Property="BorderBrush"   Value="{DynamicResource Brand.Blue}"/>
-            <Setter Property="BorderThickness" Value="1.5"/>
+            <Setter Property="BorderBrush"      Value="{DynamicResource Brand.Blue}"/>
+            <Setter Property="BorderThickness"  Value="1.5"/>
         </Style>
 
         <Style x:Key="CardHeader" TargetType="TextBlock">
-            <Setter Property="FontSize"    Value="14"/>
-            <Setter Property="FontWeight"  Value="SemiBold"/>
-            <Setter Property="Opacity"     Value="0.9"/>
-            <Setter Property="Foreground"  Value="{DynamicResource App.Foreground}"/>
+            <Setter Property="FontSize"        Value="14"/>
+            <Setter Property="FontWeight"      Value="SemiBold"/>
+            <Setter Property="Opacity"         Value="0.9"/>
+            <Setter Property="Foreground"      Value="{DynamicResource App.Foreground}"/>
         </Style>
 
         <Style x:Key="KpiValueStyle" TargetType="TextBlock">
-            <Setter Property="FontSize"    Value="20"/>
-            <Setter Property="FontWeight"  Value="Bold"/>
-            <Setter Property="Margin"      Value="0,2,0,0"/>
-            <Setter Property="Foreground"  Value="{DynamicResource App.Foreground}"/>
+            <Setter Property="FontSize"        Value="20"/>
+            <Setter Property="FontWeight"      Value="Bold"/>
+            <Setter Property="Margin"          Value="0,2,0,0"/>
+            <Setter Property="Foreground"      Value="{DynamicResource App.Foreground}"/>
         </Style>
 
-
+        <!-- Tekst DatePickera na dashboardzie -->
         <Style TargetType="{x:Type DatePickerTextBox}">
             <Setter Property="Foreground"      Value="{DynamicResource App.Foreground}"/>
             <Setter Property="Background"      Value="{DynamicResource Surface.Background}"/>
@@ -40,11 +40,11 @@
         </Style>
     </UserControl.Resources>
 
-    <!-- Dodajemy też poziomy scroll, żeby na małym laptopie nic się nie ucinało -->
+    <!-- Scroll – na mniejszych ekranach przewijasz, nic się nie ucina -->
     <ScrollViewer VerticalScrollBarVisibility="Auto"
                   HorizontalScrollBarVisibility="Auto">
         <Grid Margin="16">
-            <!-- 0: KPI, 1: DateRange, 2: Treść pod spodem -->
+            <!-- 0: KPI, 1: DateRange, 2: Treść -->
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto"/>
                 <RowDefinition Height="Auto"/>
@@ -143,7 +143,7 @@
                                Margin="0,0,0,10"
                                TextAlignment="Center"/>
 
-                    <!-- Nasz pasek okresu (Dzień / Tydzień / Miesiąc / Kwartał / Rok) -->
+                    <!-- Pasek okresu -->
                     <Border Background="{DynamicResource Brand.Blue}"
                             CornerRadius="12"
                             Padding="8"
@@ -167,7 +167,7 @@
                                 <TextBlock Text="◀" FontSize="14"/>
                             </Button>
 
-                            <!-- Środek: etykieta -->
+                            <!-- środek -->
                             <Border Grid.Column="1"
                                     Background="#22FFFFFF"
                                     CornerRadius="8"
@@ -195,15 +195,25 @@
                         </Grid>
                     </Border>
 
-                    <!-- Ręczna zmiana dat -->
+                    <!-- Ręczna zmiana dat + przyciski -->
                     <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
                         <DatePicker x:Name="StartPicker"
-                                    SelectedDateChanged="ManualDateChanged"
-                                    Margin="0,0,8,0"/>
+                                    Margin="0,0,8,0"
+                                    Width="135"/>
                         <TextBlock Text="—" VerticalAlignment="Center" Margin="4,0"/>
                         <DatePicker x:Name="EndPicker"
-                                    SelectedDateChanged="ManualDateChanged"
-                                    Margin="8,0,0,0"/>
+                                    Margin="8,0,0,0"
+                                    Width="135"/>
+
+                        <Button Content="Szukaj"
+                                Margin="16,0,0,0"
+                                Padding="10,4"
+                                Click="Search_Click"/>
+
+                        <Button Content="Wyczyść"
+                                Margin="8,0,0,0"
+                                Padding="10,4"
+                                Click="Clear_Click"/>
                     </StackPanel>
                 </StackPanel>
             </Border>
@@ -211,37 +221,41 @@
             <!-- ========== TREŚĆ POD OKRESEM (rząd 2) ========== -->
             <Grid Grid.Row="2">
                 <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="440"/>
+                    <ColumnDefinition Width="Auto"/>
                     <ColumnDefinition Width="Auto"/>
                     <ColumnDefinition Width="*"/>
                 </Grid.ColumnDefinitions>
 
                 <!-- LEWO: dwa koła -->
-                <StackPanel Grid.Column="0" Width="420" Margin="0,0,16,0">
+                <StackPanel Grid.Column="0" Margin="0,0,16,0">
                     <!-- Koło: WYDATKI -->
                     <Border Style="{StaticResource Card}" Margin="0,0,0,12">
                         <StackPanel>
                             <TextBlock Text="Wydatki wg kategorii — bieżący okres"
                                        Style="{StaticResource CardHeader}" Margin="0,0,0,8"/>
-                            <Grid>
-                                <Ellipse Width="360" Height="360" Fill="#11000000"
-                                         Stroke="{DynamicResource Surface.Border}" StrokeThickness="1"/>
-                                <ItemsControl ItemsSource="{Binding PieCurrent}">
-                                    <ItemsControl.ItemsPanel>
-                                        <ItemsPanelTemplate>
-                                            <Canvas Width="360" Height="360"/>
-                                        </ItemsPanelTemplate>
-                                    </ItemsControl.ItemsPanel>
-                                    <ItemsControl.ItemTemplate>
-                                        <DataTemplate>
-                                            <Path Data="{Binding Geometry}"
-                                                  Fill="{Binding Brush}"
-                                                  Stroke="{DynamicResource Surface.Background}"
-                                                  StrokeThickness="1"/>
-                                        </DataTemplate>
-                                    </ItemsControl.ItemTemplate>
-                                </ItemsControl>
-                            </Grid>
+
+                            <!-- Viewbox gwarantuje, że wykres zawsze się mieści -->
+                            <Viewbox Stretch="Uniform">
+                                <Grid Width="260" Height="260">
+                                    <Ellipse Width="260" Height="260" Fill="#11000000"
+                                             Stroke="{DynamicResource Surface.Border}" StrokeThickness="1"/>
+                                    <ItemsControl ItemsSource="{Binding PieCurrent}">
+                                        <ItemsControl.ItemsPanel>
+                                            <ItemsPanelTemplate>
+                                                <Canvas Width="260" Height="260"/>
+                                            </ItemsPanelTemplate>
+                                        </ItemsControl.ItemsPanel>
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate>
+                                                <Path Data="{Binding Geometry}"
+                                                      Fill="{Binding Brush}"
+                                                      Stroke="{DynamicResource Surface.Background}"
+                                                      StrokeThickness="1"/>
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+                                </Grid>
+                            </Viewbox>
                         </StackPanel>
                     </Border>
 
@@ -250,31 +264,34 @@
                         <StackPanel>
                             <TextBlock Text="Źródła przychodu — bieżący okres"
                                        Style="{StaticResource CardHeader}" Margin="0,0,0,8"/>
-                            <Grid>
-                                <Ellipse Width="360" Height="360" Fill="#11000000"
-                                         Stroke="{DynamicResource Surface.Border}" StrokeThickness="1"/>
-                                <ItemsControl ItemsSource="{Binding PieIncome}">
-                                    <ItemsControl.ItemsPanel>
-                                        <ItemsPanelTemplate>
-                                            <Canvas Width="360" Height="360"/>
-                                        </ItemsPanelTemplate>
-                                    </ItemsControl.ItemsPanel>
-                                    <ItemsControl.ItemTemplate>
-                                        <DataTemplate>
-                                            <Path Data="{Binding Geometry}"
-                                                  Fill="{Binding Brush}"
-                                                  Stroke="{DynamicResource Surface.Background}"
-                                                  StrokeThickness="1"/>
-                                        </DataTemplate>
-                                    </ItemsControl.ItemTemplate>
-                                </ItemsControl>
-                            </Grid>
+
+                            <Viewbox Stretch="Uniform">
+                                <Grid Width="260" Height="260">
+                                    <Ellipse Width="260" Height="260" Fill="#11000000"
+                                             Stroke="{DynamicResource Surface.Border}" StrokeThickness="1"/>
+                                    <ItemsControl ItemsSource="{Binding PieIncome}">
+                                        <ItemsControl.ItemsPanel>
+                                            <ItemsPanelTemplate>
+                                                <Canvas Width="260" Height="260"/>
+                                            </ItemsPanelTemplate>
+                                        </ItemsControl.ItemsPanel>
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate>
+                                                <Path Data="{Binding Geometry}"
+                                                      Fill="{Binding Brush}"
+                                                      Stroke="{DynamicResource Surface.Background}"
+                                                      StrokeThickness="1"/>
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+                                </Grid>
+                            </Viewbox>
                         </StackPanel>
                     </Border>
                 </StackPanel>
 
                 <!-- ŚRODEK: PRZYCHODY / WYDATKI (tabelki) -->
-                <Grid Grid.Column="1" HorizontalAlignment="Center">
+                <Grid Grid.Column="1" HorizontalAlignment="Center" Margin="0,0,16,0">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="420"/>
                         <ColumnDefinition Width="24"/>
@@ -290,8 +307,8 @@
                                 <ListView.View>
                                     <GridView>
                                         <GridViewColumn Header="Kategoria/Źródło" Width="240" DisplayMemberBinding="{Binding Name}"/>
-                                        <GridViewColumn Header="Kwota" Width="100" DisplayMemberBinding="{Binding AmountStr}"/>
-                                        <GridViewColumn Header="%" Width="60" DisplayMemberBinding="{Binding PercentStr}"/>
+                                        <GridViewColumn Header="Kwota"             Width="100" DisplayMemberBinding="{Binding AmountStr}"/>
+                                        <GridViewColumn Header="%"                 Width="60"  DisplayMemberBinding="{Binding PercentStr}"/>
                                     </GridView>
                                 </ListView.View>
                             </ListView>
@@ -307,8 +324,8 @@
                                 <ListView.View>
                                     <GridView>
                                         <GridViewColumn Header="Kategoria" Width="240" DisplayMemberBinding="{Binding Name}"/>
-                                        <GridViewColumn Header="Kwota" Width="100" DisplayMemberBinding="{Binding AmountStr}"/>
-                                        <GridViewColumn Header="%" Width="60" DisplayMemberBinding="{Binding PercentStr}"/>
+                                        <GridViewColumn Header="Kwota"     Width="100" DisplayMemberBinding="{Binding AmountStr}"/>
+                                        <GridViewColumn Header="%"         Width="60"  DisplayMemberBinding="{Binding PercentStr}"/>
                                     </GridView>
                                 </ListView.View>
                             </ListView>
@@ -382,6 +399,9 @@
         </Grid>
     </ScrollViewer>
 </UserControl>
+
+
+
 
 
 

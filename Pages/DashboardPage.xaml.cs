@@ -18,7 +18,7 @@ namespace Finly.Pages
         public ObservableCollection<PieSlice> PieCurrent { get; } = new();
         public ObservableCollection<PieSlice> PieIncome { get; } = new();
 
-        // Presety okresu
+        // Presety okresu: DZIŚ → TYDZIEŃ → MIESIĄC → KWARTAŁ → ROK
         private static readonly DateRangeMode[] PresetOrder =
         {
             DateRangeMode.Day,
@@ -43,6 +43,7 @@ namespace Finly.Pages
 
         private void DashboardPage_Loaded(object sender, RoutedEventArgs e)
         {
+            // Domyślnie: DZIŚ
             ApplyPreset(DateRangeMode.Day, DateTime.Today);
             RefreshMoneySummary();
             LoadCharts();
@@ -86,6 +87,7 @@ namespace Finly.Pages
                     break;
 
                 case DateRangeMode.Week:
+                    // poniedziałek jako początek tygodnia
                     int diff = ((int)anchor.DayOfWeek + 6) % 7; // pon = 0
                     _startDate = anchor.AddDays(-diff).Date;
                     _endDate = _startDate.AddDays(6);
@@ -108,19 +110,15 @@ namespace Finly.Pages
                     break;
 
                 case DateRangeMode.Custom:
-                    // ręcznie z kalendarzy
+                    // ustawiane ręcznie przyciskiem "Szukaj"
                     break;
             }
 
             UpdatePeriodLabel();
 
-            var startPicker = FindName("StartPicker") as DatePicker;
-            var endPicker = FindName("EndPicker") as DatePicker;
-
-            if (startPicker != null)
-                startPicker.SelectedDate = _startDate;
-            if (endPicker != null)
-                endPicker.SelectedDate = _endDate;
+            // Presety nie ruszają kalendarzy – użytkownik używa ich tylko z przyciskiem "Szukaj".
+            if (StartPicker != null) StartPicker.SelectedDate = null;
+            if (EndPicker != null) EndPicker.SelectedDate = null;
         }
 
         private void UpdatePeriodLabel()
@@ -146,8 +144,8 @@ namespace Finly.Pages
         {
             int idx = Array.IndexOf(PresetOrder, _mode);
             if (idx < 0) idx = 0;
-            idx = (idx - 1 + PresetOrder.Length) % PresetOrder.Length;
 
+            idx = (idx - 1 + PresetOrder.Length) % PresetOrder.Length;
             ApplyPreset(PresetOrder[idx], DateTime.Today);
             LoadCharts();
         }
@@ -156,28 +154,41 @@ namespace Finly.Pages
         {
             int idx = Array.IndexOf(PresetOrder, _mode);
             if (idx < 0) idx = 0;
-            idx = (idx + 1) % PresetOrder.Length;
 
+            idx = (idx + 1) % PresetOrder.Length;
             ApplyPreset(PresetOrder[idx], DateTime.Today);
             LoadCharts();
         }
 
+        // Klik w DatePickerach sam nic nie robi – użytkownik musi nacisnąć "Szukaj".
         private void ManualDateChanged(object sender, SelectionChangedEventArgs e)
         {
-            var startPicker = FindName("StartPicker") as DatePicker;
-            var endPicker = FindName("EndPicker") as DatePicker;
+            // celowo pusto
+        }
 
-            if (startPicker?.SelectedDate == null || endPicker?.SelectedDate == null)
+        private void Search_Click(object sender, RoutedEventArgs e)
+        {
+            if (StartPicker.SelectedDate is not DateTime s ||
+                EndPicker.SelectedDate is not DateTime ed)
                 return;
 
-            _startDate = startPicker.SelectedDate.Value.Date;
-            _endDate = endPicker.SelectedDate.Value.Date;
+            if (s > ed)
+                (s, ed) = (ed, s);
 
-            if (_startDate > _endDate)
-                (_startDate, _endDate) = (_endDate, _startDate);
-
+            _startDate = s.Date;
+            _endDate = ed.Date;
             _mode = DateRangeMode.Custom;
+
             UpdatePeriodLabel();
+            LoadCharts();
+        }
+
+        private void Clear_Click(object sender, RoutedEventArgs e)
+        {
+            StartPicker.SelectedDate = null;
+            EndPicker.SelectedDate = null;
+
+            ApplyPreset(DateRangeMode.Day, DateTime.Today);
             LoadCharts();
         }
 
@@ -288,11 +299,17 @@ namespace Finly.Pages
                 .Where(x => x.Amount > 0m)
                 .OrderByDescending(x => x.Amount)
                 .ToList();
+
             if (data.Count == 0) return;
 
             var sum = data.Sum(x => x.Amount);
             double start = 0;
             int i = 0;
+
+            // Dopasowane do 260x260 z XAML – środek (130,130), promień 120
+            const double centerX = 130;
+            const double centerY = 130;
+            const double radius = 120;
 
             foreach (var item in data)
             {
@@ -300,10 +317,14 @@ namespace Finly.Pages
                 if (sweep <= 0) continue;
 
                 var slice = PieSlice.Create(
-                    centerX: 180, centerY: 180, radius: 170,
-                    startAngle: start, sweepAngle: sweep,
+                    centerX: centerX,
+                    centerY: centerY,
+                    radius: radius,
+                    startAngle: start,
+                    sweepAngle: sweep,
                     brush: DefaultBrush(i++),
-                    name: item.Name, amount: item.Amount);
+                    name: item.Name,
+                    amount: item.Amount);
 
                 target.Add(slice);
                 start += sweep;
@@ -355,14 +376,20 @@ namespace Finly.Pages
             var g = new StreamGeometry();
             using (var ctx = g.Open())
             {
-                ctx.BeginFigure(new Point(centerX, centerY), true, true);
-                ctx.LineTo(p0, true, true);
+                ctx.BeginFigure(new Point(centerX, centerY), isFilled: true, isClosed: true);
+                ctx.LineTo(p0, isStroked: true, isSmoothJoin: true);
                 ctx.ArcTo(p1, new Size(radius, radius), 0, large,
-                          SweepDirection.Clockwise, true, true);
+                          SweepDirection.Clockwise, isStroked: true, isSmoothJoin: true);
             }
             g.Freeze();
 
-            return new PieSlice { Name = name, Amount = amount, Brush = brush, Geometry = g };
+            return new PieSlice
+            {
+                Name = name,
+                Amount = amount,
+                Brush = brush,
+                Geometry = g
+            };
         }
 
         private static double DegToRad(double deg) => Math.PI / 180 * deg;
@@ -377,6 +404,8 @@ namespace Finly.Pages
         public string PercentStr => Math.Round(Percent, 0) + "%";
     }
 }
+
+
 
 
 

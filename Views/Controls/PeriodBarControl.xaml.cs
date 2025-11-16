@@ -7,6 +7,7 @@ namespace Finly.Views.Controls
 {
     public partial class PeriodBarControl : UserControl
     {
+        // Kolejność presetów na strzałkach
         private static readonly DateRangeMode[] PresetOrder =
         {
             DateRangeMode.Day,
@@ -19,8 +20,9 @@ namespace Finly.Views.Controls
         public PeriodBarControl()
         {
             InitializeComponent();
-            ApplyPreset(DateRangeMode.Day, DateTime.Today); // domyślnie: Dzisiaj
-            UpdateLabel();
+
+            // DOMYŚLNIE: TEN MIESIĄC
+            ApplyPreset(DateRangeMode.Month, DateTime.Today);
         }
 
         // ===== Dependency Properties =====
@@ -51,7 +53,7 @@ namespace Finly.Views.Controls
                 typeof(DateRangeMode),
                 typeof(PeriodBarControl),
                 new FrameworkPropertyMetadata(
-                    DateRangeMode.Day,
+                    DateRangeMode.Month,   // spójne z konstruktorem
                     OnRangePropChanged));
 
         public static readonly DependencyProperty PeriodLabelProperty =
@@ -92,9 +94,12 @@ namespace Finly.Views.Controls
             set => SetValue(PeriodLabelProperty, value);
         }
 
+        /// <summary>
+        /// Zdarzenie dla Dashboardu – sygnał: zakres dat się zmienił.
+        /// </summary>
         public event EventHandler? RangeChanged;
 
-        // ===== Etykieta na pasku =====
+        // ===== Tekst na pasku =====
 
         private void UpdateLabel()
         {
@@ -145,19 +150,20 @@ namespace Finly.Views.Controls
                     break;
 
                 case DateRangeMode.Custom:
-                    // ustawiane ręcznie
+                    // ustawiane ręcznie przyciskiem "Szukaj"
                     break;
             }
 
             UpdateLabel();
         }
 
-        // ===== Strzałki =====
+        // ===== Strzałki – TYLKO presety (napisy) =====
 
         private void Prev_Click(object s, RoutedEventArgs e)
         {
             var idx = Array.IndexOf(PresetOrder, Mode);
             if (idx < 0) idx = 0;
+
             idx = (idx - 1 + PresetOrder.Length) % PresetOrder.Length;
             ApplyPreset(PresetOrder[idx], DateTime.Today);
         }
@@ -166,14 +172,36 @@ namespace Finly.Views.Controls
         {
             var idx = Array.IndexOf(PresetOrder, Mode);
             if (idx < 0) idx = 0;
+
             idx = (idx + 1) % PresetOrder.Length;
             ApplyPreset(PresetOrder[idx], DateTime.Today);
         }
 
-        // Publiczne API
+        // ===== Publiczne API dla Dashboardu =====
+
+        /// <summary>
+        /// Ustawia preset (Dzień / Tydzień / Miesiąc / Kwartał / Rok).
+        /// Użyj np. po kliknięciu przycisku "Wyczyść": SetPreset(DateRangeMode.Day).
+        /// </summary>
         public void SetPreset(DateRangeMode mode) => ApplyPreset(mode, DateTime.Today);
+
+        /// <summary>
+        /// Ustawia własny zakres – używane po kliknięciu "Szukaj".
+        /// Wtedy na pasku pojawia się tekst 01.01.2025 – 31.01.2025 itp.
+        /// </summary>
+        public void SetCustomRange(DateTime start, DateTime end)
+        {
+            if (start > end)
+                (start, end) = (end, start);
+
+            StartDate = start.Date;
+            EndDate = end.Date;
+            Mode = DateRangeMode.Custom;
+            UpdateLabel();
+        }
     }
 }
+
 
 
 
