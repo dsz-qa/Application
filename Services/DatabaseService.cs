@@ -176,11 +176,38 @@ namespace Finly.Services
         // ======================= KATEGORIE =======================
         // =========================================================
 
+        public sealed class CategorySummaryDto
+        {
+            public int CategoryId { get; set; }
+            public string Name { get; set; } = "";
+            public string TypeDisplay { get; set; } = "";
+            public int EntryCount { get; set; }
+            public decimal TotalAmount { get; set; }
+            public double SharePercent { get; set; }
+        }
+
+        public sealed class CategoryTransactionDto
+        {
+            public DateTime Date { get; set; }
+            public decimal Amount { get; set; }
+            public string Description { get; set; } = "";
+        }
+
         public static DataTable GetCategories(int userId)
         {
             using var c = OpenAndEnsureSchema();
             using var cmd = c.CreateCommand();
-            cmd.CommandText = "SELECT Id, Name FROM Categories WHERE UserId=@u ORDER BY Name;";
+
+            // Na liœcie do wyboru pokazujemy tylko niearchiwalne kategorie (jeœli kolumna istnieje).
+            if (ColumnExists(c, "Categories", "IsArchived"))
+            {
+                cmd.CommandText = "SELECT Id, Name FROM Categories WHERE UserId=@u AND IsArchived = 0 ORDER BY Name;";
+            }
+            else
+            {
+                cmd.CommandText = "SELECT Id, Name FROM Categories WHERE UserId=@u ORDER BY Name;";
+            }
+
             cmd.Parameters.AddWithValue("@u", userId);
 
             var dt = new DataTable();
@@ -193,7 +220,16 @@ namespace Finly.Services
         {
             using var c = OpenAndEnsureSchema();
             using var cmd = c.CreateCommand();
-            cmd.CommandText = "SELECT Name FROM Categories WHERE UserId=@u ORDER BY Name;";
+
+            if (ColumnExists(c, "Categories", "IsArchived"))
+            {
+                cmd.CommandText = "SELECT Name FROM Categories WHERE UserId=@u AND IsArchived = 0 ORDER BY Name;";
+            }
+            else
+            {
+                cmd.CommandText = "SELECT Name FROM Categories WHERE UserId=@u ORDER BY Name;";
+            }
+
             cmd.Parameters.AddWithValue("@u", userId);
 
             var list = new List<string>();
@@ -216,18 +252,35 @@ namespace Finly.Services
         {
             using var c = OpenAndEnsureSchema();
             using var cmd = c.CreateCommand();
-            cmd.CommandText = @"SELECT Id FROM Categories 
-                                WHERE UserId=@u AND lower(Name)=lower(@n) LIMIT 1;";
+
+            var sql = @"
+SELECT Id 
+FROM Categories 
+WHERE UserId=@u AND lower(Name)=lower(@n)";
+
+            if (ColumnExists(c, "Categories", "IsArchived"))
+            {
+                sql += " AND IsArchived = 0";
+            }
+
+            sql += " LIMIT 1;";
+
+            cmd.CommandText = sql;
             cmd.Parameters.AddWithValue("@u", userId);
             cmd.Parameters.AddWithValue("@n", name.Trim());
             var obj = cmd.ExecuteScalar();
             return (obj == null || obj == DBNull.Value) ? (int?)null : Convert.ToInt32(obj);
         }
 
+        /// <summary>
+        /// Tworzy now¹ kategoriê. Mo¿esz w przysz³oœci rozszerzyæ o typ, kolor, ikonê.
+        /// </summary>
         public static int CreateCategory(int userId, string name)
         {
             using var c = OpenAndEnsureSchema();
             using var cmd = c.CreateCommand();
+
+            // Prosty insert – zgodny z dotychczasowym schematem.
             cmd.CommandText = @"INSERT INTO Categories(UserId, Name) VALUES(@u,@n);
                                 SELECT last_insert_rowid();";
             cmd.Parameters.AddWithValue("@u", userId);
@@ -255,6 +308,10 @@ namespace Finly.Services
             cmd.ExecuteNonQuery();
         }
 
+        /// <summary>
+        /// Historyczne usuwanie kategorii – fizycznie z tabeli.
+        /// Przy nowym podejœciu lepiej u¿ywaæ ArchiveCategory (miêkkie usuniêcie).
+        /// </summary>
         public static void DeleteCategory(int id)
         {
             using var c = OpenAndEnsureSchema();
@@ -262,6 +319,230 @@ namespace Finly.Services
             cmd.CommandText = "DELETE FROM Categories WHERE Id=@id;";
             cmd.Parameters.AddWithValue("@id", id);
             cmd.ExecuteNonQuery();
+        }
+
+        /// <summary>
+        /// Miêkka archiwizacja kategorii (IsArchived = 1). Jeœli kolumna nie istnieje – fallback do DELETE.
+        /// </summary>
+        public static void ArchiveCategory(int id)
+        {
+            using var c = OpenAndEnsureSchema();
+            using var cmd = c.CreateCommand();
+
+            if (!ColumnExists(c, "Categories", "IsArchived"))
+            {
+                cmd.CommandText = "DELETE FROM Categories WHERE Id=@id;";
+                cmd.Parameters.AddWithValue("@id", id);
+                cmd.ExecuteNonQuery();
+                return;
+            }
+
+            cmd.CommandText = "UPDATE Categories SET IsArchived = 1 WHERE Id=@id;";
+            cmd.Parameters.AddWithValue("@id", id);
+            cmd.ExecuteNonQuery();
+        }
+
+        /// <summary>
+        /// Podsumowanie kategorii w zadanym okresie – liczba transakcji, suma, udzia³ %.
+        /// U¿ywane przez stronê Kategorie / Dashboard.
+        /// </summary>
+        public static List<CategorySummaryDto> GetCategorySummary(
+            int userId,
+            DateTime from,
+            DateTime to,
+            int? typeFilter = null,
+            string? search = null)
+        {
+            var result = new List<CategorySummaryDto>();
+
+            using var con = OpenAndEnsureSchema();
+            using var cmd = con.CreateCommand();
+
+            var sb = new StringBuilder(@"
+SELECT 
+    c.Id,
+    c.Name,
+    c.Type,
+    COUNT(e.Id) AS EntryCount,
+    IFNULL(SUM(e.Amount), 0) AS TotalAmount
+FROM Categories c
+LEFT JOIN Expenses e
+    ON e.CategoryId = c.Id
+    AND e.UserId = @uid
+    AND date(e.Date) BETWEEN date(@from) AND date(@to)
+WHERE c.UserId = @uid
+");
+
+            if (ColumnExists(con, "Categories", "IsArchived"))
+            {
+                sb.Append("  AND c.IsArchived = 0");
+            }
+
+            if (typeFilter.HasValue && ColumnExists(con, "Categories", "Type"))
+            {
+                sb.Append(" AND c.Type = @type");
+                cmd.Parameters.AddWithValue("@type", typeFilter.Value);
+            }
+
+            if (!string.IsNullOrWhiteSpace(search))
+            {
+                sb.Append(" AND lower(c.Name) LIKE @search");
+                cmd.Parameters.AddWithValue("@search", "%" + search.Trim().ToLowerInvariant() + "%");
+            }
+
+            sb.Append(@"
+GROUP BY c.Id, c.Name, c.Type
+ORDER BY TotalAmount DESC;
+");
+
+            cmd.CommandText = sb.ToString();
+            cmd.Parameters.AddWithValue("@uid", userId);
+            cmd.Parameters.AddWithValue("@from", from.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture));
+            cmd.Parameters.AddWithValue("@to", to.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture));
+
+            using var r = cmd.ExecuteReader();
+
+            var buffer = new List<(int id, string name, int type, int entries, decimal total)>();
+            decimal totalAll = 0m;
+
+            while (r.Read())
+            {
+                var id = r.GetInt32(0);
+                var name = GetStringSafe(r, 1);
+                var type = r.IsDBNull(2) ? 0 : r.GetInt32(2);
+                var entries = r.IsDBNull(3) ? 0 : r.GetInt32(3);
+                var total = r.IsDBNull(4) ? 0m : r.GetDecimal(4);
+
+                buffer.Add((id, name, type, entries, total));
+                totalAll += total;
+            }
+
+            foreach (var x in buffer)
+            {
+                double share = totalAll > 0 ? (double)(x.total / totalAll * 100m) : 0;
+
+                result.Add(new CategorySummaryDto
+                {
+                    CategoryId = x.id,
+                    Name = x.name,
+                    TypeDisplay = x.type switch
+                    {
+                        1 => "Przychód",
+                        2 => "Obie",
+                        _ => "Wydatek"
+                    },
+                    EntryCount = x.entries,
+                    TotalAmount = x.total,
+                    SharePercent = Math.Round(share, 1)
+                });
+            }
+
+            return result;
+        }
+
+        /// <summary>
+        /// Ostatnie transakcje w danej kategorii – do panelu szczegó³ów kategorii.
+        /// </summary>
+        public static List<CategoryTransactionDto> GetLastTransactionsForCategory(int userId, int categoryId, int limit = 10)
+        {
+            var list = new List<CategoryTransactionDto>();
+
+            using var con = OpenAndEnsureSchema();
+            using var cmd = con.CreateCommand();
+            cmd.CommandText = @"
+SELECT Date, Amount, Description
+FROM Expenses
+WHERE UserId = @uid AND CategoryId = @cid
+ORDER BY date(Date) DESC, Id DESC
+LIMIT @limit;";
+
+            cmd.Parameters.AddWithValue("@uid", userId);
+            cmd.Parameters.AddWithValue("@cid", categoryId);
+            cmd.Parameters.AddWithValue("@limit", limit);
+
+            using var r = cmd.ExecuteReader();
+            while (r.Read())
+            {
+                var date = GetDate(r, 0);
+                decimal amount;
+                var val = r.GetValue(1);
+                if (val is decimal dec) amount = dec;
+                else if (val is double d) amount = (decimal)d;
+                else amount = Convert.ToDecimal(val);
+
+                var desc = GetNullableString(r, 2) ?? string.Empty;
+
+                list.Add(new CategoryTransactionDto
+                {
+                    Date = date,
+                    Amount = amount,
+                    Description = desc
+                });
+            }
+
+            return list;
+        }
+
+        /// <summary>
+        /// Scala dwie kategorie: przenosi transakcje ze Ÿród³owej na docelow¹ i archiwizuje/usuwa Ÿród³ow¹.
+        /// </summary>
+        public static void MergeCategories(int userId, int sourceCategoryId, int targetCategoryId)
+        {
+            if (sourceCategoryId == targetCategoryId) return;
+
+            using var c = OpenAndEnsureSchema();
+            using var tx = c.BeginTransaction();
+
+            // SprawdŸ, czy obie kategorie nale¿¹ do u¿ytkownika
+            using (var check = c.CreateCommand())
+            {
+                check.Transaction = tx;
+                check.CommandText = @"
+SELECT COUNT(*) 
+FROM Categories 
+WHERE UserId=@u AND Id IN (@src, @tgt);";
+                check.Parameters.AddWithValue("@u", userId);
+                check.Parameters.AddWithValue("@src", sourceCategoryId);
+                check.Parameters.AddWithValue("@tgt", targetCategoryId);
+                var count = Convert.ToInt32(check.ExecuteScalar() ?? 0);
+                if (count < 2)
+                    throw new InvalidOperationException("Nie znaleziono kategorii lub nie nale¿¹ do u¿ytkownika.");
+            }
+
+            // Przepnij wydatki
+            using (var upd = c.CreateCommand())
+            {
+                upd.Transaction = tx;
+                upd.CommandText = @"
+UPDATE Expenses
+SET CategoryId = @tgt
+WHERE UserId = @u AND CategoryId = @src;";
+                upd.Parameters.AddWithValue("@tgt", targetCategoryId);
+                upd.Parameters.AddWithValue("@u", userId);
+                upd.Parameters.AddWithValue("@src", sourceCategoryId);
+                upd.ExecuteNonQuery();
+            }
+
+            // Zarchiwizuj lub usuñ Ÿród³ow¹ kategoriê
+            using (var arch = c.CreateCommand())
+            {
+                arch.Transaction = tx;
+
+                if (ColumnExists(c, "Categories", "IsArchived"))
+                {
+                    arch.CommandText = @"UPDATE Categories SET IsArchived = 1 WHERE Id=@src AND UserId=@u;";
+                }
+                else
+                {
+                    arch.CommandText = @"DELETE FROM Categories WHERE Id=@src AND UserId=@u;";
+                }
+
+                arch.Parameters.AddWithValue("@src", sourceCategoryId);
+                arch.Parameters.AddWithValue("@u", userId);
+                arch.ExecuteNonQuery();
+            }
+
+            tx.Commit();
         }
 
         // =========================================================
@@ -692,7 +973,6 @@ WHERE Id=@id AND UserId=@u;";
 
         // =========================================================
         // ======================== GOTÓWKA ========================
-
 
         public static decimal GetCashOnHand(int userId)
         {
@@ -1259,6 +1539,7 @@ VALUES (@u, @a, @d, @desc, @s);";
         }
     }
 }
+
 
 
 

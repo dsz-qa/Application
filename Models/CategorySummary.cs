@@ -1,12 +1,12 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-
-namespace Finly.Models
+﻿namespace Finly.Models
 {
-    class CategorySummary
+    public class CategorySummary
     {
+        public int CategoryId { get; set; }
+        public string Name { get; set; } = "";
+        public string TypeDisplay { get; set; } = "";
+        public int EntryCount { get; set; }
+        public decimal TotalAmount { get; set; }
+        public double SharePercent { get; set; }
     }
 }

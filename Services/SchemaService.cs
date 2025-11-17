@@ -37,20 +37,22 @@ namespace Finly.Services
                 // ===== Tabele (idempotentnie) =====
                 using (var cmd = Cmd(@"
 CREATE TABLE IF NOT EXISTS Users(
-    Id              INTEGER PRIMARY KEY AUTOINCREMENT,
-    Username        TEXT NOT NULL UNIQUE,
-    PasswordHash    TEXT NOT NULL,
-    Email           TEXT NULL,
-    FirstName       TEXT NULL,
-    LastName        TEXT NULL,
-    Address         TEXT NULL,
-    AccountType     TEXT NULL,
-    CompanyName     TEXT NULL,
-    NIP             TEXT NULL,
-    REGON           TEXT NULL,
-    KRS             TEXT NULL,
-    CompanyAddress  TEXT NULL,
-    CreatedAt       TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    Id                      INTEGER PRIMARY KEY AUTOINCREMENT,
+    Username                TEXT NOT NULL UNIQUE,
+    PasswordHash            TEXT NOT NULL,
+    Email                   TEXT NULL,
+    FirstName               TEXT NULL,
+    LastName                TEXT NULL,
+    Address                 TEXT NULL,
+    AccountType             TEXT NULL,
+    CompanyName             TEXT NULL,
+    NIP                     TEXT NULL,
+    REGON                   TEXT NULL,
+    KRS                     TEXT NULL,
+    CompanyAddress          TEXT NULL,
+    CreatedAt               TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    IsOnboarded             INTEGER NOT NULL DEFAULT 0,
+    HasSeenEnvelopesIntro   INTEGER NOT NULL DEFAULT 0
 );
 
 CREATE TABLE IF NOT EXISTS Incomes(
@@ -59,13 +61,19 @@ CREATE TABLE IF NOT EXISTS Incomes(
   Amount REAL NOT NULL,
   Date TEXT NOT NULL,
   Description TEXT NULL,
-  Source TEXT NULL
+  Source TEXT NULL,
+  FOREIGN KEY(UserId) REFERENCES Users(Id) ON DELETE CASCADE
 );
 
 CREATE TABLE IF NOT EXISTS Categories(
-    Id      INTEGER PRIMARY KEY AUTOINCREMENT,
-    UserId  INTEGER NULL,
-    Name    TEXT NOT NULL
+    Id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    UserId      INTEGER NOT NULL,
+    Name        TEXT NOT NULL,
+    Type        INTEGER NOT NULL DEFAULT 0,   -- 0=Wydatek, 1=Przychód, 2=Obie
+    Color       TEXT NULL,
+    Icon        TEXT NULL,
+    IsArchived  INTEGER NOT NULL DEFAULT 0,
+    FOREIGN KEY(UserId) REFERENCES Users(Id) ON DELETE CASCADE
 );
 
 CREATE TABLE IF NOT EXISTS Expenses(
@@ -79,6 +87,7 @@ CREATE TABLE IF NOT EXISTS Expenses(
     AccountId   INTEGER NULL,
     Note        TEXT    NULL,
     FOREIGN KEY(UserId) REFERENCES Users(Id) ON DELETE CASCADE
+    -- CategoryId/AccountId bez FK (łatwiejsze migracje); logika w kodzie
 );
 
 CREATE TABLE IF NOT EXISTS BankConnections(
@@ -87,7 +96,8 @@ CREATE TABLE IF NOT EXISTS BankConnections(
     BankName      TEXT NOT NULL,
     AccountHolder TEXT NOT NULL,
     Status        TEXT NOT NULL,
-    LastSync      TEXT
+    LastSync      TEXT,
+    FOREIGN KEY(UserId) REFERENCES Users(Id) ON DELETE CASCADE
 );
 
 -- ConnectionId może być NULL; przy usunięciu połączenia ustawiamy NULL
@@ -154,7 +164,6 @@ CREATE TABLE IF NOT EXISTS SavedCash(
     UpdatedAt  TEXT    NOT NULL DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY(UserId) REFERENCES Users(Id) ON DELETE CASCADE
 );
-
 "))
                 {
                     cmd.ExecuteNonQuery();
@@ -162,7 +171,7 @@ CREATE TABLE IF NOT EXISTS SavedCash(
 
                 // ===== Migracje (idempotentne) =====
 
-                // Users – wszystkie kolumny, których używa UserService + onboarding
+                // Users – wszystko, czego używa UserService + onboarding
                 AddColumnIfMissing(con, tx, "Users", "AccountType", "TEXT", "DEFAULT 'Personal'");
                 AddColumnIfMissing(con, tx, "Users", "CompanyName", "TEXT");
                 AddColumnIfMissing(con, tx, "Users", "NIP", "TEXT");
@@ -177,14 +186,18 @@ CREATE TABLE IF NOT EXISTS SavedCash(
                 AddColumnIfMissing(con, tx, "Users", "IsOnboarded", "INTEGER", "NOT NULL DEFAULT 0");
                 AddColumnIfMissing(con, tx, "Users", "HasSeenEnvelopesIntro", "INTEGER", "NOT NULL DEFAULT 0");
 
-                // Categories
-                AddColumnIfMissing(con, tx, "Categories", "UserId", "INTEGER NULL");
+                // Categories – nowe pola pod typ, kolor, archiwizację
+                AddColumnIfMissing(con, tx, "Categories", "UserId", "INTEGER", "NOT NULL DEFAULT 0");
+                AddColumnIfMissing(con, tx, "Categories", "Type", "INTEGER", "NOT NULL DEFAULT 0");
+                AddColumnIfMissing(con, tx, "Categories", "Color", "TEXT");
+                AddColumnIfMissing(con, tx, "Categories", "Icon", "TEXT");
+                AddColumnIfMissing(con, tx, "Categories", "IsArchived", "INTEGER", "NOT NULL DEFAULT 0");
 
-                // Expenses – spójne z zapytaniami w UI
+                // Expenses – spójne z zapytaniami w UI / DatabaseService
                 AddColumnIfMissing(con, tx, "Expenses", "Title", "TEXT");
                 AddColumnIfMissing(con, tx, "Expenses", "Description", "TEXT");
-                AddColumnIfMissing(con, tx, "Expenses", "CategoryId", "INTEGER NULL");
-                AddColumnIfMissing(con, tx, "Expenses", "AccountId", "INTEGER NULL");
+                AddColumnIfMissing(con, tx, "Expenses", "CategoryId", "INTEGER");
+                AddColumnIfMissing(con, tx, "Expenses", "AccountId", "INTEGER");
                 AddColumnIfMissing(con, tx, "Expenses", "Note", "TEXT");
 
                 // Incomes – dopilnuj Description / Source przy starych bazach
@@ -218,7 +231,10 @@ CREATE UNIQUE INDEX IF NOT EXISTS UX_Users_Username_NC
     ON Users(Username COLLATE NOCASE);
 
 CREATE INDEX IF NOT EXISTS IX_Categories_User_Name
-    ON Categories(COALESCE(UserId,0), Name COLLATE NOCASE);
+    ON Categories(UserId, Name COLLATE NOCASE);
+
+CREATE INDEX IF NOT EXISTS IX_Categories_User_Type
+    ON Categories(UserId, Type, IsArchived);
 
 CREATE INDEX IF NOT EXISTS IX_Expenses_User_Date
     ON Expenses(UserId, Date);
@@ -315,6 +331,7 @@ FROM BankAccounts;";
         }
     }
 }
+
 
 
 
