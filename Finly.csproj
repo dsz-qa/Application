@@ -19,6 +19,17 @@
 	  <Page Remove="Nowy folder\**" />
 	</ItemGroup>
 	<ItemGroup>
+	  <None Remove="Assets\Banks\aliorbanklogo.png" />
+	  <None Remove="Assets\Banks\creditagricolelogo.png" />
+	  <None Remove="Assets\Banks\inglogo.png" />
+	  <None Remove="Assets\Banks\innybank.png" />
+	  <None Remove="Assets\Banks\mbanklogo.jpg" />
+	  <None Remove="Assets\Banks\milleniumlogo.png" />
+	  <None Remove="Assets\Banks\pekaologo.jpg" />
+	  <None Remove="Assets\Banks\pekaologo.png" />
+	  <None Remove="Assets\Banks\pkobplogo.jpg" />
+	  <None Remove="Assets\Banks\revolutlogo.png" />
+	  <None Remove="Assets\Banks\santanderlogo.png" />
 	  <None Remove="Assets\Icons\add_24.png" />
 	  <None Remove="Assets\Icons\add_48.png" />
 	  <None Remove="Assets\Icons\budgets.png" />
@@ -43,6 +54,16 @@
 	  <None Remove="Assets\Images\logoFinly.png" />
 	</ItemGroup>
 	<ItemGroup>
+	  <Resource Include="Assets\Banks\aliorbanklogo.png" />
+	  <Resource Include="Assets\Banks\creditagricolelogo.png" />
+	  <Resource Include="Assets\Banks\inglogo.png" />
+	  <Resource Include="Assets\Banks\innybank.png" />
+	  <Resource Include="Assets\Banks\mbanklogo.jpg" />
+	  <Resource Include="Assets\Banks\milleniumlogo.png" />
+	  <Resource Include="Assets\Banks\pekaologo.jpg" />
+	  <Resource Include="Assets\Banks\pkobplogo.jpg" />
+	  <Resource Include="Assets\Banks\revolutlogo.png" />
+	  <Resource Include="Assets\Banks\santanderlogo.png" />
 	  <Resource Include="Assets\Icons\kalendarz.png" />
 	  <Resource Include="Assets\Icons\kontabankowe.png" />
 	</ItemGroup>

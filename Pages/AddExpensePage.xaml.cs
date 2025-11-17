@@ -20,20 +20,30 @@ namespace Finly.Pages
         {
             public string Key { get; set; } = "";
             public string Name { get; set; } = "";
-            public int? AccountId { get; set; }   // null = gotówka
+            public int? AccountId { get; set; } // null = gotówka
+
             public override string ToString() => Name;
         }
 
         // Bezparametrowy konstruktor – dla XAML
-        public AddExpensePage() : this(UserService.GetCurrentUserId()) { }
+        public AddExpensePage() : this(UserService.GetCurrentUserId())
+        {
+        }
 
         public AddExpensePage(int userId)
         {
             InitializeComponent();
+
             _uid = userId <= 0 ? UserService.GetCurrentUserId() : userId;
 
             Loaded += (_, __) =>
             {
+                // na start: żadna zakładka nie wybrana, wszystko ukryte
+                ModeTabs.SelectedIndex = -1;
+                ExpensePanel.Visibility = Visibility.Collapsed;
+                IncomePanel.Visibility = Visibility.Collapsed;
+                TransferPanel.Visibility = Visibility.Collapsed;
+
                 LoadCategories();
                 LoadTransferAccounts();
 
@@ -44,7 +54,35 @@ namespace Finly.Pages
             };
         }
 
+        // ================== PRZEŁĄCZANIE ZAKŁADEK ==================
+
+        private void ModeTabs_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            if (ModeTabs.SelectedItem is not TabItem tab)
+            {
+                ExpensePanel.Visibility = Visibility.Collapsed;
+                IncomePanel.Visibility = Visibility.Collapsed;
+                TransferPanel.Visibility = Visibility.Collapsed;
+                return;
+            }
+
+            var header = tab.Header as string ?? string.Empty;
+
+            ExpensePanel.Visibility =
+                header.Equals("Wydatek", StringComparison.OrdinalIgnoreCase)
+                ? Visibility.Visible : Visibility.Collapsed;
+
+            IncomePanel.Visibility =
+                header.Equals("Przychód", StringComparison.OrdinalIgnoreCase)
+                ? Visibility.Visible : Visibility.Collapsed;
+
+            TransferPanel.Visibility =
+                header.Equals("Transfer", StringComparison.OrdinalIgnoreCase)
+                ? Visibility.Visible : Visibility.Collapsed;
+        }
+
         // ================== DANE SŁOWNIKOWE ==================
+
         private void LoadCategories()
         {
             try
@@ -75,12 +113,14 @@ namespace Finly.Pages
             try
             {
                 var accs = DatabaseService.GetAccounts(_uid) ?? new List<BankAccountModel>();
-                items.AddRange(accs.Select(a => new AccountItem
-                {
-                    Key = $"acc:{a.Id}",
-                    AccountId = a.Id,
-                    Name = $"{a.AccountName}  —  {a.Balance.ToString("N2", CultureInfo.CurrentCulture)} zł"
-                }));
+
+                items.AddRange(
+                    accs.Select(a => new AccountItem
+                    {
+                        Key = $"acc:{a.Id}",
+                        AccountId = a.Id,
+                        Name = $"{a.AccountName} — {a.Balance.ToString("N2", CultureInfo.CurrentCulture)} zł"
+                    }));
             }
             catch
             {
@@ -90,11 +130,14 @@ namespace Finly.Pages
             TransferFromBox.ItemsSource = items.ToList();
             TransferToBox.ItemsSource = items.ToList();
 
-            if (TransferFromBox.Items.Count > 0) TransferFromBox.SelectedIndex = 0;
-            if (TransferToBox.Items.Count > 1) TransferToBox.SelectedIndex = 1;
+            if (TransferFromBox.Items.Count > 0)
+                TransferFromBox.SelectedIndex = 0;
+            if (TransferToBox.Items.Count > 1)
+                TransferToBox.SelectedIndex = 1;
         }
 
         // ================== ANULUJ / CZYSZCZENIE ==================
+
         private void Cancel_Click(object sender, RoutedEventArgs e)
         {
             if (IsTab(sender, "Wydatek"))
@@ -111,6 +154,9 @@ namespace Finly.Pages
                 IncomeSourceBox.Clear();
                 IncomeDescBox.Clear();
                 IncomeDatePicker.SelectedDate = DateTime.Today;
+                IncomeFormTypeCombo.SelectedIndex = -1;
+                IncomeAccountRow.Visibility = Visibility.Collapsed;
+                IncomeAccountCombo.SelectedIndex = -1;
             }
             else // Transfer
             {
@@ -124,6 +170,7 @@ namespace Finly.Pages
         {
             var btn = sender as DependencyObject;
             var tabItem = FindParent<TabItem>(btn);
+
             return (tabItem?.Header as string)?
                 .Equals(headerText, StringComparison.OrdinalIgnoreCase) == true;
         }
@@ -139,7 +186,32 @@ namespace Finly.Pages
             return null;
         }
 
+        // ================== FORMULARZ PRZYCHODU – FORMA I KONTO ==================
+
+        private void IncomeFormTypeCombo_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            if (IncomeFormTypeCombo.SelectedItem is ComboBoxItem item)
+            {
+                var tag = item.Tag as string ?? string.Empty;
+
+                // jeśli przelew -> pokaż konto
+                if (tag == "transfer")
+                {
+                    IncomeAccountRow.Visibility = Visibility.Visible;
+                }
+                else
+                {
+                    IncomeAccountRow.Visibility = Visibility.Collapsed;
+                }
+            }
+            else
+            {
+                IncomeAccountRow.Visibility = Visibility.Collapsed;
+            }
+        }
+
         // ================== WYDATEK ==================
+
         private void SaveExpense_Click(object sender, RoutedEventArgs e)
         {
             if (!TryParseAmount(ExpenseAmountBox.Text, out var amount))
@@ -150,9 +222,11 @@ namespace Finly.Pages
             }
 
             var date = ExpenseDatePicker.SelectedDate ?? DateTime.Today;
-            var desc = string.IsNullOrWhiteSpace(ExpenseDescBox.Text) ? null : ExpenseDescBox.Text.Trim();
-            var catName = ExpenseCategoryBox.SelectedItem?.ToString();
+            var desc = string.IsNullOrWhiteSpace(ExpenseDescBox.Text)
+                ? null
+                : ExpenseDescBox.Text.Trim();
 
+            var catName = ExpenseCategoryBox.SelectedItem?.ToString();
             int categoryId = 0;
             if (!string.IsNullOrWhiteSpace(catName))
             {
@@ -189,6 +263,7 @@ namespace Finly.Pages
         }
 
         // ================== PRZYCHÓD ==================
+
         private void SaveIncome_Click(object sender, RoutedEventArgs e)
         {
             if (!TryParseAmount(IncomeAmountBox.Text, out var amount))
@@ -206,6 +281,8 @@ namespace Finly.Pages
                 ? null
                 : IncomeDescBox.Text.Trim();
 
+            // Na razie NIE zmieniam logiki zapisu – forma przychodu i konto
+            // możesz wykorzystać później, jak będziemy spiinać to z kontami.
             try
             {
                 DatabaseService.InsertIncome(_uid, amount, date, source, desc);
@@ -220,6 +297,7 @@ namespace Finly.Pages
         }
 
         // ================== TRANSFER ==================
+
         private void SaveTransfer_Click(object sender, RoutedEventArgs e)
         {
             if (!TryParseAmount(TransferAmountBox.Text, out var amount) || amount <= 0m)
@@ -241,8 +319,8 @@ namespace Finly.Pages
 
             if (from.Key == to.Key)
             {
-                MessageBox.Show("Konta źródłowe i docelowe nie mogą być takie same.", "Transfer",
-                    MessageBoxButton.OK, MessageBoxImage.Warning);
+                MessageBox.Show("Konta źródłowe i docelowe nie mogą być takie same.",
+                    "Transfer", MessageBoxButton.OK, MessageBoxImage.Warning);
                 return;
             }
 
@@ -262,9 +340,7 @@ namespace Finly.Pages
                 {
                     MessageBox.Show(
                         "Na razie obsługiwane są transfery tylko między kontem bankowym a gotówką.",
-                        "Transfer",
-                        MessageBoxButton.OK,
-                        MessageBoxImage.Information);
+                        "Transfer", MessageBoxButton.OK, MessageBoxImage.Information);
                     return;
                 }
 
@@ -280,6 +356,7 @@ namespace Finly.Pages
         }
 
         // ================== WALIDACJA ==================
+
         private static bool TryParseAmount(string? s, out decimal value)
         {
             if (decimal.TryParse(s, NumberStyles.Any, CultureInfo.CurrentCulture, out value)) return true;
@@ -289,6 +366,11 @@ namespace Finly.Pages
         }
     }
 }
+
+
+
+
+
 
 
 

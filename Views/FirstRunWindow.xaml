@@ -3,9 +3,8 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:shell="clr-namespace:System.Windows.Shell;assembly=PresentationFramework"
         Title="Finly – pierwsza konfiguracja"
-        WindowStyle="None"
         ResizeMode="CanResize"
-        WindowState="Maximized"
+        WindowStyle="None"
         MinWidth="1024" MinHeight="640"
         UseLayoutRounding="True"
         SnapsToDevicePixels="True"
@@ -17,6 +16,7 @@
 
     <!-- ====== Zasoby okna ====== -->
     <Window.Resources>
+
         <!-- Przycisk paska tytułu – jak w ShellWindow -->
         <Style x:Key="TitleBarIconButton" TargetType="Button">
             <Setter Property="Background" Value="Transparent"/>
@@ -28,39 +28,6 @@
             <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
             <Setter Property="shell:WindowChrome.IsHitTestVisibleInChrome" Value="True"/>
         </Style>
-
-        <!-- Ciemny ComboBox do first run -->
-        <Style x:Key="DarkComboBox" TargetType="ComboBox">
-            <Setter Property="Background" Value="{DynamicResource Surface.Field}"/>
-            <Setter Property="Foreground" Value="{DynamicResource App.Foreground}"/>
-            <Setter Property="BorderBrush" Value="{DynamicResource Surface.Border}"/>
-            <Setter Property="Padding" Value="6,2"/>
-            <Setter Property="HorizontalContentAlignment" Value="Left"/>
-            <Setter Property="VerticalContentAlignment" Value="Center"/>
-            <Setter Property="ItemContainerStyle">
-                <Setter.Value>
-                    <!-- Styl dla pozycji na liście -->
-                    <Style TargetType="ComboBoxItem">
-                        <Setter Property="Background" Value="{DynamicResource Surface.Field}"/>
-                        <Setter Property="Foreground" Value="{DynamicResource App.Foreground}"/>
-                        <Setter Property="Padding" Value="6,2"/>
-                        <Setter Property="HorizontalContentAlignment" Value="Left"/>
-                        <Setter Property="VerticalContentAlignment" Value="Center"/>
-                        <Setter Property="SnapsToDevicePixels" Value="True"/>
-                        <Style.Triggers>
-                            <Trigger Property="IsMouseOver" Value="True">
-                                <Setter Property="Background" Value="#303030"/>
-                            </Trigger>
-                            <Trigger Property="IsSelected" Value="True">
-                                <Setter Property="Background" Value="{DynamicResource Brand.Blue.HoverOverlay}"/>
-                                <Setter Property="Foreground" Value="White"/>
-                            </Trigger>
-                        </Style.Triggers>
-                    </Style>
-                </Setter.Value>
-            </Setter>
-        </Style>
-
 
         <!-- Niebieski przycisk główny -->
         <Style x:Key="FirstRunPrimaryButton" TargetType="Button">
@@ -98,6 +65,7 @@
                 </Setter.Value>
             </Setter>
         </Style>
+
     </Window.Resources>
 
     <!-- Pasek tytułu systemowego -->
@@ -176,19 +144,19 @@
             </Grid>
 
             <!-- ========== TREŚĆ OKNA ========== -->
-            <Grid Grid.Row="1" Margin="24">
+            <Grid Grid.Row="1" Margin="16,12,16,16">
                 <Border Background="{DynamicResource Surface.Background}"
                         CornerRadius="18"
-                        Padding="36"
+                        Padding="24"
                         SnapsToDevicePixels="True"
                         HorizontalAlignment="Center"
-                        VerticalAlignment="Center"
+                        VerticalAlignment="Top"
                         MaxWidth="720">
                     <StackPanel HorizontalAlignment="Center">
 
                         <!-- Logo na środku -->
                         <Image Source="/Assets/Images/logoFinly.png"
-                               Width="180" Height="180"
+                               Width="140" Height="140"
                                Margin="0,0,0,16"
                                Stretch="Uniform"
                                RenderOptions.BitmapScalingMode="HighQuality"/>
@@ -253,20 +221,108 @@
                                        FontWeight="SemiBold"
                                        Foreground="{DynamicResource App.Foreground}"/>
 
+                            <!-- Używamy globalnego ciemnego stylu ComboBox z App.xaml -->
                             <ComboBox x:Name="MainBankCombo"
-          Margin="0,4,0,4"
-          Height="32"
-          Style="{StaticResource DarkComboBox}">
+                                      Margin="0,4,0,4"
+                                      Height="32">
+                                <!-- Wybierz bank + logotypy -->
+                                <ComboBoxItem>
+                                    <StackPanel Orientation="Horizontal">
+                                        <TextBlock Text="Wybierz bank"
+                                                   Margin="0,0,0,0"/>
+                                    </StackPanel>
+                                </ComboBoxItem>
 
-                                <ComboBoxItem Content="Revolut"/>
-                                <ComboBoxItem Content="PKO Bank Polski"/>
-                                <ComboBoxItem Content="mBank"/>
-                                <ComboBoxItem Content="Bank Pekao"/>
-                                <ComboBoxItem Content="ING Bank Śląski"/>
-                                <ComboBoxItem Content="Santander Bank Polska"/>
-                                <ComboBoxItem Content="Alior Bank"/>
-                                <ComboBoxItem Content="Millennium"/>
-                                <ComboBoxItem Content="Inny bank"/>
+                                <ComboBoxItem>
+                                    <StackPanel Orientation="Horizontal">
+                                        <Image Width="20" Height="20"
+                                               Margin="0,0,8,0"
+                                               Source="pack://application:,,,/Assets/Banks/revolutlogo.png"/>
+                                        <TextBlock Text="Revolut"/>
+                                    </StackPanel>
+                                </ComboBoxItem>
+
+                                <ComboBoxItem>
+                                    <StackPanel Orientation="Horizontal">
+                                        <Image Width="20" Height="20"
+                                               Margin="0,0,8,0"
+                                               Source="pack://application:,,,/Assets/Banks/pkobplogo.jpg"/>
+                                        <TextBlock Text="PKO Bank Polski"/>
+                                    </StackPanel>
+                                </ComboBoxItem>
+
+                                <ComboBoxItem>
+                                    <StackPanel Orientation="Horizontal">
+                                        <Image Width="20" Height="20"
+                                               Margin="0,0,8,0"
+                                               Source="pack://application:,,,/Assets/Banks/mbanklogo.jpg"/>
+                                        <TextBlock Text="mBank"/>
+                                    </StackPanel>
+                                </ComboBoxItem>
+
+                                <ComboBoxItem>
+                                    <StackPanel Orientation="Horizontal">
+                                        <Image Width="20" Height="20"
+                                               Margin="0,0,8,0"
+                                               Source="pack://application:,,,/Assets/Banks/pekaologo.jpg"/>
+                                        <TextBlock Text="Bank Pekao"/>
+                                    </StackPanel>
+                                </ComboBoxItem>
+
+                                <ComboBoxItem>
+                                    <StackPanel Orientation="Horizontal">
+                                        <Image Width="20" Height="20"
+                                               Margin="0,0,8,0"
+                                               Source="pack://application:,,,/Assets/Banks/inglogo.png"/>
+                                        <TextBlock Text="ING Bank Śląski"/>
+                                    </StackPanel>
+                                </ComboBoxItem>
+
+                                <ComboBoxItem>
+                                    <StackPanel Orientation="Horizontal">
+                                        <Image Width="20" Height="20"
+               Margin="0,0,8,0"
+               Source="pack://application:,,,/Assets/Banks/creditagricolelogo.png"/>
+                                        <TextBlock Text="Credit Agricole"/>
+                                    </StackPanel>
+                                </ComboBoxItem>
+
+
+                                <ComboBoxItem>
+                                    <StackPanel Orientation="Horizontal">
+                                        <Image Width="20" Height="20"
+                                               Margin="0,0,8,0"
+                                               Source="pack://application:,,,/Assets/Banks/santanderlogo.png"/>
+                                        <TextBlock Text="Santander Bank Polska"/>
+                                    </StackPanel>
+                                </ComboBoxItem>
+
+                                <ComboBoxItem>
+                                    <StackPanel Orientation="Horizontal">
+                                        <Image Width="20" Height="20"
+                                               Margin="0,0,8,0"
+                                               Source="pack://application:,,,/Assets/Banks/aliorbanklogo.png"/>
+                                        <TextBlock Text="Alior Bank"/>
+                                    </StackPanel>
+                                </ComboBoxItem>
+
+                                <ComboBoxItem>
+                                    <StackPanel Orientation="Horizontal">
+                                        <Image Width="20" Height="20"
+                                               Margin="0,0,8,0"
+                                               Source="pack://application:,,,/Assets/Banks/milleniumlogo.png"/>
+                                        <TextBlock Text="Millennium"/>
+                                    </StackPanel>
+                                </ComboBoxItem>
+
+                                <ComboBoxItem>
+                                    <StackPanel Orientation="Horizontal">
+                                        <Image Width="20" Height="20"
+                                               Margin="0,0,8,0"
+                                               Source="pack://application:,,,/Assets/Banks/innybank.png"/>
+                                        <TextBlock Text="Inny bank"/>
+                                    </StackPanel>
+                                </ComboBoxItem>
                             </ComboBox>
 
                             <TextBlock Text="Kwota na Twoim głównym koncie bankowym:"
@@ -287,7 +343,7 @@
                         </StackPanel>
 
                         <!-- PRZYCISK ZAPISU -->
-                        <StackPanel Margin="0,32,0,0"
+                        <StackPanel Margin="0,24,0,0"
                                     HorizontalAlignment="Center">
                             <Button x:Name="SaveAndContinueButton"
                                     Content="Zapisz i przejdź dalej"
@@ -302,6 +358,7 @@
         </Grid>
     </Border>
 </Window>
+
 
 
 

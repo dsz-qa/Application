@@ -43,11 +43,17 @@ namespace Finly.Views
             }
         }
 
-        // =================== Pasek tytułu ===================
+        // =================== Pasek tytułu / rozmiar okna ===================
 
         private void Window_Loaded(object sender, RoutedEventArgs e)
         {
-            WindowState = WindowState.Maximized;
+            // okno zajmuje obszar roboczy (bez paska zadań)
+            var workArea = SystemParameters.WorkArea;
+
+            Left = workArea.Left;
+            Top = workArea.Top;
+            Width = workArea.Width;
+            Height = workArea.Height;
         }
 
         private void TitleBar_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
@@ -134,11 +140,26 @@ namespace Finly.Views
 
         private string GetSelectedMainBankName()
         {
-            if (MainBankCombo.SelectedItem is ComboBoxItem item &&
-                item.Content is string s)
+            if (MainBankCombo.SelectedItem is ComboBoxItem item)
             {
-                return s == "Inny bank" ? "" : s;
+                // 1) Prosty przypadek – sam string
+                if (item.Content is string s)
+                    return s == "Inny bank" || s == "Wybierz bank" ? "" : s;
+
+                // 2) Nasz StackPanel: [Image][TextBlock]
+                if (item.Content is StackPanel sp)
+                {
+                    foreach (var child in sp.Children)
+                    {
+                        if (child is TextBlock tb)
+                        {
+                            var text = tb.Text;
+                            return text == "Inny bank" || text == "Wybierz bank" ? "" : text;
+                        }
+                    }
+                }
             }
+
             return "";
         }
 
@@ -185,6 +206,7 @@ namespace Finly.Views
         }
     }
 }
+
 
 
 
