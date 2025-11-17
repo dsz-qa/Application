@@ -25,7 +25,7 @@ namespace Finly.Pages
             public override string ToString() => Name;
         }
 
-        // Bezparametrowy konstruktor – dla XAML
+        // Bezparametrowy konstruktor – dla XAML / prostszych wywołań
         public AddExpensePage() : this(UserService.GetCurrentUserId())
         {
         }
@@ -70,31 +70,46 @@ namespace Finly.Pages
 
             ExpensePanel.Visibility =
                 header.Equals("Wydatek", StringComparison.OrdinalIgnoreCase)
-                ? Visibility.Visible : Visibility.Collapsed;
+                    ? Visibility.Visible : Visibility.Collapsed;
 
             IncomePanel.Visibility =
                 header.Equals("Przychód", StringComparison.OrdinalIgnoreCase)
-                ? Visibility.Visible : Visibility.Collapsed;
+                    ? Visibility.Visible : Visibility.Collapsed;
 
             TransferPanel.Visibility =
                 header.Equals("Transfer", StringComparison.OrdinalIgnoreCase)
-                ? Visibility.Visible : Visibility.Collapsed;
+                    ? Visibility.Visible : Visibility.Collapsed;
         }
 
         // ================== DANE SŁOWNIKOWE ==================
 
+        /// <summary>
+        /// Ładuje listę kategorii użytkownika do trzech comboboxów:
+        /// wydatek, przychód, transfer.
+        /// </summary>
         private void LoadCategories()
         {
             try
             {
                 var cats = DatabaseService.GetCategoriesByUser(_uid) ?? new List<string>();
-                ExpenseCategoryBox.ItemsSource = cats;
-                if (ExpenseCategoryBox.Items.Count > 0)
+
+                if (ExpenseCategoryBox != null)
+                    ExpenseCategoryBox.ItemsSource = cats;
+
+                if (IncomeCategoryBox != null)
+                    IncomeCategoryBox.ItemsSource = cats;
+
+                if (TransferCategoryBox != null)
+                    TransferCategoryBox.ItemsSource = cats;
+
+                if (ExpenseCategoryBox != null && ExpenseCategoryBox.Items.Count > 0)
                     ExpenseCategoryBox.SelectedIndex = 0;
             }
             catch
             {
-                ExpenseCategoryBox.ItemsSource = Array.Empty<string>();
+                if (ExpenseCategoryBox != null) ExpenseCategoryBox.ItemsSource = Array.Empty<string>();
+                if (IncomeCategoryBox != null) IncomeCategoryBox.ItemsSource = Array.Empty<string>();
+                if (TransferCategoryBox != null) TransferCategoryBox.ItemsSource = Array.Empty<string>();
             }
         }
 
@@ -127,13 +142,19 @@ namespace Finly.Pages
                 // zostawiamy tylko gotówkę
             }
 
-            TransferFromBox.ItemsSource = items.ToList();
-            TransferToBox.ItemsSource = items.ToList();
+            if (TransferFromBox != null)
+            {
+                TransferFromBox.ItemsSource = items.ToList();
+                if (TransferFromBox.Items.Count > 0)
+                    TransferFromBox.SelectedIndex = 0;
+            }
 
-            if (TransferFromBox.Items.Count > 0)
-                TransferFromBox.SelectedIndex = 0;
-            if (TransferToBox.Items.Count > 1)
-                TransferToBox.SelectedIndex = 1;
+            if (TransferToBox != null)
+            {
+                TransferToBox.ItemsSource = items.ToList();
+                if (TransferToBox.Items.Count > 1)
+                    TransferToBox.SelectedIndex = 1;
+            }
         }
 
         // ================== ANULUJ / CZYSZCZENIE ==================
@@ -145,8 +166,13 @@ namespace Finly.Pages
                 ExpenseAmountBox.Clear();
                 ExpenseDescBox.Clear();
                 ExpenseDatePicker.SelectedDate = DateTime.Today;
-                if (ExpenseCategoryBox.Items.Count > 0)
-                    ExpenseCategoryBox.SelectedIndex = 0;
+
+                if (ExpenseCategoryBox != null)
+                {
+                    ExpenseCategoryBox.Text = string.Empty;
+                    if (ExpenseCategoryBox.Items.Count > 0)
+                        ExpenseCategoryBox.SelectedIndex = 0;
+                }
             }
             else if (IsTab(sender, "Przychód"))
             {
@@ -154,15 +180,28 @@ namespace Finly.Pages
                 IncomeSourceBox.Clear();
                 IncomeDescBox.Clear();
                 IncomeDatePicker.SelectedDate = DateTime.Today;
+
                 IncomeFormTypeCombo.SelectedIndex = -1;
                 IncomeAccountRow.Visibility = Visibility.Collapsed;
                 IncomeAccountCombo.SelectedIndex = -1;
+
+                if (IncomeCategoryBox != null)
+                {
+                    IncomeCategoryBox.Text = string.Empty;
+                    IncomeCategoryBox.SelectedIndex = -1;
+                }
             }
             else // Transfer
             {
                 TransferAmountBox.Clear();
                 TransferDatePicker.SelectedDate = DateTime.Today;
                 LoadTransferAccounts();
+
+                if (TransferCategoryBox != null)
+                {
+                    TransferCategoryBox.Text = string.Empty;
+                    TransferCategoryBox.SelectedIndex = -1;
+                }
             }
         }
 
@@ -194,7 +233,6 @@ namespace Finly.Pages
             {
                 var tag = item.Tag as string ?? string.Empty;
 
-                // jeśli przelew -> pokaż konto
                 if (tag == "transfer")
                 {
                     IncomeAccountRow.Visibility = Visibility.Visible;
@@ -207,6 +245,37 @@ namespace Finly.Pages
             else
             {
                 IncomeAccountRow.Visibility = Visibility.Collapsed;
+            }
+        }
+
+        /// <summary>
+        /// Rejestruje kategorię z edytowalnego ComboBoxa w tabeli kategorii (jeśli jest nowa).
+        /// </summary>
+        private void RegisterCategoryFromCombo(ComboBox? combo)
+        {
+            if (combo == null) return;
+
+            string? catName = null;
+
+            if (!string.IsNullOrWhiteSpace(combo.Text))
+            {
+                catName = combo.Text.Trim();
+            }
+            else if (combo.SelectedItem is string s && !string.IsNullOrWhiteSpace(s))
+            {
+                catName = s;
+            }
+
+            if (!string.IsNullOrWhiteSpace(catName))
+            {
+                try
+                {
+                    _ = DatabaseService.GetOrCreateCategoryId(_uid, catName!);
+                }
+                catch
+                {
+                    // nic, najwyżej kategoria się nie dopisze
+                }
             }
         }
 
@@ -226,7 +295,18 @@ namespace Finly.Pages
                 ? null
                 : ExpenseDescBox.Text.Trim();
 
-            var catName = ExpenseCategoryBox.SelectedItem?.ToString();
+            // --- kategoria: istniejąca albo nowo wpisana ---
+            string? catName = null;
+
+            if (!string.IsNullOrWhiteSpace(ExpenseCategoryBox.Text))
+            {
+                catName = ExpenseCategoryBox.Text.Trim();
+            }
+            else if (ExpenseCategoryBox.SelectedItem is string s && !string.IsNullOrWhiteSpace(s))
+            {
+                catName = s;
+            }
+
             int categoryId = 0;
             if (!string.IsNullOrWhiteSpace(catName))
             {
@@ -253,6 +333,10 @@ namespace Finly.Pages
             {
                 DatabaseService.InsertExpense(eModel);
                 ToastService.Success("Dodano wydatek.");
+
+                // przeładuj listę kategorii, żeby nowa się pojawiła
+                LoadCategories();
+
                 Cancel_Click(sender, e);
             }
             catch (Exception ex)
@@ -281,12 +365,17 @@ namespace Finly.Pages
                 ? null
                 : IncomeDescBox.Text.Trim();
 
-            // Na razie NIE zmieniam logiki zapisu – forma przychodu i konto
-            // możesz wykorzystać później, jak będziemy spiinać to z kontami.
+            // rejestrujemy kategorię (dla list rozwijanych)
+            RegisterCategoryFromCombo(IncomeCategoryBox);
+
             try
             {
                 DatabaseService.InsertIncome(_uid, amount, date, source, desc);
                 ToastService.Success("Dodano przychód.");
+
+                // odśwież listę kategorii (gdyby była nowa)
+                LoadCategories();
+
                 Cancel_Click(sender, e);
             }
             catch (Exception ex)
@@ -324,6 +413,9 @@ namespace Finly.Pages
                 return;
             }
 
+            // rejestrujemy kategorię transferu w tabeli kategorii
+            RegisterCategoryFromCombo(TransferCategoryBox);
+
             try
             {
                 if (from.AccountId is int accFrom && to.AccountId is null)
@@ -346,7 +438,8 @@ namespace Finly.Pages
 
                 ToastService.Success("Zapisano transfer.");
                 Cancel_Click(sender, e);
-                LoadTransferAccounts(); // odśwież salda
+                LoadTransferAccounts();   // odśwież salda
+                LoadCategories();         // odśwież kategorie, jeśli doszła nowa
             }
             catch (Exception ex)
             {
@@ -366,6 +459,7 @@ namespace Finly.Pages
         }
     }
 }
+
 
 
 

@@ -18,7 +18,6 @@ namespace Finly.Pages
         public ObservableCollection<PieSlice> PieCurrent { get; } = new();
         public ObservableCollection<PieSlice> PieIncome { get; } = new();
 
-        // Presety okresu: DZIŚ → TYDZIEŃ → MIESIĄC → KWARTAŁ → ROK
         private static readonly DateRangeMode[] PresetOrder =
         {
             DateRangeMode.Day,
@@ -32,21 +31,23 @@ namespace Finly.Pages
         private DateTime _startDate;
         private DateTime _endDate;
 
+        // Konstruktor „normalny”
         public DashboardPage(int userId)
         {
             InitializeComponent();
-            _uid = userId;
+
+            _uid = userId <= 0 ? UserService.GetCurrentUserId() : userId;
             DataContext = this;
 
-            Loaded += DashboardPage_Loaded;
-        }
-
-        private void DashboardPage_Loaded(object sender, RoutedEventArgs e)
-        {
-            // Domyślnie: DZIŚ
+            // Ładujemy wszystko OD RAZU – zanim strona się pokaże
             ApplyPreset(DateRangeMode.Day, DateTime.Today);
             RefreshMoneySummary();
             LoadCharts();
+        }
+
+        // Konstruktor bezparametrowy – dla designera / prostszych wywołań
+        public DashboardPage() : this(UserService.GetCurrentUserId())
+        {
         }
 
         // ========================= KPI =========================
@@ -59,10 +60,9 @@ namespace Finly.Pages
 
         private void RefreshMoneySummary()
         {
-            var uid = UserService.GetCurrentUserId();
-            if (uid <= 0) return;
+            if (_uid <= 0) return;
 
-            var snap = DatabaseService.GetMoneySnapshot(uid);
+            var snap = DatabaseService.GetMoneySnapshot(_uid);
 
             SetKpiText("TotalWealthText", snap.Total);
             SetKpiText("BanksText", snap.Banks);
@@ -85,38 +85,30 @@ namespace Finly.Pages
                 case DateRangeMode.Day:
                     _startDate = _endDate = anchor.Date;
                     break;
-
                 case DateRangeMode.Week:
-                    // poniedziałek jako początek tygodnia
                     int diff = ((int)anchor.DayOfWeek + 6) % 7; // pon = 0
                     _startDate = anchor.AddDays(-diff).Date;
                     _endDate = _startDate.AddDays(6);
                     break;
-
                 case DateRangeMode.Month:
                     _startDate = new DateTime(anchor.Year, anchor.Month, 1);
                     _endDate = _startDate.AddMonths(1).AddDays(-1);
                     break;
-
                 case DateRangeMode.Quarter:
                     int qStartMonth = (((anchor.Month - 1) / 3) * 3) + 1;
                     _startDate = new DateTime(anchor.Year, qStartMonth, 1);
                     _endDate = _startDate.AddMonths(3).AddDays(-1);
                     break;
-
                 case DateRangeMode.Year:
                     _startDate = new DateTime(anchor.Year, 1, 1);
                     _endDate = new DateTime(anchor.Year, 12, 31);
                     break;
-
                 case DateRangeMode.Custom:
-                    // ustawiane ręcznie przyciskiem "Szukaj"
                     break;
             }
 
             UpdatePeriodLabel();
 
-            // Presety nie ruszają kalendarzy – użytkownik używa ich tylko z przyciskiem "Szukaj".
             if (StartPicker != null) StartPicker.SelectedDate = null;
             if (EndPicker != null) EndPicker.SelectedDate = null;
         }
@@ -158,12 +150,6 @@ namespace Finly.Pages
             idx = (idx + 1) % PresetOrder.Length;
             ApplyPreset(PresetOrder[idx], DateTime.Today);
             LoadCharts();
-        }
-
-        // Klik w DatePickerach sam nic nie robi – użytkownik musi nacisnąć "Szukaj".
-        private void ManualDateChanged(object sender, SelectionChangedEventArgs e)
-        {
-            // celowo pusto
         }
 
         private void Search_Click(object sender, RoutedEventArgs e)
@@ -213,7 +199,7 @@ namespace Finly.Pages
             {
                 BindExpenseTable(expenses);
                 BindIncomeTable(incomes);
-                BindMerchantBars(start, end);
+                BindExpenseTrend(start, end);   // zamiast BindMerchantBars
             }), DispatcherPriority.Loaded);
         }
 
@@ -260,32 +246,57 @@ namespace Finly.Pages
                 lv.ItemsSource = rows;
         }
 
-        private void BindMerchantBars(DateTime start, DateTime end)
+        /// <summary>
+        /// Trend wydatków: porównanie bieżącego okresu z poprzednim
+        /// (kwoty + paski procentowe).
+        /// </summary>
+        private void BindExpenseTrend(DateTime start, DateTime end)
         {
-            if (FindName("TopMerchantBars") is not ItemsControl shopBars)
+            if (FindName("ExpenseTrendBars") is not ItemsControl trendBars)
                 return;
 
             try
             {
-                var shops = DatabaseService.GetSpendingByMerchantSafe(_uid, start, end);
-                var sum = shops.Sum(x => x.Amount);
+                // Bieżący okres
+                var currentCats = DatabaseService.GetSpendingByCategorySafe(_uid, start, end)
+                                   ?? Enumerable.Empty<DatabaseService.CategoryAmountDto>();
+                var currentTotal = currentCats.Sum(x => x.Amount);
 
-                var rows = shops
-                    .OrderByDescending(x => x.Amount)
-                    .Take(5)
-                    .Select(x => new TableRow
+                // Poprzedni okres o tej samej długości
+                int days = (end.Date - start.Date).Days + 1;
+                if (days <= 0) days = 1;
+
+                var prevEnd = start.AddDays(-1);
+                var prevStart = prevEnd.AddDays(-days + 1);
+
+                var prevCats = DatabaseService.GetSpendingByCategorySafe(_uid, prevStart, prevEnd)
+                               ?? Enumerable.Empty<DatabaseService.CategoryAmountDto>();
+                var prevTotal = prevCats.Sum(x => x.Amount);
+
+                var max = Math.Max(currentTotal, prevTotal);
+                if (max <= 0) max = 1;
+
+                var items = new[]
+                {
+                    new ExpenseTrendItem
                     {
-                        Name = x.Name,
-                        Amount = x.Amount,
-                        Percent = sum > 0 ? (double)(x.Amount / sum) * 100.0 : 0.0
-                    })
-                    .ToList();
+                        DateLabel = $"{prevStart:dd.MM}–{prevEnd:dd.MM}",
+                        Amount = prevTotal,
+                        Percent = (double)(prevTotal / max * 100m)
+                    },
+                    new ExpenseTrendItem
+                    {
+                        DateLabel = $"{start:dd.MM}–{end:dd.MM}",
+                        Amount = currentTotal,
+                        Percent = (double)(currentTotal / max * 100m)
+                    }
+                };
 
-                shopBars.ItemsSource = rows;
+                trendBars.ItemsSource = items;
             }
             catch
             {
-                shopBars.ItemsSource = Array.Empty<TableRow>();
+                trendBars.ItemsSource = Array.Empty<ExpenseTrendItem>();
             }
         }
 
@@ -306,7 +317,6 @@ namespace Finly.Pages
             double start = 0;
             int i = 0;
 
-            // Dopasowane do 260x260 z XAML – środek (130,130), promień 120
             const double centerX = 130;
             const double centerY = 130;
             const double radius = 120;
@@ -335,7 +345,7 @@ namespace Finly.Pages
         {
             Color[] palette =
             {
-                Hex("#FFED7A1A"), // brand orange
+                Hex("#FFED7A1A"),
                 Hex("#FF3FA7D6"),
                 Hex("#FF7BC96F"),
                 Hex("#FFAF7AC5"),
@@ -349,8 +359,6 @@ namespace Finly.Pages
 
         private static Color Hex(string s) => (Color)ColorConverter.ConvertFromString(s)!;
     }
-
-    // ========================= MODELE POMOCNICZE =========================
 
     public sealed class PieSlice
     {
@@ -402,6 +410,14 @@ namespace Finly.Pages
         public string AmountStr => Amount.ToString("N2") + " zł";
         public double Percent { get; set; }
         public string PercentStr => Math.Round(Percent, 0) + "%";
+    }
+
+    public sealed class ExpenseTrendItem
+    {
+        public string DateLabel { get; set; } = "";
+        public decimal Amount { get; set; }
+        public string AmountStr => Amount.ToString("N2") + " zł";
+        public double Percent { get; set; }
     }
 }
 

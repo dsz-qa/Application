@@ -1,48 +1,276 @@
 ﻿<UserControl x:Class="Finly.Pages.CategoriesPage"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
-             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
-
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             mc:Ignorable="d"
+             d:DesignHeight="800"
+             d:DesignWidth="1400">
     <Grid Margin="16">
         <Grid.RowDefinitions>
+            <!-- Filtry + akcje -->
             <RowDefinition Height="Auto"/>
+            <RowDefinition Height="12"/>
+            <!-- Główna część: tabela + szczegóły -->
             <RowDefinition Height="*"/>
         </Grid.RowDefinitions>
 
-        <!-- FILTRY: preset + daty -->
-        <StackPanel Orientation="Horizontal" Grid.Row="0">
-            <ComboBox x:Name="PresetRangeCombo"
-                      Width="160"
-                      Margin="0,0,8,0"
-                      SelectionChanged="PresetRangeCombo_SelectionChanged">
-                <ComboBoxItem Content="(brak)"/>
-                <ComboBoxItem Content="Dzisiaj"/>
-                <ComboBoxItem Content="Ten tydzień"/>
-                <ComboBoxItem Content="Ten miesiąc"/>
-                <ComboBoxItem Content="Ten rok"/>
-            </ComboBox>
+        <!-- ===================== FILTRY + AKCJE ===================== -->
+        <Border Grid.Row="0"
+                Padding="12"
+                CornerRadius="8"
+                Background="{DynamicResource SurfaceBrush}">
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="8"/>
+                    <RowDefinition Height="Auto"/>
+                </Grid.RowDefinitions>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
 
-            <DatePicker x:Name="FromDate" Width="140" Margin="0,0,8,0"/>
-            <DatePicker x:Name="ToDate"   Width="140" Margin="0,0,8,0"/>
+                <!-- FILTRY -->
+                <StackPanel Orientation="Horizontal"
+                            Grid.Row="0"
+                            Grid.Column="0"
+                            VerticalAlignment="Center">
+                    <!-- Typ -->
+                    <StackPanel Orientation="Vertical" Margin="0,0,12,0">
+                        <TextBlock Text="Typ" FontSize="12" Margin="0,0,0,4"/>
+                        <ComboBox Width="160"
+                                  SelectedItem="{Binding SelectedTypeFilter}">
+                            <ComboBoxItem Content="Wszystkie"/>
+                            <ComboBoxItem Content="Wydatki"/>
+                            <ComboBoxItem Content="Przychody"/>
+                            <ComboBoxItem Content="Transfery"/>
+                        </ComboBox>
+                    </StackPanel>
 
-            <Button Content="Filtruj" Click="Filter_Click" Margin="0,0,8,0"/>
-            <Button Content="Wyczyść" Click="Clear_Click"/>
-        </StackPanel>
+                    <!-- Od -->
+                    <StackPanel Orientation="Vertical" Margin="0,0,12,0">
+                        <TextBlock Text="Od" FontSize="12" Margin="0,0,0,4"/>
+                        <DatePicker Width="140"
+                                    SelectedDate="{Binding FromDate}"/>
+                    </StackPanel>
 
-        <!-- Tabela podsumowań kategorii -->
-        <DataGrid x:Name="CategorySummaryGrid"
-                  Grid.Row="1"
-                  Margin="0,10,0,0"
-                  AutoGenerateColumns="False"
-                  IsReadOnly="True"
-                  CanUserAddRows="False">
-            <DataGrid.Columns>
-                <DataGridTextColumn Header="Kategoria" Binding="{Binding Name}" Width="*"/>
-                <DataGridTextColumn Header="Wpisów" Binding="{Binding Count}" Width="120"/>
-                <DataGridTextColumn Header="Suma"
-                                    Binding="{Binding Sum, StringFormat={}{0:N2} zł}"
-                                    Width="160"/>
-            </DataGrid.Columns>
-        </DataGrid>
+                    <!-- Do -->
+                    <StackPanel Orientation="Vertical" Margin="0,0,12,0">
+                        <TextBlock Text="Do" FontSize="12" Margin="0,0,0,4"/>
+                        <DatePicker Width="140"
+                                    SelectedDate="{Binding ToDate}"/>
+                    </StackPanel>
+
+                    <!-- Szukajka -->
+                    <StackPanel Orientation="Vertical" Margin="0,0,12,0" Width="240">
+                        <TextBlock Text="Szukaj kategorii" FontSize="12" Margin="0,0,0,4"/>
+                        <Grid>
+                            <TextBox Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}"
+                                     Margin="0,0,28,0"/>
+                            <!-- Prosta ikonka lupy z prawej (TextBlock) -->
+                            <TextBlock Text="🔍"
+                                       VerticalAlignment="Center"
+                                       HorizontalAlignment="Right"
+                                       Margin="0,0,4,0"
+                                       Opacity="0.6"/>
+                        </Grid>
+                    </StackPanel>
+
+                    <!-- Przyciski Filtruj / Wyczyść -->
+                    <StackPanel Orientation="Horizontal"
+                                VerticalAlignment="Bottom">
+                        <Button Content="Filtruj"
+                                Width="90"
+                                Margin="0,0,8,0"
+                                Click="ApplyFilters_Click"/>
+                        <Button Content="Wyczyść"
+                                Width="90"
+                                Click="ClearFilters_Click"/>
+                    </StackPanel>
+                </StackPanel>
+
+                <!-- AKCJE ADMINISTRACYJNE -->
+                <StackPanel Orientation="Horizontal"
+                            Grid.Row="0"
+                            Grid.Column="1"
+                            HorizontalAlignment="Right"
+                            VerticalAlignment="Center">
+                    <Button Content="Dodaj kategorię"
+                            Width="130"
+                            Margin="8,0,0,0"
+                            Click="AddCategory_Click"/>
+                    <Button Content="Edytuj"
+                            Width="90"
+                            Margin="8,0,0,0"
+                            Click="EditCategory_Click"/>
+                    <Button Content="Scal"
+                            Width="90"
+                            Margin="8,0,0,0"
+                            Click="MergeCategories_Click"/>
+                    <Button Content="Archiwizuj"
+                            Width="110"
+                            Margin="8,0,0,0"
+                            Click="ArchiveCategory_Click"/>
+                </StackPanel>
+
+                <!-- (opcjonalnie) pasek presetów dat: Dziś / Ten miesiąc / Ten rok -->
+                <StackPanel Grid.Row="2"
+                            Grid.ColumnSpan="2"
+                            Orientation="Horizontal"
+                            HorizontalAlignment="Left">
+                    <TextBlock Text="Szybkie zakresy:"
+                               VerticalAlignment="Center"
+                               Margin="0,0,8,0"
+                               FontSize="11"
+                               Opacity="0.7"/>
+                    <Button Content="Dziś"
+                            Margin="0,0,4,0"
+                            Click="PresetToday_Click"/>
+                    <Button Content="Ten miesiąc"
+                            Margin="0,0,4,0"
+                            Click="PresetThisMonth_Click"/>
+                    <Button Content="Ten rok"
+                            Click="PresetThisYear_Click"/>
+                </StackPanel>
+            </Grid>
+        </Border>
+
+        <!-- ===================== GŁÓWNA CZĘŚĆ ===================== -->
+        <Grid Grid.Row="2">
+            <Grid.ColumnDefinitions>
+                <!-- Tabela kategorii -->
+                <ColumnDefinition Width="3*"/>
+                <ColumnDefinition Width="12"/>
+                <!-- Szczegóły wybranej kategorii -->
+                <ColumnDefinition Width="2*"/>
+            </Grid.ColumnDefinitions>
+
+            <!-- ====== TABELA KATEGORII ====== -->
+            <Border Grid.Column="0"
+                    Padding="8"
+                    CornerRadius="8"
+                    Background="{DynamicResource SurfaceBrush}">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="8"/>
+                        <RowDefinition Height="*"/>
+                    </Grid.RowDefinitions>
+
+                    <TextBlock Text="Kategorie"
+                               FontSize="16"
+                               FontWeight="SemiBold"/>
+
+                    <DataGrid Grid.Row="2"
+                              ItemsSource="{Binding CategoryItems}"
+                              SelectedItem="{Binding SelectedCategory, Mode=TwoWay}"
+                              AutoGenerateColumns="False"
+                              CanUserAddRows="False"
+                              IsReadOnly="True">
+                        <DataGrid.Columns>
+                            <DataGridTextColumn Header="Kategoria"
+                                                Binding="{Binding Name}"
+                                                Width="*"/>
+                            <DataGridTextColumn Header="Typ"
+                                                Binding="{Binding TypeDisplay}"
+                                                Width="120"/>
+                            <DataGridTextColumn Header="Wpisów"
+                                                Binding="{Binding EntryCount}"
+                                                Width="80"/>
+                            <DataGridTextColumn Header="Suma"
+                                                Binding="{Binding TotalAmount, StringFormat={}{0:N2}}"
+                                                Width="120"/>
+                            <DataGridTextColumn Header="Udział"
+                                                Binding="{Binding SharePercent, StringFormat={}{0:N1}%}"
+                                                Width="80"/>
+                        </DataGrid.Columns>
+                    </DataGrid>
+                </Grid>
+            </Border>
+
+            <!-- ====== PANEL SZCZEGÓŁÓW ====== -->
+            <Border Grid.Column="2"
+                    Padding="8"
+                    CornerRadius="8"
+                    Background="{DynamicResource SurfaceBrush}">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <!-- Header -->
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="8"/>
+                        <!-- Trend -->
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="8"/>
+                        <!-- Ostatnie transakcje -->
+                        <RowDefinition Height="*"/>
+                    </Grid.RowDefinitions>
+
+                    <!-- HEADER KATEGORII -->
+                    <StackPanel Grid.Row="0">
+                        <TextBlock Text="{Binding SelectedCategory.Name}"
+                                   FontSize="18"
+                                   FontWeight="SemiBold"
+                                   TextTrimming="CharacterEllipsis"/>
+
+                        <StackPanel Orientation="Horizontal" Margin="0,4,0,0">
+                            <TextBlock Text="{Binding SelectedCategory.TypeDisplay}"
+                                       FontSize="12"
+                                       Margin="0,0,12,0"
+                                       Opacity="0.8"/>
+                            <TextBlock Text="{Binding SelectedCategory.TotalAmount, StringFormat=Kwota: {0:N2}}"
+                                       FontSize="12"
+                                       Margin="0,0,12,0"/>
+                            <TextBlock Text="{Binding SelectedCategory.SharePercent, StringFormat=Udział: {0:N1}%}"
+                                       FontSize="12"/>
+                        </StackPanel>
+                    </StackPanel>
+
+                    <!-- TREND (PLACEHOLDER POD WYKRES) -->
+                    <GroupBox Grid.Row="2"
+                              Header="Trend w czasie"
+                              Margin="0,0,0,0">
+                        <Border Padding="4"
+                                MinHeight="120"
+                                HorizontalAlignment="Stretch"
+                                VerticalAlignment="Stretch"
+                                CornerRadius="4"
+                                Background="{DynamicResource SubtleSurfaceBrush}">
+                            <!--
+                                Tutaj później wstawisz kontrolkę LiveCharts.
+                                Na razie prosty TextBlock jako placeholder.
+                            -->
+                            <TextBlock Text="(Wykres trendu dla wybranej kategorii)"
+                                       HorizontalAlignment="Center"
+                                       VerticalAlignment="Center"
+                                       Opacity="0.6"/>
+                        </Border>
+                    </GroupBox>
+
+                    <!-- OSTATNIE TRANSAKCJE -->
+                    <GroupBox Grid.Row="4"
+                              Header="Ostatnie transakcje">
+                        <DataGrid ItemsSource="{Binding LastTransactions}"
+                                  AutoGenerateColumns="False"
+                                  CanUserAddRows="False"
+                                  IsReadOnly="True">
+                            <DataGrid.Columns>
+                                <DataGridTextColumn Header="Data"
+                                                    Binding="{Binding Date, StringFormat={}{0:dd.MM.yyyy}}"
+                                                    Width="110"/>
+                                <DataGridTextColumn Header="Kwota"
+                                                    Binding="{Binding Amount, StringFormat={}{0:N2}}"
+                                                    Width="110"/>
+                                <DataGridTextColumn Header="Opis"
+                                                    Binding="{Binding Description}"
+                                                    Width="*"/>
+                            </DataGrid.Columns>
+                        </DataGrid>
+                    </GroupBox>
+                </Grid>
+            </Border>
+        </Grid>
     </Grid>
 </UserControl>
+
 
