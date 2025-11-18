@@ -33,8 +33,8 @@ namespace Finly.Pages
         private DateTime _startDate;
         private DateTime _endDate;
 
-        // suma wydatków – do obliczania % w środku donuta
-        private decimal _currentTotalExpenses;
+        // suma aktualnych wydatków – potrzebna do kliknięcia w kawałek koła
+        private decimal _currentTotalExpenses = 0m;
 
         public DashboardPage(int userId)
         {
@@ -185,10 +185,11 @@ namespace Finly.Pages
             var expenses = DatabaseService.GetSpendingByCategorySafe(_uid, start, end);
             var incomes = DatabaseService.GetIncomeBySourceSafe(_uid, start, end);
 
-            // true = koło wydatków (donut ze środkiem),
-            // false = koło przychodów (bez aktualizacji środka)
-            BuildPie(PieCurrent, expenses, isExpenseChart: true);
-            BuildPie(PieIncome, incomes, isExpenseChart: false);
+            // donut WYDATKÓW – steruje środkiem i klikaniem
+            BuildPie(PieCurrent, expenses, updateCenter: true);
+
+            // donut PRZYCHODÓW – tylko rysuje kawałki, nie rusza środka
+            BuildPie(PieIncome, incomes, updateCenter: false);
 
             Dispatcher.BeginInvoke(new Action(() =>
             {
@@ -198,10 +199,14 @@ namespace Finly.Pages
             }), DispatcherPriority.Loaded);
         }
 
+        /// <summary>
+        /// Rysuje donut z danych. Jeśli updateCenter = true, ustawia
+        /// środek (tekst) i _currentTotalExpenses na potrzeby kliknięcia.
+        /// </summary>
         private void BuildPie(
             ObservableCollection<PieSlice> target,
             IEnumerable<DatabaseService.CategoryAmountDto> source,
-            bool isExpenseChart)
+            bool updateCenter)
         {
             target.Clear();
 
@@ -210,51 +215,46 @@ namespace Finly.Pages
                 .OrderByDescending(x => x.Amount)
                 .ToList();
 
-            if (isExpenseChart)
+            if (data.Count == 0)
             {
-                if (data.Count == 0)
+                if (updateCenter)
                 {
-                    _currentTotalExpenses = 0;
+                    _currentTotalExpenses = 0m;
                     if (PieCenterNameText != null) PieCenterNameText.Text = "Brak danych";
                     if (PieCenterValueText != null) PieCenterValueText.Text = "0,00 zł";
                     if (PieCenterPercentText != null) PieCenterPercentText.Text = "";
-                    return;
                 }
-
-                _currentTotalExpenses = data.Sum(x => x.Amount);
-
-                if (PieCenterNameText != null) PieCenterNameText.Text = "Wszystko";
-                if (PieCenterValueText != null) PieCenterValueText.Text =
-                    _currentTotalExpenses.ToString("N2") + " zł";
-                if (PieCenterPercentText != null) PieCenterPercentText.Text = "";
+                return;
             }
-            else
+
+            var sum = data.Sum(x => x.Amount);
+
+            if (updateCenter)
             {
-                // przychody – brak danych => po prostu puste koło
-                if (data.Count == 0)
-                    return;
+                _currentTotalExpenses = sum;
+                if (PieCenterNameText != null) PieCenterNameText.Text = "Wszystko";
+                if (PieCenterValueText != null) PieCenterValueText.Text = sum.ToString("N2") + " zł";
+                if (PieCenterPercentText != null) PieCenterPercentText.Text = "";
             }
 
             double startAngle = 0;
-            int i = 0;
+            int colorIndex = 0;
 
             const double centerX = 130;
             const double centerY = 130;
             const double outerRadius = 120;
-            const double innerRadius = 70;
-
-            decimal total = data.Sum(x => x.Amount);
+            const double innerRadius = 70;   // „dziura” w środku
 
             foreach (var item in data)
             {
-                var sweep = (double)(item.Amount / total) * 360.0;
+                var sweep = (double)(item.Amount / sum) * 360.0;
                 if (sweep <= 0) continue;
 
                 var slice = PieSlice.CreateDonut(
                     centerX, centerY,
                     innerRadius, outerRadius,
                     startAngle, sweep,
-                    DefaultBrush(i++),
+                    DefaultBrush(colorIndex++),
                     item.Name,
                     item.Amount);
 
@@ -370,8 +370,7 @@ namespace Finly.Pages
             }
         }
 
-        // ===== kliknięcie w kawałek donuta (wydatki) =====
-
+        // ===== kliknięcie w kawałek donuta WYDATKÓW =====
         private void PieSlice_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
         {
             if (_currentTotalExpenses <= 0)
@@ -381,19 +380,14 @@ namespace Finly.Pages
             {
                 var share = slice.Amount / _currentTotalExpenses * 100m;
 
-                if (PieCenterNameText != null)
-                    PieCenterNameText.Text = slice.Name;
-
-                if (PieCenterValueText != null)
-                    PieCenterValueText.Text = slice.Amount.ToString("N2") + " zł";
-
-                if (PieCenterPercentText != null)
-                    PieCenterPercentText.Text = $"{share:N1}% udziału";
+                if (PieCenterNameText != null) PieCenterNameText.Text = slice.Name;
+                if (PieCenterValueText != null) PieCenterValueText.Text = slice.Amount.ToString("N2") + " zł";
+                if (PieCenterPercentText != null) PieCenterPercentText.Text = $"{share:N1}% udziału";
             }
         }
     }
 
-    // ===== klasy pomocnicze =====
+    // ===== pomocnicze klasy do bindingu =====
 
     public sealed class PieSlice
     {
@@ -414,13 +408,11 @@ namespace Finly.Pages
             double a0 = DegToRad(startAngle - 90);
             double a1 = DegToRad(startAngle + sweepAngle - 90);
 
-            // Punkty na zewnętrznym okręgu
             Point pOuter0 = new(centerX + outerRadius * Math.Cos(a0),
                                 centerY + outerRadius * Math.Sin(a0));
             Point pOuter1 = new(centerX + outerRadius * Math.Cos(a1),
                                 centerY + outerRadius * Math.Sin(a1));
 
-            // Punkty na wewnętrznym okręgu
             Point pInner1 = new(centerX + innerRadius * Math.Cos(a1),
                                 centerY + innerRadius * Math.Sin(a1));
             Point pInner0 = new(centerX + innerRadius * Math.Cos(a0),
@@ -433,17 +425,13 @@ namespace Finly.Pages
             {
                 ctx.BeginFigure(pOuter0, isFilled: true, isClosed: true);
 
-                // zewnętrzny łuk (zgodnie z ruchem wskazówek)
                 ctx.ArcTo(pOuter1, new Size(outerRadius, outerRadius), 0,
                           large, SweepDirection.Clockwise, true, true);
 
-                // linia do wewnętrznego okręgu
                 ctx.LineTo(pInner1, true, true);
 
-                // wewnętrzny łuk (przeciwnie do ruchu wskazówek)
                 ctx.ArcTo(pInner0, new Size(innerRadius, innerRadius), 0,
                           large, SweepDirection.Counterclockwise, true, true);
-                // zamknięcie figury wraca do pOuter0
             }
             g.Freeze();
 
@@ -476,6 +464,8 @@ namespace Finly.Pages
         public double Percent { get; set; }
     }
 }
+
+
 
 
 

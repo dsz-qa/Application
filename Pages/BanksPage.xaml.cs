@@ -21,10 +21,7 @@ namespace Finly.Pages
         public BanksPage()
         {
             InitializeComponent();
-
-            // Podpięcie kolekcji do repeatera z XAML
             AccountsRepeater.ItemsSource = _accounts;
-
             Loaded += BanksPage_Loaded;
         }
 
@@ -38,7 +35,8 @@ namespace Finly.Pages
         private void RefreshMoney()
         {
             var snapshot = DatabaseService.GetMoneySnapshot(_uid);
-            LblTotalBanks.Text = snapshot.Banks.ToString("N2", CultureInfo.CurrentCulture) + " zł";
+            LblTotalBanks.Text =
+                snapshot.Banks.ToString("N2", CultureInfo.CurrentCulture) + " zł";
         }
 
         // === Wczytywanie kont do kafelków ===
@@ -46,17 +44,11 @@ namespace Finly.Pages
         {
             _accounts.Clear();
 
-            var list = DatabaseService.GetAccounts(_uid) ?? new System.Collections.Generic.List<BankAccountModel>();
+            var list = DatabaseService.GetAccounts(_uid)
+                       ?? new System.Collections.Generic.List<BankAccountModel>();
 
             foreach (var acc in list)
-            {
                 _accounts.Add(new BankAccountVm(acc));
-            }
-
-            // Na wszelki wypadek – jeżeli snapshot nie liczy z kont, możesz
-            // policzyć sumę z kolekcji i nadpisać LblTotalBanks tutaj.
-            //var total = _accounts.Sum(a => a.Balance);
-            //LblTotalBanks.Text = total.ToString("N2", CultureInfo.CurrentCulture) + " zł";
         }
 
         // Pomocnik – wyciągnięcie VM z przycisku (Tag albo DataContext)
@@ -148,7 +140,7 @@ namespace Finly.Pages
 
         // ================== OPERACJE NA KONCIE (z kafelka) ==================
 
-        // Wypłata z konta do gotówki
+        // Wypłata z konta do gotówki (na razie logika jak wcześniej – do wolnej gotówki)
         private void WithdrawFromAccount_Click(object sender, RoutedEventArgs e)
         {
             var vm = GetVmFromSender(sender);
@@ -302,7 +294,11 @@ namespace Finly.Pages
         public string Currency { get; }
         public decimal Balance { get; }
 
-        public string BalanceStr => Balance.ToString("N2", CultureInfo.CurrentCulture) + " zł";
+        public string BalanceStr =>
+            Balance.ToString("N2", CultureInfo.CurrentCulture) + " zł";
+
+        // Ścieżka do logo banku (pack URI)
+        public string LogoPath { get; }
 
         public BankAccountVm(BankAccountModel m)
         {
@@ -312,9 +308,32 @@ namespace Finly.Pages
             Iban = m.Iban ?? "";
             Currency = string.IsNullOrWhiteSpace(m.Currency) ? "PLN" : m.Currency;
             Balance = m.Balance;
+
+            LogoPath = GetLogoPath(BankName);
+        }
+
+        private static string GetLogoPath(string bankName)
+        {
+            var n = (bankName ?? "").ToLowerInvariant();
+
+            if (n.Contains("mbank")) return "pack://application:,,,/Assets/Banks/mbanklogo.jpg";
+            if (n.Contains("pko") && n.Contains("polski")) return "pack://application:,,,/Assets/Banks/pkobplogo.jpg";
+            if (n.Contains("pekao")) return "pack://application:,,,/Assets/Banks/pekaologo.jpg";
+            if (n.Contains("ing")) return "pack://application:,,,/Assets/Banks/inglogo.png";
+            if (n.Contains("santander")) return "pack://application:,,,/Assets/Banks/santanderlogo.png";
+            if (n.Contains("alior")) return "pack://application:,,,/Assets/Banks/aliorbanklogo.png";
+            if (n.Contains("millennium")) return "pack://application:,,,/Assets/Banks/milleniumlogo.png";
+            if (n.Contains("credit") && n.Contains("agricole"))
+                return "pack://application:,,,/Assets/Banks/creditagricolelogo.png";
+            if (n.Contains("revolut")) return "pack://application:,,,/Assets/Banks/revolutlogo.png";
+
+            // domyślne logo „inny bank”
+            return "pack://application:,,,/Assets/Banks/innybank.png";
         }
     }
 }
+
+
 
 
 

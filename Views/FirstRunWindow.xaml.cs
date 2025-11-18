@@ -138,6 +138,10 @@ namespace Finly.Views
             return ok;
         }
 
+        /// <summary>
+        /// Zwraca nazwę wybranego banku z ComboBoxa (np. "mBank", "PKO Bank Polski").
+        /// Dla pozycji "Wybierz bank" i "Inny bank" zwraca pusty string.
+        /// </summary>
         private string GetSelectedMainBankName()
         {
             if (MainBankCombo.SelectedItem is ComboBoxItem item)
@@ -168,7 +172,8 @@ namespace Finly.Views
             if (_userId <= 0)
             {
                 MessageBox.Show("Brak zalogowanego użytkownika.", "Błąd",
-                    MessageBoxButton.OK, MessageBoxImage.Error);
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Error);
                 return;
             }
 
@@ -182,17 +187,25 @@ namespace Finly.Views
             // 2) Konto bankowe na start
             var mainBankName = GetSelectedMainBankName();
 
+            // nazwa rachunku widoczna na kafelku:
+            // - jeśli wybrano bank -> nazwa banku (mBank, PKO...),
+            // - jeśli nie wybrano -> "Rachunek startowy"
+            var accountName = string.IsNullOrWhiteSpace(mainBankName)
+                ? "Rachunek startowy"
+                : mainBankName;
+
             if (bankTotal > 0)
             {
                 var acc = new BankAccountModel
                 {
                     UserId = _userId,
                     BankName = string.IsNullOrWhiteSpace(mainBankName) ? "Konto bankowe" : mainBankName,
-                    AccountName = "Rachunek startowy",
+                    AccountName = accountName,
                     Iban = "",
                     Currency = "PLN",
                     Balance = bankTotal
                 };
+
                 DatabaseService.InsertAccount(acc);
             }
 
@@ -206,6 +219,8 @@ namespace Finly.Views
         }
     }
 }
+
+
 
 
 

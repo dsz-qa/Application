@@ -221,11 +221,9 @@
                                        FontWeight="SemiBold"
                                        Foreground="{DynamicResource App.Foreground}"/>
 
-                            <!-- Używamy globalnego ciemnego stylu ComboBox z App.xaml -->
                             <ComboBox x:Name="MainBankCombo"
                                       Margin="0,4,0,4"
                                       Height="32">
-                                <!-- Wybierz bank + logotypy -->
                                 <ComboBoxItem>
                                     <StackPanel Orientation="Horizontal">
                                         <TextBlock Text="Wybierz bank"
@@ -281,12 +279,11 @@
                                 <ComboBoxItem>
                                     <StackPanel Orientation="Horizontal">
                                         <Image Width="20" Height="20"
-               Margin="0,0,8,0"
-               Source="pack://application:,,,/Assets/Banks/creditagricolelogo.png"/>
+                                               Margin="0,0,8,0"
+                                               Source="pack://application:,,,/Assets/Banks/creditagricolelogo.png"/>
                                         <TextBlock Text="Credit Agricole"/>
                                     </StackPanel>
                                 </ComboBoxItem>
-
 
                                 <ComboBoxItem>
                                     <StackPanel Orientation="Horizontal">
@@ -358,6 +355,7 @@
         </Grid>
     </Border>
 </Window>
+
 
 
 

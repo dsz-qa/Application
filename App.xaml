@@ -21,6 +21,7 @@
             <conv:BoolToSymbolConverter            x:Key="BoolToSymbol"/>
             <conv:BoolToVisibilityConverter        x:Key="BoolToVisibility"/>
             <conv:InverseBoolToVisibilityConverter x:Key="InverseBoolToVisibility"/>
+            <conv:NullToVisibilityConverter x:Key="NullToVisibilityConverter"/>
 
             <!-- ========= COMBOBOX – CIEMNA LISTA ========= -->
 
