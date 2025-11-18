@@ -39,36 +39,35 @@
                     <!-- Typ -->
                     <StackPanel Orientation="Vertical" Margin="0,0,12,0">
                         <TextBlock Text="Typ" FontSize="12" Margin="0,0,0,4"/>
-                        <ComboBox Width="160"
-                                  SelectedItem="{Binding SelectedTypeFilter}">
+                        <ComboBox x:Name="TypeCombo"
+                                  Width="160">
                             <ComboBoxItem Content="Wszystkie"/>
                             <ComboBoxItem Content="Wydatki"/>
                             <ComboBoxItem Content="Przychody"/>
-                            <ComboBoxItem Content="Transfery"/>
+                            <ComboBoxItem Content="Obie"/>
                         </ComboBox>
                     </StackPanel>
 
                     <!-- Od -->
                     <StackPanel Orientation="Vertical" Margin="0,0,12,0">
                         <TextBlock Text="Od" FontSize="12" Margin="0,0,0,4"/>
-                        <DatePicker Width="140"
-                                    SelectedDate="{Binding FromDate}"/>
+                        <DatePicker x:Name="FromDatePicker"
+                                    Width="140"/>
                     </StackPanel>
 
                     <!-- Do -->
                     <StackPanel Orientation="Vertical" Margin="0,0,12,0">
                         <TextBlock Text="Do" FontSize="12" Margin="0,0,0,4"/>
-                        <DatePicker Width="140"
-                                    SelectedDate="{Binding ToDate}"/>
+                        <DatePicker x:Name="ToDatePicker"
+                                    Width="140"/>
                     </StackPanel>
 
                     <!-- Szukajka -->
                     <StackPanel Orientation="Vertical" Margin="0,0,12,0" Width="240">
                         <TextBlock Text="Szukaj kategorii" FontSize="12" Margin="0,0,0,4"/>
                         <Grid>
-                            <TextBox Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}"
+                            <TextBox x:Name="SearchBox"
                                      Margin="0,0,28,0"/>
-                            <!-- Prosta ikonka lupy z prawej (TextBlock) -->
                             <TextBlock Text="🔍"
                                        VerticalAlignment="Center"
                                        HorizontalAlignment="Right"
@@ -114,7 +113,7 @@
                             Click="ArchiveCategory_Click"/>
                 </StackPanel>
 
-                <!-- (opcjonalnie) pasek presetów dat: Dziś / Ten miesiąc / Ten rok -->
+                <!-- Presety dat -->
                 <StackPanel Grid.Row="2"
                             Grid.ColumnSpan="2"
                             Orientation="Horizontal"
@@ -139,10 +138,8 @@
         <!-- ===================== GŁÓWNA CZĘŚĆ ===================== -->
         <Grid Grid.Row="2">
             <Grid.ColumnDefinitions>
-                <!-- Tabela kategorii -->
                 <ColumnDefinition Width="3*"/>
                 <ColumnDefinition Width="12"/>
-                <!-- Szczegóły wybranej kategorii -->
                 <ColumnDefinition Width="2*"/>
             </Grid.ColumnDefinitions>
 
@@ -162,12 +159,13 @@
                                FontSize="16"
                                FontWeight="SemiBold"/>
 
-                    <DataGrid Grid.Row="2"
-                              ItemsSource="{Binding CategoryItems}"
-                              SelectedItem="{Binding SelectedCategory, Mode=TwoWay}"
+                    <DataGrid x:Name="CategoriesGrid"
+                              Grid.Row="2"
                               AutoGenerateColumns="False"
                               CanUserAddRows="False"
-                              IsReadOnly="True">
+                              IsReadOnly="True"
+                              SelectionMode="Single"
+                              SelectionChanged="CategoriesGrid_SelectionChanged">
                         <DataGrid.Columns>
                             <DataGridTextColumn Header="Kategoria"
                                                 Binding="{Binding Name}"
@@ -196,37 +194,28 @@
                     Background="{DynamicResource SurfaceBrush}">
                 <Grid>
                     <Grid.RowDefinitions>
-                        <!-- Header -->
                         <RowDefinition Height="Auto"/>
                         <RowDefinition Height="8"/>
-                        <!-- Trend -->
                         <RowDefinition Height="Auto"/>
                         <RowDefinition Height="8"/>
-                        <!-- Ostatnie transakcje -->
                         <RowDefinition Height="*"/>
                     </Grid.RowDefinitions>
 
                     <!-- HEADER KATEGORII -->
                     <StackPanel Grid.Row="0">
-                        <TextBlock Text="{Binding SelectedCategory.Name}"
+                        <TextBlock x:Name="CategoryNameText"
+                                   Text="(Wybierz kategorię)"
                                    FontSize="18"
                                    FontWeight="SemiBold"
                                    TextTrimming="CharacterEllipsis"/>
-
-                        <StackPanel Orientation="Horizontal" Margin="0,4,0,0">
-                            <TextBlock Text="{Binding SelectedCategory.TypeDisplay}"
-                                       FontSize="12"
-                                       Margin="0,0,12,0"
-                                       Opacity="0.8"/>
-                            <TextBlock Text="{Binding SelectedCategory.TotalAmount, StringFormat=Kwota: {0:N2}}"
-                                       FontSize="12"
-                                       Margin="0,0,12,0"/>
-                            <TextBlock Text="{Binding SelectedCategory.SharePercent, StringFormat=Udział: {0:N1}%}"
-                                       FontSize="12"/>
-                        </StackPanel>
+                        <TextBlock x:Name="CategorySummaryText"
+                                   FontSize="12"
+                                   Margin="0,4,0,0"
+                                   Opacity="0.9"
+                                   Text=""/>
                     </StackPanel>
 
-                    <!-- TREND (PLACEHOLDER POD WYKRES) -->
+                    <!-- TREND (placeholder pod wykres) -->
                     <GroupBox Grid.Row="2"
                               Header="Trend w czasie"
                               Margin="0,0,0,0">
@@ -236,10 +225,6 @@
                                 VerticalAlignment="Stretch"
                                 CornerRadius="4"
                                 Background="{DynamicResource SubtleSurfaceBrush}">
-                            <!--
-                                Tutaj później wstawisz kontrolkę LiveCharts.
-                                Na razie prosty TextBlock jako placeholder.
-                            -->
                             <TextBlock Text="(Wykres trendu dla wybranej kategorii)"
                                        HorizontalAlignment="Center"
                                        VerticalAlignment="Center"
@@ -250,13 +235,13 @@
                     <!-- OSTATNIE TRANSAKCJE -->
                     <GroupBox Grid.Row="4"
                               Header="Ostatnie transakcje">
-                        <DataGrid ItemsSource="{Binding LastTransactions}"
+                        <DataGrid x:Name="LastTransactionsGrid"
                                   AutoGenerateColumns="False"
                                   CanUserAddRows="False"
                                   IsReadOnly="True">
                             <DataGrid.Columns>
                                 <DataGridTextColumn Header="Data"
-                                                    Binding="{Binding Date, StringFormat={}{0:dd.MM.yyyy}}"
+                                                    Binding="{Binding Date}"
                                                     Width="110"/>
                                 <DataGridTextColumn Header="Kwota"
                                                     Binding="{Binding Amount, StringFormat={}{0:N2}}"

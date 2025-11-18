@@ -1,290 +1,509 @@
-﻿using System;
-using System.Collections.ObjectModel;
-using System.ComponentModel;
-using System.Runtime.CompilerServices;
+﻿using Finly.Services;
+using Finly.Views;
+using Finly.Views.Dialogs;
+using System;
+using System.Collections.Generic;
+using System.Data;
+using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
 
 namespace Finly.Pages
 {
-    public partial class CategoriesPage : UserControl, INotifyPropertyChanged
+    public partial class CategoriesPage : UserControl
     {
-        // ===== MODELE DANYCH (wewnętrzne, proste) =====
+        private readonly int _userId;
 
-        public sealed class CategorySummary
+        // Reprezentacja wiersza w tabeli kategorii
+        private sealed class CategoryRow
         {
-            public string Name { get; set; } = string.Empty;
-            /// <summary>
-            /// Np. "Wydatek", "Przychód", "Obie"
-            /// </summary>
-            public string TypeDisplay { get; set; } = string.Empty;
+            public int? CategoryId { get; set; }       // dla wydatków
+            public string? IncomeSource { get; set; }  // dla przychodów
+
+            public string Name { get; set; } = "";
+            public string TypeDisplay { get; set; } = "";   // "Wydatek" / "Przychód"
             public int EntryCount { get; set; }
             public decimal TotalAmount { get; set; }
             public double SharePercent { get; set; }
+
+            public bool IsIncome => !string.IsNullOrEmpty(IncomeSource);
         }
-
-        public sealed class CategoryTransaction
-        {
-            public DateTime Date { get; set; }
-            public decimal Amount { get; set; }
-            public string Description { get; set; } = string.Empty;
-        }
-
-        // ===== POLA / WŁAŚCIWOŚCI BINDINGÓW =====
-
-        private object? _selectedTypeFilter;
-        private DateTime? _fromDate;
-        private DateTime? _toDate;
-        private string _searchText = string.Empty;
-        private CategorySummary? _selectedCategory;
-
-        public ObservableCollection<CategorySummary> CategoryItems { get; } =
-            new ObservableCollection<CategorySummary>();
-
-        public ObservableCollection<CategoryTransaction> LastTransactions { get; } =
-            new ObservableCollection<CategoryTransaction>();
-
-        public object? SelectedTypeFilter
-        {
-            get => _selectedTypeFilter;
-            set
-            {
-                _selectedTypeFilter = value;
-                OnPropertyChanged();
-            }
-        }
-
-        public DateTime? FromDate
-        {
-            get => _fromDate;
-            set
-            {
-                _fromDate = value;
-                OnPropertyChanged();
-            }
-        }
-
-        public DateTime? ToDate
-        {
-            get => _toDate;
-            set
-            {
-                _toDate = value;
-                OnPropertyChanged();
-            }
-        }
-
-        public string SearchText
-        {
-            get => _searchText;
-            set
-            {
-                _searchText = value;
-                OnPropertyChanged();
-            }
-        }
-
-        public CategorySummary? SelectedCategory
-        {
-            get => _selectedCategory;
-            set
-            {
-                _selectedCategory = value;
-                OnPropertyChanged();
-                LoadCategoryDetails(); // Za każdym razem, gdy użytkownik zmieni kategorię
-            }
-        }
-
-        // ===== KONSTRUKTOR =====
 
         public CategoriesPage()
         {
             InitializeComponent();
-            DataContext = this;
-
-            // Domyślny zakres – ten miesiąc
-            var now = DateTime.Now;
-            FromDate = new DateTime(now.Year, now.Month, 1);
-            ToDate = FromDate.Value.AddMonths(1).AddDays(-1);
-
-            // Domyślny typ – "Wszystkie" (pierwsza pozycja ComboBoxa)
-            SelectedTypeFilter = null; // ustawi się w UI
-
-            // Tymczasowe dane do designu / testów
-            LoadSampleData();
+            _userId = UserService.GetCurrentUserId();
+            Loaded += CategoriesPage_Loaded;
         }
 
-        // ===== ŁADOWANIE DANYCH (DOCZEPIĆ DO DB) =====
+        // ================== ŻYCIE STRONY ==================
 
-        private void LoadSampleData()
+        private void CategoriesPage_Loaded(object? sender, RoutedEventArgs e)
         {
-            CategoryItems.Clear();
+            InitFilters();
+            RefreshCategories();
+        }
 
-            CategoryItems.Add(new CategorySummary
-            {
-                Name = "Jedzenie",
-                TypeDisplay = "Wydatek",
-                EntryCount = 42,
-                TotalAmount = 1234.56m,
-                SharePercent = 35.2
-            });
+        private void InitFilters()
+        {
+            if (TypeCombo != null && TypeCombo.SelectedIndex < 0)
+                TypeCombo.SelectedIndex = 0; // "Wszystkie"
 
-            CategoryItems.Add(new CategorySummary
-            {
-                Name = "Transport",
-                TypeDisplay = "Wydatek",
-                EntryCount = 12,
-                TotalAmount = 420.00m,
-                SharePercent = 12.0
-            });
+            var today = DateTime.Today;
+            var start = new DateTime(today.Year, today.Month, 1);
 
-            CategoryItems.Add(new CategorySummary
-            {
-                Name = "Wynagrodzenie",
-                TypeDisplay = "Przychód",
-                EntryCount = 2,
-                TotalAmount = 5800.00m,
-                SharePercent = 80.0
-            });
+            if (!FromDatePicker.SelectedDate.HasValue)
+                FromDatePicker.SelectedDate = start;
 
-            if (CategoryItems.Count > 0)
+            if (!ToDatePicker.SelectedDate.HasValue)
+                ToDatePicker.SelectedDate = today;
+        }
+
+        private void GetCurrentDateRange(out DateTime from, out DateTime to)
+        {
+            var today = DateTime.Today;
+            from = FromDatePicker.SelectedDate ?? today;
+            to = ToDatePicker.SelectedDate ?? today;
+
+            if (to < from)
+                (from, to) = (to, from);
+        }
+
+        private string GetTypeFilterText()
+        {
+            if (TypeCombo.SelectedItem is ComboBoxItem cbi)
+                return cbi.Content?.ToString() ?? "Wszystkie";
+            return "Wszystkie";
+        }
+
+        // ================== GŁÓWNE ODŚWIEŻANIE ==================
+
+        private void RefreshCategories(int? selectCategoryId = null, string? selectIncomeSource = null)
+        {
+            if (_userId <= 0) return;
+
+            GetCurrentDateRange(out var from, out var to);
+            var search = (SearchBox.Text ?? "").Trim();
+            var typeText = GetTypeFilterText();
+
+            bool includeExpenses = typeText is "Wszystkie" or "Wydatki" or "Obie";
+            bool includeIncomes = typeText is "Wszystkie" or "Przychody" or "Obie";
+
+            var dict = new Dictionary<string, CategoryRow>(StringComparer.OrdinalIgnoreCase);
+            decimal totalAll = 0m;
+
+            // ===== WYDATKI =====
+            if (includeExpenses)
             {
-                SelectedCategory = CategoryItems[0];
+                DataTable exp = DatabaseService.GetExpenses(_userId, from, to);
+
+                foreach (DataRow row in exp.Rows)
+                {
+                    int catId = 0;
+                    try
+                    {
+                        if (row["CategoryId"] != DBNull.Value)
+                            catId = Convert.ToInt32(row["CategoryId"]);
+                    }
+                    catch { catId = 0; }
+
+                    string name = exp.Columns.Contains("CategoryName")
+                        ? (row["CategoryName"]?.ToString() ?? "(brak kategorii)")
+                        : "(brak kategorii)";
+
+                    if (string.IsNullOrWhiteSpace(name))
+                        name = "(brak kategorii)";
+
+                    var key = $"E|{catId}|{name}";
+
+                    if (!dict.TryGetValue(key, out var cr))
+                    {
+                        cr = new CategoryRow
+                        {
+                            CategoryId = catId == 0 ? (int?)null : catId,
+                            IncomeSource = null,
+                            Name = name,
+                            TypeDisplay = "Wydatek",
+                            EntryCount = 0,
+                            TotalAmount = 0m
+                        };
+                        dict[key] = cr;
+                    }
+
+                    decimal amt = 0m;
+                    try { amt = Math.Abs(Convert.ToDecimal(row["Amount"])); } catch { }
+
+                    cr.EntryCount++;
+                    cr.TotalAmount += amt;
+                    totalAll += amt;
+                }
+            }
+
+            // ===== PRZYCHODY =====
+            if (includeIncomes)
+            {
+                DataTable inc = DatabaseService.GetIncomes(_userId, from, to, null);
+
+                foreach (DataRow row in inc.Rows)
+                {
+                    string source = inc.Columns.Contains("Source")
+                        ? (row["Source"]?.ToString() ?? "Przychody")
+                        : "Przychody";
+
+                    if (string.IsNullOrWhiteSpace(source))
+                        source = "Przychody";
+
+                    var key = $"I|{source}";
+
+                    if (!dict.TryGetValue(key, out var cr))
+                    {
+                        cr = new CategoryRow
+                        {
+                            CategoryId = null,
+                            IncomeSource = source,
+                            Name = source,
+                            TypeDisplay = "Przychód",
+                            EntryCount = 0,
+                            TotalAmount = 0m
+                        };
+                        dict[key] = cr;
+                    }
+
+                    decimal amt = 0m;
+                    try { amt = Math.Abs(Convert.ToDecimal(row["Amount"])); } catch { }
+
+                    cr.EntryCount++;
+                    cr.TotalAmount += amt;
+                    totalAll += amt;
+                }
+            }
+
+            // ===== DOŁÓŻ WSZYSTKIE KATEGORIE UŻYTKOWNIKA (nawet z 0 wpisów) =====
+            if (includeExpenses)
+            {
+                DataTable cats = DatabaseService.GetCategories(_userId);
+                foreach (DataRow crow in cats.Rows)
+                {
+                    int id;
+                    try { id = Convert.ToInt32(crow["Id"]); }
+                    catch { continue; }
+
+                    string name = crow["Name"]?.ToString() ?? "";
+                    if (string.IsNullOrWhiteSpace(name)) continue;
+
+                    var key = $"E|{id}|{name}";
+                    if (!dict.ContainsKey(key))
+                    {
+                        dict[key] = new CategoryRow
+                        {
+                            CategoryId = id,
+                            IncomeSource = null,
+                            Name = name,
+                            TypeDisplay = "Wydatek",
+                            EntryCount = 0,
+                            TotalAmount = 0m,
+                            SharePercent = 0
+                        };
+                    }
+                }
+            }
+
+            // ===== FILTR NAZWY + udział % =====
+            IEnumerable<CategoryRow> rowsEnum = dict.Values;
+
+            if (!string.IsNullOrWhiteSpace(search))
+            {
+                rowsEnum = rowsEnum.Where(r =>
+                    r.Name.Contains(search, StringComparison.OrdinalIgnoreCase));
+            }
+
+            var rows = rowsEnum.ToList();
+
+            if (totalAll > 0m)
+            {
+                foreach (var r in rows)
+                    r.SharePercent = (double)(r.TotalAmount / totalAll * 100m);
+            }
+            else
+            {
+                foreach (var r in rows)
+                    r.SharePercent = 0;
+            }
+
+            rows = rows
+                .OrderByDescending(r => r.TotalAmount)
+                .ThenBy(r => r.Name)
+                .ToList();
+
+            CategoriesGrid.ItemsSource = rows;
+
+            // wybór wiersza (np. nowo dodanej kategorii)
+            CategoryRow? rowToSelect = null;
+
+            if (selectCategoryId.HasValue)
+            {
+                rowToSelect = rows.FirstOrDefault(r => r.CategoryId == selectCategoryId.Value);
+            }
+            else if (!string.IsNullOrEmpty(selectIncomeSource))
+            {
+                rowToSelect = rows.FirstOrDefault(r =>
+                    string.Equals(r.IncomeSource, selectIncomeSource, StringComparison.OrdinalIgnoreCase));
+            }
+
+            if (rowToSelect != null)
+            {
+                CategoriesGrid.SelectedItem = rowToSelect;
+                CategoriesGrid.ScrollIntoView(rowToSelect);
+            }
+            else if (rows.Count > 0 && CategoriesGrid.SelectedItem == null)
+            {
+                CategoriesGrid.SelectedIndex = 0;
+            }
+            else if (rows.Count == 0)
+            {
+                ClearDetails();
             }
         }
 
-        /// <summary>
-        /// Tutaj później podłączysz DB:
-        /// - agregacja transakcji po kategorii
-        /// - filtr: typ, data od/do, SearchText
-        /// </summary>
-        private void ReloadFromDatabase()
-        {
-            // TODO: podłącz DatabaseService i uzupełnij CategoryItems
-            // Na razie zostawiamy sample.
-            LoadSampleData();
-        }
+        private CategoryRow? GetSelectedRow()
+            => CategoriesGrid.SelectedItem as CategoryRow;
 
-        private void LoadCategoryDetails()
-        {
-            LastTransactions.Clear();
+        // ================== SZCZEGÓŁY ==================
 
-            if (SelectedCategory == null)
+        private void CategoriesGrid_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            var row = GetSelectedRow();
+            if (row == null)
+            {
+                ClearDetails();
                 return;
+            }
 
-            // TODO: w przyszłości pobierz REALNE transakcje z DB
-            // Poniżej dummy-data jako przykład wyglądu.
-            LastTransactions.Add(new CategoryTransaction
+            CategoryNameText.Text = row.Name;
+            CategorySummaryText.Text =
+                $"{row.TypeDisplay} • Kwota: {row.TotalAmount:N2} • Udział: {row.SharePercent:N1}%";
+
+            GetCurrentDateRange(out var from, out var to);
+            var lastList = new List<object>();
+
+            if (row.IsIncome)
             {
-                Date = DateTime.Now.Date.AddDays(-1),
-                Amount = 58.90m,
-                Description = "Biedronka – zakupy spożywcze"
-            });
-            LastTransactions.Add(new CategoryTransaction
+                DataTable inc = DatabaseService.GetIncomes(_userId, from, to, null);
+
+                var filtered = inc.AsEnumerable()
+                    .Where(r =>
+                    {
+                        var src = inc.Columns.Contains("Source")
+                            ? (r["Source"]?.ToString() ?? "")
+                            : "";
+                        return string.Equals(src, row.IncomeSource,
+                            StringComparison.OrdinalIgnoreCase);
+                    })
+                    .OrderByDescending(r => r["Date"])
+                    .ThenByDescending(r => r["Id"])
+                    .Take(10);
+
+                foreach (var r in filtered)
+                {
+                    DateTime dt;
+                    DateTime.TryParse(r["Date"]?.ToString(), out dt);
+                    decimal amt = 0m;
+                    try { amt = Convert.ToDecimal(r["Amount"]); } catch { }
+
+                    string desc = inc.Columns.Contains("Description")
+                        ? (r["Description"]?.ToString() ?? "")
+                        : "";
+
+                    lastList.Add(new
+                    {
+                        Date = dt.ToString("dd.MM.yyyy"),
+                        Amount = amt,
+                        Description = string.IsNullOrWhiteSpace(desc) ? row.Name : desc
+                    });
+                }
+            }
+            else
             {
-                Date = DateTime.Now.Date.AddDays(-3),
-                Amount = 120.00m,
-                Description = "Pizzeria X – obiad"
-            });
-            LastTransactions.Add(new CategoryTransaction
-            {
-                Date = DateTime.Now.Date.AddDays(-7),
-                Amount = 230.50m,
-                Description = "Lidl – większe zakupy"
-            });
+                DataTable exp = DatabaseService.GetExpenses(
+                    _userId, from, to, row.CategoryId, null, null);
+
+                var filtered = exp.AsEnumerable()
+                    .OrderByDescending(r => r["Date"])
+                    .ThenByDescending(r => r["Id"])
+                    .Take(10);
+
+                foreach (var r in filtered)
+                {
+                    DateTime dt;
+                    DateTime.TryParse(r["Date"]?.ToString(), out dt);
+                    decimal amt = 0m;
+                    try { amt = Convert.ToDecimal(r["Amount"]); } catch { }
+
+                    string desc = "";
+                    if (exp.Columns.Contains("Title"))
+                        desc = r["Title"]?.ToString() ?? "";
+                    if (string.IsNullOrWhiteSpace(desc) && exp.Columns.Contains("Note"))
+                        desc = r["Note"]?.ToString() ?? "";
+
+                    lastList.Add(new
+                    {
+                        Date = dt.ToString("dd.MM.yyyy"),
+                        Amount = amt,
+                        Description = desc
+                    });
+                }
+            }
+
+            LastTransactionsGrid.ItemsSource = lastList;
         }
 
-        // ===== OBSŁUGA PRZYCISKÓW FILTRÓW =====
+        private void ClearDetails()
+        {
+            CategoryNameText.Text = "(Wybierz kategorię)";
+            CategorySummaryText.Text = "";
+            LastTransactionsGrid.ItemsSource = null;
+        }
+
+        // ================== FILTRY – PRZYCISKI ==================
 
         private void ApplyFilters_Click(object sender, RoutedEventArgs e)
-        {
-            // Docelowo: wywołaj ReloadFromDatabase() z parametrami filtrów.
-            ReloadFromDatabase();
-        }
+            => RefreshCategories();
 
         private void ClearFilters_Click(object sender, RoutedEventArgs e)
         {
-            SelectedTypeFilter = null;
-            SearchText = string.Empty;
-
-            var now = DateTime.Now;
-            FromDate = new DateTime(now.Year, now.Month, 1);
-            ToDate = FromDate.Value.AddMonths(1).AddDays(-1);
-
-            ReloadFromDatabase();
+            SearchBox.Text = "";
+            TypeCombo.SelectedIndex = 0;
+            FromDatePicker.SelectedDate = null;
+            ToDatePicker.SelectedDate = null;
+            InitFilters();
+            RefreshCategories();
         }
 
         private void PresetToday_Click(object sender, RoutedEventArgs e)
         {
-            var today = DateTime.Today;
-            FromDate = today;
-            ToDate = today;
-            ReloadFromDatabase();
+            var d = DateTime.Today;
+            FromDatePicker.SelectedDate = d;
+            ToDatePicker.SelectedDate = d;
+            RefreshCategories();
         }
 
         private void PresetThisMonth_Click(object sender, RoutedEventArgs e)
         {
-            var now = DateTime.Now;
-            FromDate = new DateTime(now.Year, now.Month, 1);
-            ToDate = FromDate.Value.AddMonths(1).AddDays(-1);
-            ReloadFromDatabase();
+            var today = DateTime.Today;
+            var start = new DateTime(today.Year, today.Month, 1);
+            var end = start.AddMonths(1).AddDays(-1);
+
+            FromDatePicker.SelectedDate = start;
+            ToDatePicker.SelectedDate = end;
+            RefreshCategories();
         }
 
         private void PresetThisYear_Click(object sender, RoutedEventArgs e)
         {
-            var now = DateTime.Now;
-            FromDate = new DateTime(now.Year, 1, 1);
-            ToDate = new DateTime(now.Year, 12, 31);
-            ReloadFromDatabase();
+            var today = DateTime.Today;
+            var start = new DateTime(today.Year, 1, 1);
+            var end = new DateTime(today.Year, 12, 31);
+
+            FromDatePicker.SelectedDate = start;
+            ToDatePicker.SelectedDate = end;
+            RefreshCategories();
         }
 
-        // ===== AKCJE NA KATEGORIACH =====
+        // ================== DODAJ / EDYTUJ / ARCHIWIZUJ / SCAL ==================
 
         private void AddCategory_Click(object sender, RoutedEventArgs e)
         {
-            // TODO: otwórz okno/dialog dodawania kategorii.
-            MessageBox.Show("Tu otworzysz dialog dodawania kategorii.", "Dodaj kategorię");
+            if (_userId <= 0) return;
+
+            var name = PromptForText("Dodaj kategorię", "Nazwa kategorii:");
+            if (string.IsNullOrWhiteSpace(name)) return;
+
+            var newId = DatabaseService.CreateCategory(_userId, name.Trim());
+            RefreshCategories(selectCategoryId: newId);
+
+            ToastService.Show("Kategoria została utworzona.", "success");
         }
 
         private void EditCategory_Click(object sender, RoutedEventArgs e)
         {
-            if (SelectedCategory == null)
+            var row = GetSelectedRow();
+            if (row == null)
             {
-                MessageBox.Show("Najpierw wybierz kategorię z listy.", "Brak wyboru");
+                MessageBox.Show("Najpierw wybierz kategorię.", "Kategorie",
+                    MessageBoxButton.OK, MessageBoxImage.Information);
                 return;
             }
 
-            // TODO: otwórz dialog edycji (nazwa, typ, kolor itd.).
-            MessageBox.Show($"Tu edytujesz kategorię: {SelectedCategory.Name}", "Edytuj kategorię");
-        }
+            var name = PromptForText("Edytuj kategorię", "Nazwa kategorii:", row.Name);
+            if (string.IsNullOrWhiteSpace(name)) return;
 
-        private void MergeCategories_Click(object sender, RoutedEventArgs e)
-        {
-            // TODO:
-            // 1) okno wyboru: Kategoria źródłowa + docelowa
-            // 2) update transakcji w DB
-            // 3) oznaczenie starej jako archiwalnej
-            MessageBox.Show("Tu zrobimy kreator scalania kategorii.", "Scal kategorie");
+            if (row.CategoryId.HasValue)
+            {
+                DatabaseService.UpdateCategory(row.CategoryId.Value, name.Trim());
+                RefreshCategories(selectCategoryId: row.CategoryId.Value);
+                ToastService.Show("Kategoria została zaktualizowana.", "success");
+            }
+            else
+            {
+                // na razie nie zmieniamy nazw źródeł przychodów
+                RefreshCategories(selectIncomeSource: row.IncomeSource);
+            }
         }
 
         private void ArchiveCategory_Click(object sender, RoutedEventArgs e)
         {
-            if (SelectedCategory == null)
+            var row = GetSelectedRow();
+            if (row == null || !row.CategoryId.HasValue)
             {
-                MessageBox.Show("Najpierw wybierz kategorię z listy.", "Brak wyboru");
+                MessageBox.Show("Najpierw wybierz kategorię wydatków (z przypisaną kategorią).",
+                    "Kategorie", MessageBoxButton.OK, MessageBoxImage.Information);
                 return;
             }
 
-            // TODO: flaga 'archived' w DB + odświeżenie widoku.
-            MessageBox.Show($"Tu oznaczysz kategorię '{SelectedCategory.Name}' jako archiwalną.", "Archiwizuj kategorię");
+            var confirm = MessageBox.Show(
+                $"Czy na pewno chcesz zarchiwizować kategorię „{row.Name}”?\n" +
+                "Nie będzie się pojawiać w listach, ale pozostanie w starych transakcjach.",
+                "Archiwizuj kategorię",
+                MessageBoxButton.YesNo,
+                MessageBoxImage.Question);
+
+            if (confirm != MessageBoxResult.Yes) return;
+
+            // na razie zwykły DELETE; w przyszłości można dodać IsArchived
+            DatabaseService.DeleteCategory(row.CategoryId.Value);
+            RefreshCategories();
+
+            ToastService.Show("Kategoria została zarchiwizowana.", "info");
         }
 
-        // ===== INotifyPropertyChanged =====
+        private void MergeCategories_Click(object sender, RoutedEventArgs e)
+        {
+            MessageBox.Show(
+                "Scalanie kategorii dodamy w kolejnym kroku (okno z wyborem kategorii docelowej). " +
+                "Na razie funkcja jest wyłączona, żeby niczego nie popsuć.",
+                "Scal kategorie",
+                MessageBoxButton.OK,
+                MessageBoxImage.Information);
+        }
 
-        public event PropertyChangedEventHandler? PropertyChanged;
+        // ================== ŁADNY INPUT W STYLU FINLY ==================
 
-        private void OnPropertyChanged([CallerMemberName] string? propertyName = null)
-            => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+        private string? PromptForText(string title, string label, string? initial = null)
+        {
+            var owner = Window.GetWindow(this);
+            var dlg = new TextInputDialog(title, label, initial);
+            if (owner != null)
+                dlg.Owner = owner;
+
+            var result = dlg.ShowDialog();
+            if (result == true)
+                return dlg.Value;
+
+            return null;
+        }
     }
 }
+
+
+
 
