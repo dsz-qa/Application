@@ -1,9 +1,9 @@
 ﻿using Finly.Models;
 using System;
+using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
 using System.Windows;
-using System.Windows.Controls;
 
 namespace Finly.Views.Dialogs
 {
@@ -11,12 +11,21 @@ namespace Finly.Views.Dialogs
     {
         public BankAccountModel Model { get; }
 
+        // ====== OPCJE BANKÓW DLA COMBOBOXA ======
+        private sealed class BankOption
+        {
+            public string Name { get; set; } = "";
+            public string LogoPath { get; set; } = "";
+        }
+
+        private readonly List<BankOption> _bankOptions = new();
+
         public EditAccountDialog(BankAccountModel model)
         {
             InitializeComponent();
             Model = model ?? throw new ArgumentNullException(nameof(model));
 
-            // Wypełnij ComboBox listą banków (z XAML)
+            // Wypełnij listę banków (z logotypami)
             InitBankSelection();
 
             // Ustaw wartości z modelu
@@ -24,65 +33,82 @@ namespace Finly.Views.Dialogs
             IbanBox.Text = Model.Iban ?? string.Empty;
             BalanceBox.Text = Model.Balance.ToString("N2", CultureInfo.CurrentCulture);
 
-            // Ustaw wybrany bank
+            // Ustaw wybrany bank na podstawie modelu
             SetSelectedBank(Model.BankName);
-
-            BankCombo.SelectionChanged += BankCombo_SelectionChanged;
-            BankCombo_SelectionChanged(BankCombo, null);
         }
 
         // ====== BANKI ======
 
         private void InitBankSelection()
         {
-            // Jeśli w XAML coś zmienisz / dodasz, nie trzeba ruszać kodu.
-            if (BankCombo.Items.Count == 0)
+            _bankOptions.Clear();
+
+            _bankOptions.Add(new BankOption
             {
-                BankCombo.Items.Add(new ComboBoxItem { Content = "Inny bank" });
-            }
+                Name = "Revolut",
+                LogoPath = "pack://application:,,,/Assets/Banks/revolutlogo.png"
+            });
+            _bankOptions.Add(new BankOption
+            {
+                Name = "PKO Bank Polski",
+                LogoPath = "pack://application:,,,/Assets/Banks/pkobplogo.jpg"
+            });
+            _bankOptions.Add(new BankOption
+            {
+                Name = "mBank",
+                LogoPath = "pack://application:,,,/Assets/Banks/mbanklogo.jpg"
+            });
+            _bankOptions.Add(new BankOption
+            {
+                Name = "Bank Pekao",
+                LogoPath = "pack://application:,,,/Assets/Banks/pekaologo.jpg"
+            });
+            _bankOptions.Add(new BankOption
+            {
+                Name = "ING Bank Śląski",
+                LogoPath = "pack://application:,,,/Assets/Banks/inglogo.png"
+            });
+            _bankOptions.Add(new BankOption
+            {
+                Name = "Santander Bank Polska",
+                LogoPath = "pack://application:,,,/Assets/Banks/santanderlogo.png"
+            });
+            _bankOptions.Add(new BankOption
+            {
+                Name = "Alior Bank",
+                LogoPath = "pack://application:,,,/Assets/Banks/aliorbanklogo.png"
+            });
+            _bankOptions.Add(new BankOption
+            {
+                Name = "Millennium",
+                LogoPath = "pack://application:,,,/Assets/Banks/milleniumlogo.png"
+            });
+
+            // Pozycja domyślna „Inny bank”
+            _bankOptions.Add(new BankOption
+            {
+                Name = "Inny bank",
+                LogoPath = "pack://application:,,,/Assets/Banks/innybank.png"
+            });
+
+            BankCombo.ItemsSource = _bankOptions;
         }
 
         private void SetSelectedBank(string? bankName)
         {
+            if (!_bankOptions.Any())
+                InitBankSelection();
+
             if (string.IsNullOrWhiteSpace(bankName))
             {
-                BankCombo.SelectedIndex = BankCombo.Items.Count - 1; // Inny bank
-                BankNameBox.Text = "";
+                BankCombo.SelectedItem = _bankOptions.Last(); // Inny bank
                 return;
             }
 
-            // Szukamy pozycji o takiej samej nazwie
-            foreach (var item in BankCombo.Items.Cast<ComboBoxItem>())
-            {
-                if (string.Equals(item.Content?.ToString(), bankName, StringComparison.OrdinalIgnoreCase))
-                {
-                    BankCombo.SelectedItem = item;
-                    BankNameBox.Text = bankName;
-                    return;
-                }
-            }
+            var match = _bankOptions.FirstOrDefault(b =>
+                string.Equals(b.Name, bankName, StringComparison.OrdinalIgnoreCase));
 
-            // Nie znaleziono – traktujemy jako „Inny bank”, ale zachowujemy nazwę w polu
-            BankCombo.SelectedIndex = BankCombo.Items.Count - 1;
-            BankNameBox.Text = bankName;
-        }
-
-        private void BankCombo_SelectionChanged(object? sender, SelectionChangedEventArgs? e)
-        {
-            var selected = (BankCombo.SelectedItem as ComboBoxItem)?.Content?.ToString();
-
-            if (string.Equals(selected, "Inny bank", StringComparison.OrdinalIgnoreCase) ||
-                string.IsNullOrWhiteSpace(selected))
-            {
-                BankNameBox.IsEnabled = true;
-                BankNameBox.Opacity = 1.0;
-            }
-            else
-            {
-                BankNameBox.Text = selected;
-                BankNameBox.IsEnabled = false;
-                BankNameBox.Opacity = 0.7;
-            }
+            BankCombo.SelectedItem = match ?? _bankOptions.Last();
         }
 
         // ====== PRZYCISKI ======
@@ -102,12 +128,8 @@ namespace Finly.Views.Dialogs
                 return;
             }
 
-            var bankNameFromBox = (BankNameBox.Text ?? "").Trim();
-            var selectedFromCombo = (BankCombo.SelectedItem as ComboBoxItem)?.Content?.ToString() ?? "";
-
-            var finalBankName = !string.IsNullOrWhiteSpace(bankNameFromBox)
-                ? bankNameFromBox
-                : selectedFromCombo;
+            var selectedOption = BankCombo.SelectedItem as BankOption;
+            var finalBankName = selectedOption?.Name ?? "Inny bank";
 
             Model.BankName = finalBankName;
             Model.AccountName = (AccountNameBox.Text ?? "").Trim();
@@ -126,5 +148,7 @@ namespace Finly.Views.Dialogs
         }
     }
 }
+
+
 
 

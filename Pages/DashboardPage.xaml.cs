@@ -62,14 +62,27 @@ namespace Finly.Pages
         {
             if (_uid <= 0) return;
 
+            // snapshot dalej wykorzystujemy do majątku, banków, kopert itd.
             var snap = DatabaseService.GetMoneySnapshot(_uid);
 
+            // Cały majątek
             SetKpiText("TotalWealthText", snap.Total);
+
+            // Konta bankowe
             SetKpiText("BanksText", snap.Banks);
-            SetKpiText("FreeCashDashboardText", snap.Cash);
+
+            // *** WAŻNE: wolna gotówka – tak samo jak na EnvelopesPage ***
+            var freeCash = DatabaseService.GetCashOnHand(_uid);
+            SetKpiText("FreeCashDashboardText", freeCash);
+
+            // Odłożona gotówka do rozdysponowania (ta sama logika co dotychczas)
             SetKpiText("SavedToAllocateText", snap.SavedUnallocated);
+
+            // Gotówka w kopertach
             SetKpiText("EnvelopesDashboardText", snap.Envelopes);
-            SetKpiText("InvestmentsText", 0m); // na razie 0
+
+            // Inwestycje – na razie 0
+            SetKpiText("InvestmentsText", 0m);
         }
 
         // ===== zakres dat =====
@@ -199,10 +212,6 @@ namespace Finly.Pages
             }), DispatcherPriority.Loaded);
         }
 
-        /// <summary>
-        /// Rysuje donut z danych. Jeśli updateCenter = true, ustawia
-        /// środek (tekst) i _currentTotalExpenses na potrzeby kliknięcia.
-        /// </summary>
         private void BuildPie(
             ObservableCollection<PieSlice> target,
             IEnumerable<DatabaseService.CategoryAmountDto> source,
@@ -464,6 +473,7 @@ namespace Finly.Pages
         public double Percent { get; set; }
     }
 }
+
 
 
 
