@@ -1,193 +1,184 @@
 ﻿<UserControl x:Class="Finly.Pages.AccountPage"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
-             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
-             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
-             mc:Ignorable="d">
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
 
     <ScrollViewer VerticalScrollBarVisibility="Auto">
-        <StackPanel Margin="24" Orientation="Vertical">
+        <Grid Margin="24">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <!-- Dane osobowe -->
+                <RowDefinition Height="16"/>
+                <RowDefinition Height="Auto"/>
+                <!-- Zmiana hasła -->
+                <RowDefinition Height="16"/>
+                <RowDefinition Height="Auto"/>
+                <!-- Usunięcie konta -->
+            </Grid.RowDefinitions>
 
-            <TextBlock Text="Dane konta" FontSize="24" FontWeight="Bold"/>
-
-            <!-- ============ PROFIL + ZMIANA HASŁA ============ -->
-            <Border Margin="0,12,0,0"
-                    Background="{DynamicResource Surface.Background}"
-                    BorderBrush="{DynamicResource Surface.Border}"
-                    BorderThickness="1" CornerRadius="10">
-                <Grid Margin="16">
+            <!-- ================= DANE OSOBOWE ================= -->
+            <GroupBox Header="Dane osobowe" Grid.Row="0">
+                <Grid Margin="12">
                     <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <!-- Email -->
+                        <RowDefinition Height="Auto"/>
+                        <!-- Imię -->
+                        <RowDefinition Height="Auto"/>
+                        <!-- Nazwisko -->
+                        <RowDefinition Height="Auto"/>
+                        <!-- Data ur. -->
+                        <RowDefinition Height="Auto"/>
+                        <!-- Telefon -->
+                        <RowDefinition Height="Auto"/>
+                        <!-- Miasto -->
+                        <RowDefinition Height="Auto"/>
+                        <!-- Kod pocztowy -->
+                        <RowDefinition Height="Auto"/>
+                        <!-- Ulica -->
+                        <RowDefinition Height="Auto"/>
+                        <!-- Nr domu/mieszkania -->
+                        <RowDefinition Height="Auto"/>
+                        <!-- Przyciski -->
+                    </Grid.RowDefinitions>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="160"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+
+                    <!-- Email -->
+                    <TextBlock Grid.Row="0" Grid.Column="0" Text="Email:" VerticalAlignment="Center"/>
+                    <StackPanel Grid.Row="0" Grid.Column="1">
+                        <TextBlock x:Name="LblEmail" Text="nie podano"/>
+                        <TextBox x:Name="TxtEmail" Visibility="Collapsed" Height="24"/>
+                    </StackPanel>
+
+                    <!-- Imię -->
+                    <TextBlock Grid.Row="1" Grid.Column="0" Text="Imię:" VerticalAlignment="Center" Margin="0,4,0,0"/>
+                    <StackPanel Grid.Row="1" Grid.Column="1" Margin="0,4,0,0">
+                        <TextBlock x:Name="LblFirstName" Text="nie podano"/>
+                        <TextBox x:Name="TxtFirstName" Visibility="Collapsed" Height="24"/>
+                    </StackPanel>
+
+                    <!-- Nazwisko -->
+                    <TextBlock Grid.Row="2" Grid.Column="0" Text="Nazwisko:" VerticalAlignment="Center" Margin="0,4,0,0"/>
+                    <StackPanel Grid.Row="2" Grid.Column="1" Margin="0,4,0,0">
+                        <TextBlock x:Name="LblLastName" Text="nie podano"/>
+                        <TextBox x:Name="TxtLastName" Visibility="Collapsed" Height="24"/>
+                    </StackPanel>
+
+                    <!-- Data urodzenia -->
+                    <TextBlock Grid.Row="3" Grid.Column="0" Text="Data urodzenia (DD-MM-RRRR):" VerticalAlignment="Center" Margin="0,4,0,0"/>
+                    <StackPanel Grid.Row="3" Grid.Column="1" Margin="0,4,0,0">
+                        <TextBlock x:Name="LblBirthDate" Text="nie podano"/>
+                        <TextBox x:Name="TxtBirthDate" Visibility="Collapsed" Height="24"/>
+                    </StackPanel>
+
+                    <!-- Telefon -->
+                    <TextBlock Grid.Row="4" Grid.Column="0" Text="Nr telefonu:" VerticalAlignment="Center" Margin="0,4,0,0"/>
+                    <StackPanel Grid.Row="4" Grid.Column="1" Margin="0,4,0,0">
+                        <TextBlock x:Name="LblPhone" Text="nie podano"/>
+                        <TextBox x:Name="TxtPhone" Visibility="Collapsed" Height="24"/>
+                    </StackPanel>
+
+                    <!-- Miasto -->
+                    <TextBlock Grid.Row="5" Grid.Column="0" Text="Miasto:" VerticalAlignment="Center" Margin="0,4,0,0"/>
+                    <StackPanel Grid.Row="5" Grid.Column="1" Margin="0,4,0,0">
+                        <TextBlock x:Name="LblCity" Text="nie podano"/>
+                        <TextBox x:Name="TxtCity" Visibility="Collapsed" Height="24"/>
+                    </StackPanel>
+
+                    <!-- Kod pocztowy -->
+                    <TextBlock Grid.Row="6" Grid.Column="0" Text="Kod pocztowy:" VerticalAlignment="Center" Margin="0,4,0,0"/>
+                    <StackPanel Grid.Row="6" Grid.Column="1" Margin="0,4,0,0">
+                        <TextBlock x:Name="LblPostalCode" Text="nie podano"/>
+                        <TextBox x:Name="TxtPostalCode" Visibility="Collapsed" Height="24"/>
+                    </StackPanel>
+
+                    <!-- Ulica -->
+                    <TextBlock Grid.Row="7" Grid.Column="0" Text="Ulica:" VerticalAlignment="Center" Margin="0,4,0,0"/>
+                    <StackPanel Grid.Row="7" Grid.Column="1" Margin="0,4,0,0">
+                        <TextBlock x:Name="LblStreet" Text="nie podano"/>
+                        <TextBox x:Name="TxtStreet" Visibility="Collapsed" Height="24"/>
+                    </StackPanel>
+
+                    <!-- Nr domu / mieszkania -->
+                    <TextBlock Grid.Row="8" Grid.Column="0" Text="Nr domu / mieszkania:" VerticalAlignment="Center" Margin="0,4,0,0"/>
+                    <StackPanel Grid.Row="8" Grid.Column="1" Margin="0,4,0,0">
+                        <TextBlock x:Name="LblHouseNo" Text="nie podano"/>
+                        <TextBox x:Name="TxtHouseNo" Visibility="Collapsed" Height="24"/>
+                    </StackPanel>
+
+                    <!-- Przyciski -->
+                    <StackPanel Grid.Row="9" Grid.ColumnSpan="2"
+                                Orientation="Horizontal"
+                                HorizontalAlignment="Right"
+                                Margin="0,12,0,0">
+                        <Button x:Name="BtnCancelPersonal"
+                                Content="Anuluj"
+                                Width="90"
+                                Margin="0,0,8,0"
+                                Visibility="Collapsed"
+                                Click="BtnCancelPersonal_Click"/>
+                        <Button x:Name="BtnSavePersonal"
+                                Content="Zapisz"
+                                Width="90"
+                                Margin="0,0,8,0"
+                                Visibility="Collapsed"
+                                Click="BtnSavePersonal_Click"/>
+                        <Button x:Name="BtnEditPersonal"
+                                Content="Uzupełnij / Edytuj dane"
+                                Width="170"
+                                Click="BtnEditPersonal_Click"/>
+                    </StackPanel>
+                </Grid>
+            </GroupBox>
+
+            <!-- ================= ZMIANA HASŁA ================= -->
+            <GroupBox Header="Zmiana hasła" Grid.Row="2">
+                <Grid Margin="12">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
                         <RowDefinition Height="Auto"/>
                         <RowDefinition Height="Auto"/>
                         <RowDefinition Height="Auto"/>
                     </Grid.RowDefinitions>
                     <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="200"/>
                         <ColumnDefinition Width="*"/>
-                        <ColumnDefinition Width="Auto"/>
                     </Grid.ColumnDefinitions>
 
-                    <!-- Nagłówek -->
-                    <TextBlock Grid.Row="0" Grid.ColumnSpan="2"
-                               Text="Dane użytkownika" FontSize="18" FontWeight="SemiBold"
-                               Margin="0,0,0,8"/>
+                    <TextBlock Grid.Row="0" Grid.Column="0" Text="Stare hasło:" VerticalAlignment="Center"/>
+                    <PasswordBox x:Name="PwdOld" Grid.Row="0" Grid.Column="1" Margin="0,2,0,2"/>
 
-                    <!-- Dane użytkownika -->
-                    <StackPanel Grid.Row="1" Grid.Column="0" Margin="0,8,16,0">
-                        <StackPanel Orientation="Horizontal" Margin="0,2,0,0">
-                            <TextBlock Text="E-mail:" Width="160"/>
-                            <TextBlock Text="{Binding EmailDisplay}" FontWeight="SemiBold"/>
-                        </StackPanel>
-                        <StackPanel Orientation="Horizontal" Margin="0,2,0,0">
-                            <TextBlock Text="Imię:" Width="160"/>
-                            <TextBlock Text="{Binding FirstNameDisplay}"/>
-                        </StackPanel>
-                        <StackPanel Orientation="Horizontal" Margin="0,2,0,0">
-                            <TextBlock Text="Nazwisko:" Width="160"/>
-                            <TextBlock Text="{Binding LastNameDisplay}"/>
-                        </StackPanel>
-                        <StackPanel Orientation="Horizontal" Margin="0,2,0,0">
-                            <TextBlock Text="Data urodzin:" Width="160"/>
-                            <TextBlock Text="{Binding BirthDateDisplay}"/>
-                        </StackPanel>
-                        <StackPanel Orientation="Horizontal" Margin="0,2,0,0">
-                            <TextBlock Text="Adres:" Width="160"/>
-                            <TextBlock Text="{Binding AddressDisplay}" TextWrapping="Wrap"/>
-                        </StackPanel>
-                    </StackPanel>
+                    <TextBlock Grid.Row="1" Grid.Column="0" Text="Nowe hasło:" VerticalAlignment="Center"/>
+                    <PasswordBox x:Name="PwdNew" Grid.Row="1" Grid.Column="1" Margin="0,2,0,2"/>
 
-                    <!-- Przycisk edycji danych -->
-                    <Button Grid.Row="1" Grid.Column="1"
-                            Content="Edytuj dane osobowe"
-                            VerticalAlignment="Top" Width="260"
-                            Style="{StaticResource PrimaryButton}"
-                            Click="EditPersonal_Click"/>
+                    <TextBlock Grid.Row="2" Grid.Column="0" Text="Powtórz nowe hasło:" VerticalAlignment="Center"/>
+                    <PasswordBox x:Name="PwdNew2" Grid.Row="2" Grid.Column="1" Margin="0,2,0,2"/>
 
-                    <!-- Zmiana hasła -->
-                    <StackPanel Grid.Row="2" Grid.ColumnSpan="2" Margin="0,16,0,0">
-                        <TextBlock Text="Zmiana hasła"
-                                   FontSize="16"
-                                   FontWeight="SemiBold"
-                                   Margin="0,0,0,8"/>
-
-                        <StackPanel Margin="0,8,0,0">
-                            <TextBlock Text="Wpisz aktualne hasło:" Margin="0,0,0,4"/>
-                            <PasswordBox x:Name="PwdOld"/>
-                        </StackPanel>
-
-                        <StackPanel Margin="0,8,0,0">
-                            <TextBlock Text="Nowe hasło:" Margin="0,0,0,4"/>
-                            <PasswordBox x:Name="PwdNew"/>
-                        </StackPanel>
-
-                        <StackPanel Margin="0,8,0,0">
-                            <TextBlock Text="Powtórz nowe hasło:" Margin="0,0,0,4"/>
-                            <PasswordBox x:Name="PwdNew2"/>
-                        </StackPanel>
-
-                        <StackPanel Orientation="Horizontal" Margin="0,12,0,0">
-                            <Button Content="Zmień hasło"
-                                    Click="ChangePassword_Click"
-                                    Style="{StaticResource PrimaryButton}"/>
-                            <TextBlock Margin="12,0,0,0"
-                                       Text="{Binding PasswordChangeMessage}"
-                                       Foreground="{Binding PasswordChangeBrush}"/>
-                        </StackPanel>
-                    </StackPanel>
+                    <Button Grid.Row="3" Grid.ColumnSpan="2"
+                            Content="Zmień hasło"
+                            Width="120"
+                            HorizontalAlignment="Right"
+                            Margin="0,8,0,0"
+                            Click="ChangePassword_Click"/>
                 </Grid>
-            </Border>
+            </GroupBox>
 
-            <!-- ============ USUNIĘCIE KONTA UŻYTKOWNIKA ============ -->
-            <Border Margin="0,16,0,0"
-                    Background="{DynamicResource Surface.Background}"
-                    BorderBrush="{DynamicResource Surface.Border}"
-                    BorderThickness="1" CornerRadius="10">
-                <StackPanel Margin="16">
-                    <TextBlock Text="Usunięcie konta"
-                               FontSize="16"
-                               FontWeight="SemiBold"
-                               Foreground="#D9534F"/>
-
-                    <TextBlock Margin="0,4,0,8"
-                               Text="Jeżeli chcesz trwale usunąć swoje konto i wszystkie zapisane dane (rachunki, budżety, koperty itd.), kliknij przycisk poniżej."
-                               TextWrapping="Wrap"/>
-
+            <!-- ================= USUWANIE KONTA ================= -->
+            <GroupBox Header="Usuwanie konta" Grid.Row="4">
+                <StackPanel Margin="12">
+                    <TextBlock Text="Usuń swoje konto i wszystkie dane z aplikacji."
+                               TextWrapping="Wrap" Margin="0,0,0,8"/>
                     <Button Content="Usuń konto"
-                            HorizontalAlignment="Stretch"
-                            Margin="0,4,0,0"
-                            Padding="12,6"
-                            Foreground="White"
-                            Background="#D9534F"
-                            BorderBrush="#D43F3A"
+                            Width="120"
+                            HorizontalAlignment="Left"
                             Click="DeleteUser_Click"/>
                 </StackPanel>
-            </Border>
-
-            <!-- ============ BANKI (zarządzanie) ============ -->
-            <Border Margin="0,16,0,0"
-                    Background="{DynamicResource Surface.Background}"
-                    BorderBrush="{DynamicResource Surface.Border}"
-                    BorderThickness="1" CornerRadius="10">
-                <StackPanel Margin="16">
-                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                        <TextBlock Text="Połączone banki" FontSize="18" FontWeight="SemiBold"/>
-                        <Button Margin="12,0,0,0" Content="Dodaj konto" Click="AddAccount_Click"/>
-                        <Button Margin="8,0,0,0"  Content="Edytuj zaznaczone" Click="EditSelected_Click"/>
-                        <Button Margin="8,0,0,0"  Content="Usuń zaznaczone"  Click="DeleteSelected_Click"/>
-                        <Button Margin="12,0,0,0" Content="Otwórz stronę Rachunki"
-                                Style="{StaticResource PrimaryButton}" Click="OpenBanks_Click"/>
-                    </StackPanel>
-
-                    <DataGrid x:Name="AccountsGrid"
-                              Margin="0,8,0,0"
-                              AutoGenerateColumns="False"
-                              IsReadOnly="True"
-                              CanUserAddRows="False"
-                              SelectionMode="Single"
-                              SelectionUnit="FullRow"
-                              MouseDoubleClick="AccountsGrid_MouseDoubleClick">
-                        <DataGrid.Columns>
-                            <DataGridTextColumn Header="Bank"
-                                                Binding="{Binding BankName}"
-                                                Width="160"/>
-                            <DataGridTextColumn Header="Nazwa rachunku"
-                                                Binding="{Binding AccountName}"
-                                                Width="*"/>
-                            <DataGridTextColumn Header="IBAN"
-                                                Binding="{Binding Iban}"
-                                                Width="240"/>
-                            <DataGridTextColumn Header="Waluta"
-                                                Binding="{Binding Currency}"
-                                                Width="80"/>
-                            <DataGridTextColumn Header="Saldo"
-                                                Binding="{Binding Balance, StringFormat={}{0:N2}}"
-                                                Width="120"/>
-                            <DataGridTemplateColumn Header="Akcje"
-                                                    Width="160"
-                                                    IsReadOnly="True">
-                                <DataGridTemplateColumn.CellTemplate>
-                                    <DataTemplate>
-                                        <StackPanel Orientation="Horizontal"
-                                                    HorizontalAlignment="Center">
-                                            <Button Content="Edytuj"
-                                                    Margin="0,0,8,0"
-                                                    Tag="{Binding Id}"
-                                                    Click="EditAccount_Click"/>
-                                            <Button Content="Usuń"
-                                                    Tag="{Binding Id}"
-                                                    Click="DeleteBankAccount_Click"/>
-                                        </StackPanel>
-                                    </DataTemplate>
-                                </DataGridTemplateColumn.CellTemplate>
-                            </DataGridTemplateColumn>
-                        </DataGrid.Columns>
-                    </DataGrid>
-                </StackPanel>
-            </Border>
-
-        </StackPanel>
+            </GroupBox>
+        </Grid>
     </ScrollViewer>
 </UserControl>
-
 
 
 

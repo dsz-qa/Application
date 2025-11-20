@@ -462,9 +462,15 @@ namespace Finly.Pages
 
             SetSelectedBankForEdit(model.BankName);
 
+            // RESET komunikatu IBAN przy otwarciu panelu
+            IbanHintText.Text = "";
+            IbanHintText.Visibility = Visibility.Collapsed;
+
             EditPanel.Visibility = Visibility.Visible;
             OperationPanel.Visibility = Visibility.Collapsed;
+
         }
+
 
         private void ShowEditPanel(BankAccountModel model) => ShowEditPanel(model, isNew: false);
 
@@ -542,6 +548,13 @@ namespace Finly.Pages
             EditErrorText.Visibility = Visibility.Collapsed;
             EditErrorText.Text = "";
 
+            // 🔴 na start chowamy hint IBAN
+            if (IbanHintText != null)
+            {
+                IbanHintText.Text = "Polski IBAN musi mieć dokładnie 28 znaków (PL + 26 cyfr).";
+                IbanHintText.Visibility = Visibility.Collapsed;
+            }
+
             // saldo
             var textBalance = (EditBalanceBox.Text ?? "").Replace(" ", "");
             if (!decimal.TryParse(textBalance, NumberStyles.Number, CultureInfo.CurrentCulture,
@@ -559,13 +572,19 @@ namespace Finly.Pages
             {
                 if (!ValidatePolishIban(rawIban, out var normalized, out string? error))
                 {
-                    EditErrorText.Text = error ?? "Nieprawidłowy numer IBAN.";
-                    EditErrorText.Visibility = Visibility.Visible;
+                    // 🔴 zamiast EditErrorText – pokazujemy czerwony hint pod polem IBAN
+                    if (IbanHintText != null)
+                    {
+                        IbanHintText.Text = error ?? "Nieprawidłowy numer IBAN.";
+                        IbanHintText.Visibility = Visibility.Visible;
+                    }
                     return;
                 }
 
                 finalIban = FormatPolishIban(normalized);
             }
+
+
 
             // bank
             var bankFromCombo = GetSelectedEditBankName();
@@ -609,6 +628,14 @@ namespace Finly.Pages
                 HideEditPanel();
             }
         }
+
+
+        private void EditIbanBox_TextChanged(object sender, TextChangedEventArgs e)
+        {
+            if (IbanHintText != null)
+                IbanHintText.Visibility = Visibility.Collapsed;
+        }
+
 
         private void EditCancel_Click(object sender, RoutedEventArgs e)
         {

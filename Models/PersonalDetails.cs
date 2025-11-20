@@ -8,12 +8,14 @@ namespace Finly.Models
         public string? FirstName { get; set; }
         public string? LastName { get; set; }
 
-        // Pełna data urodzin (preferowana). Może być null.
         public DateTime? BirthDate { get; set; }
 
         public string? City { get; set; }
         public string? PostalCode { get; set; }
         public string? HouseNo { get; set; }
+
+        public string? Phone { get; set; }
+        public string? Street { get; set; }
     }
 }
 

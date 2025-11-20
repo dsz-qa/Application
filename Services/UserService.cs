@@ -6,7 +6,9 @@ using System.Text;
 
 namespace Finly.Services
 {
-    /// Proste zarz¹dzanie u¿ytkownikami + stan „kto zalogowany”.
+    /// <summary>
+    /// Proste zarz¹dzanie u¿ytkownikami + stan „kto jest zalogowany”.
+    /// </summary>
     public static class UserService
     {
         // ===== Stan logowania =====
@@ -30,6 +32,7 @@ namespace Finly.Services
             CurrentUserEmail = null;
         }
 
+        // ===== Onboarding / intro kopert =====
         public static bool HasSeenEnvelopesIntro(int userId)
         {
             using var con = DatabaseService.GetConnection();
@@ -48,6 +51,7 @@ namespace Finly.Services
             cmd.Parameters.AddWithValue("@id", userId);
             cmd.ExecuteNonQuery();
         }
+
         public static bool IsOnboarded(int userId)
         {
             using var con = DatabaseService.GetConnection();
@@ -87,7 +91,6 @@ namespace Finly.Services
             cmd.ExecuteNonQuery();
         }
 
-
         public static void SetHasSeenEnvelopesIntro(int userId, bool value)
         {
             using var con = DatabaseService.GetConnection();
@@ -98,8 +101,6 @@ namespace Finly.Services
             cmd.ExecuteNonQuery();
         }
 
-
-
         // ===== Typ konta =====
         public static AccountType GetAccountType(int userId)
         {
@@ -109,8 +110,8 @@ namespace Finly.Services
             cmd.Parameters.AddWithValue("@id", userId);
             var raw = cmd.ExecuteScalar()?.ToString();
             return string.Equals(raw, "Business", StringComparison.OrdinalIgnoreCase)
-                 ? AccountType.Business
-                 : AccountType.Personal;
+                ? AccountType.Business
+                : AccountType.Personal;
         }
 
         // ===== Rejestracja / logowanie =====
@@ -173,7 +174,7 @@ VALUES ($u, $ph, $type, $cname, $nip, $regon, $krs, $caddr);";
             return exists is null || exists == DBNull.Value;
         }
 
-        /// Logowanie po **loginie lub e-mailu** (case-insensitive).
+        /// <summary>Logowanie po loginie lub e-mailu (case-insensitive).</summary>
         public static bool Login(string login, string password)
         {
             var u = Normalize(login);
@@ -217,7 +218,7 @@ LIMIT 1;";
             return (obj is null || obj == DBNull.Value) ? -1 : Convert.ToInt32(obj);
         }
 
-        /// NOWE: Id po „login **albo** e-mail”.
+        /// <summary>Id po loginie albo e-mailu.</summary>
         public static int GetUserIdByLogin(string login)
         {
             var u = Normalize(login) ?? string.Empty;
@@ -278,7 +279,6 @@ LIMIT 1;";
             if (CurrentUserId == userId) CurrentUserEmail = norm;
         }
 
-
         public static DateTime GetCreatedAt(int userId)
             => GetUserById(userId)?.CreatedAt ?? DateTime.MinValue;
 
@@ -304,7 +304,7 @@ LIMIT 1;";
                     createdAt);
         }
 
-        // ===== Usuwanie konta =====
+        // ===== Usuwanie konta (stary sposób) =====
         public static bool DeleteAccount(int userId)
         {
             try
@@ -341,7 +341,10 @@ LIMIT 1;";
                 if (CurrentUserId == userId) ClearCurrentUser();
                 return true;
             }
-            catch { return false; }
+            catch
+            {
+                return false;
+            }
         }
 
         // ===== Profil (miks/zgodnoœæ) =====
@@ -352,6 +355,7 @@ LIMIT 1;";
             string? firstName = null, lastName = null, address = null;
             string? birthYear = null, city = null, postalCode = null, houseNo = null;
 
+            // PersonalProfiles (jeœli istnieje)
             try
             {
                 using var p = c.CreateCommand();
@@ -376,7 +380,10 @@ FROM PersonalProfiles WHERE UserId=@id LIMIT 1;";
                     houseNo = pr.IsDBNull(6) ? null : pr.GetString(6);
                 }
             }
-            catch { /* brak tabeli – OK */ }
+            catch
+            {
+                // brak tabeli – OK
+            }
 
             string? companyName = null, companyNip = null, companyAddress = null;
             using (var u = c.CreateCommand())
@@ -421,6 +428,7 @@ FROM Users WHERE Id=@id;";
         {
             using var c = DatabaseService.GetConnection();
 
+            // PersonalProfiles – jeœli jest
             try
             {
                 using (var up = c.CreateCommand())
@@ -453,6 +461,7 @@ ON CONFLICT(UserId) DO UPDATE SET
             }
             catch
             {
+                // fallback – stare kolumny w Users
                 using var upu = c.CreateCommand();
                 upu.CommandText = @"UPDATE Users SET FirstName=@fn, LastName=@ln, Address=@addr WHERE Id=@id;";
                 upu.Parameters.AddWithValue("@fn", (object?)p.FirstName ?? DBNull.Value);
@@ -462,6 +471,7 @@ ON CONFLICT(UserId) DO UPDATE SET
                 upu.ExecuteNonQuery();
             }
 
+            // Dane firmowe w Users
             using (var cmd = c.CreateCommand())
             {
                 cmd.CommandText = @"
@@ -478,7 +488,7 @@ WHERE Id=@id;";
             }
         }
 
-        // ===== Dane osobowe w Users =====
+        // ===== Dane osobowe w Users (nowe podejœcie) =====
         private static void EnsurePersonalColumns(SqliteConnection con)
         {
             bool Has(string col)
@@ -487,10 +497,13 @@ WHERE Id=@id;";
                 c.CommandText = "PRAGMA table_info([Users]);";
                 using var r = c.ExecuteReader();
                 while (r.Read())
+                {
                     if (string.Equals(r["name"]?.ToString(), col, StringComparison.OrdinalIgnoreCase))
                         return true;
+                }
                 return false;
             }
+
             void Add(string col, string sqlType)
             {
                 using var c = con.CreateCommand();
@@ -506,6 +519,8 @@ WHERE Id=@id;";
             if (!Has("City")) Add("City", "TEXT NULL");
             if (!Has("PostalCode")) Add("PostalCode", "TEXT NULL");
             if (!Has("HouseNo")) Add("HouseNo", "TEXT NULL");
+            if (!Has("Phone")) Add("Phone", "TEXT NULL");
+            if (!Has("Street")) Add("Street", "TEXT NULL");
         }
 
         public static PersonalDetails GetPersonalDetails(int userId)
@@ -515,7 +530,10 @@ WHERE Id=@id;";
 
             using var cmd = con.CreateCommand();
             cmd.CommandText = @"
-SELECT Email, FirstName, LastName, BirthDate, BirthYear, City, PostalCode, HouseNo
+SELECT Email, FirstName, LastName,
+       BirthDate, BirthYear,
+       City, PostalCode, HouseNo,
+       Phone, Street
 FROM Users WHERE Id=@id;";
             cmd.Parameters.AddWithValue("@id", userId);
 
@@ -543,7 +561,9 @@ FROM Users WHERE Id=@id;";
                 BirthDate = birthDate,
                 City = r.IsDBNull(5) ? null : r.GetString(5),
                 PostalCode = r.IsDBNull(6) ? null : r.GetString(6),
-                HouseNo = r.IsDBNull(7) ? null : r.GetString(7)
+                HouseNo = r.IsDBNull(7) ? null : r.GetString(7),
+                Phone = r.IsDBNull(8) ? null : r.GetString(8),
+                Street = r.IsDBNull(9) ? null : r.GetString(9)
             };
         }
 
@@ -563,7 +583,9 @@ UPDATE Users SET
     BirthYear  = @by,
     City       = @city,
     PostalCode = @pc,
-    HouseNo    = @hn
+    HouseNo    = @hn,
+    Phone      = @phone,
+    Street     = @street
 WHERE Id=@id;";
 
             cmd.Parameters.AddWithValue("@id", userId);
@@ -585,6 +607,8 @@ WHERE Id=@id;";
             cmd.Parameters.AddWithValue("@city", (object?)d.City ?? DBNull.Value);
             cmd.Parameters.AddWithValue("@pc", (object?)d.PostalCode ?? DBNull.Value);
             cmd.Parameters.AddWithValue("@hn", (object?)d.HouseNo ?? DBNull.Value);
+            cmd.Parameters.AddWithValue("@phone", (object?)d.Phone ?? DBNull.Value);
+            cmd.Parameters.AddWithValue("@street", (object?)d.Street ?? DBNull.Value);
 
             cmd.ExecuteNonQuery();
 
@@ -602,7 +626,7 @@ WHERE Id=@id;";
         private static bool VerifyPassword(string password, string storedBase64Sha256)
             => string.Equals(HashPassword(password), storedBase64Sha256, StringComparison.Ordinal);
 
-        /// Unikalny e-mail (case-insensitive), tylko gdy Email nie jest NULL.
+        /// <summary>Unikalny e-mail (case-insensitive), tylko gdy Email nie jest NULL.</summary>
         private static void EnsureEmailUniqueIndex(SqliteConnection con)
         {
             using var cmd = con.CreateCommand();

@@ -36,6 +36,65 @@
             <Setter Property="Foreground" Value="{DynamicResource App.Foreground}"/>
         </Style>
 
+        <!-- Toggle przy operacjach (wolna gotówka / odłożona / koperta) -->
+        <Style x:Key="OperationToggleButton" TargetType="ToggleButton">
+            <Setter Property="Background" Value="#111111"/>
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="BorderBrush" Value="Transparent"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Padding" Value="16,6"/>
+            <Setter Property="Margin" Value="0,0,8,0"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ToggleButton">
+                        <Border x:Name="border"
+                        Background="{TemplateBinding Background}"
+                        BorderBrush="{TemplateBinding BorderBrush}"
+                        BorderThickness="{TemplateBinding BorderThickness}"
+                        CornerRadius="14">
+                            <ContentPresenter HorizontalAlignment="Center"
+                                      VerticalAlignment="Center"
+                                      Margin="6,2"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <!-- lekkie zacienienie przy najechaniu -->
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="border"
+                                Property="Background"
+                                Value="#191919"/>
+                            </Trigger>
+                            <!-- mocniejsze przy wciśnięciu -->
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="border"
+                                Property="Background"
+                                Value="#222222"/>
+                            </Trigger>
+                            <!-- zaznaczone = pomarańczowa ramka -->
+                            <Trigger Property="IsChecked" Value="True">
+                                <Setter TargetName="border"
+                                Property="BorderBrush"
+                                Value="{DynamicResource Brand.Orange}"/>
+                                <Setter TargetName="border"
+                                Property="BorderThickness"
+                                Value="1.5"/>
+                            </Trigger>
+                            <!-- wyszarzanie gdy disabled (na przyszłość) -->
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter TargetName="border"
+                                Property="Background"
+                                Value="#303030"/>
+                                <Setter Property="Foreground"
+                                Value="#808080"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+
         <!-- Styl dla przycisków źródła pieniędzy w panelu operacji -->
         <Style x:Key="OpSourceToggleStyle" TargetType="ToggleButton">
             <Setter Property="Background" Value="#222222"/>
@@ -391,31 +450,31 @@
                                            FontWeight="SemiBold"
                                            Foreground="{DynamicResource App.Foreground}"/>
 
-                                <!-- 3 opcje -->
                                 <StackPanel Orientation="Horizontal"
-                                            Margin="0,6,0,0">
+            Margin="0,6,0,0">
+
                                     <ToggleButton x:Name="OpFreeCashButton"
-              Style="{StaticResource OpSourceToggleStyle}"
-              Content="Wolna gotówka"
-              Tag="free"
-              MinWidth="120"
-              Click="OpSourceButton_Click"/>
+                  Content="Wolna gotówka"
+                  Tag="free"
+                  MinWidth="120"
+                  Style="{StaticResource OperationToggleButton}"
+                  Click="OpSourceButton_Click"/>
 
                                     <ToggleButton x:Name="OpSavedCashButton"
-              Style="{StaticResource OpSourceToggleStyle}"
-              Content="Odłożona gotówka"
-              Tag="saved"
-              MinWidth="140"
-              Click="OpSourceButton_Click"/>
+                  Content="Odłożona gotówka"
+                  Tag="saved"
+                  MinWidth="140"
+                  Style="{StaticResource OperationToggleButton}"
+                  Click="OpSourceButton_Click"/>
 
                                     <ToggleButton x:Name="OpEnvelopeButton"
-              Style="{StaticResource OpSourceToggleStyle}"
-              Content="Koperta"
-              Tag="envelope"
-              MinWidth="100"
-              Click="OpSourceButton_Click"/>
-
+                  Content="Koperta"
+                  Tag="envelope"
+                  MinWidth="100"
+                  Style="{StaticResource OperationToggleButton}"
+                  Click="OpSourceButton_Click"/>
                                 </StackPanel>
+
                             </StackPanel>
 
                             <!-- Wybór koperty (tylko gdy wybrano „Koperta”) -->
@@ -594,36 +653,53 @@
                                 </Grid.ColumnDefinitions>
 
                                 <TextBlock Grid.Column="0"
-                                           Text="Nazwa rachunku"
-                                           FontWeight="SemiBold"
-                                           VerticalAlignment="Center"
-                                           Foreground="{DynamicResource App.Foreground}"/>
+               Text="Nazwa rachunku"
+               FontWeight="SemiBold"
+               VerticalAlignment="Center"
+               Foreground="{DynamicResource App.Foreground}"/>
 
                                 <TextBox Grid.Column="2"
-                                         x:Name="EditAccountNameBox"
-                                         Height="26"
-                                         VerticalContentAlignment="Center"/>
+             x:Name="EditAccountNameBox"
+             Height="26"
+             VerticalContentAlignment="Center"/>
                             </Grid>
 
-                            <!-- IBAN -->
-                            <Grid Margin="0,0,0,8">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="Auto"/>
-                                    <ColumnDefinition Width="16"/>
-                                    <ColumnDefinition Width="*"/>
-                                </Grid.ColumnDefinitions>
+                            <!-- IBAN + opis pod spodem -->
+                            <StackPanel Margin="0,0,0,8">
+                                <!-- samo pole IBAN -->
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="16"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
 
-                                <TextBlock Grid.Column="0"
-                                           Text="IBAN (opcjonalnie)"
-                                           FontWeight="SemiBold"
-                                           VerticalAlignment="Center"
-                                           Foreground="{DynamicResource App.Foreground}"/>
+                                    <TextBlock Grid.Column="0"
+                   Text="IBAN (opcjonalnie)"
+                   FontWeight="SemiBold"
+                   VerticalAlignment="Center"
+                   Foreground="{DynamicResource App.Foreground}"/>
 
-                                <TextBox Grid.Column="2"
-                                         x:Name="EditIbanBox"
-                                         Height="26"
-                                         VerticalContentAlignment="Center"/>
-                            </Grid>
+
+                                    <TextBox Grid.Column="2"
+         x:Name="EditIbanBox"
+         Height="26"
+         VerticalContentAlignment="Center"
+         TextChanged="EditIbanBox_TextChanged"/>
+
+                                </Grid>
+
+                                <!-- informacja o poprawnym IBAN – CZERWONA, pod polem -->
+                                <TextBlock x:Name="IbanHintText"
+               Margin="0,4,0,0"
+               Foreground="{DynamicResource Brand.Red}"
+               FontSize="11"
+               Text="Polski IBAN musi mieć dokładnie 28 znaków (PL + 26 cyfr)."
+               TextWrapping="Wrap"
+               Visibility="Collapsed"/>
+                            </StackPanel>
+
+
 
                             <!-- Saldo -->
                             <Grid Margin="0,0,0,8">
@@ -634,19 +710,20 @@
                                 </Grid.ColumnDefinitions>
 
                                 <TextBlock Grid.Column="0"
-                                           Text="Saldo (PLN)"
-                                           FontWeight="SemiBold"
-                                           VerticalAlignment="Center"
-                                           Foreground="{DynamicResource App.Foreground}"/>
+               Text="Saldo (PLN)"
+               FontWeight="SemiBold"
+               VerticalAlignment="Center"
+               Foreground="{DynamicResource App.Foreground}"/>
 
                                 <TextBox Grid.Column="2"
-                                         x:Name="EditBalanceBox"
-                                         Height="26"
-                                         HorizontalContentAlignment="Right"
-                                         VerticalContentAlignment="Center"
-                                         GotFocus="EditBalanceBox_GotFocus"
-                                         LostFocus="EditBalanceBox_LostFocus"/>
+             x:Name="EditBalanceBox"
+             Height="26"
+             HorizontalContentAlignment="Right"
+             VerticalContentAlignment="Center"
+             GotFocus="EditBalanceBox_GotFocus"
+             LostFocus="EditBalanceBox_LostFocus"/>
                             </Grid>
+
 
                             <!-- PRZYCISKI -->
                             <StackPanel Orientation="Horizontal"
