@@ -1046,6 +1046,79 @@ SET Amount = excluded.Amount,
             cmd.ExecuteNonQuery();
         }
 
+
+
+        // ===== OPERACJE NA GOTÓWCE OD£O¯ONEJ I KOPERTACH =====
+
+        public static void AddToSavedCash(int userId, decimal amount)
+        {
+            if (amount <= 0) return;
+            var current = GetSavedCash(userId);
+            SetSavedCash(userId, current + amount);
+        }
+
+        public static void SubtractFromSavedCash(int userId, decimal amount)
+        {
+            if (amount <= 0) return;
+
+            var current = GetSavedCash(userId);
+            if (current < amount)
+                throw new InvalidOperationException("Za ma³o œrodków w gotówce od³o¿onej.");
+
+            SetSavedCash(userId, current - amount);
+        }
+
+        public static void AddToEnvelopeAllocated(int userId, int envelopeId, decimal amount)
+        {
+            if (amount <= 0) return;
+
+            using var c = OpenAndEnsureSchema();
+            using var cmd = c.CreateCommand();
+            cmd.CommandText = @"
+UPDATE Envelopes
+   SET Allocated = COALESCE(Allocated,0) + @a
+ WHERE Id=@id AND UserId=@u;";
+            cmd.Parameters.AddWithValue("@a", amount);
+            cmd.Parameters.AddWithValue("@id", envelopeId);
+            cmd.Parameters.AddWithValue("@u", userId);
+
+            var rows = cmd.ExecuteNonQuery();
+            if (rows == 0)
+                throw new InvalidOperationException("Nie znaleziono wybranej koperty.");
+        }
+
+        public static void SubtractFromEnvelopeAllocated(int userId, int envelopeId, decimal amount)
+        {
+            if (amount <= 0) return;
+
+            using var c = OpenAndEnsureSchema();
+            decimal current;
+
+            using (var q = c.CreateCommand())
+            {
+                q.CommandText = @"SELECT COALESCE(Allocated,0) FROM Envelopes WHERE Id=@id AND UserId=@u LIMIT 1;";
+                q.Parameters.AddWithValue("@id", envelopeId);
+                q.Parameters.AddWithValue("@u", userId);
+                current = Convert.ToDecimal(q.ExecuteScalar() ?? 0m);
+            }
+
+            if (current < amount)
+                throw new InvalidOperationException("W kopercie jest za ma³o œrodków.");
+
+            using (var cmd = c.CreateCommand())
+            {
+                cmd.CommandText = @"
+UPDATE Envelopes
+   SET Allocated = Allocated - @a
+ WHERE Id=@id AND UserId=@u;";
+                cmd.Parameters.AddWithValue("@a", amount);
+                cmd.Parameters.AddWithValue("@id", envelopeId);
+                cmd.Parameters.AddWithValue("@u", userId);
+                cmd.ExecuteNonQuery();
+            }
+        }
+
+
         // =========================================================
         // ======================= PODSUMOWANIA ====================
 

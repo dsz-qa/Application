@@ -36,13 +36,36 @@
             <Setter Property="Foreground" Value="{DynamicResource App.Foreground}"/>
         </Style>
 
+        <!-- Styl dla przycisków źródła pieniędzy w panelu operacji -->
+        <Style x:Key="OpSourceToggleStyle" TargetType="ToggleButton">
+            <Setter Property="Background" Value="#222222"/>
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource Surface.Border}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Padding" Value="10,4"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="HorizontalContentAlignment" Value="Center"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
+            <Setter Property="Margin" Value="0,0,8,0"/>
+            <Style.Triggers>
+                <Trigger Property="IsChecked" Value="True">
+                    <Setter Property="BorderBrush"
+                    Value="{DynamicResource Brand.Orange}"/>
+                    <Setter Property="BorderThickness" Value="1.5"/>
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+
+
         <!-- ===== KAFEL KONTA BANKOWEGO ===== -->
         <DataTemplate DataType="{x:Type local:BankAccountVm}">
             <Border Style="{StaticResource Card}"
-            Margin="0,0,16,16"
-            Width="300">
+                    Margin="0,0,16,16"
+                    Width="300">
                 <Grid>
                     <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
                         <RowDefinition Height="Auto"/>
                         <RowDefinition Height="Auto"/>
                         <RowDefinition Height="Auto"/>
@@ -50,109 +73,166 @@
 
                     <!-- LOGO + NAZWA BANKU -->
                     <StackPanel Grid.Row="0"
-                        Orientation="Horizontal"
-                        Margin="0,0,0,6">
+                                Orientation="Horizontal"
+                                Margin="0,0,0,6">
                         <Image Source="{Binding LogoPath}"
-                       Width="28" Height="28"
-                       Margin="0,0,8,0"
-                       VerticalAlignment="Center"/>
+                               Width="28" Height="28"
+                               Margin="0,0,8,0"
+                               VerticalAlignment="Center"/>
 
-                        <!-- TUTAJ duża biała nazwa banku -->
                         <TextBlock Text="{Binding BankName}"
-                           FontSize="18"
-                           FontWeight="Bold"
-                           Foreground="White"
-                           VerticalAlignment="Center"/>
+                                   FontSize="18"
+                                   FontWeight="Bold"
+                                   Foreground="White"
+                                   VerticalAlignment="Center"/>
                     </StackPanel>
 
                     <!-- SZCZEGÓŁY RACHUNKU -->
                     <StackPanel Grid.Row="1"
-                        Margin="0,2,0,0">
+                                Margin="0,2,0,0">
 
-                        <!-- Nazwa rachunku -->
                         <StackPanel Orientation="Horizontal">
                             <TextBlock Text="Nazwa rachunku: "
-                               FontWeight="SemiBold"
-                               Foreground="{DynamicResource App.Foreground}"
-                               Margin="0,0,4,0"/>
+                                       FontWeight="SemiBold"
+                                       Foreground="{DynamicResource App.Foreground}"
+                                       Margin="0,0,4,0"/>
                             <TextBlock Text="{Binding AccountName}"
-                               Foreground="{DynamicResource App.Foreground}"/>
+                                       Foreground="{DynamicResource App.Foreground}"/>
                         </StackPanel>
+                        
+                        <Grid Margin="0,2,0,0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
 
-                        <!-- IBAN -->
-                        <StackPanel Orientation="Horizontal"
-                            Margin="0,2,0,0">
-                            <TextBlock Text="IBAN: "
-                               FontWeight="SemiBold"
-                               Foreground="{DynamicResource App.Foreground}"
-                               Margin="0,0,4,0"/>
-                            <TextBlock Text="{Binding Iban}"
-                               Foreground="{DynamicResource App.Foreground}"/>
-                        </StackPanel>
+                            <TextBlock Grid.Column="0"
+               Text="IBAN: "
+               FontWeight="SemiBold"
+               Foreground="{DynamicResource App.Foreground}"
+               Margin="0,0,4,0"
+               VerticalAlignment="Top"/>
 
-                        <!-- Saldo -->
+                            <TextBlock Grid.Column="1"
+               Text="{Binding Iban}"
+               Foreground="{DynamicResource App.Foreground}"
+               TextWrapping="Wrap"
+               TextTrimming="None"/>
+                        </Grid>
+
+
                         <StackPanel Orientation="Horizontal"
-                            Margin="0,2,0,0">
+                                    Margin="0,2,0,0">
                             <TextBlock Text="Saldo: "
-                               FontWeight="SemiBold"
-                               Foreground="{DynamicResource App.Foreground}"
-                               Margin="0,0,4,0"/>
+                                       FontWeight="SemiBold"
+                                       Foreground="{DynamicResource App.Foreground}"
+                                       Margin="0,0,4,0"/>
                             <TextBlock Text="{Binding BalanceStr}"
-                               FontWeight="Bold"
-                               Foreground="{DynamicResource App.Foreground}"/>
+                                       FontWeight="Bold"
+                                       Foreground="{DynamicResource App.Foreground}"/>
                         </StackPanel>
                     </StackPanel>
 
                     <!-- AKCJE -->
                     <StackPanel Grid.Row="2"
-                        Margin="0,12,0,0">
-                        <StackPanel Orientation="Horizontal"
-                            HorizontalAlignment="Left">
+                                Margin="0,12,0,0">
+
+                        <!-- Wypłata / Wpłata -->
+                        <Grid HorizontalAlignment="Left">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="8"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+
                             <Button x:Name="WithdrawButton"
-                            Content="Wypłać z konta ▼"
-                            Padding="10,5"
-                            Margin="0,0,8,0"
-                            Click="WithdrawFromAccount_Click"
-                            Tag="{Binding}"/>
+                                    Grid.Column="0"
+                                    Content="Wypłać ▼"
+                                    Padding="10,5"
+                                    MinWidth="130"
+                                    Click="WithdrawFromAccount_Click"
+                                    Tag="{Binding}"/>
 
                             <Button x:Name="DepositButton"
-                            Content="Wpłać na ▼"
-                            Padding="10,5"
-                            Click="DepositToAccount_Click"
-                            Tag="{Binding}"/>
-                        </StackPanel>
+                                    Grid.Column="2"
+                                    Content="Wpłać ▼"
+                                    Padding="10,5"
+                                    MinWidth="130"
+                                    Click="DepositToAccount_Click"
+                                    Tag="{Binding}"/>
+                        </Grid>
 
-                        <StackPanel Orientation="Horizontal"
-                            Margin="0,10,0,0">
-                            <Button Content="Edytuj"
-                            Padding="8,4"
-                            MinWidth="80"
-                            Click="EditAccount_Click"
-                            Tag="{Binding}"/>
+                        <!-- Edytuj / Usuń -->
+                        <Grid Margin="0,10,0,0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="8"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
 
-                            <Button Padding="8,4"
-                            MinWidth="60"
-                            Margin="8,0,0,0"
-                            Background="Transparent"
-                            BorderBrush="{DynamicResource Brand.Red}"
-                            BorderThickness="1.2"
-                            Click="DeleteAccount_Click"
-                            Tag="{Binding}">
-                                <StackPanel Orientation="Horizontal">
+                            <Button Grid.Column="0"
+                                    Content="Edytuj"
+                                    Padding="8,4"
+                                    MinWidth="80"
+                                    Click="EditAccount_Click"
+                                    Tag="{Binding}"/>
+
+                            <Button Grid.Column="2"
+                                    Padding="8,4"
+                                    MinWidth="80"
+                                    Background="Transparent"
+                                    BorderBrush="{DynamicResource Brand.Red}"
+                                    BorderThickness="1.2"
+                                    Click="DeleteAccount_Click"
+                                    Tag="{Binding}">
+                                <StackPanel Orientation="Horizontal"
+                                            HorizontalAlignment="Center">
                                     <Image Source="/Assets/Icons/delete.png"
-                                   Width="16" Height="16"
-                                   Margin="0,0,4,0"/>
+                                           Width="16" Height="16"
+                                           Margin="0,0,4,0"/>
                                     <TextBlock Text="Usuń"
-                                       Foreground="{DynamicResource Brand.Red}"/>
+                                               Foreground="{DynamicResource Brand.Red}"/>
                                 </StackPanel>
                             </Button>
-                        </StackPanel>
+                        </Grid>
                     </StackPanel>
+
+                    <!-- PANEL POTWIERDZENIA USUNIĘCIA -->
+                    <Border x:Name="DeleteConfirmPanel"
+                            Grid.Row="3"
+                            Background="{DynamicResource Surface.Background}"
+                            BorderBrush="{DynamicResource Surface.Border}"
+                            BorderThickness="1"
+                            CornerRadius="6"
+                            Padding="8"
+                            Margin="0,8,0,0"
+                            Visibility="Collapsed">
+                        <StackPanel>
+                            <TextBlock Text="Na pewno chcesz usunąć ten rachunek?"
+                                       TextWrapping="Wrap"
+                                       Margin="0,0,0,8"
+                                       Foreground="{DynamicResource App.Foreground}"/>
+
+                            <StackPanel Orientation="Horizontal"
+                                        HorizontalAlignment="Right">
+                                <Button Content="Nie"
+                                        Width="80"
+                                        Margin="0,0,8,0"
+                                        Click="DeleteCancel_Click"/>
+                                <Button Content="Tak"
+                                        Width="80"
+                                        Background="{DynamicResource Brand.Red}"
+                                        Foreground="White"
+                                        BorderBrush="{DynamicResource Brand.Red}"
+                                        Click="DeleteConfirm_Click"
+                                        Tag="{Binding}"/>
+                            </StackPanel>
+                        </StackPanel>
+                    </Border>
+
                 </Grid>
             </Border>
         </DataTemplate>
-
-
 
         <!-- ===== KAFEL „DODAJ KONTO” ===== -->
         <DataTemplate DataType="{x:Type local:AddAccountTile}">
@@ -184,16 +264,15 @@
 
     </UserControl.Resources>
 
-    <!-- CAŁA STRONA w ScrollViewerze, żeby nic się nie ucinało -->
+    <!-- CAŁA STRONA w ScrollViewerze -->
     <ScrollViewer VerticalScrollBarVisibility="Auto">
-        <!-- GŁÓWNY GRID: góra (kafle) + dół (panel operacji / edycji) -->
         <Grid Margin="24">
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto"/>
                 <RowDefinition Height="*"/>
             </Grid.RowDefinitions>
 
-            <!-- ===== GÓRNY BLOK: KPI + KONTA ===== -->
+            <!-- ===== GÓRA ===== -->
             <StackPanel Grid.Row="0">
 
                 <!-- KAFEL RAZEM WSZYSTKIE KONTA -->
@@ -227,7 +306,6 @@
                     </Grid>
                 </Border>
 
-                <!-- separator -->
                 <Separator Margin="0,12,0,8"
                            Height="1"
                            Background="{DynamicResource Surface.Border}"
@@ -239,7 +317,7 @@
                            Foreground="{DynamicResource App.Foreground}"
                            Margin="0,4,0,12"/>
 
-                <!-- LISTA KONT + KAFEL DODAJ -->
+                <!-- LISTA KONT + DODAJ -->
                 <ItemsControl x:Name="AccountsRepeater"
                               Margin="0,8,0,0">
                     <ItemsControl.ItemsPanel>
@@ -249,13 +327,11 @@
                     </ItemsControl.ItemsPanel>
                 </ItemsControl>
 
-
-
             </StackPanel>
 
-            <!-- ===== DOLNY BLOK: Operacje / Edycja – wypełnia cały dół ===== -->
-            <!-- TUTAJ tło całej dolnej sekcji -->
+            <!-- ===== DÓŁ: OPERACJE / EDYCJA ===== -->
             <Grid Grid.Row="1">
+
                 <!-- PANEL OPERACJI -->
                 <Border x:Name="OperationPanel"
                         Background="Transparent"
@@ -270,7 +346,7 @@
                     <Grid HorizontalAlignment="Center"
                           VerticalAlignment="Center"
                           MaxWidth="800">
-                        <StackPanel HorizontalAlignment="Center" Width="420">
+                        <StackPanel HorizontalAlignment="Center" Width="480">
 
                             <TextBlock x:Name="OpTitle"
                                        FontSize="16"
@@ -279,72 +355,95 @@
                                        TextAlignment="Center"
                                        Foreground="{DynamicResource App.Foreground}"/>
 
-                            <TextBlock Text="Kwota (PLN):"
-                                       FontWeight="SemiBold"
-                                       Foreground="{DynamicResource App.Foreground}"
-                                       HorizontalAlignment="Left"/>
-                            <TextBox x:Name="OpAmountBox"
-                                     Width="180"
-                                     Height="26"
-                                     Margin="0,4,0,0"
-                                     HorizontalContentAlignment="Right"
-                                     VerticalContentAlignment="Center"/>
+                            <!-- Kwota -->
+                            <Grid Margin="0,0,0,4">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="16"/>
+                                    <ColumnDefinition Width="180"/>
+                                </Grid.ColumnDefinitions>
+
+                                <TextBlock Grid.Column="0"
+                                           Text="Kwota:"
+                                           FontWeight="SemiBold"
+                                           Foreground="{DynamicResource App.Foreground}"
+                                           VerticalAlignment="Center"/>
+                                <TextBox Grid.Column="2"
+         x:Name="OpAmountBox"
+         Height="26"
+         HorizontalContentAlignment="Right"
+         VerticalContentAlignment="Center"
+         GotFocus="OpAmountBox_GotFocus"
+         LostFocus="OpAmountBox_LostFocus"/>
+
+                            </Grid>
+
                             <TextBlock x:Name="OpErrorText"
                                        Foreground="{DynamicResource Brand.Red}"
                                        FontSize="11"
-                                       Margin="0,2,0,0"
+                                       Margin="0,0,0,4"
                                        Visibility="Collapsed"/>
 
-                            <!-- GOTÓWKA -->
-                            <StackPanel Margin="0,12,0,0">
-                                <TextBlock x:Name="OpMainLabel"
-                                           Text="Do:"
+                            <!-- Pytanie: skąd/dokąd -->
+                            <StackPanel Margin="0,8,0,0">
+                                <TextBlock x:Name="OpQuestionLabel"
+                                           Text="Skąd chcesz wpłacić pieniądze na konto?"
                                            FontWeight="SemiBold"
                                            Foreground="{DynamicResource App.Foreground}"/>
+
+                                <!-- 3 opcje -->
                                 <StackPanel Orientation="Horizontal"
-                                            Margin="0,4,0,0">
-                                    <RadioButton x:Name="OpFromCashRadio"
-                                                 Content="Z / do gotówki"
-                                                 IsChecked="True"
-                                                 Margin="0,0,8,0"/>
+                                            Margin="0,6,0,0">
+                                    <ToggleButton x:Name="OpFreeCashButton"
+              Style="{StaticResource OpSourceToggleStyle}"
+              Content="Wolna gotówka"
+              Tag="free"
+              MinWidth="120"
+              Click="OpSourceButton_Click"/>
+
+                                    <ToggleButton x:Name="OpSavedCashButton"
+              Style="{StaticResource OpSourceToggleStyle}"
+              Content="Odłożona gotówka"
+              Tag="saved"
+              MinWidth="140"
+              Click="OpSourceButton_Click"/>
+
+                                    <ToggleButton x:Name="OpEnvelopeButton"
+              Style="{StaticResource OpSourceToggleStyle}"
+              Content="Koperta"
+              Tag="envelope"
+              MinWidth="100"
+              Click="OpSourceButton_Click"/>
+
                                 </StackPanel>
-                                <ComboBox x:Name="OpCashCombo"
-                                          Width="220"
-                                          Margin="0,2,0,0">
-                                    <ComboBoxItem Content="Wolna gotówka" Tag="free" IsSelected="True"/>
-                                    <ComboBoxItem Content="Gotówka odłożona" Tag="savings"/>
-                                </ComboBox>
                             </StackPanel>
 
-                            <!-- KOPERTA -->
-                            <StackPanel Margin="0,12,0,0">
-                                <TextBlock x:Name="OpEnvelopeLabel"
-                                           Text="Do koperty:"
+                            <!-- Wybór koperty (tylko gdy wybrano „Koperta”) -->
+                            <StackPanel x:Name="OpEnvelopeRow"
+                                        Margin="0,8,0,0"
+                                        Visibility="Collapsed">
+                                <TextBlock Text="Wybierz kopertę:"
                                            FontWeight="SemiBold"
                                            Foreground="{DynamicResource App.Foreground}"/>
-                                <StackPanel Orientation="Horizontal"
-                                            Margin="0,4,0,0">
-                                    <RadioButton x:Name="OpFromEnvelopeRadio"
-                                                 Content="Do / z koperty"/>
-                                </StackPanel>
                                 <ComboBox x:Name="OpEnvelopeCombo"
-                                          Width="260"
-                                          Margin="0,2,0,0">
-                                    <ComboBoxItem Content="(lista kopert będzie tutaj)"/>
-                                </ComboBox>
+          Width="260"
+          Margin="0,4,0,0"
+          DisplayMemberPath="Name"/>
+
                             </StackPanel>
 
                             <!-- PRZYCISKI -->
                             <StackPanel Orientation="Horizontal"
                                         HorizontalAlignment="Right"
-                                        Margin="0,14,0,0">
-                                <Button Content="Anuluj"
-                                        Width="90"
-                                        Margin="0,0,8,0"
-                                        Click="OpCancel_Click"/>
+                                        Margin="0,16,0,0">
                                 <Button Content="Zapisz"
                                         Width="90"
+                                        Style="{DynamicResource PrimaryButton}"
+                                        Margin="0,0,8,0"
                                         Click="OpSave_Click"/>
+                                <Button Content="Anuluj"
+                                        Width="90"
+                                        Click="OpCancel_Click"/>
                             </StackPanel>
                         </StackPanel>
                     </Grid>
@@ -487,54 +586,80 @@
                             </StackPanel>
 
                             <!-- Nazwa rachunku -->
-                            <StackPanel Margin="0,0,0,8">
-                                <TextBlock Text="Nazwa rachunku"
+                            <Grid Margin="0,0,0,8">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="16"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+
+                                <TextBlock Grid.Column="0"
+                                           Text="Nazwa rachunku"
                                            FontWeight="SemiBold"
+                                           VerticalAlignment="Center"
                                            Foreground="{DynamicResource App.Foreground}"/>
-                                <TextBox x:Name="EditAccountNameBox"
-                                         Margin="0,4,0,0"
-                                         Width="260"
+
+                                <TextBox Grid.Column="2"
+                                         x:Name="EditAccountNameBox"
                                          Height="26"
                                          VerticalContentAlignment="Center"/>
-                            </StackPanel>
+                            </Grid>
 
                             <!-- IBAN -->
-                            <StackPanel Margin="0,0,0,8">
-                                <TextBlock Text="IBAN (opcjonalnie)"
+                            <Grid Margin="0,0,0,8">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="16"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+
+                                <TextBlock Grid.Column="0"
+                                           Text="IBAN (opcjonalnie)"
                                            FontWeight="SemiBold"
+                                           VerticalAlignment="Center"
                                            Foreground="{DynamicResource App.Foreground}"/>
-                                <TextBox x:Name="EditIbanBox"
-                                         Margin="0,4,0,0"
-                                         Width="260"
+
+                                <TextBox Grid.Column="2"
+                                         x:Name="EditIbanBox"
                                          Height="26"
                                          VerticalContentAlignment="Center"/>
-                            </StackPanel>
+                            </Grid>
 
                             <!-- Saldo -->
-                            <StackPanel Margin="0,0,0,8">
-                                <TextBlock Text="Saldo (PLN)"
+                            <Grid Margin="0,0,0,8">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="16"/>
+                                    <ColumnDefinition Width="140"/>
+                                </Grid.ColumnDefinitions>
+
+                                <TextBlock Grid.Column="0"
+                                           Text="Saldo (PLN)"
                                            FontWeight="SemiBold"
+                                           VerticalAlignment="Center"
                                            Foreground="{DynamicResource App.Foreground}"/>
-                                <TextBox x:Name="EditBalanceBox"
-                                         Margin="0,4,0,0"
-                                         Width="140"
+
+                                <TextBox Grid.Column="2"
+                                         x:Name="EditBalanceBox"
                                          Height="26"
                                          HorizontalContentAlignment="Right"
-                                         VerticalContentAlignment="Center"/>
-                            </StackPanel>
+                                         VerticalContentAlignment="Center"
+                                         GotFocus="EditBalanceBox_GotFocus"
+                                         LostFocus="EditBalanceBox_LostFocus"/>
+                            </Grid>
 
                             <!-- PRZYCISKI -->
                             <StackPanel Orientation="Horizontal"
                                         HorizontalAlignment="Right"
                                         Margin="0,16,0,0">
-                                <Button Content="Anuluj"
-                                        Width="80"
-                                        Margin="0,0,8,0"
-                                        Click="EditCancel_Click"/>
                                 <Button Content="Zapisz"
                                         Width="80"
                                         Style="{DynamicResource PrimaryButton}"
+                                        Margin="0,0,8,0"
                                         Click="EditSave_Click"/>
+                                <Button Content="Anuluj"
+                                        Width="80"
+                                        Click="EditCancel_Click"/>
                             </StackPanel>
 
                         </StackPanel>
@@ -545,4 +670,6 @@
         </Grid>
     </ScrollViewer>
 </UserControl>
+
+
 

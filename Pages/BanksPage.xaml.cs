@@ -1,14 +1,15 @@
 ﻿using Finly.Models;
 using Finly.Services;
-using Finly.Views.Dialogs;
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Globalization;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Controls.Primitives;
 using System.Windows.Input;
 using System.Windows.Media;
+using System.Data;
 
 namespace Finly.Pages
 {
@@ -35,6 +36,19 @@ namespace Finly.Pages
         private BankAccountVm? _currentAccount;
 
         private BankAccountModel? _editModel;
+
+        // źródło / cel operacji Wpłać/Wypłać: free / saved / envelope
+        private string _opSourceKind = "free";
+
+        // ====== pomocniczy model koperty do ComboBoxa ======
+        private sealed class EnvelopeItem
+        {
+            public int Id { get; set; }
+            public string Name { get; set; } = "";
+            public decimal Allocated { get; set; }
+
+            public override string ToString() => Name;
+        }
 
         public BanksPage()
         {
@@ -144,16 +158,14 @@ namespace Finly.Pages
             }
         }
 
-        // ===== POMOCNICZE – wyciąganie nazwy banku z ComboBoxItem (string albo StackPanel) =====
+        // ===== POMOCNICZE – wyciąganie nazwy banku z ComboBoxItem =====
         private static string ExtractBankName(object? item)
         {
             if (item is ComboBoxItem ci)
             {
-                // 1) Prosty przypadek – Content to string
                 if (ci.Content is string s)
                     return s.Trim();
 
-                // 2) Nasz StackPanel: [Image][TextBlock]
                 if (ci.Content is StackPanel sp)
                 {
                     foreach (var child in sp.Children)
@@ -171,6 +183,40 @@ namespace Finly.Pages
             return ExtractBankName(EditBankCombo.SelectedItem);
         }
 
+        // ===== KOPERTY – wczytanie do ComboBoxa =====
+        private void LoadEnvelopesForOperation()
+        {
+            if (_uid <= 0) return;
+
+            try
+            {
+                var dt = DatabaseService.GetEnvelopesTable(_uid);
+                var list = new List<EnvelopeItem>();
+
+                foreach (DataRow row in dt.Rows)
+                {
+                    var item = new EnvelopeItem
+                    {
+                        Id = Convert.ToInt32(row["Id"]),
+                        Name = (row["Name"]?.ToString() ?? "(bez nazwy)").Trim(),
+                        Allocated = row["Allocated"] == DBNull.Value
+                            ? 0m
+                            : Convert.ToDecimal(row["Allocated"])
+                    };
+                    list.Add(item);
+                }
+
+                OpEnvelopeCombo.ItemsSource = list;
+                if (list.Count > 0)
+                    OpEnvelopeCombo.SelectedIndex = 0;
+            }
+            catch (Exception ex)
+            {
+                ToastService.Error("Nie udało się wczytać kopert: " + ex.Message);
+                OpEnvelopeCombo.ItemsSource = null;
+            }
+        }
+
         // ===== PANEL OPERACJI (WYPŁATA / WPŁATA) =====
 
         private void ShowOperationPanel(BankOperationKind kind, BankAccountVm vm, FrameworkElement clickedButton)
@@ -183,24 +229,27 @@ namespace Finly.Pages
             if (kind == BankOperationKind.Withdraw)
             {
                 OpTitle.Text = $"Wypłata z konta \"{vm.AccountName}\"";
-                OpMainLabel.Text = "Do:";
-                OpEnvelopeLabel.Text = "Do koperty:";
+                OpQuestionLabel.Text = "Dokąd chcesz wypłacić swoje pieniądze?";
             }
             else
             {
                 OpTitle.Text = $"Wpłata na konto \"{vm.AccountName}\"";
-                OpMainLabel.Text = "Z:";
-                OpEnvelopeLabel.Text = "Z koperty:";
+                OpQuestionLabel.Text = "Skąd chcesz wpłacić pieniądze na konto?";
             }
 
-            OpAmountBox.Text = "";
+            OpAmountBox.Text = 0m.ToString("N2", CultureInfo.CurrentCulture);
             OpErrorText.Text = "";
             OpErrorText.Visibility = Visibility.Collapsed;
 
-            OpFromCashRadio.IsChecked = true;
-            OpFromEnvelopeRadio.IsChecked = false;
-            OpCashCombo.SelectedIndex = 0;
-            OpEnvelopeCombo.SelectedIndex = 0;
+            // domyślnie wolna gotówka
+            _opSourceKind = "free";
+            OpFreeCashButton.IsChecked = true;
+            OpSavedCashButton.IsChecked = false;
+            OpEnvelopeButton.IsChecked = false;
+            OpEnvelopeRow.Visibility = Visibility.Collapsed;
+
+            // wczytaj aktualne koperty
+            LoadEnvelopesForOperation();
 
             OperationPanel.Visibility = Visibility.Visible;
             EditPanel.Visibility = Visibility.Collapsed;
@@ -246,6 +295,22 @@ namespace Finly.Pages
                 ShowOperationPanel(BankOperationKind.Deposit, vm, fe);
         }
 
+        private void OpSourceButton_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is not ToggleButton btn) return;
+
+            string kind = btn.Tag as string ?? "free";
+            _opSourceKind = kind;
+
+            OpFreeCashButton.IsChecked = kind == "free";
+            OpSavedCashButton.IsChecked = kind == "saved";
+            OpEnvelopeButton.IsChecked = kind == "envelope";
+
+            OpEnvelopeRow.Visibility = kind == "envelope"
+                ? Visibility.Visible
+                : Visibility.Collapsed;
+        }
+
         private void OpSave_Click(object sender, RoutedEventArgs e)
         {
             if (_currentAccount == null || _currentOperation == BankOperationKind.None)
@@ -266,59 +331,23 @@ namespace Finly.Pages
                 return;
             }
 
-            bool useEnvelope = OpFromEnvelopeRadio.IsChecked == true;
-
-            if (useEnvelope && OpEnvelopeCombo.SelectedItem == null)
+            if (_opSourceKind == "envelope" && OpEnvelopeCombo.SelectedItem == null)
             {
-                OpErrorText.Text = "Wybierz kopertę lub zmień źródło.";
+                OpErrorText.Text = "Wybierz kopertę.";
                 OpErrorText.Visibility = Visibility.Visible;
                 return;
             }
-
-            string cashType = "free";
-            if (!useEnvelope && OpCashCombo.SelectedItem is ComboBoxItem ci && ci.Tag is string tag)
-                cashType = tag;
 
             try
             {
                 switch (_currentOperation)
                 {
                     case BankOperationKind.Withdraw:
-                        if (useEnvelope)
-                        {
-                            ToastService.Info("Przelew z konta do koperty dodamy po spięciu modułu kopert.");
-                        }
-                        else
-                        {
-                            if (cashType == "free")
-                            {
-                                DatabaseService.TransferBankToCash(_uid, _currentAccount.Id, amount);
-                                ToastService.Success($"Wypłacono {amount:N2} zł do wolnej gotówki.");
-                            }
-                            else
-                            {
-                                ToastService.Info("„Gotówka odłożona” będzie dostępna później.");
-                            }
-                        }
+                        HandleWithdraw(amount);
                         break;
 
                     case BankOperationKind.Deposit:
-                        if (useEnvelope)
-                        {
-                            ToastService.Info("Przelew z koperty na konto dodamy po spięciu modułu kopert.");
-                        }
-                        else
-                        {
-                            if (cashType == "free")
-                            {
-                                DatabaseService.TransferCashToBank(_uid, _currentAccount.Id, amount);
-                                ToastService.Success($"Wpłacono {amount:N2} zł na konto.");
-                            }
-                            else
-                            {
-                                ToastService.Info("Wpłata z „gotówki odłożonej” będzie dostępna później.");
-                            }
-                        }
+                        HandleDeposit(amount);
                         break;
                 }
 
@@ -332,6 +361,74 @@ namespace Finly.Pages
             finally
             {
                 HideOperationPanel();
+            }
+        }
+
+        private void HandleWithdraw(decimal amount)
+        {
+            if (_currentAccount == null) return;
+
+            switch (_opSourceKind)
+            {
+                case "free":
+                    // konto -> wolna gotówka
+                    DatabaseService.TransferBankToCash(_uid, _currentAccount.Id, amount);
+                    ToastService.Success($"Wypłacono {amount:N2} zł do wolnej gotówki.");
+                    break;
+
+                case "saved":
+                    // konto -> gotówka -> odłożona gotówka
+                    DatabaseService.TransferBankToCash(_uid, _currentAccount.Id, amount);
+                    DatabaseService.AddToSavedCash(_uid, amount);
+                    ToastService.Success($"Wypłacono {amount:N2} zł do odłożonej gotówki.");
+                    break;
+
+                case "envelope":
+                    // konto -> gotówka -> odłożona gotówka -> konkretna koperta
+                    if (OpEnvelopeCombo.SelectedItem is not EnvelopeItem env)
+                        throw new InvalidOperationException("Nie wybrano koperty.");
+
+                    DatabaseService.TransferBankToCash(_uid, _currentAccount.Id, amount);
+                    DatabaseService.AddToSavedCash(_uid, amount);
+                    DatabaseService.AddToEnvelopeAllocated(_uid, env.Id, amount);
+
+                    ToastService.Success(
+                        $"Przelano {amount:N2} zł z konta do koperty \"{env.Name}\".");
+                    break;
+            }
+        }
+
+        private void HandleDeposit(decimal amount)
+        {
+            if (_currentAccount == null) return;
+
+            switch (_opSourceKind)
+            {
+                case "free":
+                    // wolna gotówka -> konto
+                    DatabaseService.TransferCashToBank(_uid, _currentAccount.Id, amount);
+                    ToastService.Success($"Wpłacono {amount:N2} zł na konto.");
+                    break;
+
+                case "saved":
+                    // odłożona gotówka -> gotówka -> konto
+                    DatabaseService.TransferCashToBank(_uid, _currentAccount.Id, amount);
+                    DatabaseService.SubtractFromSavedCash(_uid, amount);
+                    ToastService.Success($"Wpłacono {amount:N2} zł z odłożonej gotówki na konto.");
+                    break;
+
+                case "envelope":
+                    // koperta -> odłożona gotówka -> gotówka -> konto
+                    if (OpEnvelopeCombo.SelectedItem is not EnvelopeItem env)
+                        throw new InvalidOperationException("Nie wybrano koperty.");
+
+                    DatabaseService.TransferCashToBank(_uid, _currentAccount.Id, amount);
+                    DatabaseService.SubtractFromEnvelopeAllocated(_uid, env.Id, amount);
+                    DatabaseService.SubtractFromSavedCash(_uid, amount);
+
+                    ToastService.Success(
+                        $"Wpłacono {amount:N2} zł z koperty \"{env.Name}\" na konto.");
+                    break;
             }
         }
 
@@ -394,7 +491,6 @@ namespace Finly.Pages
 
         private void SetSelectedBankForEdit(string? bankName)
         {
-            // nic nie mamy – ustaw "Inny bank" + pokaż textbox
             if (string.IsNullOrWhiteSpace(bankName))
             {
                 foreach (var item in EditBankCombo.Items)
@@ -411,7 +507,6 @@ namespace Finly.Pages
                 return;
             }
 
-            // próbujemy znaleźć dokładnie taki bank na liście
             foreach (var item in EditBankCombo.Items)
             {
                 if (string.Equals(ExtractBankName(item), bankName, StringComparison.OrdinalIgnoreCase))
@@ -423,7 +518,6 @@ namespace Finly.Pages
                 }
             }
 
-            // nie znaleziono -> traktujemy jako "Inny bank" i wpisujemy nazwę własną
             foreach (var item in EditBankCombo.Items)
             {
                 if (string.Equals(ExtractBankName(item), "Inny bank", StringComparison.OrdinalIgnoreCase))
@@ -448,6 +542,7 @@ namespace Finly.Pages
             EditErrorText.Visibility = Visibility.Collapsed;
             EditErrorText.Text = "";
 
+            // saldo
             var textBalance = (EditBalanceBox.Text ?? "").Replace(" ", "");
             if (!decimal.TryParse(textBalance, NumberStyles.Number, CultureInfo.CurrentCulture,
                                   out var balance) || balance < 0)
@@ -457,6 +552,22 @@ namespace Finly.Pages
                 return;
             }
 
+            // IBAN
+            var rawIban = (EditIbanBox.Text ?? "").Trim();
+            string finalIban = "";
+            if (!string.IsNullOrEmpty(rawIban))
+            {
+                if (!ValidatePolishIban(rawIban, out var normalized, out string? error))
+                {
+                    EditErrorText.Text = error ?? "Nieprawidłowy numer IBAN.";
+                    EditErrorText.Visibility = Visibility.Visible;
+                    return;
+                }
+
+                finalIban = FormatPolishIban(normalized);
+            }
+
+            // bank
             var bankFromCombo = GetSelectedEditBankName();
             var bankCustom = (EditBankCustomBox.Text ?? "").Trim();
 
@@ -468,7 +579,7 @@ namespace Finly.Pages
 
             _editModel.BankName = finalBankName;
             _editModel.AccountName = (EditAccountNameBox.Text ?? "").Trim();
-            _editModel.Iban = (EditIbanBox.Text ?? "").Trim();
+            _editModel.Iban = finalIban;
             _editModel.Currency = string.IsNullOrWhiteSpace(_editModel.Currency) ? "PLN" : _editModel.Currency;
             _editModel.Balance = balance;
 
@@ -502,6 +613,90 @@ namespace Finly.Pages
         private void EditCancel_Click(object sender, RoutedEventArgs e)
         {
             HideEditPanel();
+        }
+
+        // Kwota 0,00 – zachowanie (saldo w edycji konta)
+        private void EditBalanceBox_GotFocus(object sender, RoutedEventArgs e)
+        {
+            if (sender is TextBox tb)
+            {
+                var txt = (tb.Text ?? "").Trim();
+
+                if (string.IsNullOrEmpty(txt) ||
+                    txt == "0" ||
+                    txt == "0,00" ||
+                    txt == "0.00" ||
+                    txt == 0m.ToString("N2", CultureInfo.CurrentCulture))
+                {
+                    tb.Clear();
+                }
+
+                tb.SelectAll();
+            }
+        }
+
+        private void EditBalanceBox_LostFocus(object sender, RoutedEventArgs e)
+        {
+            if (sender is TextBox tb)
+            {
+                var txt = (tb.Text ?? "").Trim();
+
+                if (string.IsNullOrEmpty(txt))
+                {
+                    tb.Text = 0m.ToString("N2", CultureInfo.CurrentCulture);
+                }
+                else if (decimal.TryParse(txt, NumberStyles.Number,
+                                          CultureInfo.CurrentCulture, out var value))
+                {
+                    tb.Text = value.ToString("N2", CultureInfo.CurrentCulture);
+                }
+                else
+                {
+                    tb.Text = 0m.ToString("N2", CultureInfo.CurrentCulture);
+                }
+            }
+        }
+
+        // Kwota 0,00 – zachowanie (panel operacji)
+        private void OpAmountBox_GotFocus(object sender, RoutedEventArgs e)
+        {
+            if (sender is TextBox tb)
+            {
+                var txt = (tb.Text ?? "").Trim();
+
+                if (string.IsNullOrEmpty(txt) ||
+                    txt == "0" ||
+                    txt == "0,00" ||
+                    txt == "0.00" ||
+                    txt == 0m.ToString("N2", CultureInfo.CurrentCulture))
+                {
+                    tb.Clear();
+                }
+
+                tb.SelectAll();
+            }
+        }
+
+        private void OpAmountBox_LostFocus(object sender, RoutedEventArgs e)
+        {
+            if (sender is TextBox tb)
+            {
+                var txt = (tb.Text ?? "").Trim();
+
+                if (string.IsNullOrEmpty(txt))
+                {
+                    tb.Text = 0m.ToString("N2", CultureInfo.CurrentCulture);
+                }
+                else if (decimal.TryParse(txt, NumberStyles.Number,
+                                          CultureInfo.CurrentCulture, out var value))
+                {
+                    tb.Text = value.ToString("N2", CultureInfo.CurrentCulture);
+                }
+                else
+                {
+                    tb.Text = 0m.ToString("N2", CultureInfo.CurrentCulture);
+                }
+            }
         }
 
         // ===== KLIKNIĘCIE „EDYTUJ” NA KAFELKU =====
@@ -562,25 +757,137 @@ namespace Finly.Pages
                 return;
             }
 
-            var c = new ConfirmDialog("Usunąć ten rachunek? Operacja nieodwracalna.")
-            {
-                Owner = Window.GetWindow(this)
-            };
+            if (sender is not FrameworkElement fe)
+                return;
 
-            if (c.ShowDialog() == true && c.Result)
+            HideAllDeletePanels();
+
+            FrameworkElement? container = fe;
+            while (container != null &&
+                   container is not ContentPresenter &&
+                   container is not Border)
             {
-                try
+                container = VisualTreeHelper.GetParent(container) as FrameworkElement;
+            }
+
+            if (container == null) return;
+
+            var panel = FindInTree<Border>(container, "DeleteConfirmPanel");
+            if (panel == null) return;
+
+            panel.Visibility = panel.Visibility == Visibility.Visible
+                ? Visibility.Collapsed
+                : Visibility.Visible;
+        }
+
+        private void HideAllDeletePanels()
+        {
+            foreach (var item in AccountsRepeater.Items)
+            {
+                var container =
+                    AccountsRepeater.ItemContainerGenerator.ContainerFromItem(item) as FrameworkElement;
+                if (container == null) continue;
+
+                var panel = FindInTree<Border>(container, "DeleteConfirmPanel");
+                if (panel != null)
+                    panel.Visibility = Visibility.Collapsed;
+            }
+        }
+
+        private void DeleteCancel_Click(object sender, RoutedEventArgs e)
+        {
+            HideAllDeletePanels();
+        }
+
+        private void DeleteConfirm_Click(object sender, RoutedEventArgs e)
+        {
+            var vm = GetVmFromSender(sender);
+            if (vm == null)
+            {
+                HideAllDeletePanels();
+                return;
+            }
+
+            try
+            {
+                DatabaseService.DeleteAccount(vm.Id, _uid);
+                ToastService.Success("Usunięto rachunek.");
+                LoadAccounts();
+                RefreshMoney();
+            }
+            catch (Exception ex)
+            {
+                ToastService.Error("Błąd usuwania rachunku: " + ex.Message);
+            }
+            finally
+            {
+                HideAllDeletePanels();
+            }
+        }
+
+        // ===== IBAN – prosta walidacja i format =====
+
+        private static bool ValidatePolishIban(string input, out string normalized, out string? error)
+        {
+            normalized = "";
+            error = null;
+
+            if (string.IsNullOrWhiteSpace(input))
+            {
+                error = "Numer IBAN jest pusty.";
+                return false;
+            }
+
+            var s = input.ToUpperInvariant().Replace(" ", "");
+
+            if (!s.StartsWith("PL"))
+            {
+                error = "Polski IBAN musi zaczynać się od 'PL'.";
+                return false;
+            }
+
+            if (s.Length != 28)
+            {
+                error = "Polski IBAN musi mieć dokładnie 28 znaków (PL + 26 cyfr).";
+                return false;
+            }
+
+            for (int i = 2; i < 28; i++)
+            {
+                if (!char.IsDigit(s[i]))
                 {
-                    DatabaseService.DeleteAccount(vm.Id, _uid);
-                    ToastService.Success("Usunięto rachunek.");
-                    LoadAccounts();
-                    RefreshMoney();
-                }
-                catch (Exception ex)
-                {
-                    ToastService.Error("Błąd usuwania rachunku: " + ex.Message);
+                    error = "Po 'PL' w numerze IBAN mogą występować tylko cyfry.";
+                    return false;
                 }
             }
+
+            normalized = s;
+            return true;
+        }
+
+        private static string FormatPolishIban(string normalized)
+        {
+            // normalized: "PL" + 26 cyfr, bez spacji
+            if (string.IsNullOrWhiteSpace(normalized))
+                return "";
+
+            var s = normalized.ToUpperInvariant().Replace(" ", "");
+            if (s.Length != 28 || !s.StartsWith("PL"))
+                return normalized;
+
+            string country = s.Substring(0, 2); // PL
+            string check = s.Substring(2, 2);
+            string rest = s.Substring(4);      // 24 cyfry
+
+            // grupujemy resztę po 4 cyfry
+            var parts = new List<string> { country + check };
+            for (int i = 0; i < rest.Length; i += 4)
+            {
+                int len = Math.Min(4, rest.Length - i);
+                parts.Add(rest.Substring(i, len));
+            }
+
+            return string.Join(" ", parts);
         }
 
         private static BankAccountModel ToEntity(BankAccountModel m) => new()
@@ -596,7 +903,6 @@ namespace Finly.Pages
         };
     }
 
-    // ===== VM KAFELKA KONTA =====
     // ===== VM KAFELKA KONTA =====
     public sealed class BankAccountVm
     {
@@ -620,7 +926,6 @@ namespace Finly.Pages
             Currency = string.IsNullOrWhiteSpace(m.Currency) ? "PLN" : m.Currency;
             Balance = m.Balance;
 
-            // JEDEN parametr – nazwa banku z bazy
             LogoPath = GetLogoForBank(BankName);
         }
 
@@ -655,5 +960,5 @@ namespace Finly.Pages
     public sealed class AddAccountTile
     {
     }
-
 }
+
