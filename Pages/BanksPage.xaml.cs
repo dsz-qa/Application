@@ -144,14 +144,14 @@ namespace Finly.Pages
             }
         }
 
-        // ===== POMOCNICZE – nazwa banku z ComboBoxItem (zawiera StackPanel z obrazkiem) =====
-        private static string GetBankNameFromItem(object? item)
+        // ===== POMOCNICZE – wyciąganie nazwy banku z ComboBoxItem (string albo StackPanel) =====
+        private static string ExtractBankName(object? item)
         {
             if (item is ComboBoxItem ci)
             {
                 // 1) Prosty przypadek – Content to string
                 if (ci.Content is string s)
-                    return s;
+                    return s.Trim();
 
                 // 2) Nasz StackPanel: [Image][TextBlock]
                 if (ci.Content is StackPanel sp)
@@ -159,14 +159,17 @@ namespace Finly.Pages
                     foreach (var child in sp.Children)
                     {
                         if (child is TextBlock tb && !string.IsNullOrWhiteSpace(tb.Text))
-                            return tb.Text;
+                            return tb.Text.Trim();
                     }
                 }
             }
-
             return "";
         }
 
+        private string GetSelectedEditBankName()
+        {
+            return ExtractBankName(EditBankCombo.SelectedItem);
+        }
 
         // ===== PANEL OPERACJI (WYPŁATA / WPŁATA) =====
 
@@ -366,9 +369,7 @@ namespace Finly.Pages
             OperationPanel.Visibility = Visibility.Collapsed;
         }
 
-        // wersja pomocnicza – używana przy Edytuj
-        private void ShowEditPanel(BankAccountModel model)
-            => ShowEditPanel(model, isNew: false);
+        private void ShowEditPanel(BankAccountModel model) => ShowEditPanel(model, isNew: false);
 
         private void HideEditPanel()
         {
@@ -376,32 +377,9 @@ namespace Finly.Pages
             _editModel = null;
         }
 
-        /// <summary>
-        /// Wyciąga nazwę banku z ComboBoxItem (string albo StackPanel z TextBlockiem),
-        /// tak jak w FirstRunWindow.
-        /// </summary>
-        private static string GetBankNameFromComboItem(ComboBoxItem? item)
-        {
-            if (item == null) return "";
-
-            if (item.Content is string s)
-                return s;
-
-            if (item.Content is StackPanel sp)
-            {
-                foreach (var child in sp.Children)
-                {
-                    if (child is TextBlock tb)
-                        return tb.Text;
-                }
-            }
-
-            return "";
-        }
-
         private void EditBankCombo_SelectionChanged(object? sender, SelectionChangedEventArgs? e)
         {
-            var bankName = GetBankNameFromItem(EditBankCombo.SelectedItem);
+            var bankName = ExtractBankName(EditBankCombo.SelectedItem);
 
             if (string.Equals(bankName, "Inny bank", StringComparison.OrdinalIgnoreCase))
             {
@@ -419,10 +397,9 @@ namespace Finly.Pages
             // nic nie mamy – ustaw "Inny bank" + pokaż textbox
             if (string.IsNullOrWhiteSpace(bankName))
             {
-                // wybierz pozycję "Inny bank"
                 foreach (var item in EditBankCombo.Items)
                 {
-                    if (string.Equals(GetBankNameFromItem(item), "Inny bank", StringComparison.OrdinalIgnoreCase))
+                    if (string.Equals(ExtractBankName(item), "Inny bank", StringComparison.OrdinalIgnoreCase))
                     {
                         EditBankCombo.SelectedItem = item;
                         break;
@@ -437,7 +414,7 @@ namespace Finly.Pages
             // próbujemy znaleźć dokładnie taki bank na liście
             foreach (var item in EditBankCombo.Items)
             {
-                if (string.Equals(GetBankNameFromItem(item), bankName, StringComparison.OrdinalIgnoreCase))
+                if (string.Equals(ExtractBankName(item), bankName, StringComparison.OrdinalIgnoreCase))
                 {
                     EditBankCombo.SelectedItem = item;
                     EditBankCustomBox.Visibility = Visibility.Collapsed;
@@ -449,7 +426,7 @@ namespace Finly.Pages
             // nie znaleziono -> traktujemy jako "Inny bank" i wpisujemy nazwę własną
             foreach (var item in EditBankCombo.Items)
             {
-                if (string.Equals(GetBankNameFromItem(item), "Inny bank", StringComparison.OrdinalIgnoreCase))
+                if (string.Equals(ExtractBankName(item), "Inny bank", StringComparison.OrdinalIgnoreCase))
                 {
                     EditBankCombo.SelectedItem = item;
                     break;
@@ -459,7 +436,6 @@ namespace Finly.Pages
             EditBankCustomBox.Visibility = Visibility.Visible;
             EditBankCustomBox.Text = bankName;
         }
-
 
         private void EditSave_Click(object sender, RoutedEventArgs e)
         {
@@ -481,9 +457,7 @@ namespace Finly.Pages
                 return;
             }
 
-            var selectedItem = EditBankCombo.SelectedItem as ComboBoxItem;
-            var bankFromCombo = GetBankNameFromItem(EditBankCombo.SelectedItem);
-
+            var bankFromCombo = GetSelectedEditBankName();
             var bankCustom = (EditBankCustomBox.Text ?? "").Trim();
 
             string finalBankName;
@@ -623,6 +597,7 @@ namespace Finly.Pages
     }
 
     // ===== VM KAFELKA KONTA =====
+    // ===== VM KAFELKA KONTA =====
     public sealed class BankAccountVm
     {
         public int Id { get; }
@@ -645,10 +620,11 @@ namespace Finly.Pages
             Currency = string.IsNullOrWhiteSpace(m.Currency) ? "PLN" : m.Currency;
             Balance = m.Balance;
 
-            LogoPath = GetLogoForBank(BankName, AccountName);
+            // JEDEN parametr – nazwa banku z bazy
+            LogoPath = GetLogoForBank(BankName);
         }
 
-        private static string GetLogoForBank(string? bankName, string? accountName)
+        private static string GetLogoForBank(string? bankName)
         {
             var text = (bankName ?? "").ToLowerInvariant();
 
@@ -673,9 +649,11 @@ namespace Finly.Pages
 
             return "pack://application:,,,/Assets/Banks/innybank.png";
         }
-
     }
 
     // marker dla kafla "Dodaj konto"
-    public sealed class AddAccountTile { }
+    public sealed class AddAccountTile
+    {
+    }
+
 }

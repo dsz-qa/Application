@@ -57,6 +57,7 @@ namespace Finly.Services
                 if (_schemaInitialized) return;
                 using var c = GetConnection();
                 SchemaService.Ensure(c);
+                EnsureBankAccountsSchema(c);
                 _schemaInitialized = true;
             }
         }
@@ -71,6 +72,7 @@ namespace Finly.Services
                     {
                         using var c0 = GetConnection();
                         SchemaService.Ensure(c0);
+                        EnsureBankAccountsSchema(c0);   // MIGRACJA BankName w BankAccounts
                         _schemaInitialized = true;
                     }
                 }
@@ -556,7 +558,7 @@ WHERE UserId = @u AND CategoryId = @src;";
             cmd.CommandText = @"
 SELECT 
     Id,
-    '' AS BankName,
+    BankName,
     AccountName,
     Iban,
     Currency,
@@ -577,8 +579,19 @@ ORDER BY AccountName;";
             var list = new List<BankAccountModel>();
             using var c = OpenAndEnsureSchema();
             using var cmd = c.CreateCommand();
-            cmd.CommandText = @"SELECT Id, UserId, ConnectionId, AccountName, Iban, Currency, Balance
-                                FROM BankAccounts WHERE UserId=@u ORDER BY AccountName;";
+            cmd.CommandText = @"
+SELECT 
+    Id,
+    UserId,
+    ConnectionId,
+    BankName,
+    AccountName,
+    Iban,
+    Currency,
+    Balance
+FROM BankAccounts 
+WHERE UserId=@u 
+ORDER BY AccountName;";
             cmd.Parameters.AddWithValue("@u", userId);
 
             using var r = cmd.ExecuteReader();
@@ -589,10 +602,11 @@ ORDER BY AccountName;";
                     Id = r.GetInt32(0),
                     UserId = r.GetInt32(1),
                     ConnectionId = r.IsDBNull(2) ? (int?)null : r.GetInt32(2),
-                    AccountName = GetStringSafe(r, 3),
-                    Iban = GetStringSafe(r, 4),
-                    Currency = string.IsNullOrWhiteSpace(GetStringSafe(r, 5)) ? "PLN" : GetStringSafe(r, 5),
-                    Balance = r.IsDBNull(6) ? 0m : Convert.ToDecimal(r.GetValue(6))
+                    BankName = GetStringSafe(r, 3),
+                    AccountName = GetStringSafe(r, 4),
+                    Iban = GetStringSafe(r, 5),
+                    Currency = string.IsNullOrWhiteSpace(GetStringSafe(r, 6)) ? "PLN" : GetStringSafe(r, 6),
+                    Balance = r.IsDBNull(7) ? 0m : Convert.ToDecimal(r.GetValue(7))
                 });
             }
             return list;
@@ -612,11 +626,12 @@ ORDER BY AccountName;";
 
             using var cmd = c.CreateCommand();
             cmd.CommandText = @"
-INSERT INTO BankAccounts(UserId, ConnectionId, AccountName, Iban, Currency, Balance)
-VALUES (@u, @conn, @name, @iban, @cur, @bal);
+INSERT INTO BankAccounts(UserId, ConnectionId, BankName, AccountName, Iban, Currency, Balance)
+VALUES (@u, @conn, @bank, @name, @iban, @cur, @bal);
 SELECT last_insert_rowid();";
             cmd.Parameters.AddWithValue("@u", a.UserId);
             cmd.Parameters.AddWithValue("@conn", (object?)a.ConnectionId ?? DBNull.Value);
+            cmd.Parameters.AddWithValue("@bank", a.BankName ?? "");
             cmd.Parameters.AddWithValue("@name", a.AccountName ?? "");
             cmd.Parameters.AddWithValue("@iban", a.Iban ?? "");
             cmd.Parameters.AddWithValue("@cur", string.IsNullOrWhiteSpace(a.Currency) ? "PLN" : a.Currency);
@@ -641,11 +656,17 @@ SELECT last_insert_rowid();";
             using var cmd = c.CreateCommand();
             cmd.CommandText = @"
 UPDATE BankAccounts SET
-    ConnectionId=@conn, AccountName=@name, Iban=@iban, Currency=@cur, Balance=@bal
+    ConnectionId=@conn, 
+    BankName=@bank,
+    AccountName=@name, 
+    Iban=@iban, 
+    Currency=@cur, 
+    Balance=@bal
 WHERE Id=@id AND UserId=@u;";
             cmd.Parameters.AddWithValue("@id", a.Id);
             cmd.Parameters.AddWithValue("@u", a.UserId);
             cmd.Parameters.AddWithValue("@conn", (object?)a.ConnectionId ?? DBNull.Value);
+            cmd.Parameters.AddWithValue("@bank", a.BankName ?? "");
             cmd.Parameters.AddWithValue("@name", a.AccountName ?? "");
             cmd.Parameters.AddWithValue("@iban", a.Iban ?? "");
             cmd.Parameters.AddWithValue("@cur", string.IsNullOrWhiteSpace(a.Currency) ? "PLN" : a.Currency);
@@ -1202,6 +1223,21 @@ UPDATE BankAccounts
             return false;
         }
 
+        /// <summary>
+        /// MIGRACJA: dopilnuj, ¿eby w BankAccounts by³a kolumna BankName (TEXT).
+        /// </summary>
+        private static void EnsureBankAccountsSchema(SqliteConnection con)
+        {
+            if (!TableExists(con, "BankAccounts")) return;
+
+            if (!ColumnExists(con, "BankAccounts", "BankName"))
+            {
+                using var cmd = con.CreateCommand();
+                cmd.CommandText = "ALTER TABLE BankAccounts ADD COLUMN BankName TEXT;";
+                cmd.ExecuteNonQuery();
+            }
+        }
+
         public sealed class CategoryAmountDto
         {
             public string Name { get; set; } = "";
@@ -1534,11 +1570,12 @@ VALUES (@u, @a, @d, @desc, @s);";
             cmd.Parameters.AddWithValue("@a", amount);
             cmd.Parameters.AddWithValue("@d", date.ToString("yyyy-MM-dd"));
             cmd.Parameters.AddWithValue("@desc", (object?)note ?? DBNull.Value);
-            cmd.Parameters.AddWithValue("@s", source ?? "Przychód");
+            cmd.Parameters.AddWithValue("@s", source ?? "Przychody");
             cmd.ExecuteNonQuery();
         }
     }
 }
+
 
 
 
