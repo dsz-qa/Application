@@ -231,6 +231,44 @@ namespace Finly.Pages
                 }
             }
         }
+
+        private void ShowDeleteConfirm_Click(object sender, RoutedEventArgs e)
+        {
+            DeleteConfirmPanel.Visibility = Visibility.Visible;
+        }
+
+        private void CancelDelete_Click(object sender, RoutedEventArgs e)
+        {
+            DeleteConfirmPanel.Visibility = Visibility.Collapsed;
+        }
+
+        private void ConfirmDelete_Click(object sender, RoutedEventArgs e)
+        {
+            var uid = UserService.GetCurrentUserId();
+            if (uid <= 0)
+            {
+                ToastService.Error("Brak zalogowanego użytkownika.");
+                return;
+            }
+
+            try
+            {
+                DatabaseService.DeleteUserCascade(uid);
+                UserService.ClearCurrentUser();
+                ToastService.Success("Twoje konto zostało usunięte.");
+
+                var auth = new AuthWindow();
+                Application.Current.MainWindow = auth;
+                auth.Show();
+
+                Window.GetWindow(this)?.Close();
+            }
+            catch (Exception ex)
+            {
+                ToastService.Error("Nie udało się usunąć konta: " + ex.Message);
+            }
+        }
+
     }
 }
 
