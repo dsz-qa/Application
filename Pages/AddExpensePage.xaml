@@ -165,11 +165,12 @@
         <!-- =============== TREŚĆ – 3 panele ================= -->
 
         <!-- ========== WYDATEK ========== -->
+        <!-- ========== WYDATEK ========== -->
         <Border x:Name="ExpensePanel"
-                Grid.Row="5"
-                Style="{StaticResource Card}"
-                Margin="0,16,0,0"
-                Visibility="Collapsed">
+        Grid.Row="5"
+        Style="{StaticResource Card}"
+        Margin="0,16,0,0"
+        Visibility="Collapsed">
             <Grid>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="200"/>
@@ -187,68 +188,114 @@
                     <!-- 4 data -->
                     <RowDefinition Height="10"/>
                     <RowDefinition Height="Auto"/>
-                    <!-- 6 opis -->
+                    <!-- 6 skąd płacisz -->
+                    <RowDefinition Height="10"/>
+                    <RowDefinition Height="Auto"/>
+                    <!-- 8 koperta -->
                     <RowDefinition Height="20"/>
                     <RowDefinition Height="Auto"/>
-                    <!-- 8 przyciski -->
+                    <!-- 10 opis -->
+                    <RowDefinition Height="20"/>
+                    <RowDefinition Height="Auto"/>
+                    <!-- 12 przyciski -->
                 </Grid.RowDefinitions>
 
                 <!-- Kwota -->
                 <TextBlock Grid.Row="0" Grid.Column="0"
-                           Text="Kwota:"
-                           VerticalAlignment="Center"
-                           Margin="0,0,8,0"/>
+                   Text="Kwota:"
+                   VerticalAlignment="Center"
+                   Margin="0,0,8,0"/>
                 <TextBox x:Name="ExpenseAmountBox"
-                         Grid.Row="0" Grid.Column="1"
-                         Height="28"/>
+                 Grid.Row="0" Grid.Column="1"
+                 Height="28"/>
 
                 <!-- Kategoria -->
                 <TextBlock Grid.Row="2" Grid.Column="0"
-                           Text="Kategoria:"
-                           VerticalAlignment="Center"
-                           Margin="0,0,8,0"/>
+                   Text="Kategoria:"
+                   VerticalAlignment="Center"
+                   Margin="0,0,8,0"/>
                 <ComboBox x:Name="ExpenseCategoryBox"
-                          Grid.Row="2" Grid.Column="1"
-                          Height="28"
-                          IsEditable="True"
-                          IsTextSearchEnabled="True"
-                          StaysOpenOnEdit="True"
-                          IsReadOnly="False"/>
+                  Grid.Row="2" Grid.Column="1"
+                  Height="28"
+                  IsEditable="True"
+                  IsTextSearchEnabled="True"
+                  StaysOpenOnEdit="True"
+                  IsReadOnly="False"
+                  Style="{StaticResource DarkComboBoxStyle}"
+                  ItemContainerStyle="{StaticResource DarkComboBoxItemStyle}"/>
 
                 <!-- Data -->
                 <TextBlock Grid.Row="4" Grid.Column="0"
-                           Text="Data:"
-                           VerticalAlignment="Center"
-                           Margin="0,0,8,0"/>
+                   Text="Data:"
+                   VerticalAlignment="Center"
+                   Margin="0,0,8,0"/>
                 <DatePicker x:Name="ExpenseDatePicker"
-                            Grid.Row="4" Grid.Column="1"
-                            Height="28"/>
+                    Grid.Row="4" Grid.Column="1"
+                    Height="28"/>
+
+                <!-- SKĄD PŁACISZ -->
+                <TextBlock Grid.Row="6" Grid.Column="0"
+                   Text="Skąd płacisz:"
+                   VerticalAlignment="Center"
+                   Margin="0,0,8,0"/>
+                <ComboBox x:Name="ExpenseSourceCombo"
+                  Grid.Row="6" Grid.Column="1"
+                  Height="28"
+                  Style="{StaticResource DarkComboBoxStyle}"
+                  ItemContainerStyle="{StaticResource DarkComboBoxItemStyle}"
+                  SelectionChanged="ExpenseSourceCombo_SelectionChanged">
+                    <ComboBoxItem Content="Wolna gotówka" Tag="cash_free"/>
+                    <ComboBoxItem Content="Odłożona gotówka" Tag="cash_saved"/>
+                    <ComboBoxItem Content="Koperta"        Tag="envelope"/>
+                </ComboBox>
+
+                <!-- KOPERTA (pokazuje się tylko gdy wybrano Koperta) -->
+                <Grid x:Name="ExpenseEnvelopeRow"
+              Grid.Row="8"
+              Grid.ColumnSpan="2"
+              Visibility="Collapsed">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="200"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+
+                    <TextBlock Grid.Column="0"
+                       Text="Koperta:"
+                       VerticalAlignment="Center"
+                       Margin="0,0,8,0"/>
+                    <ComboBox x:Name="ExpenseEnvelopeCombo"
+                      Grid.Column="1"
+                      Height="28"
+                      Style="{StaticResource DarkComboBoxStyle}"
+                      ItemContainerStyle="{StaticResource DarkComboBoxItemStyle}"/>
+                </Grid>
 
                 <!-- Opis -->
-                <TextBlock Grid.Row="6" Grid.Column="0"
-                           Text="Opis:"
-                           VerticalAlignment="Top"
-                           Margin="0,4,8,0"/>
+                <TextBlock Grid.Row="10" Grid.Column="0"
+                   Text="Opis:"
+                   VerticalAlignment="Top"
+                   Margin="0,4,8,0"/>
                 <TextBox x:Name="ExpenseDescBox"
-                         Grid.Row="6" Grid.Column="1"
-                         Height="80"
-                         TextWrapping="Wrap"
-                         AcceptsReturn="True"
-                         VerticalScrollBarVisibility="Auto"/>
+                 Grid.Row="10" Grid.Column="1"
+                 Height="80"
+                 TextWrapping="Wrap"
+                 AcceptsReturn="True"
+                 VerticalScrollBarVisibility="Auto"/>
 
                 <!-- Przyciski -->
-                <StackPanel Grid.Row="8" Grid.ColumnSpan="2"
-                            Orientation="Horizontal"
-                            HorizontalAlignment="Right">
+                <StackPanel Grid.Row="12" Grid.ColumnSpan="2"
+                    Orientation="Horizontal"
+                    HorizontalAlignment="Right">
                     <Button Content="Dodaj"
-                            Margin="0,0,8,0"
-                            Style="{StaticResource PrimaryButton}"
-                            Click="SaveExpense_Click"/>
+                    Margin="0,0,8,0"
+                    Style="{StaticResource PrimaryButton}"
+                    Click="SaveExpense_Click"/>
                     <Button Content="Anuluj"
-                            Click="Cancel_Click"/>
+                    Click="Cancel_Click"/>
                 </StackPanel>
             </Grid>
         </Border>
+
 
         <!-- ========== PRZYCHÓD ========== -->
         <Border x:Name="IncomePanel"

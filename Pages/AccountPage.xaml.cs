@@ -138,7 +138,7 @@ namespace Finly.Pages
                 HouseNo = NullIfEmpty(TxtHouseNo.Text)
             };
 
-            // Walidacja e-maila (prosta – czy coś jest + @)
+            // Walidacja e-maila (prosta – czy jest znak @)
             if (!string.IsNullOrWhiteSpace(d.Email) && !d.Email!.Contains("@"))
             {
                 ToastService.Info("Podaj poprawny adres e-mail (lub zostaw pole puste).");
@@ -153,7 +153,7 @@ namespace Finly.Pages
                         birthRaw,
                         "dd-MM-yyyy",
                         CultureInfo.GetCultureInfo("pl-PL"),
-                        System.Globalization.DateTimeStyles.None,
+                        DateTimeStyles.None,
                         out var bd))
                 {
                     ToastService.Info("Data urodzenia musi mieć format DD-MM-RRRR.");
@@ -180,6 +180,7 @@ namespace Finly.Pages
             }
         }
 
+
         // ===== HASŁO =====
 
         private void ChangePassword_Click(object sender, RoutedEventArgs e)
@@ -194,43 +195,6 @@ namespace Finly.Pages
         }
 
         // ===== USUWANIE KONTA UŻYTKOWNIKA =====
-        private void DeleteUser_Click(object sender, RoutedEventArgs e)
-        {
-            var uid = UserService.GetCurrentUserId();
-            if (uid <= 0)
-            {
-                ToastService.Error("Brak zalogowanego użytkownika.");
-                return;
-            }
-
-            var dlg = new ConfirmDialog(
-                "Usunąć konto użytkownika?\n\n" +
-                "Tej operacji nie można cofnąć. Zostaną usunięte wszystkie Twoje dane: " +
-                "rachunki, transakcje, budżety, kategorie itp.")
-            {
-                Owner = Window.GetWindow(this)
-            };
-
-            if (dlg.ShowDialog() == true && dlg.Result)
-            {
-                try
-                {
-                    DatabaseService.DeleteUserCascade(uid);
-                    UserService.ClearCurrentUser();
-                    ToastService.Success("Twoje konto zostało usunięte.");
-
-                    var auth = new AuthWindow();
-                    Application.Current.MainWindow = auth;
-                    auth.Show();
-
-                    Window.GetWindow(this)?.Close();
-                }
-                catch (Exception ex)
-                {
-                    ToastService.Error("Nie udało się usunąć konta: " + ex.Message);
-                }
-            }
-        }
 
         private void ShowDeleteConfirm_Click(object sender, RoutedEventArgs e)
         {
@@ -242,7 +206,7 @@ namespace Finly.Pages
             DeleteConfirmPanel.Visibility = Visibility.Collapsed;
         }
 
-        private void ConfirmDelete_Click(object sender, RoutedEventArgs e)
+        private void DeleteUser_Click(object sender, RoutedEventArgs e)
         {
             var uid = UserService.GetCurrentUserId();
             if (uid <= 0)
@@ -253,6 +217,7 @@ namespace Finly.Pages
 
             try
             {
+                // faktyczne usunięcie użytkownika i wszystkich danych
                 DatabaseService.DeleteUserCascade(uid);
                 UserService.ClearCurrentUser();
                 ToastService.Success("Twoje konto zostało usunięte.");
@@ -268,9 +233,9 @@ namespace Finly.Pages
                 ToastService.Error("Nie udało się usunąć konta: " + ex.Message);
             }
         }
-
     }
 }
+
 
 
 

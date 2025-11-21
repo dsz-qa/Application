@@ -9,6 +9,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
+using System.Windows.Shapes;
 using System.Windows.Threading;
 
 namespace Finly.Pages
@@ -17,6 +18,7 @@ namespace Finly.Pages
     {
         private readonly int _uid;
 
+        // Kolekcje do donutów
         public ObservableCollection<PieSlice> PieCurrent { get; } = new();
         public ObservableCollection<PieSlice> PieIncome { get; } = new();
 
@@ -33,8 +35,8 @@ namespace Finly.Pages
         private DateTime _startDate;
         private DateTime _endDate;
 
-        // suma aktualnych wydatków – potrzebna do kliknięcia w kawałek koła
         private decimal _currentTotalExpenses = 0m;
+        private decimal _currentTotalIncome = 0m;
 
         public DashboardPage(int userId)
         {
@@ -50,7 +52,9 @@ namespace Finly.Pages
 
         public DashboardPage() : this(UserService.GetCurrentUserId()) { }
 
-        // ===== KPI =====
+        // =====================================================================
+        // KPI
+        // =====================================================================
 
         private void SetKpiText(string name, decimal value)
         {
@@ -62,30 +66,24 @@ namespace Finly.Pages
         {
             if (_uid <= 0) return;
 
-            // snapshot dalej wykorzystujemy do majątku, banków, kopert itd.
             var snap = DatabaseService.GetMoneySnapshot(_uid);
 
-            // Cały majątek
             SetKpiText("TotalWealthText", snap.Total);
-
-            // Konta bankowe
             SetKpiText("BanksText", snap.Banks);
 
-            // *** WAŻNE: wolna gotówka – tak samo jak na EnvelopesPage ***
             var freeCash = DatabaseService.GetCashOnHand(_uid);
             SetKpiText("FreeCashDashboardText", freeCash);
 
-            // Odłożona gotówka do rozdysponowania (ta sama logika co dotychczas)
             SetKpiText("SavedToAllocateText", snap.SavedUnallocated);
-
-            // Gotówka w kopertach
             SetKpiText("EnvelopesDashboardText", snap.Envelopes);
 
-            // Inwestycje – na razie 0
+            // Na razie 0
             SetKpiText("InvestmentsText", 0m);
         }
 
-        // ===== zakres dat =====
+        // =====================================================================
+        // Zakres dat
+        // =====================================================================
 
         private void ApplyPreset(DateRangeMode mode, DateTime anchor)
         {
@@ -187,7 +185,9 @@ namespace Finly.Pages
             LoadCharts();
         }
 
-        // ===== wykresy + tabelki =====
+        // =====================================================================
+        // Ładowanie wykresów + tabelek
+        // =====================================================================
 
         private void LoadCharts()
         {
@@ -198,11 +198,8 @@ namespace Finly.Pages
             var expenses = DatabaseService.GetSpendingByCategorySafe(_uid, start, end);
             var incomes = DatabaseService.GetIncomeBySourceSafe(_uid, start, end);
 
-            // donut WYDATKÓW – steruje środkiem i klikaniem
-            BuildPie(PieCurrent, expenses, updateCenter: true);
-
-            // donut PRZYCHODÓW – tylko rysuje kawałki, nie rusza środka
-            BuildPie(PieIncome, incomes, updateCenter: false);
+            BuildExpensePie(expenses);
+            BuildIncomePie(incomes);
 
             Dispatcher.BeginInvoke(new Action(() =>
             {
@@ -212,12 +209,13 @@ namespace Finly.Pages
             }), DispatcherPriority.Loaded);
         }
 
-        private void BuildPie(
-            ObservableCollection<PieSlice> target,
-            IEnumerable<DatabaseService.CategoryAmountDto> source,
-            bool updateCenter)
+        // =====================================================================
+        // Donut WYDATKÓW
+        // =====================================================================
+
+        private void BuildExpensePie(IEnumerable<DatabaseService.CategoryAmountDto> source)
         {
-            target.Clear();
+            PieCurrent.Clear();
 
             var data = (source ?? Enumerable.Empty<DatabaseService.CategoryAmountDto>())
                 .Where(x => x.Amount > 0m)
@@ -226,33 +224,28 @@ namespace Finly.Pages
 
             if (data.Count == 0)
             {
-                if (updateCenter)
-                {
-                    _currentTotalExpenses = 0m;
-                    if (PieCenterNameText != null) PieCenterNameText.Text = "Brak danych";
-                    if (PieCenterValueText != null) PieCenterValueText.Text = "0,00 zł";
-                    if (PieCenterPercentText != null) PieCenterPercentText.Text = "";
-                }
+                _currentTotalExpenses = 0m;
+
+                if (FindName("PieCenterNameText") is TextBlock n) n.Text = "Brak danych";
+                if (FindName("PieCenterValueText") is TextBlock v) v.Text = "0,00 zł";
+                if (FindName("PieCenterPercentText") is TextBlock p) p.Text = "";
                 return;
             }
 
             var sum = data.Sum(x => x.Amount);
+            _currentTotalExpenses = sum;
 
-            if (updateCenter)
-            {
-                _currentTotalExpenses = sum;
-                if (PieCenterNameText != null) PieCenterNameText.Text = "Wszystko";
-                if (PieCenterValueText != null) PieCenterValueText.Text = sum.ToString("N2") + " zł";
-                if (PieCenterPercentText != null) PieCenterPercentText.Text = "";
-            }
+            if (FindName("PieCenterNameText") is TextBlock nAll) nAll.Text = "Wszystko";
+            if (FindName("PieCenterValueText") is TextBlock vAll) vAll.Text = sum.ToString("N2") + " zł";
+            if (FindName("PieCenterPercentText") is TextBlock pAll) pAll.Text = "";
 
             double startAngle = 0;
             int colorIndex = 0;
 
-            const double centerX = 130;
-            const double centerY = 130;
-            const double outerRadius = 120;
-            const double innerRadius = 70;   // „dziura” w środku
+            const double centerX = 110;
+            const double centerY = 110;
+            const double outerRadius = 100;
+            const double innerRadius = 60;
 
             foreach (var item in data)
             {
@@ -267,28 +260,70 @@ namespace Finly.Pages
                     item.Name,
                     item.Amount);
 
-                target.Add(slice);
+                PieCurrent.Add(slice);
                 startAngle += sweep;
             }
         }
 
-        private Brush DefaultBrush(int i)
+        // =====================================================================
+        // Donut PRZYCHODÓW
+        // =====================================================================
+
+        private void BuildIncomePie(IEnumerable<DatabaseService.CategoryAmountDto> source)
         {
-            Color[] palette =
+            PieIncome.Clear();
+
+            var data = (source ?? Enumerable.Empty<DatabaseService.CategoryAmountDto>())
+                .Where(x => x.Amount > 0m)
+                .OrderByDescending(x => x.Amount)
+                .ToList();
+
+            if (data.Count == 0)
             {
-                Hex("#FFED7A1A"),
-                Hex("#FF3FA7D6"),
-                Hex("#FF7BC96F"),
-                Hex("#FFAF7AC5"),
-                Hex("#FFF6BF26"),
-                Hex("#FF56C1A7"),
-                Hex("#FFCE6A6B"),
-                Hex("#FF9AA0A6")
-            };
-            return new SolidColorBrush(palette[i % palette.Length]);
+                _currentTotalIncome = 0m;
+
+                if (FindName("IncomeCenterNameText") is TextBlock n) n.Text = "Brak danych";
+                if (FindName("IncomeCenterValueText") is TextBlock v) v.Text = "0,00 zł";
+                if (FindName("IncomeCenterPercentText") is TextBlock p) p.Text = "";
+                return;
+            }
+
+            var sum = data.Sum(x => x.Amount);
+            _currentTotalIncome = sum;
+
+            if (FindName("IncomeCenterNameText") is TextBlock nAll) nAll.Text = "Wszystko";
+            if (FindName("IncomeCenterValueText") is TextBlock vAll) vAll.Text = sum.ToString("N2") + " zł";
+            if (FindName("IncomeCenterPercentText") is TextBlock pAll) pAll.Text = "";
+
+            double startAngle = 0;
+            int colorIndex = 0;
+
+            const double centerX = 110;
+            const double centerY = 110;
+            const double outerRadius = 100;
+            const double innerRadius = 60;
+
+            foreach (var item in data)
+            {
+                var sweep = (double)(item.Amount / sum) * 360.0;
+                if (sweep <= 0) continue;
+
+                var slice = PieSlice.CreateDonut(
+                    centerX, centerY,
+                    innerRadius, outerRadius,
+                    startAngle, sweep,
+                    DefaultBrush(colorIndex++),
+                    item.Name,
+                    item.Amount);
+
+                PieIncome.Add(slice);
+                startAngle += sweep;
+            }
         }
 
-        private static Color Hex(string s) => (Color)ColorConverter.ConvertFromString(s)!;
+        // =====================================================================
+        // Tabelki
+        // =====================================================================
 
         private void BindExpenseTable(IEnumerable<DatabaseService.CategoryAmountDto> data)
         {
@@ -305,8 +340,8 @@ namespace Finly.Pages
                 })
                 .ToList();
 
-            if (FindName("ExpenseTable") is ListView lv)
-                lv.ItemsSource = rows;
+            if (FindName("ExpenseTable") is ItemsControl expTable)
+                expTable.ItemsSource = rows;
 
             if (FindName("TopCategoryBars") is ItemsControl catBars)
                 catBars.ItemsSource = rows.Take(5).ToList();
@@ -327,13 +362,28 @@ namespace Finly.Pages
                 })
                 .ToList();
 
-            if (FindName("IncomeTable") is ListView lv)
-                lv.ItemsSource = rows;
+            if (FindName("IncomeTable") is ItemsControl incTable)
+                incTable.ItemsSource = rows;
+
+            // Środek donuta przychodów – całość
+            if (FindName("IncomeCenterNameText") is TextBlock n)
+                n.Text = rows.Count == 0 ? "Brak danych" : "Przychód";
+
+            if (FindName("IncomeCenterValueText") is TextBlock v)
+                v.Text = sum.ToString("N2", CultureInfo.CurrentCulture) + " zł";
+
+            if (FindName("IncomeCenterPercentText") is TextBlock p)
+                p.Text = rows.Count == 0 ? "" : "100,0% udziału";
         }
+
+        // =====================================================================
+        // Trend wydatków – wykres liniowy
+        // =====================================================================
 
         private void BindExpenseTrend(DateTime start, DateTime end)
         {
-            if (FindName("ExpenseTrendBars") is not ItemsControl trendBars)
+            if (FindName("ExpenseTrendCanvas") is not Canvas canvas ||
+                FindName("ExpenseTrendLabels") is not ItemsControl labels)
                 return;
 
             try
@@ -371,16 +421,66 @@ namespace Finly.Pages
                     }
                 };
 
-                trendBars.ItemsSource = items;
+                labels.ItemsSource = items;
+
+                // Rysowanie linii
+                canvas.Children.Clear();
+
+                if (items.Length == 0)
+                    return;
+
+                double width = canvas.ActualWidth;
+                if (width <= 0) width = 200;
+                double height = canvas.ActualHeight;
+                if (height <= 0) height = 80;
+
+                var line = new Polyline
+                {
+                    Stroke = (Brush)Application.Current.TryFindResource("Brand.Green") ?? Brushes.LimeGreen,
+                    StrokeThickness = 2
+                };
+
+                for (int i = 0; i < items.Length; i++)
+                {
+                    double x = (items.Length == 1)
+                        ? width / 2.0
+                        : i * (width / (items.Length - 1));
+
+                    double y = height - (items[i].Percent / 100.0) * (height - 4) - 2;
+
+                    line.Points.Add(new Point(x, y));
+
+                    var dot = new Ellipse
+                    {
+                        Width = 6,
+                        Height = 6,
+                        Fill = Brushes.White,
+                        Stroke = line.Stroke,
+                        StrokeThickness = 1
+                    };
+                    Canvas.SetLeft(dot, x - 3);
+                    Canvas.SetTop(dot, y - 3);
+                    canvas.Children.Add(dot);
+                }
+
+                canvas.Children.Add(line);
             }
             catch
             {
-                trendBars.ItemsSource = Array.Empty<ExpenseTrendItem>();
+                canvas.Children.Clear();
+                labels.ItemsSource = Array.Empty<ExpenseTrendItem>();
             }
         }
 
-        // ===== kliknięcie w kawałek donuta WYDATKÓW =====
+        // =====================================================================
+        // Kliknięcia w kawałki donuta
+        // =====================================================================
+
+        // Stary handler z XAML – deleguje do wersji „wydatkowej”
         private void PieSlice_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+            => ExpensePieSlice_MouseLeftButtonDown(sender, e);
+
+        private void ExpensePieSlice_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
         {
             if (_currentTotalExpenses <= 0)
                 return;
@@ -389,14 +489,59 @@ namespace Finly.Pages
             {
                 var share = slice.Amount / _currentTotalExpenses * 100m;
 
-                if (PieCenterNameText != null) PieCenterNameText.Text = slice.Name;
-                if (PieCenterValueText != null) PieCenterValueText.Text = slice.Amount.ToString("N2") + " zł";
-                if (PieCenterPercentText != null) PieCenterPercentText.Text = $"{share:N1}% udziału";
+                if (FindName("PieCenterNameText") is TextBlock n)
+                    n.Text = slice.Name;
+                if (FindName("PieCenterValueText") is TextBlock v)
+                    v.Text = slice.Amount.ToString("N2") + " zł";
+                if (FindName("PieCenterPercentText") is TextBlock p)
+                    p.Text = $"{share:N1}% udziału";
             }
         }
+
+        private void IncomePieSlice_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+        {
+            if (_currentTotalIncome <= 0)
+                return;
+
+            if ((sender as FrameworkElement)?.DataContext is PieSlice slice)
+            {
+                var share = slice.Amount / _currentTotalIncome * 100m;
+
+                if (FindName("IncomeCenterNameText") is TextBlock n)
+                    n.Text = slice.Name;
+                if (FindName("IncomeCenterValueText") is TextBlock v)
+                    v.Text = slice.Amount.ToString("N2") + " zł";
+                if (FindName("IncomeCenterPercentText") is TextBlock p)
+                    p.Text = $"{share:N1}% udziału";
+            }
+        }
+
+        // =====================================================================
+        // Paleta kolorów
+        // =====================================================================
+
+        private Brush DefaultBrush(int i)
+        {
+            Color[] palette =
+            {
+                Hex("#FFED7A1A"),
+                Hex("#FF3FA7D6"),
+                Hex("#FF7BC96F"),
+                Hex("#FFAF7AC5"),
+                Hex("#FFF6BF26"),
+                Hex("#FF56C1A7"),
+                Hex("#FFCE6A6B"),
+                Hex("#FF9AA0A6")
+            };
+            return new SolidColorBrush(palette[i % palette.Length]);
+        }
+
+        private static Color Hex(string s) => (Color)ColorConverter.ConvertFromString(s)!;
     }
 
-    // ===== pomocnicze klasy do bindingu =====
+    // =====================================================================
+    // Klasy pomocnicze
+    // =====================================================================
 
     public sealed class PieSlice
     {
@@ -473,36 +618,3 @@ namespace Finly.Pages
         public double Percent { get; set; }
     }
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
