@@ -25,7 +25,6 @@ namespace Finly.Pages
             public override string ToString() => Name;
         }
 
-        // Bezparametrowy konstruktor – dla XAML / prostszych wywołań
         public AddExpensePage() : this(UserService.GetCurrentUserId())
         {
         }
@@ -38,78 +37,95 @@ namespace Finly.Pages
 
             Loaded += (_, __) =>
             {
-                // na start: żadna zakładka nie wybrana, wszystko ukryte
+                // start – żadna zakładka nie wybrana
                 ModeTabs.SelectedIndex = -1;
-                ExpensePanel.Visibility = Visibility.Collapsed;
-                IncomePanel.Visibility = Visibility.Collapsed;
-                TransferPanel.Visibility = Visibility.Collapsed;
+                ShowPanels(null);
 
                 LoadCategories();
                 LoadTransferAccounts();
+                LoadEnvelopes();
+                LoadIncomeAccounts();
 
-                // Domyślne daty: dziś
-                ExpenseDatePicker.SelectedDate = DateTime.Today;
-                IncomeDatePicker.SelectedDate = DateTime.Today;
-                TransferDatePicker.SelectedDate = DateTime.Today;
+                // Domyślne daty
+                var today = DateTime.Today;
+                ExpenseDatePicker.SelectedDate = today;
+                IncomeDatePicker.SelectedDate = today;
+                TransferDatePicker.SelectedDate = today;
             };
         }
 
-        // ================== PRZEŁĄCZANIE ZAKŁADEK ==================
+        // ================== PANELE / ZAKŁADKI ==================
 
         private void ModeTabs_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
-            if (ModeTabs.SelectedItem is not TabItem tab)
-            {
-                ExpensePanel.Visibility = Visibility.Collapsed;
-                IncomePanel.Visibility = Visibility.Collapsed;
-                TransferPanel.Visibility = Visibility.Collapsed;
-                return;
-            }
+            var tab = ModeTabs.SelectedItem as TabItem;
+            var header = tab?.Header as string;
 
-            var header = tab.Header as string ?? string.Empty;
+            ShowPanels(header);
+            ClearAmountErrors();
+        }
 
+        private void ShowPanels(string? header)
+        {
             ExpensePanel.Visibility =
-                header.Equals("Wydatek", StringComparison.OrdinalIgnoreCase)
+                string.Equals(header, "Wydatek", StringComparison.OrdinalIgnoreCase)
                     ? Visibility.Visible : Visibility.Collapsed;
 
             IncomePanel.Visibility =
-                header.Equals("Przychód", StringComparison.OrdinalIgnoreCase)
+                string.Equals(header, "Przychód", StringComparison.OrdinalIgnoreCase)
                     ? Visibility.Visible : Visibility.Collapsed;
 
             TransferPanel.Visibility =
-                header.Equals("Transfer", StringComparison.OrdinalIgnoreCase)
+                string.Equals(header, "Transfer", StringComparison.OrdinalIgnoreCase)
                     ? Visibility.Visible : Visibility.Collapsed;
         }
 
         // ================== DANE SŁOWNIKOWE ==================
 
-        /// <summary>
-        /// Ładuje listę kategorii użytkownika do trzech comboboxów:
-        /// wydatek, przychód, transfer.
-        /// </summary>
         private void LoadCategories()
         {
+            List<string> cats;
             try
             {
-                var cats = DatabaseService.GetCategoriesByUser(_uid) ?? new List<string>();
-
-                if (ExpenseCategoryBox != null)
-                    ExpenseCategoryBox.ItemsSource = cats;
-
-                if (IncomeCategoryBox != null)
-                    IncomeCategoryBox.ItemsSource = cats;
-
-                if (TransferCategoryBox != null)
-                    TransferCategoryBox.ItemsSource = cats;
-
-                if (ExpenseCategoryBox != null && ExpenseCategoryBox.Items.Count > 0)
-                    ExpenseCategoryBox.SelectedIndex = 0;
+                cats = DatabaseService.GetCategoriesByUser(_uid) ?? new List<string>();
             }
             catch
             {
-                if (ExpenseCategoryBox != null) ExpenseCategoryBox.ItemsSource = Array.Empty<string>();
-                if (IncomeCategoryBox != null) IncomeCategoryBox.ItemsSource = Array.Empty<string>();
-                if (TransferCategoryBox != null) TransferCategoryBox.ItemsSource = Array.Empty<string>();
+                cats = new List<string>();
+            }
+
+            ExpenseCategoryBox.ItemsSource = cats;
+            IncomeCategoryBox.ItemsSource = cats;
+            TransferCategoryBox.ItemsSource = cats;
+        }
+
+        private void LoadEnvelopes()
+        {
+            try
+            {
+                var envs = DatabaseService.GetEnvelopesNames(_uid) ?? new List<string>();
+                ExpenseEnvelopeCombo.ItemsSource = envs;
+                if (envs.Count > 0)
+                    ExpenseEnvelopeCombo.SelectedIndex = 0;
+            }
+            catch
+            {
+                ExpenseEnvelopeCombo.ItemsSource = Array.Empty<string>();
+            }
+        }
+
+        private void LoadIncomeAccounts()
+        {
+            try
+            {
+                var accs = DatabaseService.GetAccounts(_uid) ?? new List<BankAccountModel>();
+                IncomeAccountCombo.ItemsSource = accs;
+                IncomeAccountCombo.DisplayMemberPath = "AccountName";
+                IncomeAccountCombo.SelectedValuePath = "Id";
+            }
+            catch
+            {
+                IncomeAccountCombo.ItemsSource = null;
             }
         }
 
@@ -142,105 +158,78 @@ namespace Finly.Pages
                 // zostawiamy tylko gotówkę
             }
 
-            if (TransferFromBox != null)
-            {
-                TransferFromBox.ItemsSource = items.ToList();
-                if (TransferFromBox.Items.Count > 0)
-                    TransferFromBox.SelectedIndex = 0;
-            }
+            TransferFromBox.ItemsSource = items.ToList();
+            TransferToBox.ItemsSource = items.ToList();
 
-            if (TransferToBox != null)
-            {
-                TransferToBox.ItemsSource = items.ToList();
-                if (TransferToBox.Items.Count > 1)
-                    TransferToBox.SelectedIndex = 1;
-            }
+            if (TransferFromBox.Items.Count > 0)
+                TransferFromBox.SelectedIndex = 0;
+            if (TransferToBox.Items.Count > 1)
+                TransferToBox.SelectedIndex = 1;
         }
 
         // ================== ANULUJ / CZYSZCZENIE ==================
 
         private void Cancel_Click(object sender, RoutedEventArgs e)
         {
-            if (IsTab(sender, "Wydatek"))
-            {
-                ExpenseAmountBox.Clear();
-                ExpenseDescBox.Clear();
-                ExpenseDatePicker.SelectedDate = DateTime.Today;
+            ClearAmountErrors();
 
-                if (ExpenseCategoryBox != null)
-                {
-                    ExpenseCategoryBox.Text = string.Empty;
-                    if (ExpenseCategoryBox.Items.Count > 0)
-                        ExpenseCategoryBox.SelectedIndex = 0;
-                }
-            }
-            else if (IsTab(sender, "Przychód"))
-            {
-                IncomeAmountBox.Clear();
-                IncomeSourceBox.Clear();
-                IncomeDescBox.Clear();
-                IncomeDatePicker.SelectedDate = DateTime.Today;
+            // Wspólne
+            ExpenseAmountBox.Clear();
+            IncomeAmountBox.Clear();
+            TransferAmountBox.Clear();
 
-                IncomeFormTypeCombo.SelectedIndex = -1;
-                IncomeAccountRow.Visibility = Visibility.Collapsed;
-                IncomeAccountCombo.SelectedIndex = -1;
+            ExpenseDescBox.Clear();
+            IncomeDescBox.Clear();
+            TransferDescBox.Clear();
 
-                if (IncomeCategoryBox != null)
-                {
-                    IncomeCategoryBox.Text = string.Empty;
-                    IncomeCategoryBox.SelectedIndex = -1;
-                }
-            }
-            else // Transfer
-            {
-                TransferAmountBox.Clear();
-                TransferDatePicker.SelectedDate = DateTime.Today;
-                LoadTransferAccounts();
+            ExpenseNewCategoryBox.Clear();
+            IncomeNewCategoryBox.Clear();
+            TransferNewCategoryBox.Clear();
 
-                if (TransferCategoryBox != null)
-                {
-                    TransferCategoryBox.Text = string.Empty;
-                    TransferCategoryBox.SelectedIndex = -1;
-                }
-            }
+            ExpenseDatePicker.SelectedDate = DateTime.Today;
+            IncomeDatePicker.SelectedDate = DateTime.Today;
+            TransferDatePicker.SelectedDate = DateTime.Today;
+
+            ExpenseSourceCombo.SelectedIndex = -1;
+            ExpenseEnvelopeRow.Visibility = Visibility.Collapsed;
+
+            IncomeFormTypeCombo.SelectedIndex = -1;
+            IncomeAccountRow.Visibility = Visibility.Collapsed;
+            IncomeAccountCombo.SelectedIndex = -1;
+
+            ExpenseCategoryBox.SelectedIndex = -1;
+            IncomeCategoryBox.SelectedIndex = -1;
+            TransferCategoryBox.SelectedIndex = -1;
+
+            ExpenseEnvelopeCombo.SelectedIndex = -1;
+
+            LoadTransferAccounts();
+            LoadCategories();
+            LoadEnvelopes();
+            LoadIncomeAccounts();
         }
 
-        private bool IsTab(object sender, string headerText)
+        // ================== OBSŁUGA FORM PRZYCHODU / SKĄD PŁACISZ ==================
+
+        private void ExpenseSourceCombo_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
-            var btn = sender as DependencyObject;
-            var tabItem = FindParent<TabItem>(btn);
-
-            return (tabItem?.Header as string)?
-                .Equals(headerText, StringComparison.OrdinalIgnoreCase) == true;
-        }
-
-        private static T? FindParent<T>(DependencyObject? child) where T : DependencyObject
-        {
-            while (child != null)
+            if (ExpenseSourceCombo.SelectedItem is ComboBoxItem item &&
+                string.Equals(item.Tag as string, "envelope", StringComparison.OrdinalIgnoreCase))
             {
-                var parent = System.Windows.Media.VisualTreeHelper.GetParent(child);
-                if (parent is T t) return t;
-                child = parent;
+                ExpenseEnvelopeRow.Visibility = Visibility.Visible;
             }
-            return null;
+            else
+            {
+                ExpenseEnvelopeRow.Visibility = Visibility.Collapsed;
+            }
         }
-
-        // ================== FORMULARZ PRZYCHODU – FORMA I KONTO ==================
 
         private void IncomeFormTypeCombo_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
-            if (IncomeFormTypeCombo.SelectedItem is ComboBoxItem item)
+            if (IncomeFormTypeCombo.SelectedItem is ComboBoxItem item &&
+                string.Equals(item.Tag as string, "transfer", StringComparison.OrdinalIgnoreCase))
             {
-                var tag = item.Tag as string ?? string.Empty;
-
-                if (tag == "transfer")
-                {
-                    IncomeAccountRow.Visibility = Visibility.Visible;
-                }
-                else
-                {
-                    IncomeAccountRow.Visibility = Visibility.Collapsed;
-                }
+                IncomeAccountRow.Visibility = Visibility.Visible;
             }
             else
             {
@@ -248,34 +237,41 @@ namespace Finly.Pages
             }
         }
 
-        /// <summary>
-        /// Rejestruje kategorię z edytowalnego ComboBoxa w tabeli kategorii (jeśli jest nowa).
-        /// </summary>
-        private void RegisterCategoryFromCombo(ComboBox? combo)
+        // ================== POMOCNICZE ==================
+
+        private void ClearAmountErrors()
         {
-            if (combo == null) return;
+            ExpenseAmountErrorText.Visibility = Visibility.Collapsed;
+            IncomeAmountErrorText.Visibility = Visibility.Collapsed;
+            TransferAmountErrorText.Visibility = Visibility.Collapsed;
+        }
 
-            string? catName = null;
+        /// <summary>
+        /// Wybiera nazwę kategorii z listy + pola "Nowa kategoria".
+        /// Jeśli nowa kategoria nie jest pusta – ma priorytet.
+        /// </summary>
+        private string? ResolveCategoryName(ComboBox combo, TextBox newCatBox)
+        {
+            if (!string.IsNullOrWhiteSpace(newCatBox.Text))
+                return newCatBox.Text.Trim();
 
-            if (!string.IsNullOrWhiteSpace(combo.Text))
+            if (combo.SelectedItem is string s && !string.IsNullOrWhiteSpace(s))
+                return s.Trim();
+
+            return null;
+        }
+
+        private int GetCategoryIdOrZero(string? catName)
+        {
+            if (string.IsNullOrWhiteSpace(catName)) return 0;
+
+            try
             {
-                catName = combo.Text.Trim();
+                return DatabaseService.GetOrCreateCategoryId(_uid, catName);
             }
-            else if (combo.SelectedItem is string s && !string.IsNullOrWhiteSpace(s))
+            catch
             {
-                catName = s;
-            }
-
-            if (!string.IsNullOrWhiteSpace(catName))
-            {
-                try
-                {
-                    _ = DatabaseService.GetOrCreateCategoryId(_uid, catName!);
-                }
-                catch
-                {
-                    // nic, najwyżej kategoria się nie dopisze
-                }
+                return 0;
             }
         }
 
@@ -283,10 +279,11 @@ namespace Finly.Pages
 
         private void SaveExpense_Click(object sender, RoutedEventArgs e)
         {
-            if (!TryParseAmount(ExpenseAmountBox.Text, out var amount))
+            ClearAmountErrors();
+
+            if (!TryParseAmount(ExpenseAmountBox.Text, out var amount) || amount <= 0m)
             {
-                MessageBox.Show("Podaj poprawną kwotę wydatku.", "Dodaj wydatek",
-                    MessageBoxButton.OK, MessageBoxImage.Warning);
+                ExpenseAmountErrorText.Visibility = Visibility.Visible;
                 return;
             }
 
@@ -295,30 +292,9 @@ namespace Finly.Pages
                 ? null
                 : ExpenseDescBox.Text.Trim();
 
-            // --- kategoria: istniejąca albo nowo wpisana ---
-            string? catName = null;
-
-            if (!string.IsNullOrWhiteSpace(ExpenseCategoryBox.Text))
-            {
-                catName = ExpenseCategoryBox.Text.Trim();
-            }
-            else if (ExpenseCategoryBox.SelectedItem is string s && !string.IsNullOrWhiteSpace(s))
-            {
-                catName = s;
-            }
-
-            int categoryId = 0;
-            if (!string.IsNullOrWhiteSpace(catName))
-            {
-                try
-                {
-                    categoryId = DatabaseService.GetOrCreateCategoryId(_uid, catName!);
-                }
-                catch
-                {
-                    categoryId = 0;
-                }
-            }
+            // kategoria
+            var catName = ResolveCategoryName(ExpenseCategoryBox, ExpenseNewCategoryBox);
+            int categoryId = GetCategoryIdOrZero(catName);
 
             var eModel = new Expense
             {
@@ -334,15 +310,13 @@ namespace Finly.Pages
                 DatabaseService.InsertExpense(eModel);
                 ToastService.Success("Dodano wydatek.");
 
-                // przeładuj listę kategorii, żeby nowa się pojawiła
+                // odśwież kategorie (nowa może się pojawić na liście)
                 LoadCategories();
-
                 Cancel_Click(sender, e);
             }
             catch (Exception ex)
             {
-                MessageBox.Show("Nie udało się dodać wydatku.\n" + ex.Message,
-                    "Błąd", MessageBoxButton.OK, MessageBoxImage.Error);
+                ToastService.Error("Nie udało się dodać wydatku.\n" + ex.Message);
             }
         }
 
@@ -350,10 +324,11 @@ namespace Finly.Pages
 
         private void SaveIncome_Click(object sender, RoutedEventArgs e)
         {
-            if (!TryParseAmount(IncomeAmountBox.Text, out var amount))
+            ClearAmountErrors();
+
+            if (!TryParseAmount(IncomeAmountBox.Text, out var amount) || amount <= 0m)
             {
-                MessageBox.Show("Podaj poprawną kwotę przychodu.", "Dodaj przychód",
-                    MessageBoxButton.OK, MessageBoxImage.Warning);
+                IncomeAmountErrorText.Visibility = Visibility.Visible;
                 return;
             }
 
@@ -365,23 +340,22 @@ namespace Finly.Pages
                 ? null
                 : IncomeDescBox.Text.Trim();
 
-            // rejestrujemy kategorię (dla list rozwijanych)
-            RegisterCategoryFromCombo(IncomeCategoryBox);
+            // kategoria – na razie tylko na potrzeby przyszłej rozbudowy
+            var catName = ResolveCategoryName(IncomeCategoryBox, IncomeNewCategoryBox);
+            _ = GetCategoryIdOrZero(catName); // żeby nie było niewykorzystanej zmiennej
 
             try
             {
+                // aktualny DatabaseService.InsertIncome nie przyjmuje kategorii – zapisujemy tak jak do tej pory
                 DatabaseService.InsertIncome(_uid, amount, date, source, desc);
                 ToastService.Success("Dodano przychód.");
 
-                // odśwież listę kategorii (gdyby była nowa)
                 LoadCategories();
-
                 Cancel_Click(sender, e);
             }
             catch (Exception ex)
             {
-                MessageBox.Show("Nie udało się dodać przychodu.\n" + ex.Message,
-                    "Błąd", MessageBoxButton.OK, MessageBoxImage.Error);
+                ToastService.Error("Nie udało się dodać przychodu.\n" + ex.Message);
             }
         }
 
@@ -389,62 +363,54 @@ namespace Finly.Pages
 
         private void SaveTransfer_Click(object sender, RoutedEventArgs e)
         {
+            ClearAmountErrors();
+
             if (!TryParseAmount(TransferAmountBox.Text, out var amount) || amount <= 0m)
             {
-                MessageBox.Show("Podaj poprawną kwotę transferu.", "Transfer",
-                    MessageBoxButton.OK, MessageBoxImage.Warning);
+                TransferAmountErrorText.Visibility = Visibility.Visible;
                 return;
             }
 
             var from = TransferFromBox.SelectedItem as AccountItem;
             var to = TransferToBox.SelectedItem as AccountItem;
 
-            if (from == null || to == null)
+            if (from == null || to == null || from.Key == to.Key)
             {
-                MessageBox.Show("Wybierz konta źródłowe i docelowe.", "Transfer",
-                    MessageBoxButton.OK, MessageBoxImage.Warning);
+                ToastService.Info("Wybierz różne konta źródłowe i docelowe.");
                 return;
             }
 
-            if (from.Key == to.Key)
-            {
-                MessageBox.Show("Konta źródłowe i docelowe nie mogą być takie same.",
-                    "Transfer", MessageBoxButton.OK, MessageBoxImage.Warning);
-                return;
-            }
-
-            // rejestrujemy kategorię transferu w tabeli kategorii
-            RegisterCategoryFromCombo(TransferCategoryBox);
+            // kategoria – na razie tylko wizualnie, bez zapisu
+            var catName = ResolveCategoryName(TransferCategoryBox, TransferNewCategoryBox);
+            _ = GetCategoryIdOrZero(catName);
 
             try
             {
                 if (from.AccountId is int accFrom && to.AccountId is null)
                 {
-                    // Bank -> gotówka
+                    // bank -> gotówka
                     DatabaseService.TransferBankToCash(_uid, accFrom, amount);
                 }
                 else if (from.AccountId is null && to.AccountId is int accTo)
                 {
-                    // Gotówka -> bank
+                    // gotówka -> bank
                     DatabaseService.TransferCashToBank(_uid, accTo, amount);
                 }
                 else
                 {
-                    MessageBox.Show(
-                        "Na razie obsługiwane są transfery tylko między kontem bankowym a gotówką.",
-                        "Transfer", MessageBoxButton.OK, MessageBoxImage.Information);
+                    ToastService.Info("Na razie obsługiwane są transfery tylko między kontem bankowym a gotówką.");
                     return;
                 }
 
                 ToastService.Success("Zapisano transfer.");
+
                 Cancel_Click(sender, e);
                 LoadTransferAccounts();   // odśwież salda
-                LoadCategories();         // odśwież kategorie, jeśli doszła nowa
+                LoadCategories();         // odśwież kategorie
             }
             catch (Exception ex)
             {
-                MessageBox.Show("Nie udało się zapisać transferu.\n" + ex.Message,
-                    "Błąd", MessageBoxButton.OK, MessageBoxImage.Error);
+                ToastService.Error("Nie udało się zapisać transferu.\n" + ex.Message);
             }
         }
 
@@ -459,19 +425,3 @@ namespace Finly.Pages
         }
     }
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

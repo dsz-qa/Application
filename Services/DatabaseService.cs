@@ -161,6 +161,44 @@ namespace Finly.Services
             cmd.ExecuteNonQuery();
         }
 
+        /// <summary>
+        /// Alias dla zgodnoœci – wiele miejsc wo³a GetEnvelopeNames, a w³aœciwa
+        /// implementacja jest w GetEnvelopesNames.
+        /// </summary>
+        public static List<string> GetEnvelopeNames(int userId) => GetEnvelopesNames(userId);
+
+        public static List<string> GetEnvelopesNames(int userId)
+        {
+            var result = new List<string>();
+
+            try
+            {
+                using var conn = OpenAndEnsureSchema();
+                using var cmd = conn.CreateCommand();
+                cmd.CommandText = @"
+            SELECT Name
+            FROM Envelopes
+            WHERE UserId = @uid
+            ORDER BY Name;
+        ";
+                cmd.Parameters.AddWithValue("@uid", userId);
+
+                using var rd = cmd.ExecuteReader();
+                while (rd.Read())
+                {
+                    var name = rd["Name"]?.ToString();
+                    if (!string.IsNullOrWhiteSpace(name))
+                        result.Add(name);
+                }
+            }
+            catch
+            {
+                // jeœli coœ pójdzie nie tak, po prostu zwracamy pust¹ listê
+            }
+
+            return result;
+        }
+
         private static string ToIsoDate(DateTime dt) => dt.ToString("yyyy-MM-dd");
 
         // ==== helpery odczytu z DataReadera ====
@@ -1272,6 +1310,33 @@ UPDATE BankAccounts
             tx.Commit();
         }
 
+        /// <summary>
+        /// Przeci¹¿enia pod now¹ stronê „Dodaj” – wersja z kategori¹, dat¹ i opisem.
+        /// Na razie kategoria/opis nie s¹ zapisywane w tabeli, ale sygnatura
+        /// zgadza siê z wywo³aniami w AddExpensePage.
+        /// </summary>
+        public static void TransferBankToCash(
+            int userId,
+            int accountId,
+            decimal amount,
+            int? categoryId,
+            DateTime date,
+            string? description)
+        {
+            TransferBankToCash(userId, accountId, amount);
+        }
+
+        public static void TransferCashToBank(
+            int userId,
+            int accountId,
+            decimal amount,
+            int? categoryId,
+            DateTime date,
+            string? description)
+        {
+            TransferCashToBank(userId, accountId, amount);
+        }
+
         // =========================================================
         // ====================== ZESTAWIENIA ======================
 
@@ -1631,6 +1696,7 @@ WHERE UserId=@u");
 
         /// <summary>
         /// Prostszy insert przychodów – mapuje parametr note na Description.
+        /// U¿ywany m.in. przez ekran „Dodaj”.
         /// </summary>
         public static void InsertIncome(int userId, decimal amount, DateTime date, string source, string? note)
         {
@@ -1646,20 +1712,21 @@ VALUES (@u, @a, @d, @desc, @s);";
             cmd.Parameters.AddWithValue("@s", source ?? "Przychody");
             cmd.ExecuteNonQuery();
         }
+
+        /// <summary>
+        /// Nowe przeci¹¿enie pod AddExpensePage – wersja z kategori¹.
+        /// Tabela Incomes nie ma CategoryId, wiêc parametr jest na razie ignorowany,
+        /// ale sygnatura zgadza siê z wywo³aniami w UI.
+        /// </summary>
+        public static void InsertIncome(
+            int userId,
+            decimal amount,
+            DateTime date,
+            int? categoryId,
+            string source,
+            string? note)
+        {
+            InsertIncome(userId, amount, date, source, note);
+        }
     }
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

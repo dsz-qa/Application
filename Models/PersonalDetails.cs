@@ -18,4 +18,3 @@ namespace Finly.Models
         public string? Street { get; set; }
     }
 }
-

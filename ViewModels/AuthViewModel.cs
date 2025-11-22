@@ -1,6 +1,6 @@
 ﻿using System;
 using System.ComponentModel;
-using System.Linq; // <-- potrzebne dla .All()
+using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Text.RegularExpressions;
 using System.Windows.Media;
@@ -37,8 +37,75 @@ namespace Finly.ViewModels
         private string _krs = string.Empty;
         public string KRS { get => _krs; set => Set(ref _krs, value ?? string.Empty); }
 
+        // >> NOWE: części adresu firmy
+        private string _companyCity = string.Empty;
+        public string CompanyCity
+        {
+            get => _companyCity;
+            set
+            {
+                if (Set(ref _companyCity, value ?? string.Empty))
+                    UpdateCompanyAddress();
+            }
+        }
+
+        private string _companyPostalCode = string.Empty;
+        public string CompanyPostalCode
+        {
+            get => _companyPostalCode;
+            set
+            {
+                if (Set(ref _companyPostalCode, value ?? string.Empty))
+                    UpdateCompanyAddress();
+            }
+        }
+
+        private string _companyStreet = string.Empty;
+        public string CompanyStreet
+        {
+            get => _companyStreet;
+            set
+            {
+                if (Set(ref _companyStreet, value ?? string.Empty))
+                    UpdateCompanyAddress();
+            }
+        }
+
+        private string _companyHouseNo = string.Empty;
+        public string CompanyHouseNo
+        {
+            get => _companyHouseNo;
+            set
+            {
+                if (Set(ref _companyHouseNo, value ?? string.Empty))
+                    UpdateCompanyAddress();
+            }
+        }
+
+        // pełny adres, który trafia do bazy (Users.CompanyAddress)
         private string _companyAddress = string.Empty;
-        public string CompanyAddress { get => _companyAddress; set => Set(ref _companyAddress, value ?? string.Empty); }
+        public string CompanyAddress
+        {
+            get => _companyAddress;
+            set => Set(ref _companyAddress, value ?? string.Empty);
+        }
+
+        // sklejanie adresu z części
+        private void UpdateCompanyAddress()
+        {
+            var parts = new[]
+            {
+                string.IsNullOrWhiteSpace(CompanyCity) ? null : CompanyCity.Trim(),
+                string.IsNullOrWhiteSpace(CompanyPostalCode) ? null : CompanyPostalCode.Trim(),
+                string.Join(" ", new[]
+                {
+                    string.IsNullOrWhiteSpace(CompanyStreet) ? null : CompanyStreet.Trim(),
+                    string.IsNullOrWhiteSpace(CompanyHouseNo) ? null : CompanyHouseNo.Trim()
+                }.Where(s => !string.IsNullOrWhiteSpace(s)))
+            }.Where(p => !string.IsNullOrWhiteSpace(p));
+
+            CompanyAddress = string.Join(", ", parts);
+        }
 
         // ===== Walidacja NIP/REGON (PL) =====
         private static bool IsValidNip(string nip)
@@ -301,7 +368,6 @@ namespace Finly.ViewModels
             return LoggedInUserId > 0;
         }
 
-
         // ===== Rejestracja =====
         public bool Register(string password, string confirm)
         {
@@ -319,6 +385,9 @@ namespace Finly.ViewModels
 
             if (!UserService.IsUsernameAvailable(Username))
                 return Error("Nie udało się utworzyć konta. Login jest zajęty.");
+
+            // >>> PRZELICZ adres firmy z pól Miasto/Kod/Ulica/Nr
+            UpdateCompanyAddress();
 
             // Walidacja firmowa (gdy Business)
             if (IsBusinessAccount)
@@ -388,4 +457,3 @@ namespace Finly.ViewModels
             => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
     }
 }
-

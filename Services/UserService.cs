@@ -133,6 +133,9 @@ namespace Finly.Services
 
             using var con = DatabaseService.GetConnection();
             SchemaService.Ensure(con);
+
+            // upewniamy siê, ¿e Users ma kolumnê Email itd.
+            EnsurePersonalColumns(con);
             EnsureEmailUniqueIndex(con); // idempotentnie
 
             // unikalnoœæ loginu
@@ -147,9 +150,10 @@ namespace Finly.Services
             using (var ins = con.CreateCommand())
             {
                 ins.CommandText = @"
-INSERT INTO Users (Username, PasswordHash, AccountType, CompanyName, NIP, REGON, KRS, CompanyAddress)
-VALUES ($u, $ph, $type, $cname, $nip, $regon, $krs, $caddr);";
+INSERT INTO Users (Username, Email, PasswordHash, AccountType, CompanyName, NIP, REGON, KRS, CompanyAddress)
+VALUES ($u, $email, $ph, $type, $cname, $nip, $regon, $krs, $caddr);";
                 ins.Parameters.AddWithValue("$u", u);
+                ins.Parameters.AddWithValue("$email", u); // login = e-mail
                 ins.Parameters.AddWithValue("$ph", HashPassword(password));
                 ins.Parameters.AddWithValue("$type", accountType == AccountType.Business ? "Business" : "Personal");
                 ins.Parameters.AddWithValue("$cname", (object?)companyName ?? DBNull.Value);
@@ -638,9 +642,3 @@ WHERE Email IS NOT NULL;";
         }
     }
 }
-
-
-
-
-
-

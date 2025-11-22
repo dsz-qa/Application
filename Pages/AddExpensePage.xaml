@@ -14,43 +14,26 @@
             <Setter Property="CornerRadius" Value="10"/>
             <Setter Property="Padding" Value="16"/>
         </Style>
-        <!-- CIEMNY COMBOBOX DO FINLY -->
-        <Style x:Key="DarkComboBoxStyle" TargetType="ComboBox">
-            <Setter Property="Foreground" Value="White"/>
-            <Setter Property="Background" Value="{DynamicResource Surface.Background}"/>
-            <Setter Property="BorderBrush" Value="{DynamicResource Brand.Blue}"/>
-            <Setter Property="BorderThickness" Value="1"/>
+
+        <!-- Czerwony tekst błędu pod polami -->
+        <Style x:Key="ErrorTextStyle" TargetType="TextBlock">
+            <Setter Property="Foreground" Value="#FFE57373"/>
+            <Setter Property="FontSize" Value="11"/>
+            <Setter Property="Margin" Value="2,2,0,0"/>
+            <Setter Property="Visibility" Value="Collapsed"/>
         </Style>
-
-        <Style x:Key="DarkComboBoxItemStyle" TargetType="ComboBoxItem">
-            <Setter Property="Foreground" Value="White"/>
-            <Setter Property="Background" Value="Transparent"/>
-            <Style.Triggers>
-                <Trigger Property="IsSelected" Value="True">
-                    <Setter Property="Background" Value="#FF2D7D46"/>
-                    <!-- zielony jak w Finly -->
-                    <Setter Property="Foreground" Value="White"/>
-                </Trigger>
-                <Trigger Property="IsMouseOver" Value="True">
-                    <Setter Property="Background" Value="#333333"/>
-                </Trigger>
-            </Style.Triggers>
-        </Style>
-
-
-        <!-- Styl pozycji w listach rozwijanych -->
     </UserControl.Resources>
 
     <Grid Margin="16">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
             <!-- tytuł -->
-            <RowDefinition Height="16"/>
+            <RowDefinition Height="24"/>
+            <!-- odstęp -->
             <RowDefinition Height="Auto"/>
-            <!-- pytanie -->
-            <RowDefinition Height="12"/>
-            <RowDefinition Height="Auto"/>
-            <!-- zakładki -->
+            <!-- pytanie + zakładki -->
+            <RowDefinition Height="24"/>
+            <!-- odstęp -->
             <RowDefinition Height="*"/>
             <!-- treść -->
         </Grid.RowDefinitions>
@@ -62,277 +45,147 @@
                    FontWeight="Bold"
                    Foreground="{DynamicResource App.Foreground}"/>
 
-        <!-- Pytanie -->
-        <TextBlock Grid.Row="2"
-                   Text="Co chcesz dodać?"
-                   FontSize="18"
-                   FontWeight="SemiBold"
-                   HorizontalAlignment="Center"
-                   Foreground="{DynamicResource App.Foreground}"/>
+        <!-- Pytanie + zakładki, wyśrodkowane razem -->
+        <StackPanel Grid.Row="2"
+                    Orientation="Vertical"
+                    HorizontalAlignment="Center">
+            <TextBlock Text="Co chcesz dodać?"
+                       FontSize="22"
+                       FontWeight="SemiBold"
+                       HorizontalAlignment="Center"
+                       Foreground="{DynamicResource App.Foreground}"
+                       Margin="0,0,0,12"/>
 
-        <!-- Zakładki na środku -->
-        <TabControl x:Name="ModeTabs"
-                    Grid.Row="4"
-                    Width="600"
-                    HorizontalAlignment="Center"
-                    Background="Transparent"
-                    BorderThickness="0"
-                    SelectionChanged="ModeTabs_SelectionChanged">
+            <TabControl x:Name="ModeTabs"
+                        Width="680"
+                        HorizontalAlignment="Center"
+                        Background="Transparent"
+                        BorderThickness="0"
+                        SelectionChanged="ModeTabs_SelectionChanged">
 
-            <TabControl.Resources>
-                <!-- WYGLĄD ZAKŁADEK -->
-                <Style TargetType="TabItem">
-                    <Setter Property="Foreground" Value="White"/>
-                    <Setter Property="FontSize" Value="16"/>
-                    <Setter Property="FontWeight" Value="SemiBold"/>
-                    <Setter Property="Template">
-                        <Setter.Value>
-                            <ControlTemplate TargetType="TabItem">
-                                <Border x:Name="Bd"
-                                        Background="#202020"
-                                        CornerRadius="18"
-                                        Padding="24,8"
-                                        Margin="4,0"
-                                        BorderThickness="1"
-                                        BorderBrush="Transparent">
-                                    <ContentPresenter HorizontalAlignment="Center"
-                                                      VerticalAlignment="Center"
-                                                      ContentSource="Header"/>
-                                </Border>
-                                <ControlTemplate.Triggers>
-                                    <!-- AKTYWNA zakładka – pomarańczowa ramka -->
-                                    <Trigger Property="IsSelected" Value="True">
-                                        <Setter TargetName="Bd"
-                                                Property="BorderBrush"
-                                                Value="#FFEB8A00"/>
-                                        <Setter TargetName="Bd"
-                                                Property="BorderThickness"
-                                                Value="2"/>
-                                        <Setter Property="Foreground"
-                                                Value="White"/>
-                                    </Trigger>
+                <TabControl.Resources>
+                    <!-- WYGLĄD ZAKŁADEK -->
+                    <Style TargetType="TabItem">
+                        <Setter Property="Foreground" Value="White"/>
+                        <Setter Property="FontSize" Value="18"/>
+                        <Setter Property="FontWeight" Value="SemiBold"/>
+                        <Setter Property="Padding" Value="32,10"/>
+                        <Setter Property="MinWidth" Value="170"/>
+                        <Setter Property="Template">
+                            <Setter.Value>
+                                <ControlTemplate TargetType="TabItem">
+                                    <Border x:Name="Bd"
+                                            Background="#202020"
+                                            CornerRadius="18"
+                                            Margin="4,0"
+                                            BorderThickness="1"
+                                            BorderBrush="Transparent">
+                                        <ContentPresenter HorizontalAlignment="Center"
+                                                          VerticalAlignment="Center"
+                                                          ContentSource="Header"/>
+                                    </Border>
+                                    <ControlTemplate.Triggers>
+                                        <!-- AKTYWNA zakładka – pomarańczowa ramka -->
+                                        <Trigger Property="IsSelected" Value="True">
+                                            <Setter TargetName="Bd"
+                                                    Property="BorderBrush"
+                                                    Value="#FFEB8A00"/>
+                                            <Setter TargetName="Bd"
+                                                    Property="BorderThickness"
+                                                    Value="2"/>
+                                            <Setter Property="Foreground"
+                                                    Value="White"/>
+                                        </Trigger>
 
-                                    <!-- HOVER – delikatna ramka -->
-                                    <Trigger Property="IsMouseOver" Value="True">
-                                        <Setter TargetName="Bd"
-                                                Property="BorderBrush"
-                                                Value="#80EB8A00"/>
-                                    </Trigger>
-                                </ControlTemplate.Triggers>
-                            </ControlTemplate>
-                        </Setter.Value>
-                    </Setter>
-                </Style>
+                                        <!-- HOVER – delikatna ramka -->
+                                        <Trigger Property="IsMouseOver" Value="True">
+                                            <Setter TargetName="Bd"
+                                                    Property="BorderBrush"
+                                                    Value="#80EB8A00"/>
+                                        </Trigger>
+                                    </ControlTemplate.Triggers>
+                                </ControlTemplate>
+                            </Setter.Value>
+                        </Setter>
+                    </Style>
 
-                <!-- NAGŁÓWKI Z IKONAMI – header dalej jest stringiem -->
-                <DataTemplate x:Key="IncomeHeaderTemplate">
-                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                        <Image Source="/Assets/Icons/przychody.png"
-                               Width="20" Height="20"
-                               Margin="0,0,6,0"/>
-                        <TextBlock Text="{Binding}" VerticalAlignment="Center"/>
-                    </StackPanel>
-                </DataTemplate>
+                    <!-- NAGŁÓWKI Z IKONAMI -->
+                    <DataTemplate x:Key="IncomeHeaderTemplate">
+                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                            <Image Source="/Assets/Icons/przychody.png"
+                                   Width="22" Height="22"
+                                   Margin="0,0,6,0"/>
+                            <TextBlock Text="{Binding}" VerticalAlignment="Center"/>
+                        </StackPanel>
+                    </DataTemplate>
 
-                <DataTemplate x:Key="ExpenseHeaderTemplate">
-                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                        <Image Source="/Assets/Icons/wydatki.png"
-                               Width="20" Height="20"
-                               Margin="0,0,6,0"/>
-                        <TextBlock Text="{Binding}" VerticalAlignment="Center"/>
-                    </StackPanel>
-                </DataTemplate>
+                    <DataTemplate x:Key="ExpenseHeaderTemplate">
+                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                            <Image Source="/Assets/Icons/wydatki.png"
+                                   Width="22" Height="22"
+                                   Margin="0,0,6,0"/>
+                            <TextBlock Text="{Binding}" VerticalAlignment="Center"/>
+                        </StackPanel>
+                    </DataTemplate>
 
-                <DataTemplate x:Key="TransferHeaderTemplate">
-                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                        <Image Source="/Assets/Icons/transakcje.png"
-                               Width="20" Height="20"
-                               Margin="0,0,6,0"/>
-                        <TextBlock Text="{Binding}" VerticalAlignment="Center"/>
-                    </StackPanel>
-                </DataTemplate>
-            </TabControl.Resources>
+                    <DataTemplate x:Key="TransferHeaderTemplate">
+                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                            <Image Source="/Assets/Icons/transakcje.png"
+                                   Width="22" Height="22"
+                                   Margin="0,0,6,0"/>
+                            <TextBlock Text="{Binding}" VerticalAlignment="Center"/>
+                        </StackPanel>
+                    </DataTemplate>
+                </TabControl.Resources>
 
-            <!-- Header jest stringiem, dzięki temu Cancel_Click działa -->
-            <TabItem Header="Przychód"
-                     HeaderTemplate="{StaticResource IncomeHeaderTemplate}"/>
-            <TabItem Header="Wydatek"
-                     HeaderTemplate="{StaticResource ExpenseHeaderTemplate}"/>
-            <TabItem Header="Transfer"
-                     HeaderTemplate="{StaticResource TransferHeaderTemplate}"/>
-        </TabControl>
+                <TabItem Header="Przychód"
+                         HeaderTemplate="{StaticResource IncomeHeaderTemplate}"/>
+                <TabItem Header="Wydatek"
+                         HeaderTemplate="{StaticResource ExpenseHeaderTemplate}"/>
+                <TabItem Header="Transfer"
+                         HeaderTemplate="{StaticResource TransferHeaderTemplate}"/>
+            </TabControl>
+        </StackPanel>
 
-        <!-- =============== TREŚĆ – 3 panele ================= -->
+        <!-- ===================== TREŚĆ ===================== -->
 
-        <!-- ========== WYDATEK ========== -->
         <!-- ========== WYDATEK ========== -->
         <Border x:Name="ExpensePanel"
-        Grid.Row="5"
-        Style="{StaticResource Card}"
-        Margin="0,16,0,0"
-        Visibility="Collapsed">
-            <Grid>
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="200"/>
-                    <ColumnDefinition Width="*"/>
-                </Grid.ColumnDefinitions>
-
-                <Grid.RowDefinitions>
-                    <RowDefinition Height="Auto"/>
-                    <!-- 0 kwota -->
-                    <RowDefinition Height="10"/>
-                    <RowDefinition Height="Auto"/>
-                    <!-- 2 kategoria -->
-                    <RowDefinition Height="10"/>
-                    <RowDefinition Height="Auto"/>
-                    <!-- 4 data -->
-                    <RowDefinition Height="10"/>
-                    <RowDefinition Height="Auto"/>
-                    <!-- 6 skąd płacisz -->
-                    <RowDefinition Height="10"/>
-                    <RowDefinition Height="Auto"/>
-                    <!-- 8 koperta -->
-                    <RowDefinition Height="20"/>
-                    <RowDefinition Height="Auto"/>
-                    <!-- 10 opis -->
-                    <RowDefinition Height="20"/>
-                    <RowDefinition Height="Auto"/>
-                    <!-- 12 przyciski -->
-                </Grid.RowDefinitions>
-
-                <!-- Kwota -->
-                <TextBlock Grid.Row="0" Grid.Column="0"
-                   Text="Kwota:"
-                   VerticalAlignment="Center"
-                   Margin="0,0,8,0"/>
-                <TextBox x:Name="ExpenseAmountBox"
-                 Grid.Row="0" Grid.Column="1"
-                 Height="28"/>
-
-                <!-- Kategoria -->
-                <TextBlock Grid.Row="2" Grid.Column="0"
-                   Text="Kategoria:"
-                   VerticalAlignment="Center"
-                   Margin="0,0,8,0"/>
-                <ComboBox x:Name="ExpenseCategoryBox"
-                  Grid.Row="2" Grid.Column="1"
-                  Height="28"
-                  IsEditable="True"
-                  IsTextSearchEnabled="True"
-                  StaysOpenOnEdit="True"
-                  IsReadOnly="False"
-                  Style="{StaticResource DarkComboBoxStyle}"
-                  ItemContainerStyle="{StaticResource DarkComboBoxItemStyle}"/>
-
-                <!-- Data -->
-                <TextBlock Grid.Row="4" Grid.Column="0"
-                   Text="Data:"
-                   VerticalAlignment="Center"
-                   Margin="0,0,8,0"/>
-                <DatePicker x:Name="ExpenseDatePicker"
-                    Grid.Row="4" Grid.Column="1"
-                    Height="28"/>
-
-                <!-- SKĄD PŁACISZ -->
-                <TextBlock Grid.Row="6" Grid.Column="0"
-                   Text="Skąd płacisz:"
-                   VerticalAlignment="Center"
-                   Margin="0,0,8,0"/>
-                <ComboBox x:Name="ExpenseSourceCombo"
-                  Grid.Row="6" Grid.Column="1"
-                  Height="28"
-                  Style="{StaticResource DarkComboBoxStyle}"
-                  ItemContainerStyle="{StaticResource DarkComboBoxItemStyle}"
-                  SelectionChanged="ExpenseSourceCombo_SelectionChanged">
-                    <ComboBoxItem Content="Wolna gotówka" Tag="cash_free"/>
-                    <ComboBoxItem Content="Odłożona gotówka" Tag="cash_saved"/>
-                    <ComboBoxItem Content="Koperta"        Tag="envelope"/>
-                </ComboBox>
-
-                <!-- KOPERTA (pokazuje się tylko gdy wybrano Koperta) -->
-                <Grid x:Name="ExpenseEnvelopeRow"
-              Grid.Row="8"
-              Grid.ColumnSpan="2"
-              Visibility="Collapsed">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="200"/>
-                        <ColumnDefinition Width="*"/>
-                    </Grid.ColumnDefinitions>
-
-                    <TextBlock Grid.Column="0"
-                       Text="Koperta:"
-                       VerticalAlignment="Center"
-                       Margin="0,0,8,0"/>
-                    <ComboBox x:Name="ExpenseEnvelopeCombo"
-                      Grid.Column="1"
-                      Height="28"
-                      Style="{StaticResource DarkComboBoxStyle}"
-                      ItemContainerStyle="{StaticResource DarkComboBoxItemStyle}"/>
-                </Grid>
-
-                <!-- Opis -->
-                <TextBlock Grid.Row="10" Grid.Column="0"
-                   Text="Opis:"
-                   VerticalAlignment="Top"
-                   Margin="0,4,8,0"/>
-                <TextBox x:Name="ExpenseDescBox"
-                 Grid.Row="10" Grid.Column="1"
-                 Height="80"
-                 TextWrapping="Wrap"
-                 AcceptsReturn="True"
-                 VerticalScrollBarVisibility="Auto"/>
-
-                <!-- Przyciski -->
-                <StackPanel Grid.Row="12" Grid.ColumnSpan="2"
-                    Orientation="Horizontal"
-                    HorizontalAlignment="Right">
-                    <Button Content="Dodaj"
-                    Margin="0,0,8,0"
-                    Style="{StaticResource PrimaryButton}"
-                    Click="SaveExpense_Click"/>
-                    <Button Content="Anuluj"
-                    Click="Cancel_Click"/>
-                </StackPanel>
-            </Grid>
-        </Border>
-
-
-        <!-- ========== PRZYCHÓD ========== -->
-        <Border x:Name="IncomePanel"
-                Grid.Row="5"
+                Grid.Row="4"
                 Style="{StaticResource Card}"
-                Margin="0,16,0,0"
+                Margin="0,0,0,0"
                 Visibility="Collapsed">
             <Grid>
                 <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="200"/>
+                    <ColumnDefinition Width="220"/>
                     <ColumnDefinition Width="*"/>
                 </Grid.ColumnDefinitions>
 
                 <Grid.RowDefinitions>
+                    <!-- kolejność: Kwota, Kategoria, Nowa kategoria, Data, Skąd płacisz, Koperta, Opis, Przyciski -->
                     <RowDefinition Height="Auto"/>
-                    <!-- 0 kwota -->
+                    <!-- 0 Kwota -->
                     <RowDefinition Height="10"/>
                     <RowDefinition Height="Auto"/>
-                    <!-- 2 źródło -->
+                    <!-- 2 Kategoria -->
                     <RowDefinition Height="10"/>
                     <RowDefinition Height="Auto"/>
-                    <!-- 4 kategoria -->
+                    <!-- 4 Nowa kategoria -->
                     <RowDefinition Height="10"/>
                     <RowDefinition Height="Auto"/>
-                    <!-- 6 data -->
+                    <!-- 6 Data -->
                     <RowDefinition Height="10"/>
                     <RowDefinition Height="Auto"/>
-                    <!-- 8 forma -->
+                    <!-- 8 Skąd płacisz -->
                     <RowDefinition Height="10"/>
                     <RowDefinition Height="Auto"/>
-                    <!-- 10 konto -->
+                    <!-- 10 Koperta (grid) -->
                     <RowDefinition Height="10"/>
                     <RowDefinition Height="Auto"/>
-                    <!-- 12 opis -->
+                    <!-- 12 Opis -->
                     <RowDefinition Height="20"/>
                     <RowDefinition Height="Auto"/>
-                    <!-- 14 przyciski -->
+                    <!-- 14 Przyciski -->
                 </Grid.RowDefinitions>
 
                 <!-- Kwota -->
@@ -340,31 +193,174 @@
                            Text="Kwota:"
                            VerticalAlignment="Center"
                            Margin="0,0,8,0"/>
-                <TextBox x:Name="IncomeAmountBox"
-                         Grid.Row="0" Grid.Column="1"
-                         Height="28"/>
 
-                <!-- Źródło -->
+                <StackPanel Grid.Row="0" Grid.Column="1">
+                    <TextBox x:Name="ExpenseAmountBox"
+                             Height="28"/>
+                    <TextBlock x:Name="ExpenseAmountErrorText"
+                               Style="{StaticResource ErrorTextStyle}"
+                               Text="Podaj poprawną kwotę."/>
+                </StackPanel>
+
+                <!-- Kategoria (lista) -->
                 <TextBlock Grid.Row="2" Grid.Column="0"
-                           Text="Źródło:"
+                           Text="Kategoria:"
                            VerticalAlignment="Center"
                            Margin="0,0,8,0"/>
-                <TextBox x:Name="IncomeSourceBox"
-                         Grid.Row="2" Grid.Column="1"
+                <ComboBox x:Name="ExpenseCategoryBox"
+                          Grid.Row="2" Grid.Column="1"
+                          Height="28"
+                          IsEditable="False"/>
+
+                <!-- Nowa kategoria -->
+                <TextBlock Grid.Row="4" Grid.Column="0"
+                           Text="Nowa kategoria (opcjonalnie):"
+                           VerticalAlignment="Center"
+                           Margin="0,0,8,0"/>
+                <TextBox x:Name="ExpenseNewCategoryBox"
+                         Grid.Row="4" Grid.Column="1"
                          Height="28"/>
 
+                <!-- Data -->
+                <TextBlock Grid.Row="6" Grid.Column="0"
+                           Text="Data:"
+                           VerticalAlignment="Center"
+                           Margin="0,0,8,0"/>
+                <DatePicker x:Name="ExpenseDatePicker"
+                            Grid.Row="6" Grid.Column="1"
+                            Height="28"/>
+
+                <!-- Skąd płacisz -->
+                <TextBlock Grid.Row="8" Grid.Column="0"
+                           Text="Skąd płacisz:"
+                           VerticalAlignment="Center"
+                           Margin="0,0,8,0"/>
+                <ComboBox x:Name="ExpenseSourceCombo"
+                          Grid.Row="8" Grid.Column="1"
+                          Height="28"
+                          SelectionChanged="ExpenseSourceCombo_SelectionChanged">
+                    <ComboBoxItem Content="Wolna gotówka"   Tag="cash_free"/>
+                    <ComboBoxItem Content="Odłożona gotówka" Tag="cash_saved"/>
+                    <ComboBoxItem Content="Koperta"          Tag="envelope"/>
+                </ComboBox>
+
+                <!-- Wybór koperty (tylko przy opcji Koperta) -->
+                <Grid x:Name="ExpenseEnvelopeRow"
+                      Grid.Row="10"
+                      Grid.ColumnSpan="2"
+                      Visibility="Collapsed">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="220"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Grid.Column="0"
+                               Text="Koperta:"
+                               VerticalAlignment="Center"
+                               Margin="0,0,8,0"/>
+                    <ComboBox x:Name="ExpenseEnvelopeCombo"
+                              Grid.Column="1"
+                              Height="28"/>
+                </Grid>
+
+                <!-- Opis -->
+                <TextBlock Grid.Row="12" Grid.Column="0"
+                           Text="Opis:"
+                           VerticalAlignment="Top"
+                           Margin="0,4,8,0"/>
+                <TextBox x:Name="ExpenseDescBox"
+                         Grid.Row="12" Grid.Column="1"
+                         Height="80"
+                         TextWrapping="Wrap"
+                         AcceptsReturn="True"
+                         VerticalScrollBarVisibility="Auto"/>
+
+                <!-- Przyciski -->
+                <StackPanel Grid.Row="14" Grid.ColumnSpan="2"
+                            Orientation="Horizontal"
+                            HorizontalAlignment="Right">
+                    <Button Content="Dodaj"
+                            Margin="0,0,8,0"
+                            Style="{StaticResource PrimaryButton}"
+                            Click="SaveExpense_Click"/>
+                    <Button Content="Anuluj"
+                            Click="Cancel_Click"/>
+                </StackPanel>
+            </Grid>
+        </Border>
+
+        <!-- ========== PRZYCHÓD ========== -->
+        <Border x:Name="IncomePanel"
+                Grid.Row="4"
+                Style="{StaticResource Card}"
+                Margin="0,0,0,0"
+                Visibility="Collapsed">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="220"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+
+                <Grid.RowDefinitions>
+                    <!-- kolejność: Kwota, Kategoria, Nowa kategoria, Data, Źródło, Forma, Konto, Opis, Przyciski -->
+                    <RowDefinition Height="Auto"/>
+                    <!-- 0 Kwota -->
+                    <RowDefinition Height="10"/>
+                    <RowDefinition Height="Auto"/>
+                    <!-- 2 Kategoria -->
+                    <RowDefinition Height="10"/>
+                    <RowDefinition Height="Auto"/>
+                    <!-- 4 Nowa kategoria -->
+                    <RowDefinition Height="10"/>
+                    <RowDefinition Height="Auto"/>
+                    <!-- 6 Data -->
+                    <RowDefinition Height="10"/>
+                    <RowDefinition Height="Auto"/>
+                    <!-- 8 Źródło -->
+                    <RowDefinition Height="10"/>
+                    <RowDefinition Height="Auto"/>
+                    <!-- 10 Forma -->
+                    <RowDefinition Height="10"/>
+                    <RowDefinition Height="Auto"/>
+                    <!-- 12 Konto (grid) -->
+                    <RowDefinition Height="10"/>
+                    <RowDefinition Height="Auto"/>
+                    <!-- 14 Opis -->
+                    <RowDefinition Height="20"/>
+                    <RowDefinition Height="Auto"/>
+                    <!-- 16 Przyciski -->
+                </Grid.RowDefinitions>
+
+                <!-- Kwota -->
+                <TextBlock Grid.Row="0" Grid.Column="0"
+                           Text="Kwota:"
+                           VerticalAlignment="Center"
+                           Margin="0,0,8,0"/>
+                <StackPanel Grid.Row="0" Grid.Column="1">
+                    <TextBox x:Name="IncomeAmountBox"
+                             Height="28"/>
+                    <TextBlock x:Name="IncomeAmountErrorText"
+                               Style="{StaticResource ErrorTextStyle}"
+                               Text="Podaj poprawną kwotę."/>
+                </StackPanel>
+
                 <!-- Kategoria -->
-                <TextBlock Grid.Row="4" Grid.Column="0"
+                <TextBlock Grid.Row="2" Grid.Column="0"
                            Text="Kategoria:"
                            VerticalAlignment="Center"
                            Margin="0,0,8,0"/>
                 <ComboBox x:Name="IncomeCategoryBox"
-                          Grid.Row="4" Grid.Column="1"
+                          Grid.Row="2" Grid.Column="1"
                           Height="28"
-                          IsEditable="True"
-                          IsTextSearchEnabled="True"
-                          StaysOpenOnEdit="True"
-                          IsReadOnly="False"/>
+                          IsEditable="False"/>
+
+                <!-- Nowa kategoria -->
+                <TextBlock Grid.Row="4" Grid.Column="0"
+                           Text="Nowa kategoria (opcjonalnie):"
+                           VerticalAlignment="Center"
+                           Margin="0,0,8,0"/>
+                <TextBox x:Name="IncomeNewCategoryBox"
+                         Grid.Row="4" Grid.Column="1"
+                         Height="28"/>
 
                 <!-- Data -->
                 <TextBlock Grid.Row="6" Grid.Column="0"
@@ -375,27 +371,36 @@
                             Grid.Row="6" Grid.Column="1"
                             Height="28"/>
 
-                <!-- Forma przychodu -->
+                <!-- Źródło przychodu -->
                 <TextBlock Grid.Row="8" Grid.Column="0"
+                           Text="Źródło przychodu:"
+                           VerticalAlignment="Center"
+                           Margin="0,0,8,0"/>
+                <TextBox x:Name="IncomeSourceBox"
+                         Grid.Row="8" Grid.Column="1"
+                         Height="28"/>
+
+                <!-- Forma przychodu -->
+                <TextBlock Grid.Row="10" Grid.Column="0"
                            Text="Forma przychodu:"
                            VerticalAlignment="Center"
                            Margin="0,0,8,0"/>
                 <ComboBox x:Name="IncomeFormTypeCombo"
-                          Grid.Row="8" Grid.Column="1"
+                          Grid.Row="10" Grid.Column="1"
                           Height="28"
                           SelectionChanged="IncomeFormTypeCombo_SelectionChanged">
-                    <ComboBoxItem Content="Wolna gotówka" Tag="cash_free"/>
+                    <ComboBoxItem Content="Wolna gotówka"   Tag="cash_free"/>
                     <ComboBoxItem Content="Odłożona gotówka" Tag="cash_saved"/>
-                    <ComboBoxItem Content="Przelew" Tag="transfer"/>
+                    <ComboBoxItem Content="Przelew"          Tag="transfer"/>
                 </ComboBox>
 
-                <!-- Na jakie konto trafia przychód -->
+                <!-- Na jakie konto trafia przychód (tylko przy przelewie) -->
                 <Grid x:Name="IncomeAccountRow"
-                      Grid.Row="10"
+                      Grid.Row="12"
                       Grid.ColumnSpan="2"
                       Visibility="Collapsed">
                     <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="200"/>
+                        <ColumnDefinition Width="220"/>
                         <ColumnDefinition Width="*"/>
                     </Grid.ColumnDefinitions>
 
@@ -409,19 +414,19 @@
                 </Grid>
 
                 <!-- Opis -->
-                <TextBlock Grid.Row="12" Grid.Column="0"
+                <TextBlock Grid.Row="14" Grid.Column="0"
                            Text="Opis:"
                            VerticalAlignment="Top"
                            Margin="0,4,8,0"/>
                 <TextBox x:Name="IncomeDescBox"
-                         Grid.Row="12" Grid.Column="1"
+                         Grid.Row="14" Grid.Column="1"
                          Height="80"
                          TextWrapping="Wrap"
                          AcceptsReturn="True"
                          VerticalScrollBarVisibility="Auto"/>
 
                 <!-- Przyciski -->
-                <StackPanel Grid.Row="14" Grid.ColumnSpan="2"
+                <StackPanel Grid.Row="16" Grid.ColumnSpan="2"
                             Orientation="Horizontal"
                             HorizontalAlignment="Right">
                     <Button Content="Dodaj"
@@ -436,85 +441,116 @@
 
         <!-- ========== TRANSFER ========== -->
         <Border x:Name="TransferPanel"
-                Grid.Row="5"
+                Grid.Row="4"
                 Style="{StaticResource Card}"
-                Margin="0,16,0,0"
+                Margin="0,0,0,0"
                 Visibility="Collapsed">
             <Grid>
                 <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="200"/>
+                    <ColumnDefinition Width="220"/>
                     <ColumnDefinition Width="*"/>
                 </Grid.ColumnDefinitions>
 
                 <Grid.RowDefinitions>
+                    <!-- kolejność: Kwota, Kategoria, Nowa kategoria, Data, Z konta, Na konto, Opis, Przyciski -->
                     <RowDefinition Height="Auto"/>
-                    <!-- 0 z konta -->
+                    <!-- 0 Kwota -->
                     <RowDefinition Height="10"/>
                     <RowDefinition Height="Auto"/>
-                    <!-- 2 na konto -->
+                    <!-- 2 Kategoria -->
                     <RowDefinition Height="10"/>
                     <RowDefinition Height="Auto"/>
-                    <!-- 4 kategoria -->
+                    <!-- 4 Nowa kategoria -->
                     <RowDefinition Height="10"/>
                     <RowDefinition Height="Auto"/>
-                    <!-- 6 kwota -->
+                    <!-- 6 Data -->
                     <RowDefinition Height="10"/>
                     <RowDefinition Height="Auto"/>
-                    <!-- 8 data -->
+                    <!-- 8 Z konta -->
+                    <RowDefinition Height="10"/>
+                    <RowDefinition Height="Auto"/>
+                    <!-- 10 Na konto -->
+                    <RowDefinition Height="10"/>
+                    <RowDefinition Height="Auto"/>
+                    <!-- 12 Opis -->
                     <RowDefinition Height="20"/>
                     <RowDefinition Height="Auto"/>
-                    <!-- 10 przyciski -->
+                    <!-- 14 Przyciski -->
                 </Grid.RowDefinitions>
 
+                <!-- Kwota -->
                 <TextBlock Grid.Row="0" Grid.Column="0"
-                           Text="Z konta:"
+                           Text="Kwota:"
                            VerticalAlignment="Center"
                            Margin="0,0,8,0"/>
-                <ComboBox x:Name="TransferFromBox"
-                          Grid.Row="0" Grid.Column="1"
-                          Height="28"/>
+                <StackPanel Grid.Row="0" Grid.Column="1">
+                    <TextBox x:Name="TransferAmountBox"
+                             Height="28"/>
+                    <TextBlock x:Name="TransferAmountErrorText"
+                               Style="{StaticResource ErrorTextStyle}"
+                               Text="Podaj poprawną kwotę."/>
+                </StackPanel>
 
+                <!-- Kategoria -->
                 <TextBlock Grid.Row="2" Grid.Column="0"
-                           Text="Na konto:"
-                           VerticalAlignment="Center"
-                           Margin="0,0,8,0"/>
-                <ComboBox x:Name="TransferToBox"
-                          Grid.Row="2" Grid.Column="1"
-                          Height="28"/>
-
-                <!-- Kategoria transferu -->
-                <TextBlock Grid.Row="4" Grid.Column="0"
                            Text="Kategoria:"
                            VerticalAlignment="Center"
                            Margin="0,0,8,0"/>
                 <ComboBox x:Name="TransferCategoryBox"
-                          Grid.Row="4" Grid.Column="1"
+                          Grid.Row="2" Grid.Column="1"
                           Height="28"
-                          IsEditable="True"
-                          IsTextSearchEnabled="True"
-                          StaysOpenOnEdit="True"
-                          IsReadOnly="False"/>
+                          IsEditable="False"/>
 
-                <!-- Kwota -->
-                <TextBlock Grid.Row="6" Grid.Column="0"
-                           Text="Kwota:"
+                <!-- Nowa kategoria -->
+                <TextBlock Grid.Row="4" Grid.Column="0"
+                           Text="Nowa kategoria (opcjonalnie):"
                            VerticalAlignment="Center"
                            Margin="0,0,8,0"/>
-                <TextBox x:Name="TransferAmountBox"
-                         Grid.Row="6" Grid.Column="1"
+                <TextBox x:Name="TransferNewCategoryBox"
+                         Grid.Row="4" Grid.Column="1"
                          Height="28"/>
 
                 <!-- Data -->
-                <TextBlock Grid.Row="8" Grid.Column="0"
+                <TextBlock Grid.Row="6" Grid.Column="0"
                            Text="Data:"
                            VerticalAlignment="Center"
                            Margin="0,0,8,0"/>
                 <DatePicker x:Name="TransferDatePicker"
-                            Grid.Row="8" Grid.Column="1"
+                            Grid.Row="6" Grid.Column="1"
                             Height="28"/>
 
+                <!-- Z konta -->
+                <TextBlock Grid.Row="8" Grid.Column="0"
+                           Text="Z konta:"
+                           VerticalAlignment="Center"
+                           Margin="0,0,8,0"/>
+                <ComboBox x:Name="TransferFromBox"
+                          Grid.Row="8" Grid.Column="1"
+                          Height="28"/>
+
+                <!-- Na konto -->
+                <TextBlock Grid.Row="10" Grid.Column="0"
+                           Text="Na konto:"
+                           VerticalAlignment="Center"
+                           Margin="0,0,8,0"/>
+                <ComboBox x:Name="TransferToBox"
+                          Grid.Row="10" Grid.Column="1"
+                          Height="28"/>
+
+                <!-- Opis -->
+                <TextBlock Grid.Row="12" Grid.Column="0"
+                           Text="Opis:"
+                           VerticalAlignment="Top"
+                           Margin="0,4,8,0"/>
+                <TextBox x:Name="TransferDescBox"
+                         Grid.Row="12" Grid.Column="1"
+                         Height="80"
+                         TextWrapping="Wrap"
+                         AcceptsReturn="True"
+                         VerticalScrollBarVisibility="Auto"/>
+
                 <!-- Przyciski -->
-                <StackPanel Grid.Row="10" Grid.ColumnSpan="2"
+                <StackPanel Grid.Row="14" Grid.ColumnSpan="2"
                             Orientation="Horizontal"
                             HorizontalAlignment="Right">
                     <Button Content="Zapisz transfer"
@@ -529,15 +565,3 @@
 
     </Grid>
 </UserControl>
-
-
-
-
-
-
-
-
-
-
-
-
