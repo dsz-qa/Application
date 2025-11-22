@@ -1,4 +1,5 @@
-﻿// Finly/Pages/SettingsPage.xaml.cs
+﻿using System;
+using System.Reflection;
 using System.Windows;
 using System.Windows.Controls;
 using Finly.Services;
@@ -7,6 +8,10 @@ namespace Finly.Pages
 {
     public partial class SettingsPage : UserControl
     {
+        // proste, statyczne „pamiętanie” ustawień (na czas działania aplikacji)
+        private static bool _autoLoginEnabled = false;
+        private static bool _animationsEnabled = true;
+
         public SettingsPage()
         {
             InitializeComponent();
@@ -15,36 +20,84 @@ namespace Finly.Pages
 
         private void SettingsPage_Loaded(object sender, RoutedEventArgs e)
         {
-            // Ustaw radio zgodnie z bieżącym motywem
-            if (ThemeService.Current == ThemeService.Theme.Light)
-                LightRadio.IsChecked = true;
-            else
-                DarkRadio.IsChecked = true;
+            // 1) Pozycja toastów -> ComboBox
+            ToastPositionCombo.SelectedIndex = PositionToIndex(ToastService.Position);
 
-            // (opcjonalnie) lista pozycji tostów – jeśli używasz ToastService
-            ToastPosCombo.ItemsSource = new[] { "Prawy górny", "Lewy górny", "Prawy dolny", "Lewy dolny" };
-            ToastPosCombo.SelectedIndex = 0;
+            // 2) Auto-login / animacje
+            AutoLoginCheckBox.IsChecked = _autoLoginEnabled;
+            AnimationsCheckBox.IsChecked = _animationsEnabled;
+
+            // 3) Wersja z assembly (jeśli się uda)
+            try
+            {
+                var ver = Assembly.GetExecutingAssembly()?.GetName()?.Version;
+                if (ver != null)
+                {
+                    LblVersion.Text = $"Wersja: {ver}";
+                }
+            }
+            catch
+            {
+                // jakby coś poszło nie tak, zostawiamy tekst domyślny z XAML
+            }
         }
 
-        private void LightRadio_Checked(object sender, RoutedEventArgs e)
-            => ThemeService.Apply(ThemeService.Theme.Light);
+        // =============== POWIADOMIENIA ===============
 
-        private void DarkRadio_Checked(object sender, RoutedEventArgs e)
-            => ThemeService.Apply(ThemeService.Theme.Dark);
-
-        private void PreviewBtn_Click(object sender, RoutedEventArgs e)
+        private int PositionToIndex(ToastService.ToastPosition pos)
         {
-            // krótki podgląd działania (jeśli masz ToastService – fajnie dać feedback)
-            try { ToastService.Success("Zastosowano motyw: " + ThemeService.Current); }
-            catch { /* brak ToastService – ignoruj */ }
+            return pos switch
+            {
+                ToastService.ToastPosition.TopRight => 0,
+                ToastService.ToastPosition.BottomRight => 1,
+                ToastService.ToastPosition.BottomCenter => 2,
+                _ => 0
+            };
         }
 
-        private void ToastPosCombo_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        private ToastService.ToastPosition IndexToPosition(int index)
         {
-            // Jeżeli masz obsługę pozycji tostów – wywołaj tutaj swój serwis
-            // Np. ToastService.Position = (ToastPosition)ToastPosCombo.SelectedIndex;
+            return index switch
+            {
+                0 => ToastService.ToastPosition.TopRight,
+                1 => ToastService.ToastPosition.BottomRight,
+                2 => ToastService.ToastPosition.BottomCenter,
+                _ => ToastService.ToastPosition.TopRight
+            };
+        }
+
+        private void ToastPositionCombo_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            if (ToastPositionCombo.SelectedIndex < 0)
+                return;
+
+            var pos = IndexToPosition(ToastPositionCombo.SelectedIndex);
+            ToastService.Position = pos;
+        }
+
+        private void BtnShowTestToast_Click(object sender, RoutedEventArgs e)
+        {
+            ToastService.Info("To jest testowe powiadomienie z ustawień.");
+        }
+
+        // =============== LOGOWANIE ===============
+
+        private void AutoLoginCheckBox_Click(object sender, RoutedEventArgs e)
+        {
+            _autoLoginEnabled = AutoLoginCheckBox.IsChecked == true;
+            ToastService.Info(_autoLoginEnabled
+                ? "Auto-logowanie: włączone (logika może być podpięta w AuthWindow)."
+                : "Auto-logowanie: wyłączone.");
+        }
+
+        // =============== INTERFEJS ===============
+
+        private void AnimationsCheckBox_Click(object sender, RoutedEventArgs e)
+        {
+            _animationsEnabled = AnimationsCheckBox.IsChecked == true;
+            ToastService.Info(_animationsEnabled
+                ? "Animacje interfejsu: włączone."
+                : "Animacje interfejsu: wyłączone.");
         }
     }
 }
-
-

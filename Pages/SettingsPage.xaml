@@ -1,49 +1,139 @@
 ﻿<UserControl x:Class="Finly.Pages.SettingsPage"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
-             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
-             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
-             mc:Ignorable="d">
-    <Grid Margin="16">
-        <Grid.RowDefinitions>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="12"/>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="*"/>
-        </Grid.RowDefinitions>
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
 
-        <!-- MOTYW -->
-        <GroupBox Header="Motyw aplikacji">
-            <StackPanel Orientation="Horizontal" Margin="8,6">
-                <RadioButton x:Name="LightRadio"
-                             Content="Jasny"
-                             Checked="LightRadio_Checked"
-                             Margin="0,0,12,0"/>
-                <RadioButton x:Name="DarkRadio"
-                             Content="Ciemny"
-                             Checked="DarkRadio_Checked"/>
-                <Button x:Name="PreviewBtn"
-                        Content="Przetestuj"
-                        Margin="16,0,0,0"
-                        Click="PreviewBtn_Click"/>
-            </StackPanel>
-        </GroupBox>
+    <ScrollViewer VerticalScrollBarVisibility="Auto">
+        <!-- zawartość bliżej sidebara, szerokość jak na AccountPage -->
+        <Grid Margin="24,24,0,24"
+              HorizontalAlignment="Left"
+              Width="700">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <!-- Powiadomienia -->
+                <RowDefinition Height="16"/>
+                <RowDefinition Height="Auto"/>
+                <!-- Logowanie -->
+                <RowDefinition Height="16"/>
+                <RowDefinition Height="Auto"/>
+                <!-- Interfejs -->
+                <RowDefinition Height="16"/>
+                <RowDefinition Height="Auto"/>
+                <!-- Informacje -->
+            </Grid.RowDefinitions>
 
-        <Separator Grid.Row="1"/>
+            <!-- ================== POWIADOMIENIA ================== -->
+            <Border Grid.Row="0"
+                    BorderBrush="{DynamicResource Brand.Blue}"
+                    BorderThickness="2"
+                    CornerRadius="6"
+                    Padding="12"
+                    Background="{DynamicResource Surface.Background}">
+                <StackPanel>
+                    <TextBlock Text="Powiadomienia"
+                               FontSize="18"
+                               FontWeight="Bold"
+                               Foreground="White"
+                               Margin="0,0,0,10"/>
 
-        <!-- POZYCJA POWIADOMIEŃ -->
-        <GroupBox Grid.Row="2" Header="Pozycja powiadomień (tostów)">
-            <StackPanel Orientation="Horizontal" Margin="8,6">
-                <ComboBox x:Name="ToastPosCombo"
-                          Width="220"
-                          SelectionChanged="ToastPosCombo_SelectionChanged"/>
-                <Button x:Name="TestToastButton"
-                        Content="Wyświetl test"
-                        Margin="12,0,0,0"
-                        Click="PreviewBtn_Click"/>
-            </StackPanel>
-        </GroupBox>
-    </Grid>
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="160"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="120"/>
+                        </Grid.ColumnDefinitions>
+
+                        <TextBlock Grid.Column="0"
+                                   Text="Pozycja toastów:"
+                                   VerticalAlignment="Center"/>
+
+                        <ComboBox x:Name="ToastPositionCombo"
+                                  Grid.Column="1"
+                                  Height="26"
+                                  Margin="0,0,8,0"
+                                  SelectionChanged="ToastPositionCombo_SelectionChanged">
+                            <ComboBoxItem Content="Prawy górny"   Tag="TopRight"/>
+                            <ComboBoxItem Content="Prawy dolny"   Tag="BottomRight"/>
+                            <ComboBoxItem Content="Środek na dole" Tag="BottomCenter"/>
+                        </ComboBox>
+
+                        <Button Grid.Column="2"
+                                x:Name="BtnShowTestToast"
+                                Content="Wyświetl test"
+                                Height="26"
+                                Click="BtnShowTestToast_Click"/>
+                    </Grid>
+                </StackPanel>
+            </Border>
+
+            <!-- ================== LOGOWANIE ================== -->
+            <Border Grid.Row="2"
+                    BorderBrush="{DynamicResource Brand.Blue}"
+                    BorderThickness="2"
+                    CornerRadius="6"
+                    Padding="12"
+                    Background="{DynamicResource Surface.Background}">
+                <StackPanel>
+                    <TextBlock Text="Logowanie"
+                               FontSize="18"
+                               FontWeight="Bold"
+                               Foreground="White"
+                               Margin="0,0,0,10"/>
+
+                    <CheckBox x:Name="AutoLoginCheckBox"
+                              Content="Automatycznie loguj przy starcie aplikacji"
+                              IsChecked="False"
+                              Click="AutoLoginCheckBox_Click"/>
+                </StackPanel>
+            </Border>
+
+            <!-- ================== INTERFEJS ================== -->
+            <Border Grid.Row="4"
+                    BorderBrush="{DynamicResource Brand.Blue}"
+                    BorderThickness="2"
+                    CornerRadius="6"
+                    Padding="12"
+                    Background="{DynamicResource Surface.Background}">
+                <StackPanel>
+                    <TextBlock Text="Interfejs"
+                               FontSize="18"
+                               FontWeight="Bold"
+                               Foreground="White"
+                               Margin="0,0,0,10"/>
+
+                    <CheckBox x:Name="AnimationsCheckBox"
+                              Content="Włącz animacje interfejsu"
+                              IsChecked="True"
+                              Click="AnimationsCheckBox_Click"/>
+                </StackPanel>
+            </Border>
+
+            <!-- ================== INFORMACJE O APLIKACJI ================== -->
+            <Border Grid.Row="6"
+                    BorderBrush="{DynamicResource Brand.Blue}"
+                    BorderThickness="2"
+                    CornerRadius="6"
+                    Padding="12"
+                    Background="{DynamicResource Surface.Background}">
+                <StackPanel>
+                    <TextBlock Text="Informacje"
+                               FontSize="18"
+                               FontWeight="Bold"
+                               Foreground="White"
+                               Margin="0,0,0,10"/>
+
+                    <TextBlock Text="Nazwa aplikacji: Finly"
+                               Margin="0,0,0,2"/>
+                    <TextBlock x:Name="LblVersion"
+                               Text="Wersja: 1.0.0"
+                               Margin="0,0,0,2"/>
+                    <TextBlock Text="Autor: Dominika Szymańska"
+                               Margin="0,0,0,2"/>
+                    <TextBlock Text="Opis: Aplikacja do zarządzania finansami osobistymi i firmowymi."
+                               TextWrapping="Wrap"
+                               Margin="0,4,0,0"/>
+                </StackPanel>
+            </Border>
+
+        </Grid>
+    </ScrollViewer>
 </UserControl>
-
-
