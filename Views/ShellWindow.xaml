@@ -362,15 +362,15 @@
                                       Tag="pack://application:,,,/Assets/Icons/dodaj.png"
                                       Click="Nav_Add_Click"/>
 
+                        <ToggleButton Grid.Row="11" x:Name="NavTransactions" Style="{StaticResource NavItemCentered}"
+                                      Content="Transakcje"
+                                      Tag="pack://application:,,,/Assets/Icons/transakcje.png"
+                                      Click="Nav_Transactions_Click"/>
+
                         <ToggleButton Grid.Row="2" x:Name="NavBudgets" Style="{StaticResource NavItemCentered}"
                                       Content="Budżety"
                                       Tag="pack://application:,,,/Assets/Icons/budzety.png"
                                       Click="Nav_Budgets_Click"/>
-
-                        <ToggleButton Grid.Row="3" x:Name="NavGoals" Style="{StaticResource NavItemCentered}"
-                                      Content="Cele"
-                                      Tag="pack://application:,,,/Assets/Icons/cele.png"
-                                      Click="Nav_Goals_Click"/>
 
                         <ToggleButton Grid.Row="4" x:Name="NavCategories" Style="{StaticResource NavItemCentered}"
                                       Content="Kategorie"
@@ -396,6 +396,11 @@
                                       Content="Inwestycje"
                                       Tag="pack://application:,,,/Assets/Icons/inwestycje.png"
                                       Click="Nav_Investments_Click"/>
+                        
+                        <ToggleButton Grid.Row="3" x:Name="NavGoals" Style="{StaticResource NavItemCentered}"
+                                      Content="Cele"
+                                      Tag="pack://application:,,,/Assets/Icons/cele.png"
+                                      Click="Nav_Goals_Click"/>
 
                         <ToggleButton Grid.Row="9" x:Name="NavEnvelopes" Style="{StaticResource NavItemCentered}"
                                       Content="Koperty"
@@ -407,10 +412,7 @@
                                       Tag="pack://application:,,,/Assets/Icons/kontabankowe.png"
                                       Click="Nav_Banks_Click"/>
 
-                        <ToggleButton Grid.Row="11" x:Name="NavTransactions" Style="{StaticResource NavItemCentered}"
-                                      Content="Transakcje"
-                                      Tag="pack://application:,,,/Assets/Icons/transakcje.png"
-                                      Click="Nav_Transactions_Click"/>
+
                     </Grid>
 
                     <!-- Stopka -->

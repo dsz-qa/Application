@@ -3,192 +3,377 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:local="clr-namespace:Finly.Pages"
+             xmlns:data="clr-namespace:System.Data;assembly=System.Data"
              mc:Ignorable="d">
 
-	<ScrollViewer VerticalScrollBarVisibility="Auto">
-		<StackPanel Margin="24">
+    <UserControl.Resources>
 
-			<TextBlock Text="Koperty" FontSize="24" FontWeight="Bold"/>
 
-			<!-- ==== GOTÓWKA ==== -->
-			<Border Margin="0,12,0,0"
-                    Background="{DynamicResource Surface.Background}"
-                    BorderBrush="{DynamicResource Surface.Border}"
-                    BorderThickness="1" CornerRadius="10" Padding="16">
-				<Grid>
-					<Grid.ColumnDefinitions>
-						<ColumnDefinition Width="*"/>
-						<ColumnDefinition Width="Auto"/>
-					</Grid.ColumnDefinitions>
+        <!-- Karta ogólna -->
+        <Style x:Key="Card" TargetType="Border">
+            <Setter Property="Background"      Value="{DynamicResource Surface.Background}"/>
+            <Setter Property="BorderBrush"     Value="{DynamicResource Surface.Border}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="CornerRadius"    Value="10"/>
+            <Setter Property="Padding"         Value="12"/>
+            <Setter Property="Margin"          Value="0,12,16,0"/>
+        </Style>
 
-					<StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                        <TextBlock Text="Odłożona gotówka (całkowita):" VerticalAlignment="Center"/>
-                        <TextBox x:Name="CashBox" Width="140" HorizontalContentAlignment="Right" Margin="12,0,0,0"/>
+        <!-- Karta z niebieskim obramowaniem (KPI) -->
+        <Style x:Key="AccentCard" TargetType="Border" BasedOn="{StaticResource Card}">
+            <Setter Property="BorderBrush"     Value="{DynamicResource Brand.Blue}"/>
+            <Setter Property="BorderThickness" Value="2"/>
+            <Setter Property="Margin"          Value="0,16,16,0"/>
+        </Style>
 
-                        <Button Content="Zapisz"
-                                Width="120"
-                                Style="{StaticResource PrimaryButton}"
-                                Click="SaveCash_Click"
-                                Margin="12,0,0,0"/>
-					</StackPanel>
+        <!-- Nagłówek karty -->
+        <Style x:Key="CardHeader" TargetType="TextBlock">
+            <Setter Property="FontSize"   Value="13"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Foreground" Value="{DynamicResource App.Foreground}"/>
+            <Setter Property="Opacity"    Value="0.9"/>
+        </Style>
 
-                    <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
-                        <StackPanel Margin="24,0,0,0">
-                            <TextBlock Text="Wolna gotówka" FontSize="12" Opacity="0.8"/>
-                            <TextBlock x:Name="FreeCashText" FontWeight="SemiBold"/>
+        <!-- Wartość KPI -->
+        <Style x:Key="KpiValueStyle" TargetType="TextBlock">
+            <Setter Property="FontSize"   Value="20"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="Margin"     Value="0,4,0,0"/>
+            <Setter Property="Foreground" Value="{DynamicResource App.Foreground}"/>
+        </Style>
+
+        <!-- ===== KAFEL ISTNIEJĄCEJ KOPERTY (DataRowView) ===== -->
+        <DataTemplate DataType="{x:Type data:DataRowView}">
+            <Border Style="{StaticResource Card}"
+                    Width="260">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+
+                    <StackPanel Grid.Row="0">
+
+                        <!-- Nazwa + ikonka -->
+                        <StackPanel Orientation="Horizontal"
+                                    Margin="0,0,0,4">
+                            <TextBlock Text="✉"
+                                       FontSize="18"
+                                       Margin="0,0,6,0"
+                                       VerticalAlignment="Center"/>
+                            <TextBlock Text="{Binding Row[Name]}"
+                                       FontSize="16"
+                                       FontWeight="Bold"
+                                       Foreground="White"
+                                       VerticalAlignment="Center"/>
                         </StackPanel>
-                        <StackPanel Margin="24,0,0,0">
-                            <TextBlock Text="Gotówka w kopertach" FontSize="12" Opacity="0.8"/>
-                            <TextBlock x:Name="EnvelopesSumText" FontWeight="SemiBold"/>
-                        </StackPanel>
-                        <StackPanel Margin="24,0,0,0">
-                            <TextBlock Text="Gotówka do rozdysponowania" FontSize="12" Opacity="0.8"/>
-                            <TextBlock x:Name="UnassignedText" FontWeight="SemiBold"/>
-                        </StackPanel>
+
+                        <!-- Docelowa kwota -->
+                        <TextBlock Text="Docelowa kwota"
+                                   FontWeight="SemiBold"
+                                   Foreground="{DynamicResource App.Foreground}"
+                                   Opacity="0.9"/>
+                        <TextBlock Text="{Binding Row[Target], StringFormat={}{0:N2} zł}"
+                                   Margin="0,2,0,4"
+                                   Foreground="{DynamicResource App.Foreground}"/>
+
+                        <!-- Przydzielona kwota -->
+                        <TextBlock Text="Przydzielona kwota"
+                                   FontWeight="SemiBold"
+                                   Foreground="{DynamicResource App.Foreground}"
+                                   Opacity="0.9"/>
+                        <TextBlock Text="{Binding Row[Allocated], StringFormat={}{0:N2} zł}"
+                                   Margin="0,2,0,4"
+                                   Foreground="{DynamicResource App.Foreground}"/>
+
+                        <!-- Cel (z notatki) -->
+                        <TextBlock Text="Cel"
+                                   FontWeight="SemiBold"
+                                   Foreground="{DynamicResource App.Foreground}"
+                                   Opacity="0.9"/>
+                        <TextBlock Text="{Binding Row[GoalText]}"
+                                   Margin="0,2,0,0"
+                                   Foreground="{DynamicResource App.Foreground}"
+                                   TextWrapping="Wrap"/>
                     </StackPanel>
 
+                    <!-- Przyciski -->
+                    <StackPanel Grid.Row="1"
+                                Orientation="Horizontal"
+                                Margin="0,10,0,0"
+                                HorizontalAlignment="Right">
+                        <Button Content="Edytuj"
+                                Margin="0,0,8,0"
+                                Padding="8,4"
+                                MinWidth="70"
+                                Tag="{Binding}"
+                                Click="EditEnvelope_Click"/>
+                        <Button Content="Usuń"
+                                Padding="8,4"
+                                MinWidth="70"
+                                Tag="{Binding}"
+                                Click="DeleteEnvelope_Click"/>
+                    </StackPanel>
                 </Grid>
-			</Border>
+            </Border>
+        </DataTemplate>
 
-            <!-- ==== PODGLĄD KART (galeria) ==== -->
-            <Border Margin="0,12,0,0"
-        Background="{DynamicResource Surface.Background}"
-        BorderBrush="{DynamicResource Surface.Border}"
-        BorderThickness="1" CornerRadius="10" Padding="16">
-                <StackPanel>
-                    <TextBlock Text="Koperty — podgląd" FontSize="18" FontWeight="SemiBold" Margin="0,0,0,8"/>
-                    <ItemsControl x:Name="EnvelopesCards">
-                        <ItemsControl.ItemsPanel>
-                            <ItemsPanelTemplate>
-                                <WrapPanel ItemWidth="320" ItemHeight="Auto" MinWidth="320"/>
-                            </ItemsPanelTemplate>
-                        </ItemsControl.ItemsPanel>
-                        <ItemsControl.ItemTemplate>
-                            <DataTemplate>
-                                <Border Margin="6" Padding="12"
-                            Background="{DynamicResource Surface.Background}"
-                            BorderBrush="{DynamicResource Surface.Border}"
-                            BorderThickness="1" CornerRadius="12">
-                                    <StackPanel>
-                                        <!-- Nazwa -->
-                                        <StackPanel Orientation="Horizontal">
-                                            <TextBlock Text="✉ " FontSize="16" Margin="0,0,6,0"/>
-                                            <TextBlock Text="{Binding Row[Name]}" FontSize="16" FontWeight="Bold"/>
-                                        </StackPanel>
+        <!-- ===== KAFEL „DODAJ KOPERTĘ” (jak Dodaj konto) ===== -->
+        <DataTemplate DataType="{x:Type local:AddEnvelopeTile}">
+            <Border Style="{StaticResource Card}"
+                    Width="260"
+                    Cursor="Hand"
+                    MouseLeftButtonUp="AddEnvelopeCard_Click">
+                <Grid>
+                    <StackPanel HorizontalAlignment="Center"
+                                VerticalAlignment="Center"
+                                Margin="0,16,0,16">
+                        <TextBlock Text="+"
+                                   FontSize="28"
+                                   FontWeight="Bold"
+                                   HorizontalAlignment="Center"
+                                   Foreground="{DynamicResource App.Foreground}"/>
+                        <TextBlock Text="Dodaj kopertę"
+                                   Margin="0,6,0,0"
+                                   FontSize="13"
+                                   FontWeight="SemiBold"
+                                   Foreground="{DynamicResource App.Foreground}"
+                                   HorizontalAlignment="Center"/>
+                    </StackPanel>
+                </Grid>
+            </Border>
+        </DataTemplate>
 
-                                        <!-- Cel (Target) -->
-                                        <TextBlock Text="Cel" FontWeight="SemiBold" Margin="0,8,0,0"/>
-                                        <TextBlock Text="{Binding Row[Target], StringFormat={}{0:N2} zł}"/>
+    </UserControl.Resources>
 
-                                        <!-- Aktualne saldo (Allocated) -->
-                                        <TextBlock Text="Aktualne saldo" FontWeight="SemiBold" Margin="0,8,0,0"/>
-                                        <TextBlock Text="{Binding Row[Allocated], StringFormat={}{0:N2} zł}"/>
+    <!-- CAŁA STRONA -->
+    <ScrollViewer VerticalScrollBarVisibility="Auto">
+        <Grid Margin="24">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <!-- KPI -->
+                <RowDefinition Height="*"/>
+                <!-- Koperty -->
+                <RowDefinition Height="Auto"/>
+                <!-- Formularz -->
+            </Grid.RowDefinitions>
 
-                                        <!-- Notatka (na co zbierasz) -->
-                                        <TextBlock Text="Notatka" FontWeight="SemiBold" Margin="0,8,0,0"/>
-                                        <TextBlock Text="{Binding Row[Note]}" TextWrapping="Wrap" />
-                                    </StackPanel>
-                                </Border>
-                            </DataTemplate>
-                        </ItemsControl.ItemTemplate>
-                    </ItemsControl>
+            <!-- ==================== GÓRNE KPI ==================== -->
+            <Grid Grid.Row="0">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+
+                <!-- Razem wszystkie koperty -->
+                <Border Grid.Column="0" Style="{StaticResource AccentCard}">
+                    <StackPanel>
+                        <TextBlock Text="Razem wszystkie koperty"
+                                   Style="{StaticResource CardHeader}"
+                                   FontSize="18"
+                                   FontWeight="Bold"
+                                   Margin="0,0,0,4"/>
+                        <TextBlock Text="Suma środków przydzielonych do wszystkich kopert."
+                                   Margin="0,2,0,0"
+                                   Foreground="{DynamicResource App.Foreground}"
+                                   Opacity="0.7"/>
+                        <TextBlock x:Name="TotalEnvelopesText"
+                                   Style="{StaticResource KpiValueStyle}"
+                                   FontSize="24"
+                                   Text="0,00 zł"/>
+                    </StackPanel>
+                </Border>
+
+                <!-- Odłożona gotówka -->
+                <Border Grid.Column="1" Style="{StaticResource AccentCard}">
+                    <StackPanel>
+                        <TextBlock Text="Odłożona gotówka"
+                                   Style="{StaticResource CardHeader}"
+                                   FontSize="18"
+                                   FontWeight="Bold"
+                                   Margin="0,0,0,4"/>
+                        <TextBlock x:Name="SavedCashText"
+                                   Style="{StaticResource KpiValueStyle}"
+                                   FontSize="24"
+                                   Text="0,00 zł"/>
+                    </StackPanel>
+                </Border>
+
+                <!-- Gotówka w kopertach -->
+                <Border Grid.Column="2" Style="{StaticResource AccentCard}">
+                    <StackPanel>
+                        <TextBlock Text="Gotówka w kopertach"
+                                   Style="{StaticResource CardHeader}"
+                                   FontSize="18"
+                                   FontWeight="Bold"
+                                   Margin="0,0,0,4"/>
+                        <TextBlock x:Name="EnvelopesSumText"
+                                   Style="{StaticResource KpiValueStyle}"
+                                   FontSize="24"
+                                   Text="0,00 zł"/>
+                    </StackPanel>
+                </Border>
+
+                <!-- Gotówka do rozdysponowania -->
+                <Border Grid.Column="3" Style="{StaticResource AccentCard}">
+                    <StackPanel>
+                        <TextBlock Text="Gotówka do rozdysponowania"
+                                   Style="{StaticResource CardHeader}"
+                                   FontSize="18"
+                                   FontWeight="Bold"
+                                   Margin="0,0,0,4"/>
+                        <TextBlock x:Name="UnassignedText"
+                                   Style="{StaticResource KpiValueStyle}"
+                                   FontSize="24"
+                                   Text="0,00 zł"/>
+                    </StackPanel>
+                </Border>
+            </Grid>
+
+            <!-- ==================== LISTA KOPERT + DODAJ ==================== -->
+            <StackPanel Grid.Row="1" Margin="0,12,0,0">
+                <Separator Height="1"
+                           Background="{DynamicResource Surface.Border}"
+                           Opacity="0.8"
+                           Margin="0,0,0,8"/>
+
+                <TextBlock Text="Koperty"
+                           FontSize="24"
+                           FontWeight="Bold"
+                           Foreground="{DynamicResource App.Foreground}"
+                           Margin="0,4,0,12"/>
+
+                <ItemsControl x:Name="EnvelopesCards">
+                    <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate>
+                            <WrapPanel HorizontalAlignment="Stretch"/>
+                        </ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                </ItemsControl>
+            </StackPanel>
+
+            <!-- ==================== FORMULARZ DODAJ / EDYTUJ ==================== -->
+            <Border x:Name="FormBorder"
+                    Grid.Row="2"
+                    Margin="0,16,0,24"
+                    Background="{DynamicResource Surface.Background}"
+                    BorderBrush="{DynamicResource Surface.Border}"
+                    BorderThickness="1"
+                    CornerRadius="10"
+                    Padding="16"
+                    Visibility="Collapsed">
+                <StackPanel HorizontalAlignment="Center"
+                            MaxWidth="600">
+
+                    <Separator Height="1"
+                               Background="{DynamicResource Surface.Border}"
+                               Opacity="0.8"
+                               Margin="0,0,0,12"/>
+
+                    <TextBlock x:Name="FormHeader"
+                               Text="Dodaj kopertę"
+                               FontSize="18"
+                               FontWeight="SemiBold"
+                               HorizontalAlignment="Center"
+                               Foreground="{DynamicResource App.Foreground}"/>
+
+                    <Grid Margin="0,12,0,0">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                        </Grid.RowDefinitions>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="220"/>
+                        </Grid.ColumnDefinitions>
+
+                        <!-- Nazwa -->
+                        <TextBlock Grid.Row="0" Grid.Column="0"
+                                   Text="Nazwa:"
+                                   Margin="0,4,8,4"
+                                   VerticalAlignment="Center"
+                                   Foreground="{DynamicResource App.Foreground}"/>
+                        <TextBox x:Name="NameBox"
+                                 Grid.Row="0" Grid.Column="1"
+                                 MinWidth="220"/>
+
+                        <!-- Przydzielono -->
+                        <TextBlock Grid.Row="1" Grid.Column="0"
+                                   Text="Przydzielono:"
+                                   Margin="0,4,8,4"
+                                   VerticalAlignment="Center"
+                                   Foreground="{DynamicResource App.Foreground}"/>
+                        <TextBox x:Name="AllocatedBox"
+                                 Grid.Row="1" Grid.Column="1"
+                                 HorizontalContentAlignment="Right"
+                                 Text="0,00"
+                                 GotFocus="AmountBox_GotFocus"
+                                 LostFocus="AmountBox_LostFocus"/>
+
+                        <!-- Docelowa kwota -->
+                        <TextBlock Grid.Row="2" Grid.Column="0"
+                                   Text="Docelowa kwota:"
+                                   Margin="0,4,8,4"
+                                   VerticalAlignment="Center"
+                                   Foreground="{DynamicResource App.Foreground}"/>
+                        <TextBox x:Name="TargetBox"
+                                 Grid.Row="2" Grid.Column="1"
+                                 HorizontalContentAlignment="Right"
+                                 Text="0,00"
+                                 GotFocus="AmountBox_GotFocus"
+                                 LostFocus="AmountBox_LostFocus"/>
+
+                        <!-- Cel -->
+                        <TextBlock Grid.Row="3" Grid.Column="0"
+                                   Text="Cel:"
+                                   Margin="0,4,8,4"
+                                   VerticalAlignment="Top"
+                                   Foreground="{DynamicResource App.Foreground}"/>
+                        <TextBox x:Name="GoalBox"
+                                 Grid.Row="3" Grid.Column="1"
+                                 Height="50"
+                                 TextWrapping="Wrap"
+                                 AcceptsReturn="True"/>
+
+                        <!-- Opis -->
+                        <TextBlock Grid.Row="4" Grid.Column="0"
+                                   Text="Opis:"
+                                   Margin="0,4,8,4"
+                                   VerticalAlignment="Top"
+                                   Foreground="{DynamicResource App.Foreground}"/>
+                        <TextBox x:Name="DescriptionBox"
+                                 Grid.Row="4" Grid.Column="1"
+                                 Height="60"
+                                 TextWrapping="Wrap"
+                                 AcceptsReturn="True"/>
+                    </Grid>
+
+                    <StackPanel Orientation="Horizontal"
+                                Margin="0,12,0,0"
+                                HorizontalAlignment="Center">
+                        <Button x:Name="SaveEnvelopeBtn"
+                                Content="Dodaj"
+                                Width="100"
+                                Margin="0,0,8,0"
+                                Click="SaveEnvelope_Click"/>
+                        <Button Content="Anuluj"
+                                Width="100"
+                                Click="CancelEdit_Click"/>
+                    </StackPanel>
+
+                    <TextBlock x:Name="FormMessage"
+                               Margin="0,8,0,0"
+                               HorizontalAlignment="Center"
+                               Foreground="OrangeRed"/>
                 </StackPanel>
             </Border>
 
-
-            <!-- ==== LISTA KOPERT ==== -->
-			<Border Margin="0,12,0,0"
-                    Background="{DynamicResource Surface.Background}"
-                    BorderBrush="{DynamicResource Surface.Border}"
-                    BorderThickness="1" CornerRadius="10" Padding="16">
-				<StackPanel>
-					<StackPanel Orientation="Horizontal">
-						<TextBlock Text="Koperty" FontSize="18" FontWeight="SemiBold"/>
-						<Button Content="Dodaj nową"
-                                Style="{StaticResource PrimaryButton}"
-                                Click="StartAdd_Click"
-                                Margin="8,0,0,0"/>
-					</StackPanel>
-
-					<DataGrid x:Name="EnvelopesGrid"
-                              Margin="0,8,0,0"
-                              AutoGenerateColumns="False"
-                              IsReadOnly="True"
-                              CanUserAddRows="False"
-                              SelectionMode="Single"
-                              SelectionUnit="FullRow"
-                              MouseDoubleClick="EnvelopesGrid_MouseDoubleClick">
-						<DataGrid.Columns>
-							<DataGridTextColumn Header="Nazwa" Binding="{Binding Row[Name]}" Width="*" />
-							<DataGridTextColumn Header="Cel" Binding="{Binding Row[Target], StringFormat={}{0:N2}}" Width="120" />
-							<DataGridTextColumn Header="Przydzielono" Binding="{Binding Row[Allocated], StringFormat={}{0:N2}}" Width="140" />
-							<DataGridTextColumn Header="Pozostało" Binding="{Binding Row[Remaining], StringFormat={}{0:N2}}" Width="140" />
-							<DataGridTextColumn Header="Notatka" Binding="{Binding Row[Note]}" Width="2*"/>
-							<DataGridTemplateColumn Header="Akcje" Width="160">
-								<DataGridTemplateColumn.CellTemplate>
-									<DataTemplate>
-										<StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
-											<Button Content="Edytuj" Margin="0,0,8,0"
-                                                    Tag="{Binding Row[Id]}"
-                                                    Click="EditEnvelope_Click"/>
-											<Button Content="Usuń"
-                                                    Tag="{Binding Row[Id]}"
-                                                    Click="DeleteEnvelope_Click"/>
-										</StackPanel>
-									</DataTemplate>
-								</DataGridTemplateColumn.CellTemplate>
-							</DataGridTemplateColumn>
-						</DataGrid.Columns>
-					</DataGrid>
-				</StackPanel>
-			</Border>
-
-			<!-- ==== FORMULARZ DODAJ/EDYTUJ ==== -->
-			<Border Margin="0,12,0,24"
-                    Background="{DynamicResource Surface.Background}"
-                    BorderBrush="{DynamicResource Surface.Border}"
-                    BorderThickness="1" CornerRadius="10" Padding="16">
-				<StackPanel>
-					<TextBlock x:Name="FormHeader" Text="Dodaj kopertę" FontSize="18" FontWeight="SemiBold"/>
-
-					<Grid Margin="0,8,0,0">
-						<Grid.ColumnDefinitions>
-							<ColumnDefinition Width="220"/>
-							<ColumnDefinition Width="*"/>
-							<ColumnDefinition Width="220"/>
-							<ColumnDefinition Width="*"/>
-						</Grid.ColumnDefinitions>
-						<Grid.RowDefinitions>
-							<RowDefinition Height="Auto"/>
-							<RowDefinition Height="Auto"/>
-						</Grid.RowDefinitions>
-
-						<TextBlock Grid.Column="0" Text="Nazwa:" VerticalAlignment="Center" Margin="0,0,8,0"/>
-						<TextBox x:Name="NameBox" Grid.Column="1"/>
-
-						<TextBlock Grid.Column="2" Text="Cel (PLN):" VerticalAlignment="Center" Margin="12,0,8,0"/>
-						<TextBox x:Name="TargetBox" Grid.Column="3" HorizontalContentAlignment="Right"/>
-
-						<TextBlock Grid.Row="1" Grid.Column="0" Text="Przydzielono (PLN):" VerticalAlignment="Center" Margin="0,8,8,0"/>
-						<TextBox x:Name="AllocatedBox" Grid.Row="1" Grid.Column="1" HorizontalContentAlignment="Right" Margin="0,8,0,0"/>
-
-						<TextBlock Grid.Row="1" Grid.Column="2" Text="Notatka:" VerticalAlignment="Top" Margin="12,8,8,0"/>
-						<TextBox x:Name="NoteBox" Grid.Row="1" Grid.Column="3" Height="60" TextWrapping="Wrap" AcceptsReturn="True" Margin="0,8,0,0"/>
-					</Grid>
-
-					<StackPanel Orientation="Horizontal" Margin="0,8,0,0">
-						<Button x:Name="SaveEnvelopeBtn"
-                                Content="Zapisz"
-                                Style="{StaticResource PrimaryButton}"
-                                Click="SaveEnvelope_Click"/>
-						<Button Content="Anuluj" Click="CancelEdit_Click" Margin="8,0,0,0"/>
-						<TextBlock x:Name="FormMessage" Margin="12,0,0,0" />
-					</StackPanel>
-				</StackPanel>
-			</Border>
-
-		</StackPanel>
-	</ScrollViewer>
+        </Grid>
+    </ScrollViewer>
 </UserControl>
-
-
