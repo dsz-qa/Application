@@ -51,6 +51,7 @@
 	  <None Remove="Assets\Icons\statystyki.png" />
 	  <None Remove="Assets\Icons\stronaglowna.png" />
 	  <None Remove="Assets\Icons\transakcje.png" />
+	  <None Remove="Assets\Icons\transfer.png" />
 	  <None Remove="Assets\Icons\wydatki.png" />
 	  <None Remove="Assets\Images\logoFinly.png" />
 	</ItemGroup>
@@ -105,6 +106,7 @@
 	  <Resource Include="Assets\Icons\statystyki.png" />
 	  <Resource Include="Assets\Icons\stronaglowna.png" />
 	  <Resource Include="Assets\Icons\transakcje.png" />
+	  <Resource Include="Assets\Icons\transfer.png" />
 	  <Resource Include="Assets\Icons\wydatki.png" />
 	  <Resource Include="Assets\Images\logoFinly.png">
 	    <CopyToOutputDirectory>Never</CopyToOutputDirectory>

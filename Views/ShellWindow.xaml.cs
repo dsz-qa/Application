@@ -220,7 +220,6 @@ namespace Finly.Views
             SetActiveFooter(null);
         }
 
-
         // ===== Kliknięcia NAV (lewy sidebar) =====
         private void Nav_Home_Click(object sender, RoutedEventArgs e)
         {
@@ -328,6 +327,9 @@ namespace Finly.Views
 
         private void Nav_Logout_Click(object sender, RoutedEventArgs e)
         {
+            // Po wylogowaniu nie auto-logujemy już tego użytkownika
+            SettingsService.LastUserId = null;
+
             UserService.ClearCurrentUser();
 
             var auth = new AuthWindow();
@@ -342,30 +344,23 @@ namespace Finly.Views
         {
             if (NavContainer == null) return;
 
-            // najpierw wszystko odznaczamy
             foreach (var tb in FindVisualChildren<ToggleButton>(NavContainer))
                 tb.IsChecked = false;
 
-            // jeśli ktoś podał konkretny przycisk – zaznaczamy go
             if (active != null)
             {
                 active.IsChecked = true;
                 return;
             }
 
-            // jeśli nie ma konkretnego, ale na RightHost siedzi DashboardPage => zaznacz Panel główny
             if (RightHost.Content is DashboardPage && NavHome != null)
-            {
                 NavHome.IsChecked = true;
-            }
         }
-
 
         private void SetActiveFooter(ToggleButton? active)
         {
             if (FooterAccount != null) FooterAccount.IsChecked = active == FooterAccount;
             if (FooterSettings != null) FooterSettings.IsChecked = active == FooterSettings;
-
             if (FooterLogout != null) FooterLogout.IsChecked = false;
         }
 
@@ -398,8 +393,3 @@ namespace Finly.Views
         }
     }
 }
-
-
-
-
-

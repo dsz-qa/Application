@@ -10,7 +10,9 @@ using System.Text;
 
 namespace Finly.Services
 {
+    /// <summary>
     /// Centralny serwis SQLite – spójny z wywo³aniami w UI.
+    /// </summary>
     public static class DatabaseService
     {
         // ====== stan/lock schematu ======
@@ -79,6 +81,271 @@ namespace Finly.Services
             }
             return GetConnection();
         }
+
+        // ===== PRZENOSZENIE GOTÓWKI MIÊDZY PULAMI =====
+        /// <summary>
+        /// Przeniesienie z wolnej gotówki do od³o¿onej.
+        /// Wolna gotówka = CashOnHand - SavedCash.
+        /// Saved roœnie, free maleje, suma (free + saved) zostaje taka sama.
+        /// Dodatkowo korygujemy CashOnHand tak, ¿eby zawsze zgadza³o siê: CashOnHand = free + saved.
+        /// </summary>
+        public static void TransferFreeToSaved(int userId, decimal amount)
+        {
+            if (amount <= 0) return;
+
+            // Aktualny stan
+            var allCash = GetCashOnHand(userId);
+            var saved = GetSavedCash(userId);
+            var free = Math.Max(0m, allCash - saved);
+
+            if (free < amount)
+                throw new InvalidOperationException("Za ma³o wolnej gotówki.");
+
+            // Nowy stan logiczny
+            var newSaved = saved + amount;
+            var newFree = free - amount;
+            var newAll = newSaved + newFree;   // ca³a fizyczna gotówka
+
+            // Zapis do bazy
+            SetSavedCash(userId, newSaved);
+            SetCashOnHand(userId, newAll);
+        }
+
+        /// <summary>
+        /// Przeniesienie z od³o¿onej gotówki do wolnej.
+        /// Wolna gotówka = CashOnHand - SavedCash.
+        /// Saved maleje, free roœnie, suma (free + saved) zostaje taka sama.
+        /// Dodatkowo korygujemy CashOnHand tak, ¿eby zawsze zgadza³o siê: CashOnHand = free + saved.
+        /// </summary>
+        public static void TransferSavedToFree(int userId, decimal amount)
+        {
+            if (amount <= 0) return;
+
+            // Aktualny stan
+            var allCash = GetCashOnHand(userId);
+            var saved = GetSavedCash(userId);
+            var free = Math.Max(0m, allCash - saved);
+
+            if (saved < amount)
+                throw new InvalidOperationException("Za ma³o od³o¿onej gotówki.");
+
+            // Nowy stan logiczny
+            var newSaved = saved - amount;
+            var newFree = free + amount;
+            var newAll = newSaved + newFree;   // ca³a fizyczna gotówka
+
+            // Zapis do bazy
+            SetSavedCash(userId, newSaved);
+            SetCashOnHand(userId, newAll);
+        }
+
+
+        /// <summary>
+        /// Przeniesienie œrodków z od³o¿onej gotówki na konto bankowe.
+        /// Zmniejsza SavedCash i CashOnHand, zwiêksza wybrane konto.
+        /// </summary>
+        public static void TransferSavedToBank(int userId, int accountId, decimal amount)
+        {
+            if (amount <= 0) throw new ArgumentException("Kwota musi byæ dodatnia.", nameof(amount));
+
+            var saved = GetSavedCash(userId);
+            if (saved < amount)
+                throw new InvalidOperationException("Za ma³o od³o¿onej gotówki.");
+
+            var cash = GetCashOnHand(userId);
+            if (cash < amount)
+                throw new InvalidOperationException("Za ma³o gotówki w portfelu.");
+
+            // zdejmujemy z od³o¿onej i fizycznej gotówki
+            SetSavedCash(userId, saved - amount);
+            SetCashOnHand(userId, cash - amount);
+
+            // zwiêkszamy konto bankowe
+            using var c = OpenAndEnsureSchema();
+            using var cmd = c.CreateCommand();
+            cmd.CommandText = @"
+UPDATE BankAccounts
+   SET Balance = Balance + @a
+ WHERE Id=@id AND UserId=@u;";
+            cmd.Parameters.AddWithValue("@a", amount);
+            cmd.Parameters.AddWithValue("@id", accountId);
+            cmd.Parameters.AddWithValue("@u", userId);
+            var rows = cmd.ExecuteNonQuery();
+            if (rows == 0)
+                throw new InvalidOperationException("Nie znaleziono rachunku bankowego lub nie nale¿y do u¿ytkownika.");
+        }
+
+        /// <summary>
+        /// Przeniesienie œrodków z konta bankowego do od³o¿onej gotówki.
+        /// </summary>
+        public static void TransferBankToSaved(int userId, int accountId, decimal amount)
+        {
+            if (amount <= 0) throw new ArgumentException("Kwota musi byæ dodatnia.", nameof(amount));
+
+            using var c = OpenAndEnsureSchema();
+            using var tx = c.BeginTransaction();
+
+            decimal currentBal;
+            using (var chk = c.CreateCommand())
+            {
+                chk.Transaction = tx;
+                chk.CommandText = @"SELECT Balance FROM BankAccounts WHERE Id=@id AND UserId=@u LIMIT 1;";
+                chk.Parameters.AddWithValue("@id", accountId);
+                chk.Parameters.AddWithValue("@u", userId);
+                var obj = chk.ExecuteScalar();
+                if (obj == null || obj == DBNull.Value)
+                    throw new InvalidOperationException("Nie znaleziono rachunku lub nie nale¿y do u¿ytkownika.");
+                currentBal = Convert.ToDecimal(obj);
+            }
+
+            if (currentBal < amount)
+                throw new InvalidOperationException("Na rachunku brakuje œrodków na tak¹ wyp³atê.");
+
+            using (var up = c.CreateCommand())
+            {
+                up.Transaction = tx;
+                up.CommandText = @"UPDATE BankAccounts SET Balance = Balance - @a WHERE Id=@id AND UserId=@u;";
+                up.Parameters.AddWithValue("@a", amount);
+                up.Parameters.AddWithValue("@id", accountId);
+                up.Parameters.AddWithValue("@u", userId);
+                up.ExecuteNonQuery();
+            }
+
+            tx.Commit();
+
+            // Po wyp³acie zwiêkszamy fizyczn¹ gotówkê i od³o¿on¹
+            var cash = GetCashOnHand(userId);
+            SetCashOnHand(userId, cash + amount);
+            AddToSavedCash(userId, amount);
+        }
+
+        /// <summary>
+        /// Przeniesienie œrodków miêdzy kopertami.
+        /// </summary>
+        public static void TransferEnvelopeToEnvelope(int userId, int fromEnvelopeId, int toEnvelopeId, decimal amount)
+        {
+            if (amount <= 0 || fromEnvelopeId == toEnvelopeId) return;
+
+            SubtractFromEnvelopeAllocated(userId, fromEnvelopeId, amount);
+            AddToEnvelopeAllocated(userId, toEnvelopeId, amount);
+        }
+
+        /// <summary>
+        /// Od³o¿ona gotówka (poza kopertami) -> koperta.
+        /// SavedCash siê nie zmienia, zmienia siê tylko podzia³.
+        /// </summary>
+        public static void TransferSavedToEnvelope(int userId, int envelopeId, decimal amount)
+        {
+            if (amount <= 0) return;
+
+            var saved = GetSavedCash(userId);
+            var allocated = GetTotalAllocatedInEnvelopesForUser(userId);
+            var unassigned = saved - allocated;
+
+            if (unassigned < amount)
+                throw new InvalidOperationException("Za ma³o od³o¿onej gotówki poza kopertami.");
+
+            AddToEnvelopeAllocated(userId, envelopeId, amount);
+        }
+
+        /// <summary>
+        /// Koperta -> od³o¿ona gotówka (poza kopertami).
+        /// </summary>
+        public static void TransferEnvelopeToSaved(int userId, int envelopeId, decimal amount)
+        {
+            if (amount <= 0) return;
+
+            SubtractFromEnvelopeAllocated(userId, envelopeId, amount);
+            // SavedCash siê nie zmienia – dalej jest od³o¿ona, tylko bez przypisania do koperty
+        }
+
+        /// <summary>
+        /// Wolna gotówka -> koperta.
+        /// Zwiêksza SavedCash oraz przydzia³ w kopercie, fizyczna gotówka bez zmian.
+        /// </summary>
+        public static void TransferFreeToEnvelope(int userId, int envelopeId, decimal amount)
+        {
+            if (amount <= 0) return;
+
+            var allCash = GetCashOnHand(userId);
+            var saved = GetSavedCash(userId);
+            var free = Math.Max(0m, allCash - saved);
+
+            if (free < amount)
+                throw new InvalidOperationException("Za ma³o wolnej gotówki.");
+
+            SetSavedCash(userId, saved + amount);
+            AddToEnvelopeAllocated(userId, envelopeId, amount);
+        }
+
+        /// <summary>
+        /// Koperta -> wolna gotówka.
+        /// Zmniejsza SavedCash i przydzia³ w kopercie.
+        /// </summary>
+        public static void TransferEnvelopeToFree(int userId, int envelopeId, decimal amount)
+        {
+            if (amount <= 0) return;
+
+            var saved = GetSavedCash(userId);
+            if (saved < amount)
+                throw new InvalidOperationException("Za ma³o od³o¿onej gotówki.");
+
+            SubtractFromEnvelopeAllocated(userId, envelopeId, amount);
+            SetSavedCash(userId, saved - amount);
+        }
+
+        /// <summary>
+        /// Przelew miêdzy dwoma kontami bankowymi tego samego u¿ytkownika.
+        /// </summary>
+        public static void TransferBankToBank(int userId, int fromAccountId, int toAccountId, decimal amount)
+        {
+            if (amount <= 0) throw new ArgumentException("Kwota musi byæ dodatnia.", nameof(amount));
+            if (fromAccountId == toAccountId) return;
+
+            using var c = OpenAndEnsureSchema();
+            using var tx = c.BeginTransaction();
+
+            decimal fromBal;
+            using (var chk = c.CreateCommand())
+            {
+                chk.Transaction = tx;
+                chk.CommandText = @"SELECT Balance FROM BankAccounts WHERE Id=@id AND UserId=@u LIMIT 1;";
+                chk.Parameters.AddWithValue("@id", fromAccountId);
+                chk.Parameters.AddWithValue("@u", userId);
+                var obj = chk.ExecuteScalar();
+                if (obj == null || obj == DBNull.Value)
+                    throw new InvalidOperationException("Nie znaleziono rachunku Ÿród³owego lub nie nale¿y do u¿ytkownika.");
+                fromBal = Convert.ToDecimal(obj);
+            }
+
+            if (fromBal < amount)
+                throw new InvalidOperationException("Na rachunku Ÿród³owym brakuje œrodków na taki przelew.");
+
+            using (var updFrom = c.CreateCommand())
+            {
+                updFrom.Transaction = tx;
+                updFrom.CommandText = @"UPDATE BankAccounts SET Balance = Balance - @a WHERE Id=@id AND UserId=@u;";
+                updFrom.Parameters.AddWithValue("@a", amount);
+                updFrom.Parameters.AddWithValue("@id", fromAccountId);
+                updFrom.Parameters.AddWithValue("@u", userId);
+                updFrom.ExecuteNonQuery();
+            }
+
+            using (var updTo = c.CreateCommand())
+            {
+                updTo.Transaction = tx;
+                updTo.CommandText = @"UPDATE BankAccounts SET Balance = Balance + @a WHERE Id=@id AND UserId=@u;";
+                updTo.Parameters.AddWithValue("@a", amount);
+                updTo.Parameters.AddWithValue("@id", toAccountId);
+                updTo.Parameters.AddWithValue("@u", userId);
+                var rowsTo = updTo.ExecuteNonQuery();
+                if (rowsTo == 0)
+                    throw new InvalidOperationException("Nie znaleziono rachunku docelowego lub nie nale¿y do u¿ytkownika.");
+            }
+
+            tx.Commit();
+        }
+
 
         public static void DeleteUserCascade(int userId)
         {
@@ -226,6 +493,108 @@ namespace Finly.Services
             public double SharePercent { get; set; }
         }
 
+        public static int? GetEnvelopeIdByName(int userId, string name)
+        {
+            using var c = OpenAndEnsureSchema();
+            using var cmd = c.CreateCommand();
+            cmd.CommandText = @"
+SELECT Id
+FROM Envelopes
+WHERE UserId=@u AND Name=@n
+LIMIT 1;";
+            cmd.Parameters.AddWithValue("@u", userId);
+            cmd.Parameters.AddWithValue("@n", name.Trim());
+
+            var obj = cmd.ExecuteScalar();
+            if (obj == null || obj == DBNull.Value) return null;
+            return Convert.ToInt32(obj);
+        }
+
+        // ===== WYDATKI – operacje na Ÿród³ach pieniêdzy =====
+
+        public static void SpendFromFreeCash(int userId, decimal amount)
+        {
+            if (amount <= 0) return;
+
+            var allCash = GetCashOnHand(userId);
+            var saved = GetSavedCash(userId);
+            var free = Math.Max(0m, allCash - saved);
+
+            if (free < amount)
+                throw new InvalidOperationException("Za ma³o wolnej gotówki na taki wydatek.");
+
+            SetCashOnHand(userId, allCash - amount);
+        }
+
+        public static void SpendFromSavedCash(int userId, decimal amount)
+        {
+            if (amount <= 0) return;
+
+            // najpierw zdejmujemy z od³o¿onej puli
+            SubtractFromSavedCash(userId, amount);
+
+            // fizyczna gotówka te¿ zmniejsza siê o tê kwotê
+            var allCash = GetCashOnHand(userId);
+            if (allCash < amount)
+                throw new InvalidOperationException("Za ma³o gotówki na taki wydatek.");
+
+            SetCashOnHand(userId, allCash - amount);
+        }
+
+        public static void SpendFromEnvelope(int userId, int envelopeId, decimal amount)
+        {
+            if (amount <= 0) return;
+
+            // koperta ma swoj¹ pulê Allocated – pilnujemy, ¿eby jej nie przekroczyæ
+            SubtractFromEnvelopeAllocated(userId, envelopeId, amount);
+
+            // schodzi równie¿ z od³o¿onej gotówki
+            SubtractFromSavedCash(userId, amount);
+
+            // oraz z fizycznej gotówki
+            var allCash = GetCashOnHand(userId);
+            if (allCash < amount)
+                throw new InvalidOperationException("Za ma³o gotówki na taki wydatek.");
+
+            SetCashOnHand(userId, allCash - amount);
+        }
+
+        public static void SpendFromBankAccount(int userId, int accountId, decimal amount)
+        {
+            if (amount <= 0) return;
+
+            using var c = OpenAndEnsureSchema();
+            using var tx = c.BeginTransaction();
+
+            decimal currentBal;
+            using (var chk = c.CreateCommand())
+            {
+                chk.Transaction = tx;
+                chk.CommandText = @"SELECT Balance FROM BankAccounts WHERE Id=@id AND UserId=@u LIMIT 1;";
+                chk.Parameters.AddWithValue("@id", accountId);
+                chk.Parameters.AddWithValue("@u", userId);
+                var obj = chk.ExecuteScalar();
+                if (obj == null || obj == DBNull.Value)
+                    throw new InvalidOperationException("Nie znaleziono rachunku lub nie nale¿y do u¿ytkownika.");
+                currentBal = Convert.ToDecimal(obj);
+            }
+
+            if (currentBal < amount)
+                throw new InvalidOperationException("Na koncie bankowym brakuje œrodków na taki wydatek.");
+
+            using (var upd = c.CreateCommand())
+            {
+                upd.Transaction = tx;
+                upd.CommandText = @"UPDATE BankAccounts SET Balance = Balance - @a WHERE Id=@id AND UserId=@u;";
+                upd.Parameters.AddWithValue("@a", amount);
+                upd.Parameters.AddWithValue("@id", accountId);
+                upd.Parameters.AddWithValue("@u", userId);
+                upd.ExecuteNonQuery();
+            }
+
+            tx.Commit();
+        }
+
         public sealed class CategoryTransactionDto
         {
             public DateTime Date { get; set; }
@@ -320,7 +689,6 @@ WHERE UserId=@u AND lower(Name)=lower(@n)";
             using var c = OpenAndEnsureSchema();
             using var cmd = c.CreateCommand();
 
-            // Prosty insert – zgodny z dotychczasowym schematem.
             cmd.CommandText = @"INSERT INTO Categories(UserId, Name) VALUES(@u,@n);
                                 SELECT last_insert_rowid();";
             cmd.Parameters.AddWithValue("@u", userId);
@@ -1032,6 +1400,7 @@ WHERE Id=@id AND UserId=@u;";
 
         // =========================================================
         // ======================== GOTÓWKA ========================
+        // =========================================================
 
         public static decimal GetCashOnHand(int userId)
         {
@@ -1083,8 +1452,6 @@ SET Amount = excluded.Amount,
             cmd.Parameters.AddWithValue("@a", amount);
             cmd.ExecuteNonQuery();
         }
-
-
 
         // ===== OPERACJE NA GOTÓWCE OD£O¯ONEJ I KOPERTACH =====
 
@@ -1156,9 +1523,9 @@ UPDATE Envelopes
             }
         }
 
-
         // =========================================================
         // ======================= PODSUMOWANIA ====================
+        // =========================================================
 
         public static decimal GetTotalAllocatedInEnvelopesForUser(int userId)
         {
@@ -1339,6 +1706,7 @@ UPDATE BankAccounts
 
         // =========================================================
         // ====================== ZESTAWIENIA ======================
+        // =========================================================
 
         private static bool TableExists(SqliteConnection con, string name)
         {
@@ -1613,6 +1981,7 @@ HAVING SUM(ABS(e.Amount)) > 0
 
         // =========================================================
         // ======================== PRZYCHODY ======================
+        // =========================================================
 
         public sealed class Income
         {
@@ -1671,7 +2040,7 @@ WHERE Id=@id;";
         {
             using var c = OpenAndEnsureSchema();
             using var cmd = c.CreateCommand();
-            var sb = new System.Text.StringBuilder(@"
+            var sb = new StringBuilder(@"
 SELECT Id, UserId, Amount, Date, Description, Source
 FROM Incomes
 WHERE UserId=@u");
@@ -1727,6 +2096,84 @@ VALUES (@u, @a, @d, @desc, @s);";
             string? note)
         {
             InsertIncome(userId, amount, date, source, note);
+        }
+
+        // ===== PRZYCHODY – operacje na Ÿród³ach =====
+
+        /// <summary>
+        /// Przychód do wolnej gotówki.
+        /// Zwiêksza Incomes + CashOnHand. SavedCash zostaje bez zmian,
+        /// wiêc na dashboardzie roœnie tylko "Wolna gotówka".
+        /// </summary>
+        public static void AddIncomeToFreeCash(
+            int userId,
+            decimal amount,
+            DateTime date,
+            int? categoryId,
+            string source,
+            string? note)
+        {
+            if (amount <= 0) return;
+
+            InsertIncome(userId, amount, date, categoryId, source, note);
+
+            var allCash = GetCashOnHand(userId);
+            SetCashOnHand(userId, allCash + amount);
+        }
+
+        /// <summary>
+        /// Przychód do od³o¿onej gotówki.
+        /// Zwiêksza Incomes + CashOnHand + SavedCash o tê sam¹ kwotê.
+        /// Dziêki temu "Wolna gotówka" siê nie zmienia, a roœnie tylko "Od³o¿ona gotówka".
+        /// </summary>
+        public static void AddIncomeToSavedCash(
+            int userId,
+            decimal amount,
+            DateTime date,
+            int? categoryId,
+            string source,
+            string? note)
+        {
+            if (amount <= 0) return;
+
+            InsertIncome(userId, amount, date, categoryId, source, note);
+
+            var allCash = GetCashOnHand(userId);
+            SetCashOnHand(userId, allCash + amount);
+
+            AddToSavedCash(userId, amount);
+        }
+
+        /// <summary>
+        /// Przychód bezpoœrednio na konto bankowe.
+        /// Zwiêksza Incomes oraz saldo wskazanego rachunku.
+        /// </summary>
+        public static void AddIncomeToBankAccount(
+            int userId,
+            int accountId,
+            decimal amount,
+            DateTime date,
+            int? categoryId,
+            string source,
+            string? note)
+        {
+            if (amount <= 0) return;
+
+            InsertIncome(userId, amount, date, categoryId, source, note);
+
+            using var c = OpenAndEnsureSchema();
+            using var cmd = c.CreateCommand();
+            cmd.CommandText = @"
+UPDATE BankAccounts
+   SET Balance = Balance + @a
+ WHERE Id=@id AND UserId=@u;";
+            cmd.Parameters.AddWithValue("@a", amount);
+            cmd.Parameters.AddWithValue("@id", accountId);
+            cmd.Parameters.AddWithValue("@u", userId);
+
+            var rows = cmd.ExecuteNonQuery();
+            if (rows == 0)
+                throw new InvalidOperationException("Nie znaleziono rachunku bankowego lub nie nale¿y do u¿ytkownika.");
         }
     }
 }

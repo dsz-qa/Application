@@ -130,7 +130,7 @@
 
                     <DataTemplate x:Key="TransferHeaderTemplate">
                         <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                            <Image Source="/Assets/Icons/transakcje.png"
+                            <Image Source="/Assets/Icons/transfer.png"
                                    Width="22" Height="22"
                                    Margin="0,0,6,0"/>
                             <TextBlock Text="{Binding}" VerticalAlignment="Center"/>
@@ -162,7 +162,7 @@
                 </Grid.ColumnDefinitions>
 
                 <Grid.RowDefinitions>
-                    <!-- kolejność: Kwota, Kategoria, Nowa kategoria, Data, Skąd płacisz, Koperta, Opis, Przyciski -->
+                    <!-- kolejność: Kwota, Kategoria, Nowa kategoria, Data, Skąd płacisz, Koperta/Konto, Opis, Przyciski -->
                     <RowDefinition Height="Auto"/>
                     <!-- 0 Kwota -->
                     <RowDefinition Height="10"/>
@@ -179,7 +179,7 @@
                     <!-- 8 Skąd płacisz -->
                     <RowDefinition Height="10"/>
                     <RowDefinition Height="Auto"/>
-                    <!-- 10 Koperta (grid) -->
+                    <!-- 10 Koperta/Konto (gridy) -->
                     <RowDefinition Height="10"/>
                     <RowDefinition Height="Auto"/>
                     <!-- 12 Opis -->
@@ -242,25 +242,47 @@
                     <ComboBoxItem Content="Wolna gotówka"   Tag="cash_free"/>
                     <ComboBoxItem Content="Odłożona gotówka" Tag="cash_saved"/>
                     <ComboBoxItem Content="Koperta"          Tag="envelope"/>
+                    <ComboBoxItem Content="Konto bankowe"    Tag="bank"/>
                 </ComboBox>
 
-                <!-- Wybór koperty (tylko przy opcji Koperta) -->
-                <Grid x:Name="ExpenseEnvelopeRow"
-                      Grid.Row="10"
-                      Grid.ColumnSpan="2"
-                      Visibility="Collapsed">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="220"/>
-                        <ColumnDefinition Width="*"/>
-                    </Grid.ColumnDefinitions>
-                    <TextBlock Grid.Column="0"
-                               Text="Koperta:"
-                               VerticalAlignment="Center"
-                               Margin="0,0,8,0"/>
-                    <ComboBox x:Name="ExpenseEnvelopeCombo"
-                              Grid.Column="1"
-                              Height="28"/>
-                </Grid>
+                <!-- Koperta / Konto bankowe -->
+                <StackPanel Grid.Row="10"
+                            Grid.ColumnSpan="2"
+                            Orientation="Vertical">
+
+                    <!-- Wybór koperty (tylko przy opcji Koperta) -->
+                    <Grid x:Name="ExpenseEnvelopeRow"
+                          Visibility="Collapsed"
+                          Margin="0,0,0,4">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="220"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Grid.Column="0"
+                                   Text="Koperta:"
+                                   VerticalAlignment="Center"
+                                   Margin="0,0,8,0"/>
+                        <ComboBox x:Name="ExpenseEnvelopeCombo"
+                                  Grid.Column="1"
+                                  Height="28"/>
+                    </Grid>
+
+                    <!-- Wybór konta bankowego (tylko przy opcji Konto bankowe) -->
+                    <Grid x:Name="ExpenseBankRow"
+                          Visibility="Collapsed">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="220"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Grid.Column="0"
+                                   Text="Konto bankowe:"
+                                   VerticalAlignment="Center"
+                                   Margin="0,0,8,0"/>
+                        <ComboBox x:Name="ExpenseBankAccountCombo"
+                                  Grid.Column="1"
+                                  Height="28"/>
+                    </Grid>
+                </StackPanel>
 
                 <!-- Opis -->
                 <TextBlock Grid.Row="12" Grid.Column="0"

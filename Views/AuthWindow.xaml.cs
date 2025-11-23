@@ -177,6 +177,9 @@ namespace Finly.Views
             UserService.CurrentUserName = VM.Username;
             UserService.CurrentUserEmail = UserService.GetEmail(userId);
 
+            // >>> zapamiętaj użytkownika dla auto-logowania
+            SettingsService.LastUserId = userId;
+
             bool onboarded = DatabaseService.IsUserOnboarded(userId);
 
             Window next = onboarded
@@ -301,11 +304,3 @@ namespace Finly.Views
         }
     }
 }
-
-
-
-
-
-
-
-

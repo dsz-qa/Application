@@ -1,5 +1,4 @@
 ﻿using Finly.Services;
-using Finly.Views;
 using System;
 using System.Data;
 using System.Globalization;
@@ -37,21 +36,7 @@ namespace Finly.Pages
             if (_userId <= 0)
                 return;
 
-            // 1) ekran powitalny tylko raz na użytkownika
-            if (!UserService.HasSeenEnvelopesIntro(_userId))
-            {
-                var dlg = new EnvelopesIntroWindow
-                {
-                    Owner = Application.Current.MainWindow
-                };
-
-                if (dlg.ShowDialog() == true)
-                {
-                    UserService.MarkEnvelopesIntroSeen(_userId);
-                }
-            }
-
-            // 2) normalne załadowanie danych
+            // bez okna powitalnego – od razu ładujemy dane
             LoadAll();
             SetAddMode();
         }
@@ -63,8 +48,8 @@ namespace Finly.Pages
             try
             {
                 // 1) Wolna gotówka + odłożona gotówka
-                var freeCash = DatabaseService.GetCashOnHand(_userId);  // możesz wydawać
-                var savedTotal = DatabaseService.GetSavedCash(_userId);   // cała odłożona pula
+                var freeCash = DatabaseService.GetCashOnHand(_userId);  // fizyczna gotówka
+                var savedTotal = DatabaseService.GetSavedCash(_userId); // cała odłożona pula
 
                 // w textboxie edytujesz CAŁĄ odłożoną gotówkę
                 CashBox.Text = savedTotal.ToString("N2");
@@ -105,7 +90,6 @@ namespace Finly.Pages
                 FormMessage.Text = "Błąd odczytu: " + ex.Message;
             }
         }
-
 
         // ================= HELPERS ==================
 
@@ -267,6 +251,3 @@ namespace Finly.Pages
         private void CancelEdit_Click(object sender, RoutedEventArgs e) => SetAddMode();
     }
 }
-
-
-

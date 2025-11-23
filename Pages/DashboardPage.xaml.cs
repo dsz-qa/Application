@@ -71,15 +71,15 @@ namespace Finly.Pages
             SetKpiText("TotalWealthText", snap.Total);
             SetKpiText("BanksText", snap.Banks);
 
-            var freeCash = DatabaseService.GetCashOnHand(_uid);
-            SetKpiText("FreeCashDashboardText", freeCash);
+            // TU BYŁ BŁĄD – użyj wolnej gotówki z MoneySnapshot
+            SetKpiText("FreeCashDashboardText", snap.Cash);
 
             SetKpiText("SavedToAllocateText", snap.SavedUnallocated);
             SetKpiText("EnvelopesDashboardText", snap.Envelopes);
 
-            // Na razie 0
             SetKpiText("InvestmentsText", 0m);
         }
+
 
         // =====================================================================
         // Zakres dat

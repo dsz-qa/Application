@@ -2,6 +2,7 @@
 using Finly.Services;
 using System;
 using System.Collections.Generic;
+using System.Data;
 using System.Globalization;
 using System.Linq;
 using System.Windows;
@@ -13,14 +14,21 @@ namespace Finly.Pages
     {
         private readonly int _uid;
 
-        // Specjalna pozycja „Gotówka (portfel)” dla transferów
-        private const string CashKey = "__CASH__";
+        private enum TransferItemKind
+        {
+            FreeCash,      // wolna gotówka
+            SavedCash,     // odłożona gotówka
+            BankAccount,   // konto bankowe
+            Envelope       // koperta
+        }
 
-        private sealed class AccountItem
+        private sealed class TransferItem
         {
             public string Key { get; set; } = "";
             public string Name { get; set; } = "";
-            public int? AccountId { get; set; } // null = gotówka
+            public TransferItemKind Kind { get; set; }
+            public int? BankAccountId { get; set; }
+            public int? EnvelopeId { get; set; }
 
             public override string ToString() => Name;
         }
@@ -42,7 +50,7 @@ namespace Finly.Pages
                 ShowPanels(null);
 
                 LoadCategories();
-                LoadTransferAccounts();
+                LoadTransferItems();
                 LoadEnvelopes();
                 LoadIncomeAccounts();
 
@@ -119,43 +127,95 @@ namespace Finly.Pages
             try
             {
                 var accs = DatabaseService.GetAccounts(_uid) ?? new List<BankAccountModel>();
+
+                // Przychody – dla przelewów
                 IncomeAccountCombo.ItemsSource = accs;
                 IncomeAccountCombo.DisplayMemberPath = "AccountName";
                 IncomeAccountCombo.SelectedValuePath = "Id";
+
+                // Wydatki – gdy źródło to „Konto bankowe”
+                ExpenseBankAccountCombo.ItemsSource = accs.ToList();
+                ExpenseBankAccountCombo.DisplayMemberPath = "AccountName";
+                ExpenseBankAccountCombo.SelectedValuePath = "Id";
             }
             catch
             {
                 IncomeAccountCombo.ItemsSource = null;
+                ExpenseBankAccountCombo.ItemsSource = null;
             }
         }
 
-        private void LoadTransferAccounts()
+        /// <summary>
+        /// Buduje listę wszystkich miejsc, między którymi można robić transfer:
+        /// - wolna gotówka
+        /// - odłożona gotówka
+        /// - każde konto bankowe
+        /// - każda koperta
+        /// </summary>
+        private void LoadTransferItems()
         {
-            var items = new List<AccountItem>
+            var items = new List<TransferItem>
             {
-                new AccountItem
+                new TransferItem
                 {
-                    Key = CashKey,
-                    Name = "Gotówka (portfel)",
-                    AccountId = null
+                    Key  = "free",
+                    Name = "Wolna gotówka",
+                    Kind = TransferItemKind.FreeCash
+                },
+                new TransferItem
+                {
+                    Key  = "saved",
+                    Name = "Odłożona gotówka",
+                    Kind = TransferItemKind.SavedCash
                 }
             };
 
+            // Konta bankowe
             try
             {
                 var accs = DatabaseService.GetAccounts(_uid) ?? new List<BankAccountModel>();
 
                 items.AddRange(
-                    accs.Select(a => new AccountItem
+                    accs.Select(a => new TransferItem
                     {
-                        Key = $"acc:{a.Id}",
-                        AccountId = a.Id,
-                        Name = $"{a.AccountName} — {a.Balance.ToString("N2", CultureInfo.CurrentCulture)} zł"
+                        Key = $"bank:{a.Id}",
+                        Kind = TransferItemKind.BankAccount,
+                        BankAccountId = a.Id,
+                        Name = $"Konto bankowe: {a.AccountName} — {a.Balance.ToString("N2", CultureInfo.CurrentCulture)} zł"
                     }));
             }
             catch
             {
-                // zostawiamy tylko gotówkę
+                // pomijamy konta jeśli coś pójdzie nie tak
+            }
+
+            // Koperty
+            try
+            {
+                var dt = DatabaseService.GetEnvelopesTable(_uid);
+                if (dt != null)
+                {
+                    foreach (DataRow r in dt.Rows)
+                    {
+                        var id = Convert.ToInt32(r["Id"]);
+                        var name = r["Name"]?.ToString() ?? "(bez nazwy)";
+                        decimal allocated = 0m;
+                        if (r["Allocated"] != DBNull.Value)
+                            allocated = Convert.ToDecimal(r["Allocated"]);
+
+                        items.Add(new TransferItem
+                        {
+                            Key = $"env:{id}",
+                            Kind = TransferItemKind.Envelope,
+                            EnvelopeId = id,
+                            Name = $"Koperta: {name} — {allocated.ToString("N2", CultureInfo.CurrentCulture)} zł"
+                        });
+                    }
+                }
+            }
+            catch
+            {
+                // brak kopert – trudno
             }
 
             TransferFromBox.ItemsSource = items.ToList();
@@ -192,6 +252,8 @@ namespace Finly.Pages
 
             ExpenseSourceCombo.SelectedIndex = -1;
             ExpenseEnvelopeRow.Visibility = Visibility.Collapsed;
+            ExpenseBankRow.Visibility = Visibility.Collapsed;
+            ExpenseBankAccountCombo.SelectedIndex = -1;
 
             IncomeFormTypeCombo.SelectedIndex = -1;
             IncomeAccountRow.Visibility = Visibility.Collapsed;
@@ -203,7 +265,7 @@ namespace Finly.Pages
 
             ExpenseEnvelopeCombo.SelectedIndex = -1;
 
-            LoadTransferAccounts();
+            LoadTransferItems();
             LoadCategories();
             LoadEnvelopes();
             LoadIncomeAccounts();
@@ -213,14 +275,21 @@ namespace Finly.Pages
 
         private void ExpenseSourceCombo_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
-            if (ExpenseSourceCombo.SelectedItem is ComboBoxItem item &&
-                string.Equals(item.Tag as string, "envelope", StringComparison.OrdinalIgnoreCase))
+            ExpenseEnvelopeRow.Visibility = Visibility.Collapsed;
+            ExpenseBankRow.Visibility = Visibility.Collapsed;
+
+            if (ExpenseSourceCombo.SelectedItem is ComboBoxItem item)
             {
-                ExpenseEnvelopeRow.Visibility = Visibility.Visible;
-            }
-            else
-            {
-                ExpenseEnvelopeRow.Visibility = Visibility.Collapsed;
+                var tag = item.Tag as string;
+
+                if (string.Equals(tag, "envelope", StringComparison.OrdinalIgnoreCase))
+                {
+                    ExpenseEnvelopeRow.Visibility = Visibility.Visible;
+                }
+                else if (string.Equals(tag, "bank", StringComparison.OrdinalIgnoreCase))
+                {
+                    ExpenseBankRow.Visibility = Visibility.Visible;
+                }
             }
         }
 
@@ -246,10 +315,6 @@ namespace Finly.Pages
             TransferAmountErrorText.Visibility = Visibility.Collapsed;
         }
 
-        /// <summary>
-        /// Wybiera nazwę kategorii z listy + pola "Nowa kategoria".
-        /// Jeśli nowa kategoria nie jest pusta – ma priorytet.
-        /// </summary>
         private string? ResolveCategoryName(ComboBox combo, TextBox newCatBox)
         {
             if (!string.IsNullOrWhiteSpace(newCatBox.Text))
@@ -287,12 +352,18 @@ namespace Finly.Pages
                 return;
             }
 
+            if (ExpenseSourceCombo.SelectedItem is not ComboBoxItem sourceItem)
+            {
+                ToastService.Info("Wybierz skąd płacisz.");
+                return;
+            }
+
+            var sourceTag = sourceItem.Tag as string ?? "";
             var date = ExpenseDatePicker.SelectedDate ?? DateTime.Today;
             var desc = string.IsNullOrWhiteSpace(ExpenseDescBox.Text)
                 ? null
                 : ExpenseDescBox.Text.Trim();
 
-            // kategoria
             var catName = ResolveCategoryName(ExpenseCategoryBox, ExpenseNewCategoryBox);
             int categoryId = GetCategoryIdOrZero(catName);
 
@@ -307,11 +378,57 @@ namespace Finly.Pages
 
             try
             {
+                // 1) Odejmujemy z właściwego źródła
+                switch (sourceTag)
+                {
+                    case "cash_free":
+                        DatabaseService.SpendFromFreeCash(_uid, amount);
+                        break;
+
+                    case "cash_saved":
+                        DatabaseService.SpendFromSavedCash(_uid, amount);
+                        break;
+
+                    case "envelope":
+                        if (ExpenseEnvelopeCombo.SelectedItem is not string envName ||
+                            string.IsNullOrWhiteSpace(envName))
+                        {
+                            ToastService.Info("Wybierz kopertę, z której chcesz zapłacić.");
+                            return;
+                        }
+
+                        var envId = DatabaseService.GetEnvelopeIdByName(_uid, envName);
+                        if (envId == null)
+                        {
+                            ToastService.Error("Nie udało się odnaleźć wybranej koperty.");
+                            return;
+                        }
+
+                        DatabaseService.SpendFromEnvelope(_uid, envId.Value, amount);
+                        break;
+
+                    case "bank":
+                        if (ExpenseBankAccountCombo.SelectedItem is not BankAccountModel acc)
+                        {
+                            ToastService.Info("Wybierz konto bankowe, z którego ma zejść wydatek.");
+                            return;
+                        }
+
+                        DatabaseService.SpendFromBankAccount(_uid, acc.Id, amount);
+                        break;
+
+                    default:
+                        ToastService.Info("Wybierz poprawne źródło płatności.");
+                        return;
+                }
+
+                // 2) Zapisujemy wydatek
                 DatabaseService.InsertExpense(eModel);
                 ToastService.Success("Dodano wydatek.");
 
-                // odśwież kategorie (nowa może się pojawić na liście)
                 LoadCategories();
+                LoadEnvelopes();
+                LoadIncomeAccounts();
                 Cancel_Click(sender, e);
             }
             catch (Exception ex)
@@ -332,6 +449,13 @@ namespace Finly.Pages
                 return;
             }
 
+            if (IncomeFormTypeCombo.SelectedItem is not ComboBoxItem formItem)
+            {
+                ToastService.Info("Wybierz formę przychodu.");
+                return;
+            }
+
+            var formTag = formItem.Tag as string ?? "";
             var date = IncomeDatePicker.SelectedDate ?? DateTime.Today;
             var source = string.IsNullOrWhiteSpace(IncomeSourceBox.Text)
                 ? "Przychód"
@@ -340,17 +464,40 @@ namespace Finly.Pages
                 ? null
                 : IncomeDescBox.Text.Trim();
 
-            // kategoria – na razie tylko na potrzeby przyszłej rozbudowy
             var catName = ResolveCategoryName(IncomeCategoryBox, IncomeNewCategoryBox);
-            _ = GetCategoryIdOrZero(catName); // żeby nie było niewykorzystanej zmiennej
+            int? categoryId = GetCategoryIdOrZero(catName);
+            if (categoryId == 0) categoryId = null;
 
             try
             {
-                // aktualny DatabaseService.InsertIncome nie przyjmuje kategorii – zapisujemy tak jak do tej pory
-                DatabaseService.InsertIncome(_uid, amount, date, source, desc);
+                switch (formTag)
+                {
+                    case "cash_free":
+                        DatabaseService.AddIncomeToFreeCash(_uid, amount, date, categoryId, source, desc);
+                        break;
+
+                    case "cash_saved":
+                        DatabaseService.AddIncomeToSavedCash(_uid, amount, date, categoryId, source, desc);
+                        break;
+
+                    case "transfer":
+                        if (IncomeAccountCombo.SelectedItem is not BankAccountModel acc)
+                        {
+                            ToastService.Info("Wybierz konto bankowe, na które wpływa przelew.");
+                            return;
+                        }
+                        DatabaseService.AddIncomeToBankAccount(_uid, acc.Id, amount, date, categoryId, source, desc);
+                        break;
+
+                    default:
+                        ToastService.Info("Wybierz poprawną formę przychodu.");
+                        return;
+                }
+
                 ToastService.Success("Dodano przychód.");
 
                 LoadCategories();
+                LoadIncomeAccounts();
                 Cancel_Click(sender, e);
             }
             catch (Exception ex)
@@ -371,8 +518,8 @@ namespace Finly.Pages
                 return;
             }
 
-            var from = TransferFromBox.SelectedItem as AccountItem;
-            var to = TransferToBox.SelectedItem as AccountItem;
+            var from = TransferFromBox.SelectedItem as TransferItem;
+            var to = TransferToBox.SelectedItem as TransferItem;
 
             if (from == null || to == null || from.Key == to.Key)
             {
@@ -380,33 +527,144 @@ namespace Finly.Pages
                 return;
             }
 
-            // kategoria – na razie tylko wizualnie, bez zapisu
             var catName = ResolveCategoryName(TransferCategoryBox, TransferNewCategoryBox);
-            _ = GetCategoryIdOrZero(catName);
+            _ = GetCategoryIdOrZero(catName); // na razie kategoria tylko informacyjnie
 
             try
             {
-                if (from.AccountId is int accFrom && to.AccountId is null)
+                bool handled = false;
+
+                // BANK <-> BANK
+                if (!handled &&
+                    from.Kind == TransferItemKind.BankAccount &&
+                    to.Kind == TransferItemKind.BankAccount &&
+                    from.BankAccountId is int accFrom &&
+                    to.BankAccountId is int accTo)
                 {
-                    // bank -> gotówka
-                    DatabaseService.TransferBankToCash(_uid, accFrom, amount);
+                    DatabaseService.TransferBankToBank(_uid, accFrom, accTo, amount);
+                    handled = true;
                 }
-                else if (from.AccountId is null && to.AccountId is int accTo)
+
+                // BANK -> WOLNA GOTÓWKA
+                if (!handled &&
+                    from.Kind == TransferItemKind.BankAccount &&
+                    to.Kind == TransferItemKind.FreeCash &&
+                    from.BankAccountId is int accFromBankToFree)
                 {
-                    // gotówka -> bank
-                    DatabaseService.TransferCashToBank(_uid, accTo, amount);
+                    DatabaseService.TransferBankToCash(_uid, accFromBankToFree, amount);
+                    handled = true;
                 }
-                else
+
+                // WOLNA GOTÓWKA -> BANK
+                if (!handled &&
+                    from.Kind == TransferItemKind.FreeCash &&
+                    to.Kind == TransferItemKind.BankAccount &&
+                    to.BankAccountId is int accToFreeToBank)
                 {
-                    ToastService.Info("Na razie obsługiwane są transfery tylko między kontem bankowym a gotówką.");
+                    DatabaseService.TransferCashToBank(_uid, accToFreeToBank, amount);
+                    handled = true;
+                }
+
+                // WOLNA GOTÓWKA -> ODŁOŻONA
+                if (!handled &&
+                    from.Kind == TransferItemKind.FreeCash &&
+                    to.Kind == TransferItemKind.SavedCash)
+                {
+                    DatabaseService.TransferFreeToSaved(_uid, amount);
+                    handled = true;
+                }
+
+                // ODŁOŻONA -> WOLNA
+                if (!handled &&
+                    from.Kind == TransferItemKind.SavedCash &&
+                    to.Kind == TransferItemKind.FreeCash)
+                {
+                    DatabaseService.TransferSavedToFree(_uid, amount);
+                    handled = true;
+                }
+
+                // ODŁOŻONA -> BANK
+                if (!handled &&
+                    from.Kind == TransferItemKind.SavedCash &&
+                    to.Kind == TransferItemKind.BankAccount &&
+                    to.BankAccountId is int accToSavedToBank)
+                {
+                    DatabaseService.TransferSavedToBank(_uid, accToSavedToBank, amount);
+                    handled = true;
+                }
+
+                // BANK -> ODŁOŻONA
+                if (!handled &&
+                    from.Kind == TransferItemKind.BankAccount &&
+                    to.Kind == TransferItemKind.SavedCash &&
+                    from.BankAccountId is int accFromBankToSaved)
+                {
+                    DatabaseService.TransferBankToSaved(_uid, accFromBankToSaved, amount);
+                    handled = true;
+                }
+
+                // KOPERTA -> KOPERTA
+                if (!handled &&
+                    from.Kind == TransferItemKind.Envelope &&
+                    to.Kind == TransferItemKind.Envelope &&
+                    from.EnvelopeId is int envFrom &&
+                    to.EnvelopeId is int envTo)
+                {
+                    DatabaseService.TransferEnvelopeToEnvelope(_uid, envFrom, envTo, amount);
+                    handled = true;
+                }
+
+                // ODŁOŻONA -> KOPERTA
+                if (!handled &&
+                    from.Kind == TransferItemKind.SavedCash &&
+                    to.Kind == TransferItemKind.Envelope &&
+                    to.EnvelopeId is int envToFromSaved)
+                {
+                    DatabaseService.TransferSavedToEnvelope(_uid, envToFromSaved, amount);
+                    handled = true;
+                }
+
+                // KOPERTA -> ODŁOŻONA
+                if (!handled &&
+                    from.Kind == TransferItemKind.Envelope &&
+                    to.Kind == TransferItemKind.SavedCash &&
+                    from.EnvelopeId is int envFromToSaved)
+                {
+                    DatabaseService.TransferEnvelopeToSaved(_uid, envFromToSaved, amount);
+                    handled = true;
+                }
+
+                // WOLNA GOTÓWKA -> KOPERTA
+                if (!handled &&
+                    from.Kind == TransferItemKind.FreeCash &&
+                    to.Kind == TransferItemKind.Envelope &&
+                    to.EnvelopeId is int envToFromFree)
+                {
+                    DatabaseService.TransferFreeToEnvelope(_uid, envToFromFree, amount);
+                    handled = true;
+                }
+
+                // KOPERTA -> WOLNA GOTÓWKA
+                if (!handled &&
+                    from.Kind == TransferItemKind.Envelope &&
+                    to.Kind == TransferItemKind.FreeCash &&
+                    from.EnvelopeId is int envFromToFree)
+                {
+                    DatabaseService.TransferEnvelopeToFree(_uid, envFromToFree, amount);
+                    handled = true;
+                }
+
+                if (!handled)
+                {
+                    ToastService.Info("Ten rodzaj transferu nie jest jeszcze obsługiwany.");
                     return;
                 }
 
                 ToastService.Success("Zapisano transfer.");
 
                 Cancel_Click(sender, e);
-                LoadTransferAccounts();   // odśwież salda
-                LoadCategories();         // odśwież kategorie
+                LoadTransferItems();
+                LoadCategories();
             }
             catch (Exception ex)
             {
