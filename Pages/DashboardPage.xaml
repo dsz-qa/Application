@@ -32,6 +32,14 @@
             <Setter Property="Foreground"      Value="{DynamicResource App.Foreground}"/>
         </Style>
 
+        <Style x:Key="KpiCard" TargetType="Border">
+            <Setter Property="Background"      Value="{DynamicResource Surface.Background}"/>
+            <Setter Property="BorderBrush"     Value="{DynamicResource Brand.Blue}"/>
+            <Setter Property="BorderThickness" Value="2"/>
+            <Setter Property="CornerRadius"    Value="10"/>
+            <Setter Property="Padding"         Value="12"/>
+            <Setter Property="Margin"          Value="0,0,16,0"/>
+        </Style>
         <!-- Tekst DatePickera na dashboardzie -->
         <Style TargetType="{x:Type DatePickerTextBox}">
             <Setter Property="Foreground"      Value="{DynamicResource App.Foreground}"/>
@@ -60,7 +68,7 @@
             </Grid.ColumnDefinitions>
 
             <!-- Cały majątek -->
-            <Border Grid.Column="0" Style="{StaticResource Card}">
+            <Border Grid.Column="0" Style="{StaticResource KpiCard}">
                 <StackPanel>
                     <TextBlock Text="Cały majątek" FontSize="13" Opacity="0.8"/>
                     <TextBlock x:Name="TotalWealthText"
@@ -70,7 +78,7 @@
             </Border>
 
             <!-- Konta bankowe -->
-            <Border Grid.Column="1" Style="{StaticResource Card}">
+            <Border Grid.Column="1" Style="{StaticResource KpiCard}">
                 <StackPanel>
                     <TextBlock Text="Konta bankowe" FontSize="13" Opacity="0.8"/>
                     <TextBlock x:Name="BanksText"
@@ -80,7 +88,7 @@
             </Border>
 
             <!-- Wolna gotówka -->
-            <Border Grid.Column="2" Style="{StaticResource Card}">
+            <Border Grid.Column="2" Style="{StaticResource KpiCard}">
                 <StackPanel>
                     <TextBlock Text="Wolna gotówka" FontSize="13" Opacity="0.8"/>
                     <TextBlock x:Name="FreeCashDashboardText"
@@ -90,7 +98,7 @@
             </Border>
 
             <!-- Odłożona gotówka -->
-            <Border Grid.Column="3" Style="{StaticResource Card}">
+            <Border Grid.Column="3" Style="{StaticResource KpiCard}">
                 <StackPanel>
                     <TextBlock Text="Odłożona gotówka (do rozdysponowania)"
                                FontSize="13" Opacity="0.8" TextWrapping="Wrap"/>
@@ -101,7 +109,7 @@
             </Border>
 
             <!-- Gotówka w kopertach -->
-            <Border Grid.Column="4" Style="{StaticResource Card}">
+            <Border Grid.Column="4" Style="{StaticResource KpiCard}">
                 <StackPanel>
                     <TextBlock Text="Gotówka w kopertach" FontSize="13" Opacity="0.8"/>
                     <TextBlock x:Name="EnvelopesDashboardText"
@@ -111,7 +119,7 @@
             </Border>
 
             <!-- Inwestycje -->
-            <Border Grid.Column="5" Style="{StaticResource Card}">
+            <Border Grid.Column="5" Style="{StaticResource KpiCard}">
                 <StackPanel>
                     <TextBlock Text="Inwestycje" FontSize="13" Opacity="0.8"/>
                     <TextBlock x:Name="InvestmentsText"

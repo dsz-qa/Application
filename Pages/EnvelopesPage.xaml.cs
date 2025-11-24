@@ -20,8 +20,11 @@ namespace Finly.Pages
         private DataTable? _dt;
         private int? _editingId = null;
 
+        // kolekcja kart (koperty + kafelek Dodaj)
         private readonly ObservableCollection<object> _cards = new();
-        private decimal _savedTotal = 0m;   // aktualna "Odłożona gotówka" z bazy
+
+        // aktualna "Odłożona gotówka" w bazie
+        private decimal _savedTotal = 0m;
 
         public EnvelopesPage()
         {
@@ -53,10 +56,8 @@ namespace Finly.Pages
         {
             try
             {
-                // 1) Odłożona gotówka
                 _savedTotal = DatabaseService.GetSavedCash(_userId);
 
-                // 2) Koperty
                 _dt = DatabaseService.GetEnvelopesTable(_userId);
 
                 if (_dt != null)
@@ -67,18 +68,47 @@ namespace Finly.Pages
                     if (!_dt.Columns.Contains("GoalText"))
                         _dt.Columns.Add("GoalText", typeof(string));
 
+                    if (!_dt.Columns.Contains("Deadline"))
+                        _dt.Columns.Add("Deadline", typeof(string));
+
+                    if (!_dt.Columns.Contains("MonthlyRequired"))
+                        _dt.Columns.Add("MonthlyRequired", typeof(decimal));
+
                     foreach (DataRow r in _dt.Rows)
                     {
                         var target = SafeDec(r["Target"]);
                         var alloc = SafeDec(r["Allocated"]);
                         r["Remaining"] = target - alloc;
 
-                        SplitNote(r["Note"]?.ToString(), out var goal, out _);
+                        SplitNote(r["Note"]?.ToString(), out var goal, out var description, out var deadline);
                         r["GoalText"] = goal;
+
+                        if (deadline.HasValue)
+                        {
+                            r["Deadline"] = deadline.Value.ToString("d", CultureInfo.CurrentCulture);
+
+                            var remaining = target - alloc;
+                            if (remaining <= 0m)
+                            {
+                                r["MonthlyRequired"] = 0m;
+                            }
+                            else
+                            {
+                                int monthsLeft = MonthsBetween(DateTime.Today, deadline.Value);
+                                if (monthsLeft <= 0)
+                                    monthsLeft = 1;
+
+                                r["MonthlyRequired"] = remaining / monthsLeft;
+                            }
+                        }
+                        else
+                        {
+                            r["Deadline"] = "";
+                            r["MonthlyRequired"] = 0m;
+                        }
                     }
                 }
 
-                // 3) Karty + kafelek "Dodaj kopertę"
                 _cards.Clear();
                 if (_dt != null)
                 {
@@ -87,7 +117,6 @@ namespace Finly.Pages
                 }
                 _cards.Add(new AddEnvelopeTile());
 
-                // 4) Sumy
                 var allocated = _dt?.AsEnumerable().Sum(r => SafeDec(r["Allocated"])) ?? 0m;
                 var unassigned = _savedTotal - allocated;
 
@@ -96,7 +125,9 @@ namespace Finly.Pages
                 EnvelopesSumText.Text = allocated.ToString("N2") + " zł";
 
                 UnassignedText.Text = unassigned.ToString("N2") + " zł";
-                UnassignedText.Foreground = unassigned < 0 ? Brushes.IndianRed : (Brush)FindResource("App.Foreground");
+                UnassignedText.Foreground = unassigned < 0
+                    ? Brushes.IndianRed
+                    : (Brush)FindResource("App.Foreground");
             }
             catch (Exception ex)
             {
@@ -127,14 +158,24 @@ namespace Finly.Pages
             catch { return 0m; }
         }
 
+        private static int MonthsBetween(DateTime from, DateTime to)
+        {
+            if (to <= from) return 0;
+            int months = (to.Year - from.Year) * 12 + (to.Month - from.Month);
+            if (to.Day > from.Day)
+                months++;
+            return months;
+        }
+
         /// <summary>
         /// Note jest zapisywany jako:
-        /// "Cel: ....\nOpis: ...."
+        /// "Cel: ....\nOpis: ....\nTermin: RRRR-MM-DD"
         /// </summary>
-        private static void SplitNote(string? note, out string goal, out string description)
+        private static void SplitNote(string? note, out string goal, out string description, out DateTime? deadline)
         {
             goal = string.Empty;
             description = string.Empty;
+            deadline = null;
 
             if (string.IsNullOrWhiteSpace(note))
                 return;
@@ -153,6 +194,20 @@ namespace Finly.Pages
                 {
                     description = line.Substring(5).Trim();
                 }
+                else if (line.StartsWith("Termin:", StringComparison.OrdinalIgnoreCase))
+                {
+                    var dateText = line.Substring(7).Trim();
+                    if (DateTime.TryParseExact(dateText, "yyyy-MM-dd",
+                            CultureInfo.InvariantCulture, DateTimeStyles.None, out var d1))
+                    {
+                        deadline = d1.Date;
+                    }
+                    else if (DateTime.TryParse(dateText, CultureInfo.CurrentCulture,
+                             DateTimeStyles.None, out var d2))
+                    {
+                        deadline = d2.Date;
+                    }
+                }
                 else
                 {
                     if (string.IsNullOrEmpty(goal))
@@ -163,34 +218,68 @@ namespace Finly.Pages
             }
         }
 
-        private static string BuildNote(string goal, string description)
+        private static string BuildNote(string goal, string description, DateTime? deadline)
         {
             goal = (goal ?? "").Trim();
             description = (description ?? "").Trim();
 
-            if (string.IsNullOrEmpty(goal) && string.IsNullOrEmpty(description))
-                return string.Empty;
+            var parts = new System.Collections.Generic.List<string>();
 
-            if (string.IsNullOrEmpty(description))
-                return $"Cel: {goal}";
+            if (!string.IsNullOrEmpty(goal))
+                parts.Add($"Cel: {goal}");
 
-            if (string.IsNullOrEmpty(goal))
-                return $"Opis: {description}";
+            if (!string.IsNullOrEmpty(description))
+                parts.Add($"Opis: {description}");
 
-            return $"Cel: {goal}\nOpis: {description}";
+            if (deadline.HasValue)
+                parts.Add("Termin: " + deadline.Value.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture));
+
+            return string.Join("\n", parts);
+        }
+
+        private void RecalculateMonthlyRequired()
+        {
+            var target = SafeParse(TargetBox.Text);
+            var allocated = SafeParse(AllocatedBox.Text);
+            var remaining = target - allocated;
+
+            if (remaining <= 0m)
+            {
+                MonthlyRequiredText.Text = "0,00 zł";
+                return;
+            }
+
+            var deadline = DeadlinePicker.SelectedDate;
+            if (deadline == null)
+            {
+                MonthlyRequiredText.Text = "-";
+                return;
+            }
+
+            int monthsLeft = MonthsBetween(DateTime.Today, deadline.Value.Date);
+            if (monthsLeft <= 0)
+                monthsLeft = 1;
+
+            var perMonth = remaining / monthsLeft;
+            MonthlyRequiredText.Text = perMonth.ToString("N2") + " zł";
         }
 
         private void SetAddMode()
         {
             _editingId = null;
             FormHeader.Text = "Dodaj kopertę";
+
             NameBox.Text = string.Empty;
             TargetBox.Text = "0,00";
             AllocatedBox.Text = "0,00";
             GoalBox.Text = string.Empty;
             DescriptionBox.Text = string.Empty;
+            DeadlinePicker.SelectedDate = null;
+            MonthlyRequiredText.Text = "-";
+
             FormMessage.Text = string.Empty;
             SaveEnvelopeBtn.Content = "Dodaj";
+
             FormBorder.Visibility = Visibility.Visible;
         }
 
@@ -198,13 +287,17 @@ namespace Finly.Pages
         {
             _editingId = id;
             FormHeader.Text = "Edytuj kopertę";
+
             NameBox.Text = row["Name"]?.ToString() ?? "";
             TargetBox.Text = SafeDec(row["Target"]).ToString("N2");
             AllocatedBox.Text = SafeDec(row["Allocated"]).ToString("N2");
 
-            SplitNote(row["Note"]?.ToString(), out var goal, out var description);
+            SplitNote(row["Note"]?.ToString(), out var goal, out var description, out var deadline);
             GoalBox.Text = goal;
             DescriptionBox.Text = description;
+            DeadlinePicker.SelectedDate = deadline;
+
+            RecalculateMonthlyRequired();
 
             FormMessage.Text = string.Empty;
             SaveEnvelopeBtn.Content = "Zapisz zmiany";
@@ -213,13 +306,11 @@ namespace Finly.Pages
 
         // ===================== ZDARZENIA UI =====================
 
-        // kafelek "Dodaj kopertę"
         private void AddEnvelopeCard_Click(object sender, MouseButtonEventArgs e)
         {
             SetAddMode();
         }
 
-        // ZERA znikają przy focuse
         private void AmountBox_GotFocus(object sender, RoutedEventArgs e)
         {
             if (sender is TextBox tb)
@@ -237,6 +328,13 @@ namespace Finly.Pages
                 var val = SafeParse(tb.Text);
                 tb.Text = val.ToString("N2");
             }
+
+            RecalculateMonthlyRequired();
+        }
+
+        private void DeadlinePicker_SelectedDateChanged(object sender, SelectionChangedEventArgs e)
+        {
+            RecalculateMonthlyRequired();
         }
 
         private void EditEnvelope_Click(object sender, RoutedEventArgs e)
@@ -266,11 +364,12 @@ namespace Finly.Pages
 
             try
             {
-                // zwracamy przydzieloną kwotę do odłożonej gotówki
                 var newSaved = _savedTotal + allocated;
                 DatabaseService.SetSavedCash(_userId, newSaved);
+                _savedTotal = newSaved;
 
                 DatabaseService.DeleteEnvelope(id);
+
                 LoadAll();
                 FormBorder.Visibility = Visibility.Collapsed;
                 FormMessage.Text = "Kopertę usunięto.";
@@ -288,6 +387,7 @@ namespace Finly.Pages
             var allocated = SafeParse(AllocatedBox.Text);
             var goal = GoalBox.Text ?? string.Empty;
             var description = DescriptionBox.Text ?? string.Empty;
+            var deadline = DeadlinePicker.SelectedDate;
 
             if (string.IsNullOrWhiteSpace(name))
             {
@@ -305,13 +405,14 @@ namespace Finly.Pages
             decimal previousAllocated = 0m;
             if (_editingId is int idExisting && _dt != null)
             {
-                var row = _dt.AsEnumerable().FirstOrDefault(r => Convert.ToInt32(r["Id"]) == idExisting);
+                var row = _dt.AsEnumerable()
+                             .FirstOrDefault(r => Convert.ToInt32(r["Id"]) == idExisting);
                 if (row != null)
                     previousAllocated = SafeDec(row["Allocated"]);
             }
 
-            var delta = allocated - previousAllocated; // ile NOWEJ kasy chcemy dołożyć do kopert
-            var newSavedTotal = _savedTotal - delta;   // zdejmujemy z odłożonej gotówki
+            var delta = allocated - previousAllocated;   // ile nowej kasy dokładamy
+            var newSavedTotal = _savedTotal - delta;     // zdejmujemy z odłożonej gotówki
 
             if (newSavedTotal < 0)
             {
@@ -319,25 +420,43 @@ namespace Finly.Pages
                 return;
             }
 
-            var note = BuildNote(goal, description);
+            var note = BuildNote(goal, description, deadline);
 
             try
             {
-                // zapis koperty
+                int envelopeId;
+
                 if (_editingId is int id)
                 {
                     DatabaseService.UpdateEnvelope(id, _userId, name, target, allocated, note);
+                    envelopeId = id;
                     FormMessage.Text = "Zapisano zmiany.";
                 }
                 else
                 {
-                    DatabaseService.InsertEnvelope(_userId, name, target, allocated, note);
+                    envelopeId = DatabaseService.InsertEnvelope(_userId, name, target, allocated, note);
                     FormMessage.Text = "Dodano kopertę.";
                 }
 
-                // aktualizacja odłożonej gotówki w bazie
+                // zapisujemy nową wartość odłożonej gotówki
                 DatabaseService.SetSavedCash(_userId, newSavedTotal);
+                _savedTotal = newSavedTotal;
 
+                // *** NOWE: zapisujemy cel/termin także w kolumnach używanych przez stronę „Cele” ***
+                //      Dzięki temu GoalsPage widzi ten sam termin i liczy miesięczną kwotę
+                if (deadline.HasValue)
+                {
+                    DatabaseService.UpdateEnvelopeGoal(
+                        _userId,
+                        envelopeId,
+                        target,
+                        allocated,
+                        deadline.Value,
+                        note   // tu możesz równie dobrze podać sam goal/description, ważne że deadline idzie do bazy
+                    );
+                }
+
+                _editingId = null;
                 LoadAll();
                 FormBorder.Visibility = Visibility.Collapsed;
             }

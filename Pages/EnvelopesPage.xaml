@@ -9,7 +9,6 @@
 
     <UserControl.Resources>
 
-
         <!-- Karta ogólna -->
         <Style x:Key="Card" TargetType="Border">
             <Setter Property="Background"      Value="{DynamicResource Surface.Background}"/>
@@ -93,7 +92,17 @@
                                    Foreground="{DynamicResource App.Foreground}"
                                    Opacity="0.9"/>
                         <TextBlock Text="{Binding Row[GoalText]}"
-                                   Margin="0,2,0,0"
+                                   Margin="0,2,0,4"
+                                   Foreground="{DynamicResource App.Foreground}"
+                                   TextWrapping="Wrap"/>
+
+                        <!-- Termin (tylko data, bez miesięcznej kwoty) -->
+                        <TextBlock Text="Termin"
+                                   FontWeight="SemiBold"
+                                   Foreground="{DynamicResource App.Foreground}"
+                                   Opacity="0.9"/>
+                        <TextBlock Text="{Binding Row[Deadline]}"
+                                   Margin="0,2,0,4"
                                    Foreground="{DynamicResource App.Foreground}"
                                    TextWrapping="Wrap"/>
                     </StackPanel>
@@ -119,7 +128,7 @@
             </Border>
         </DataTemplate>
 
-        <!-- ===== KAFEL „DODAJ KOPERTĘ” (jak Dodaj konto) ===== -->
+        <!-- ===== KAFEL „DODAJ KOPERTĘ” ===== -->
         <DataTemplate DataType="{x:Type local:AddEnvelopeTile}">
             <Border Style="{StaticResource Card}"
                     Width="260"
@@ -175,11 +184,13 @@
                                    Style="{StaticResource CardHeader}"
                                    FontSize="18"
                                    FontWeight="Bold"
-                                   Margin="0,0,0,4"/>
+                                   Margin="0,0,0,4"
+                                   TextWrapping="Wrap"/>
                         <TextBlock Text="Suma środków przydzielonych do wszystkich kopert."
                                    Margin="0,2,0,0"
                                    Foreground="{DynamicResource App.Foreground}"
-                                   Opacity="0.7"/>
+                                   Opacity="0.7"
+                                   TextWrapping="Wrap"/>
                         <TextBlock x:Name="TotalEnvelopesText"
                                    Style="{StaticResource KpiValueStyle}"
                                    FontSize="24"
@@ -194,7 +205,8 @@
                                    Style="{StaticResource CardHeader}"
                                    FontSize="18"
                                    FontWeight="Bold"
-                                   Margin="0,0,0,4"/>
+                                   Margin="0,0,0,4"
+                                   TextWrapping="Wrap"/>
                         <TextBlock x:Name="SavedCashText"
                                    Style="{StaticResource KpiValueStyle}"
                                    FontSize="24"
@@ -209,7 +221,8 @@
                                    Style="{StaticResource CardHeader}"
                                    FontSize="18"
                                    FontWeight="Bold"
-                                   Margin="0,0,0,4"/>
+                                   Margin="0,0,0,4"
+                                   TextWrapping="Wrap"/>
                         <TextBlock x:Name="EnvelopesSumText"
                                    Style="{StaticResource KpiValueStyle}"
                                    FontSize="24"
@@ -224,7 +237,8 @@
                                    Style="{StaticResource CardHeader}"
                                    FontSize="18"
                                    FontWeight="Bold"
-                                   Margin="0,0,0,4"/>
+                                   Margin="0,0,0,4"
+                                   TextWrapping="Wrap"/>
                         <TextBlock x:Name="UnassignedText"
                                    Style="{StaticResource KpiValueStyle}"
                                    FontSize="24"
@@ -268,11 +282,6 @@
                 <StackPanel HorizontalAlignment="Center"
                             MaxWidth="600">
 
-                    <Separator Height="1"
-                               Background="{DynamicResource Surface.Border}"
-                               Opacity="0.8"
-                               Margin="0,0,0,12"/>
-
                     <TextBlock x:Name="FormHeader"
                                Text="Dodaj kopertę"
                                FontSize="18"
@@ -282,6 +291,8 @@
 
                     <Grid Margin="0,12,0,0">
                         <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
                             <RowDefinition Height="Auto"/>
                             <RowDefinition Height="Auto"/>
                             <RowDefinition Height="Auto"/>
@@ -352,6 +363,30 @@
                                  Height="60"
                                  TextWrapping="Wrap"
                                  AcceptsReturn="True"/>
+
+                        <!-- Termin -->
+                        <TextBlock Grid.Row="5" Grid.Column="0"
+                                   Text="Termin (data):"
+                                   Margin="0,4,8,4"
+                                   VerticalAlignment="Center"
+                                   Foreground="{DynamicResource App.Foreground}"/>
+                        <DatePicker x:Name="DeadlinePicker"
+                                    Grid.Row="5" Grid.Column="1"
+                                    Height="28"
+                                    SelectedDateChanged="DeadlinePicker_SelectedDateChanged"/>
+
+                        <!-- Miesięcznie trzeba odkładać – ukryte w UI -->
+                        <TextBlock Grid.Row="6" Grid.Column="0"
+                                   Text="Miesięcznie trzeba odkładać:"
+                                   Margin="0,4,8,4"
+                                   VerticalAlignment="Center"
+                                   Foreground="{DynamicResource App.Foreground}"
+                                   Visibility="Collapsed"/>
+                        <TextBlock x:Name="MonthlyRequiredText"
+                                   Grid.Row="6" Grid.Column="1"
+                                   VerticalAlignment="Center"
+                                   Foreground="{DynamicResource App.Foreground}"
+                                   Visibility="Collapsed"/>
                     </Grid>
 
                     <StackPanel Orientation="Horizontal"

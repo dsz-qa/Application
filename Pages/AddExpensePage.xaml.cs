@@ -45,6 +45,9 @@ namespace Finly.Pages
 
             Loaded += (_, __) =>
             {
+                // KPI – tak jak na Dashboardzie
+                RefreshMoneySummary();
+
                 // start – żadna zakładka nie wybrana
                 ModeTabs.SelectedIndex = -1;
                 ShowPanels(null);
@@ -60,6 +63,28 @@ namespace Finly.Pages
                 IncomeDatePicker.SelectedDate = today;
                 TransferDatePicker.SelectedDate = today;
             };
+        }
+
+        // ================== KPI (jak na DashboardPage) ==================
+
+        private void SetKpiText(string name, decimal value)
+        {
+            if (FindName(name) is TextBlock tb)
+                tb.Text = value.ToString("N2", CultureInfo.CurrentCulture) + " zł";
+        }
+
+        private void RefreshMoneySummary()
+        {
+            if (_uid <= 0) return;
+
+            var snap = DatabaseService.GetMoneySnapshot(_uid);
+
+            SetKpiText("TotalWealthText", snap.Total);
+            SetKpiText("BanksText", snap.Banks);
+            SetKpiText("FreeCashDashboardText", snap.Cash);
+            SetKpiText("SavedToAllocateText", snap.SavedUnallocated);
+            SetKpiText("EnvelopesDashboardText", snap.Envelopes);
+            SetKpiText("InvestmentsText", 0m);
         }
 
         // ================== PANELE / ZAKŁADKI ==================
@@ -429,6 +454,10 @@ namespace Finly.Pages
                 LoadCategories();
                 LoadEnvelopes();
                 LoadIncomeAccounts();
+
+                // odśwież KPI
+                RefreshMoneySummary();
+
                 Cancel_Click(sender, e);
             }
             catch (Exception ex)
@@ -498,6 +527,10 @@ namespace Finly.Pages
 
                 LoadCategories();
                 LoadIncomeAccounts();
+
+                // odśwież KPI
+                RefreshMoneySummary();
+
                 Cancel_Click(sender, e);
             }
             catch (Exception ex)
@@ -665,6 +698,9 @@ namespace Finly.Pages
                 Cancel_Click(sender, e);
                 LoadTransferItems();
                 LoadCategories();
+
+                // odśwież KPI
+                RefreshMoneySummary();
             }
             catch (Exception ex)
             {

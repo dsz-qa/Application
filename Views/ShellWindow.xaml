@@ -39,6 +39,7 @@
             <Setter Property="shell:WindowChrome.IsHitTestVisibleInChrome" Value="True"/>
         </Style>
 
+
         <!-- NAV: standardowy przycisk nawigacji -->
         <Style x:Key="NavItemCentered" TargetType="{x:Type ToggleButton}">
             <Setter Property="HorizontalAlignment" Value="Stretch"/>
@@ -56,38 +57,40 @@
                     <ControlTemplate TargetType="{x:Type ToggleButton}">
                         <Grid>
                             <Border x:Name="bg"
-                                    Background="{TemplateBinding Background}"
-                                    CornerRadius="10"/>
+                            Background="{TemplateBinding Background}"
+                            CornerRadius="10"/>
 
+                            <!-- pomarańczowe paski po bokach -->
                             <Rectangle x:Name="leftBar"
-                                       Width="2"
-                                       Fill="{DynamicResource Brand.Orange}"
-                                       HorizontalAlignment="Left"
-                                       Opacity=".9"
-                                       Visibility="Collapsed"/>
+                               Width="2"
+                               Fill="{DynamicResource Brand.Orange}"
+                               HorizontalAlignment="Left"
+                               Opacity=".9"
+                               Visibility="Collapsed"/>
                             <Rectangle x:Name="rightBar"
-                                       Width="2"
-                                       Fill="{DynamicResource Brand.Orange}"
-                                       HorizontalAlignment="Right"
-                                       Opacity=".9"
-                                       Visibility="Collapsed"/>
+                               Width="2"
+                               Fill="{DynamicResource Brand.Orange}"
+                               HorizontalAlignment="Right"
+                               Opacity=".9"
+                               Visibility="Collapsed"/>
 
-                            <Grid Margin="16,0">
+                            <!-- CAŁA zawartość wyśrodkowana -->
+                            <Grid Margin="0" HorizontalAlignment="Center">
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="Auto"/>
-                                    <ColumnDefinition Width="12"/>
-                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="8"/>
+                                    <ColumnDefinition Width="Auto"/>
                                 </Grid.ColumnDefinitions>
 
                                 <!-- Ikona jako maska -->
                                 <Rectangle x:Name="iconShape"
-                                           Grid.Column="0"
-                                           Width="{DynamicResource Nav.IconSize}"
-                                           Height="{DynamicResource Nav.IconSize}"
-                                           VerticalAlignment="Center">
+                                   Grid.Column="0"
+                                   Width="{DynamicResource Nav.IconSize}"
+                                   Height="{DynamicResource Nav.IconSize}"
+                                   VerticalAlignment="Center">
                                     <Rectangle.OpacityMask>
                                         <ImageBrush Stretch="Uniform"
-                                                    ImageSource="{Binding RelativeSource={RelativeSource TemplatedParent}, Path=Tag}"/>
+                                            ImageSource="{Binding RelativeSource={RelativeSource TemplatedParent}, Path=Tag}"/>
                                     </Rectangle.OpacityMask>
                                     <Rectangle.Fill>
                                         <SolidColorBrush Color="White"/>
@@ -95,15 +98,15 @@
                                 </Rectangle>
 
                                 <ContentPresenter Grid.Column="2"
-                                                  HorizontalAlignment="Center"
-                                                  VerticalAlignment="Center"
-                                                  TextElement.FontWeight="SemiBold"/>
+                                          HorizontalAlignment="Center"
+                                          VerticalAlignment="Center"
+                                          TextElement.FontWeight="SemiBold"/>
                             </Grid>
 
                             <Rectangle Height="1"
-                                       VerticalAlignment="Bottom"
-                                       Fill="{DynamicResource Surface.Border}"
-                                       Opacity=".8"/>
+                               VerticalAlignment="Bottom"
+                               Fill="{DynamicResource Surface.Border}"
+                               Opacity=".8"/>
                         </Grid>
 
                         <ControlTemplate.Triggers>
@@ -111,10 +114,9 @@
                                 <Setter TargetName="bg" Property="Background" Value="#1AFFFFFF"/>
                             </Trigger>
                             <Trigger Property="IsChecked" Value="True">
-                                <Setter TargetName="bg" Property="Background" Value="#26ED7A1A"/>
+                                <!-- TYLKO ikonka i paski są pomarańczowe -->
                                 <Setter TargetName="leftBar"  Property="Visibility" Value="Visible"/>
                                 <Setter TargetName="rightBar" Property="Visibility" Value="Visible"/>
-                                <Setter Property="FontWeight" Value="SemiBold"/>
                                 <Setter Property="Foreground" Value="{DynamicResource Brand.Orange}"/>
                                 <Setter TargetName="iconShape" Property="Fill" Value="{DynamicResource Brand.Orange}"/>
                             </Trigger>
@@ -127,15 +129,16 @@
             </Setter>
         </Style>
 
-        <!-- NAV: wyróżniony „Panel główny” (wygląda inaczej, ale TEŻ tylko przy IsChecked=True) -->
+
+
+        <!-- NAV: wyróżniony „Panel główny” – tylko ikona domku bez tekstu -->
         <Style x:Key="NavItemPrimary" TargetType="{x:Type ToggleButton}">
             <Setter Property="HorizontalAlignment" Value="Stretch"/>
             <Setter Property="HorizontalContentAlignment" Value="Center"/>
             <Setter Property="Padding" Value="16,14"/>
             <Setter Property="Margin" Value="0,4"/>
-            <Setter Property="FontSize" Value="{DynamicResource Nav.FontSize}"/>
             <Setter Property="Foreground" Value="{DynamicResource Brand.Orange}"/>
-            <Setter Property="Background" Value="#10ED7A1A"/>
+            <Setter Property="Background" Value="Transparent"/>
             <Setter Property="BorderBrush" Value="Transparent"/>
             <Setter Property="Cursor" Value="Hand"/>
             <Setter Property="ContentTemplate" Value="{x:Null}"/>
@@ -144,51 +147,41 @@
                     <ControlTemplate TargetType="{x:Type ToggleButton}">
                         <Grid>
                             <Border x:Name="bg"
-                                    Background="{TemplateBinding Background}"
-                                    CornerRadius="10"/>
+                            Background="{TemplateBinding Background}"
+                            CornerRadius="10"/>
 
                             <Rectangle x:Name="leftBar"
-                                       Width="2"
-                                       Fill="{DynamicResource Brand.Orange}"
-                                       HorizontalAlignment="Left"
-                                       Opacity=".9"
-                                       Visibility="Collapsed"/>
+                               Width="2"
+                               Fill="{DynamicResource Brand.Orange}"
+                               HorizontalAlignment="Left"
+                               Opacity=".9"
+                               Visibility="Collapsed"/>
                             <Rectangle x:Name="rightBar"
-                                       Width="2"
-                                       Fill="{DynamicResource Brand.Orange}"
-                                       HorizontalAlignment="Right"
-                                       Opacity=".9"
-                                       Visibility="Collapsed"/>
+                               Width="2"
+                               Fill="{DynamicResource Brand.Orange}"
+                               HorizontalAlignment="Right"
+                               Opacity=".9"
+                               Visibility="Collapsed"/>
 
-                            <Grid Margin="16,0">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="Auto"/>
-                                    <ColumnDefinition Width="12"/>
-                                    <ColumnDefinition Width="*"/>
-                                </Grid.ColumnDefinitions>
-
+                            <Grid Margin="0">
+                                <!-- tylko ikona domku, bez napisu -->
                                 <Rectangle x:Name="iconShape"
-                                           Grid.Column="0"
-                                           Width="{DynamicResource Nav.IconSize}"
-                                           Height="{DynamicResource Nav.IconSize}"
-                                           VerticalAlignment="Center"
-                                           Fill="{DynamicResource Brand.Orange}">
+                                   Width="{DynamicResource Nav.IconSize}"
+                                   Height="{DynamicResource Nav.IconSize}"
+                                   VerticalAlignment="Center"
+                                   HorizontalAlignment="Center"
+                                   Fill="{DynamicResource Brand.Orange}">
                                     <Rectangle.OpacityMask>
                                         <ImageBrush Stretch="Uniform"
-                                                    ImageSource="{Binding RelativeSource={RelativeSource TemplatedParent}, Path=Tag}"/>
+                                            ImageSource="{Binding RelativeSource={RelativeSource TemplatedParent}, Path=Tag}"/>
                                     </Rectangle.OpacityMask>
                                 </Rectangle>
-
-                                <ContentPresenter Grid.Column="2"
-                                                  HorizontalAlignment="Center"
-                                                  VerticalAlignment="Center"
-                                                  TextElement.FontWeight="SemiBold"/>
                             </Grid>
 
                             <Rectangle Height="1"
-                                       VerticalAlignment="Bottom"
-                                       Fill="{DynamicResource Surface.Border}"
-                                       Opacity=".8"/>
+                               VerticalAlignment="Bottom"
+                               Fill="{DynamicResource Surface.Border}"
+                               Opacity=".8"/>
                         </Grid>
 
                         <ControlTemplate.Triggers>
@@ -199,7 +192,6 @@
                                 <Setter TargetName="bg" Property="Background" Value="#26ED7A1A"/>
                                 <Setter TargetName="leftBar"  Property="Visibility" Value="Visible"/>
                                 <Setter TargetName="rightBar" Property="Visibility" Value="Visible"/>
-                                <Setter Property="FontWeight" Value="Bold"/>
                             </Trigger>
                             <Trigger Property="IsEnabled" Value="False">
                                 <Setter Property="Opacity" Value=".5"/>
@@ -209,6 +201,8 @@
                 </Setter.Value>
             </Setter>
         </Style>
+
+
 
         <!-- Stopka -->
         <Style x:Key="SidebarActionToggle.Blue" TargetType="{x:Type ToggleButton}">
@@ -321,99 +315,145 @@
                         <RowDefinition Height="*"/>
                         <RowDefinition Height="Auto"/>
                     </Grid.RowDefinitions>
+                    <StackPanel Grid.Row="0" Margin="16,16,16,8" HorizontalAlignment="Center">
+                        <!-- Logo -->
+                        <Image Width="{DynamicResource Logo.Size}" Height="{DynamicResource Logo.Size}"
+           SnapsToDevicePixels="True"
+           RenderOptions.BitmapScalingMode="HighQuality"
+           Stretch="Uniform"
+           Source="pack://application:,,,/Assets/Images/logoFinly.png"
+           HorizontalAlignment="Center"/>
 
-                    <!-- Logo -->
-                    <StackPanel Grid.Row="0" Margin="16,16,16,8">
-                        <DockPanel VerticalAlignment="Center">
-                            <Image Width="{DynamicResource Logo.Size}" Height="{DynamicResource Logo.Size}"
-                                   SnapsToDevicePixels="True"
-                                   RenderOptions.BitmapScalingMode="HighQuality"
-                                   Stretch="Uniform"
-                                   Source="pack://application:,,,/Assets/Images/logoFinly.png"
-                                   DockPanel.Dock="Left"/>
-                        </DockPanel>
-                        <Separator Margin="0,12,0,8" Background="{DynamicResource Surface.Border}"/>
+     <Separator Margin="0,12,0,8"
+               Background="{DynamicResource Surface.Border}"/>
+
+                        <!-- Przycisk HOME -->
+                        <ToggleButton x:Name="NavHome"
+                  Margin="0,8,0,0"
+                  Style="{StaticResource NavItemPrimary}"
+                  Tag="pack://application:,,,/Assets/Icons/stronaglowna.png"
+                  Click="Nav_Home_Click">
+                            <StackPanel Orientation="Vertical" HorizontalAlignment="Center">
+                                <Rectangle Width="36" Height="36" Margin="0,0,0,4">
+                                    <Rectangle.OpacityMask>
+                                        <ImageBrush Stretch="Uniform"
+                                ImageSource="pack://application:,,,/Assets/Icons/stronaglowna.png"/>
+                                    </Rectangle.OpacityMask>
+                                    <Rectangle.Fill>
+                                        <SolidColorBrush Color="White"/>
+                                    </Rectangle.Fill>
+                                </Rectangle>
+                                <TextBlock Text="Home"
+                       HorizontalAlignment="Center"
+                       FontWeight="SemiBold"
+                       Foreground="{DynamicResource Sidebar.Foreground}"/>
+                            </StackPanel>
+                        </ToggleButton>
+
                     </StackPanel>
+
 
                     <!-- NAV -->
                     <Grid Grid.Row="1" x:Name="NavContainer" Margin="0,0,0,8" VerticalAlignment="Stretch">
                         <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <!-- 0 separator -->
                             <RowDefinition Height="*"/>
+                            <!-- 1 Dodaj -->
                             <RowDefinition Height="*"/>
+                            <!-- 2 Transakcje -->
                             <RowDefinition Height="*"/>
+                            <!-- 3 Budżety -->
                             <RowDefinition Height="*"/>
+                            <!-- 4 Cele -->
                             <RowDefinition Height="*"/>
+                            <!-- 5 Kategorie -->
                             <RowDefinition Height="*"/>
+                            <!-- 6 Statystyki -->
                             <RowDefinition Height="*"/>
+                            <!-- 7 Raporty -->
                             <RowDefinition Height="*"/>
+                            <!-- 8 Kredyty -->
                             <RowDefinition Height="*"/>
+                            <!-- 9 Inwestycje -->
                             <RowDefinition Height="*"/>
+                            <!-- 10 Koperty -->
                             <RowDefinition Height="*"/>
-                            <RowDefinition Height="*"/>
+                            <!-- 11 Konta bankowe -->
                         </Grid.RowDefinitions>
 
-                        <ToggleButton Grid.Row="0" x:Name="NavHome" Style="{StaticResource NavItemPrimary}"
-                                      Content="Panel główny"
-                                      Tag="pack://application:,,,/Assets/Icons/stronaglowna.png"
-                                      Click="Nav_Home_Click"/>
+                        <Separator Grid.Row="0" Margin="0,12,0,8"
+               Background="{DynamicResource Surface.Border}"/>
 
+                        <!-- 1: Dodaj -->
                         <ToggleButton Grid.Row="1" x:Name="NavAdd" Style="{StaticResource NavItemCentered}"
-                                      Content="Dodaj"
-                                      Tag="pack://application:,,,/Assets/Icons/dodaj.png"
-                                      Click="Nav_Add_Click"/>
+                  Content="Dodaj"
+                  Tag="pack://application:,,,/Assets/Icons/dodaj.png"
+                  Click="Nav_Add_Click"/>
 
-                        <ToggleButton Grid.Row="11" x:Name="NavTransactions" Style="{StaticResource NavItemCentered}"
-                                      Content="Transakcje"
-                                      Tag="pack://application:,,,/Assets/Icons/transakcje.png"
-                                      Click="Nav_Transactions_Click"/>
+                        <!-- 2: Transakcje -->
+                        <ToggleButton Grid.Row="2" x:Name="NavTransactions" Style="{StaticResource NavItemCentered}"
+                  Content="Transakcje"
+                  Tag="pack://application:,,,/Assets/Icons/transakcje.png"
+                  Click="Nav_Transactions_Click"/>
 
-                        <ToggleButton Grid.Row="2" x:Name="NavBudgets" Style="{StaticResource NavItemCentered}"
-                                      Content="Budżety"
-                                      Tag="pack://application:,,,/Assets/Icons/budzety.png"
-                                      Click="Nav_Budgets_Click"/>
+                        <!-- 3: Budżety -->
+                        <ToggleButton Grid.Row="3" x:Name="NavBudgets" Style="{StaticResource NavItemCentered}"
+                  Content="Budżety"
+                  Tag="pack://application:,,,/Assets/Icons/budzety.png"
+                  Click="Nav_Budgets_Click"/>
 
-                        <ToggleButton Grid.Row="4" x:Name="NavCategories" Style="{StaticResource NavItemCentered}"
-                                      Content="Kategorie"
-                                      Tag="pack://application:,,,/Assets/Icons/kategorie.png"
-                                      Click="Nav_Categories_Click"/>
+                        <!-- 4: Cele -->
+                        <ToggleButton Grid.Row="4" x:Name="NavGoals" Style="{StaticResource NavItemCentered}"
+                  Content="Cele"
+                  Tag="pack://application:,,,/Assets/Icons/cele.png"
+                  Click="Nav_Goals_Click"/>
 
-                        <ToggleButton Grid.Row="5" x:Name="NavCharts" Style="{StaticResource NavItemCentered}"
-                                      Content="Statystyki"
-                                      Tag="pack://application:,,,/Assets/Icons/statystyki.png"
-                                      Click="Nav_Charts_Click"/>
+                        <!-- 5: Kategorie -->
+                        <ToggleButton Grid.Row="5" x:Name="NavCategories" Style="{StaticResource NavItemCentered}"
+                  Content="Kategorie"
+                  Tag="pack://application:,,,/Assets/Icons/kategorie.png"
+                  Click="Nav_Categories_Click"/>
 
-                        <ToggleButton Grid.Row="6" x:Name="NavReports" Style="{StaticResource NavItemCentered}"
-                                      Content="Raporty"
-                                      Tag="pack://application:,,,/Assets/Icons/raporty.png"
-                                      Click="Nav_Reports_Click"/>
+                        <!-- 6: Statystyki -->
+                        <ToggleButton Grid.Row="6" x:Name="NavCharts" Style="{StaticResource NavItemCentered}"
+                  Content="Statystyki"
+                  Tag="pack://application:,,,/Assets/Icons/statystyki.png"
+                  Click="Nav_Charts_Click"/>
 
-                        <ToggleButton Grid.Row="7" x:Name="NavLoans" Style="{StaticResource NavItemCentered}"
-                                      Content="Kredyty"
-                                      Tag="pack://application:,,,/Assets/Icons/kredyty.png"
-                                      Click="Nav_Loans_Click"/>
+                        <!-- 7: Raporty -->
+                        <ToggleButton Grid.Row="7" x:Name="NavReports" Style="{StaticResource NavItemCentered}"
+                  Content="Raporty"
+                  Tag="pack://application:,,,/Assets/Icons/raporty.png"
+                  Click="Nav_Reports_Click"/>
 
-                        <ToggleButton Grid.Row="8" x:Name="NavInvestments" Style="{StaticResource NavItemCentered}"
-                                      Content="Inwestycje"
-                                      Tag="pack://application:,,,/Assets/Icons/inwestycje.png"
-                                      Click="Nav_Investments_Click"/>
-                        
-                        <ToggleButton Grid.Row="3" x:Name="NavGoals" Style="{StaticResource NavItemCentered}"
-                                      Content="Cele"
-                                      Tag="pack://application:,,,/Assets/Icons/cele.png"
-                                      Click="Nav_Goals_Click"/>
+                        <!-- 8: Kredyty -->
+                        <ToggleButton Grid.Row="8" x:Name="NavLoans" Style="{StaticResource NavItemCentered}"
+                  Content="Kredyty"
+                  Tag="pack://application:,,,/Assets/Icons/kredyty.png"
+                  Click="Nav_Loans_Click"/>
 
-                        <ToggleButton Grid.Row="9" x:Name="NavEnvelopes" Style="{StaticResource NavItemCentered}"
-                                      Content="Koperty"
-                                      Tag="pack://application:,,,/Assets/Icons/koperty.png"
-                                      Click="Nav_Envelopes_Click"/>
+                        <!-- 9: Inwestycje -->
+                        <ToggleButton Grid.Row="9" x:Name="NavInvestments" Style="{StaticResource NavItemCentered}"
+                  Content="Inwestycje"
+                  Tag="pack://application:,,,/Assets/Icons/inwestycje.png"
+                  Click="Nav_Investments_Click"/>
 
-                        <ToggleButton Grid.Row="10" x:Name="NavBanks" Style="{StaticResource NavItemCentered}"
-                                      Content="Konta bankowe"
-                                      Tag="pack://application:,,,/Assets/Icons/kontabankowe.png"
-                                      Click="Nav_Banks_Click"/>
+                        <!-- 10: Koperty -->
+                        <ToggleButton Grid.Row="10" x:Name="NavEnvelopes" Style="{StaticResource NavItemCentered}"
+                  Content="Koperty"
+                  Tag="pack://application:,,,/Assets/Icons/koperty.png"
+                  Click="Nav_Envelopes_Click"/>
 
-
+                        <!-- 11: Konta bankowe -->
+                        <ToggleButton Grid.Row="11" x:Name="NavBanks" Style="{StaticResource NavItemCentered}"
+                  Content="Konta bankowe"
+                  Tag="pack://application:,,,/Assets/Icons/kontabankowe.png"
+                  Click="Nav_Banks_Click"/>
                     </Grid>
+
+
+
 
                     <!-- Stopka -->
                     <Grid Grid.Row="2" Margin="8,8,8,16">

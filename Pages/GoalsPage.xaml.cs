@@ -1,14 +1,20 @@
-﻿using System;
+﻿using Finly.Services;
+using System;
 using System.Collections.ObjectModel;
 using System.Globalization;
 using System.Linq;
+using System.Reflection.PortableExecutable;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Input;
 
 namespace Finly.Pages
 {
     public class GoalVm
     {
+        // powiązanie 1:1 z kopertą
+        public int EnvelopeId { get; set; }
+
         public string Name { get; set; } = "";
         public decimal TargetAmount { get; set; }
         public decimal CurrentAmount { get; set; }
@@ -28,7 +34,7 @@ namespace Finly.Pages
 
                 if (d <= today) return 0;
 
-                int months = (d.Year - today.Year) * 12 + d.Month - today.Month;
+                int months = (d.Year - today.Year) * 12 + (d.Month - today.Month);
                 if (d.Day > today.Day) months++;
                 if (months <= 0) months = 1;
 
@@ -46,27 +52,79 @@ namespace Finly.Pages
                 return Math.Round(Remaining / m, 2);
             }
         }
+
+        public decimal CompletionPercent
+        {
+            get
+            {
+                if (TargetAmount <= 0) return 0m;
+                var pct = (CurrentAmount / TargetAmount) * 100m;
+                if (pct < 0) pct = 0;
+                if (pct > 100) pct = 100;
+                return Math.Round(pct, 1);
+            }
+        }
     }
+
+    /// <summary>
+    /// Kafelek „Dodaj cel”.
+    /// </summary>
+    public sealed class AddGoalTile { }
 
     public partial class GoalsPage : UserControl
     {
         private readonly ObservableCollection<GoalVm> _goals = new();
+        private readonly ObservableCollection<object> _items = new();
+
+        private int _uid => UserService.GetCurrentUserId();
+        private int? _editingEnvelopeId = null;
 
         public GoalsPage()
         {
             InitializeComponent();
-            GoalsRepeater.ItemsSource = _goals;
+
+            GoalsRepeater.ItemsSource = _items;
+            Loaded += GoalsPage_Loaded;
+
+            FormBorder.Visibility = Visibility.Collapsed;
+        }
+
+        private void GoalsPage_Loaded(object sender, RoutedEventArgs e)
+        {
             LoadGoals();
         }
 
-        // Na razie cele są tylko w pamięci.
-        // Później możesz je podpiąć pod bazę / koperty.
         private void LoadGoals()
         {
-            // startowo pusto
             _goals.Clear();
 
+            var list = DatabaseService.GetEnvelopeGoals(_uid);
+            foreach (var g in list)
+            {
+                _goals.Add(new GoalVm
+                {
+                    EnvelopeId = g.EnvelopeId,
+                    Name = g.Name,
+                    TargetAmount = g.Target,
+                    CurrentAmount = g.Allocated,
+                    DueDate = g.Deadline,
+                    Description = g.GoalText ?? string.Empty
+                });
+            }
+
+            RebuildItems();
             RefreshKpis();
+        }
+
+        private void RebuildItems()
+        {
+            _items.Clear();
+
+            foreach (var g in _goals)
+                _items.Add(g);
+
+            // kafelek „Dodaj cel”
+            _items.Add(new AddGoalTile());
         }
 
         private static decimal ParseDecimal(string? text)
@@ -86,12 +144,67 @@ namespace Finly.Pages
         {
             var totalTarget = _goals.Sum(g => g.TargetAmount);
             var totalSaved = _goals.Sum(g => g.CurrentAmount);
-            var avgMonthly = _goals.Count == 0 ? 0m : _goals.Average(g => g.MonthlyNeeded);
+            var totalMonthly = _goals.Sum(g => g.MonthlyNeeded);
 
             TotalGoalsAmountText.Text = totalTarget.ToString("N2") + " zł";
             TotalGoalsSavedText.Text = totalSaved.ToString("N2") + " zł";
-            AverageMonthlyNeededText.Text = avgMonthly.ToString("N2") + " zł";
+            TotalMonthlyNeededText.Text = totalMonthly.ToString("N2") + " zł";
         }
+
+        // ========= kafel „Dodaj cel” =========
+
+        private void AddGoalCard_Click(object sender, MouseButtonEventArgs e)
+        {
+            _editingEnvelopeId = null;
+
+            FormHeader.Text = "Dodaj cel";
+            GoalFormMessage.Text = string.Empty;
+            FormBorder.Visibility = Visibility.Visible;
+
+            ClearGoalForm();
+        }
+
+        // ========= Edycja / usuwanie istniejących celów =========
+
+        private void EditGoal_Click(object sender, RoutedEventArgs e)
+        {
+            if ((sender as FrameworkElement)?.DataContext is not GoalVm vm)
+                return;
+
+            _editingEnvelopeId = vm.EnvelopeId;
+
+            FormHeader.Text = "Edytuj cel";
+            GoalFormMessage.Text = string.Empty;
+            FormBorder.Visibility = Visibility.Visible;
+
+            GoalNameBox.Text = vm.Name;
+            GoalTargetBox.Text = vm.TargetAmount.ToString("N2");
+            GoalCurrentBox.Text = vm.CurrentAmount.ToString("N2");
+            GoalDueDatePicker.SelectedDate = vm.DueDate;
+            GoalDescriptionBox.Text = vm.Description ?? "";
+        }
+
+        private void DeleteGoal_Click(object sender, RoutedEventArgs e)
+        {
+            if ((sender as FrameworkElement)?.DataContext is not GoalVm vm)
+                return;
+
+            try
+            {
+                // Czyścimy DANE CELU w kopercie, ale NIE usuwamy samej koperty.
+                DatabaseService.ClearEnvelopeGoal(_uid, vm.EnvelopeId);
+
+                _goals.Remove(vm);
+                RebuildItems();
+                RefreshKpis();
+            }
+            catch (Exception ex)
+            {
+                ToastService.Error("Nie udało się usunąć celu.\n" + ex.Message);
+            }
+        }
+
+        // ========= Formularz zapisujący cel do kopert =========
 
         private void AddGoal_Click(object sender, RoutedEventArgs e)
         {
@@ -131,36 +244,84 @@ namespace Finly.Pages
                 return;
             }
 
-            var goal = new GoalVm
+            try
             {
-                Name = name,
-                TargetAmount = target,
-                CurrentAmount = current,
-                DueDate = dueDate,
-                Description = desc
-            };
+                int envelopeId;
 
-            _goals.Add(goal);
-            RefreshKpis();
-            GoalFormMessage.Text = "Cel dodany.";
+                if (_editingEnvelopeId.HasValue)
+                {
+                    // edycja istniejącej koperty
+                    envelopeId = _editingEnvelopeId.Value;
+                }
+                else
+                {
+                    // szukamy koperty o tej nazwie; jeśli brak – tworzymy nową kopertę z tym celem
+                    var existingId = DatabaseService.GetEnvelopeIdByName(_uid, name);
+                    if (existingId.HasValue)
+                    {
+                        envelopeId = existingId.Value;
+                    }
+                    else
+                    {
+                        envelopeId = DatabaseService.InsertEnvelope(_uid, name, target, current, desc);
+                    }
+                }
 
-            // opcjonalnie wyczyść
-            ClearGoalForm();
+                // ustaw / zaktualizuj dane celu w tej kopercie
+                DatabaseService.UpdateEnvelopeGoal(_uid, envelopeId, target, current, dueDate.Value, desc);
+
+                // przeładuj cele z bazy (procent, miesięcznie, KPI)
+                LoadGoals();
+
+                GoalFormMessage.Text = _editingEnvelopeId.HasValue
+                    ? "Cel zaktualizowany."
+                    : "Cel dodany.";
+
+                ClearGoalForm();
+                FormBorder.Visibility = Visibility.Collapsed;
+                _editingEnvelopeId = null;
+            }
+            catch (Exception ex)
+            {
+                GoalFormMessage.Text = "Nie udało się zapisać celu: " + ex.Message;
+            }
         }
 
         private void ClearGoalForm_Click(object sender, RoutedEventArgs e)
         {
             ClearGoalForm();
             GoalFormMessage.Text = string.Empty;
+            FormBorder.Visibility = Visibility.Collapsed;
+            _editingEnvelopeId = null;
         }
 
         private void ClearGoalForm()
         {
             GoalNameBox.Text = "";
-            GoalTargetBox.Text = "";
-            GoalCurrentBox.Text = "";
+            GoalTargetBox.Text = "0,00";
+            GoalCurrentBox.Text = "0,00";
             GoalDueDatePicker.SelectedDate = null;
             GoalDescriptionBox.Text = "";
+        }
+
+        // ========= 0,00 -> czyszczenie po kliknięciu =========
+
+        private void AmountBox_GotFocus(object sender, RoutedEventArgs e)
+        {
+            if (sender is TextBox tb)
+            {
+                if (tb.Text == "0,00" || tb.Text == "0.00")
+                    tb.Clear();
+            }
+        }
+
+        private void AmountBox_LostFocus(object sender, RoutedEventArgs e)
+        {
+            if (sender is TextBox tb)
+            {
+                var val = ParseDecimal(tb.Text);
+                tb.Text = val.ToString("N2");
+            }
         }
     }
 }
