@@ -47,6 +47,7 @@
 	  <None Remove="Assets\Icons\logoFinly.ico" />
 	  <None Remove="Assets\Icons\przychody.png" />
 	  <None Remove="Assets\Icons\raporty.png" />
+	  <None Remove="Assets\Icons\search.png" />
 	  <None Remove="Assets\Icons\statistics_24.png" />
 	  <None Remove="Assets\Icons\statistics_48.png" />
 	  <None Remove="Assets\Icons\statystyki.png" />
@@ -105,6 +106,7 @@
 	  </Resource>
 	  <Resource Include="Assets\Icons\przychody.png" />
 	  <Resource Include="Assets\Icons\raporty.png" />
+	  <Resource Include="Assets\Icons\search.png" />
 	  <Resource Include="Assets\Icons\statystyki.png" />
 	  <Resource Include="Assets\Icons\stronaglowna.png" />
 	  <Resource Include="Assets\Icons\transakcje.png" />

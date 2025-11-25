@@ -8,8 +8,9 @@ using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Data;
+using System.Windows.Input;
 using System.Windows.Media;
-using System.Windows.Media.Media3D;
+using Finly.Views.Controls;
 
 namespace Finly.Pages
 {
@@ -17,8 +18,6 @@ namespace Finly.Pages
     {
         private readonly int _uid;
         private readonly ObservableCollection<CategoryVm> _categories = new();
-        private readonly ObservableCollection<ChartBarItem> _spendingBars = new();
-        private readonly ObservableCollection<ChartBarItem> _incomeBars = new();
 
         private CollectionView _categoriesView;
 
@@ -33,12 +32,17 @@ namespace Finly.Pages
             _uid = userId <= 0 ? UserService.GetCurrentUserId() : userId;
 
             CategoriesList.ItemsSource = _categories;
-            SpendingChart.ItemsSource = _spendingBars;
-            IncomeChart.ItemsSource = _incomeBars;
 
             Loaded += CategoriesPage_Loaded;
 
             _categoriesView = (CollectionView)CollectionViewSource.GetDefaultView(_categories);
+
+            // PeriodBar from XAML
+            PeriodBar.RangeChanged += PeriodBar_RangeChanged;
+
+            // subscribe to donut clicks
+            SpendingChart.SliceClicked += SpendingChart_SliceClicked;
+            IncomeChart.SliceClicked += IncomeChart_SliceClicked;
         }
 
         private void CategoriesPage_Loaded(object sender, RoutedEventArgs e)
@@ -53,6 +57,11 @@ namespace Finly.Pages
             {
                 MessageText.Text = "Błąd ładowania kategorii: " + ex.Message;
             }
+        }
+
+        private void PeriodBar_RangeChanged(object? sender, EventArgs e)
+        {
+            LoadCharts();
         }
 
         // === Lista kategorii ===
@@ -150,60 +159,16 @@ namespace Finly.Pages
         {
             if ((sender as FrameworkElement)?.Tag is CategoryVm vm)
             {
-                try
-                {
-                    // próbuj użyć bezpiecznej metody jeśli istnieje
-                    var dsType = typeof(DatabaseService);
-                    var safeMethod = dsType.GetMethod("DeleteCategorySafe");
-                    if (safeMethod != null)
-                    {
-                        safeMethod.Invoke(null, new object[] { _uid, vm.Name });
-                    }
-                    else
-                    {
-                        var id = DatabaseService.GetCategoryIdByName(_uid, vm.Name);
-                        if (id.HasValue)
-                            DatabaseService.DeleteCategory(id.Value);
-                    }
-
-                    MessageText.Text = "Kategoria usunięta.";
-                    LoadCategories();
-                    LoadCharts();
-                }
-                catch (Exception ex)
-                {
-                    MessageText.Text = "Błąd usuwania: " + ex.Message;
-                }
+                TryDeleteCategory(vm);
             }
             else if (sender is FrameworkElement fe)
             {
-                // maybe Tag stored on parent panel
-                var parent = FindAncestor<Border>(fe);
-                if (parent != null && parent.Tag is CategoryVm vm2)
+                var container = FindAncestor<ContentPresenter>(fe);
+                if (container == null) return;
+                var panel = FindDescendantByName<FrameworkElement>(container, "DeleteConfirmPanel");
+                if (panel != null && panel.Tag is CategoryVm vm2)
                 {
-                    try
-                    {
-                        var dsType = typeof(DatabaseService);
-                        var safeMethod = dsType.GetMethod("DeleteCategorySafe");
-                        if (safeMethod != null)
-                        {
-                            safeMethod.Invoke(null, new object[] { _uid, vm2.Name });
-                        }
-                        else
-                        {
-                            var id = DatabaseService.GetCategoryIdByName(_uid, vm2.Name);
-                            if (id.HasValue)
-                                DatabaseService.DeleteCategory(id.Value);
-                        }
-
-                        MessageText.Text = "Kategoria usunięta.";
-                        LoadCategories();
-                        LoadCharts();
-                    }
-                    catch (Exception ex)
-                    {
-                        MessageText.Text = "Błąd usuwania: " + ex.Message;
-                    }
+                    TryDeleteCategory(vm2);
                 }
             }
         }
@@ -217,6 +182,33 @@ namespace Finly.Pages
                 var panel = FindDescendantByName<FrameworkElement>(container, "DeleteConfirmPanel");
                 if (panel != null)
                     panel.Visibility = Visibility.Collapsed;
+            }
+        }
+
+        private void TryDeleteCategory(CategoryVm vm)
+        {
+            try
+            {
+                var dsType = typeof(DatabaseService);
+                var safeMethod = dsType.GetMethod("DeleteCategorySafe");
+                if (safeMethod != null)
+                {
+                    safeMethod.Invoke(null, new object[] { _uid, vm.Name });
+                }
+                else
+                {
+                    var id = DatabaseService.GetCategoryIdByName(_uid, vm.Name);
+                    if (id.HasValue)
+                        DatabaseService.DeleteCategory(id.Value);
+                }
+
+                MessageText.Text = "Kategoria usunięta.";
+                LoadCategories();
+                LoadCharts();
+            }
+            catch (Exception ex)
+            {
+                MessageText.Text = "Błąd usuwania: " + ex.Message;
             }
         }
 
@@ -261,31 +253,7 @@ namespace Finly.Pages
                 var yes = MessageBox.Show($"Czy na pewno usunąć kategorię \"{vm.Name}\"? (operacja może wpłynąć na dane)", "Usuń kategorię", MessageBoxButton.YesNo, MessageBoxImage.Warning);
                 if (yes != MessageBoxResult.Yes) return;
 
-                try
-                {
-                    // próbuj użyć bezpiecznej metody jeśli istnieje
-                    var dsType = typeof(DatabaseService);
-                    var safeMethod = dsType.GetMethod("DeleteCategorySafe");
-                    if (safeMethod != null)
-                    {
-                        safeMethod.Invoke(null, new object[] { _uid, vm.Name });
-                    }
-                    else
-                    {
-                        // fallback: usuń po Id
-                        var id = DatabaseService.GetCategoryIdByName(_uid, vm.Name);
-                        if (id.HasValue)
-                            DatabaseService.DeleteCategory(id.Value);
-                    }
-
-                    MessageText.Text = "Kategoria usunięta.";
-                    LoadCategories();
-                    LoadCharts();
-                }
-                catch (Exception ex)
-                {
-                    MessageText.Text = "Błąd usuwania: " + ex.Message;
-                }
+                TryDeleteCategory(vm);
             }
         }
 
@@ -299,51 +267,115 @@ namespace Finly.Pages
 
         private void LoadSpendingChart()
         {
-            _spendingBars.Clear();
+            // prepare donut using Dashboard's PieSlice helper
+            // SpendingDonut.ItemsSource = null;
 
-            // ostatnie 30 dni
-            var from = DateTime.Today.AddDays(-30);
-            var to = DateTime.Today;
+            DateTime from = PeriodBar.StartDate;
+            DateTime to = PeriodBar.EndDate;
+            if (from > to) (from, to) = (to, from);
 
             var data = DatabaseService.GetSpendingByCategorySafe(_uid, from, to) ?? new List<DatabaseService.CategoryAmountDto>();
-            if (!data.Any()) return;
-
-            var max = data.Max(x => x.Amount);
-            foreach (var d in data.OrderByDescending(x => x.Amount))
+            if (!data.Any())
             {
-                _spendingBars.Add(new ChartBarItem
-                {
-                    Name = d.Name,
-                    Amount = d.Amount,
-                    Brush = GetRandomBrush(d.Name),
-                    BarWidth = (max <= 0) ? 0 : (200.0 * (double)(d.Amount / max))
-                });
+                PieCenterNameText.Text = "Brak danych";
+                PieCenterValueText.Text = "0,00 zł";
+                PieCenterPercentText.Text = string.Empty;
+                // clear charts
+                SpendingChart.Draw(new Dictionary<string, decimal>(), 0, new Brush[0]);
+                return;
             }
+
+            var list = data.Where(x => x.Amount > 0).OrderByDescending(x => x.Amount).ToList();
+            var sum = list.Sum(x => x.Amount);
+            if (sum <= 0)
+            {
+                PieCenterNameText.Text = "Brak danych";
+                PieCenterValueText.Text = "0,00 zł";
+                PieCenterPercentText.Text = string.Empty;
+                SpendingChart.Draw(new Dictionary<string, decimal>(), 0, new Brush[0]);
+                return;
+            }
+
+            var palette = new[] { "#FFED7A1A", "#FF3FA7D6", "#FF7BC96F", "#FFAF7AC5", "#FFF6BF26", "#FF56C1A7", "#FFCE6A6B", "#FF9AA0A6" };
+            var used = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            int idx = 0;
+
+            var totals = new Dictionary<string, decimal>();
+            foreach (var item in list)
+            {
+                totals[item.Name] = item.Amount;
+            }
+
+            var brushes = totals.Keys.Select((k, i) => (Brush)(new BrushConverter().ConvertFromString(palette[i % palette.Length])!)).ToArray();
+
+            SpendingChart.Draw(totals, sum, brushes);
+
+            PieCenterNameText.Text = "Wszystko";
+            PieCenterValueText.Text = sum.ToString("N2") + " zł";
+            PieCenterPercentText.Text = string.Empty;
         }
 
         private void LoadIncomeChart()
         {
-            _incomeBars.Clear();
+            // IncomeDonut.ItemsSource = null;
 
-            // ostatnie 30 dni
-            var from = DateTime.Today.AddDays(-30);
-            var to = DateTime.Today;
+            DateTime from = PeriodBar.StartDate;
+            DateTime to = PeriodBar.EndDate;
+            if (from > to) (from, to) = (to, from);
 
-            // użyjemy bezpiecznej metody (jeśli nie ma dokładnej metody wg kategorii, użyjemy przychodów wg źródła)
             var data = DatabaseService.GetIncomeBySourceSafe(_uid, from, to) ?? new List<DatabaseService.CategoryAmountDto>();
-            if (!data.Any()) return;
+            var list = data.Where(x => x.Amount > 0).OrderByDescending(x => x.Amount).ToList();
+            var sum = list.Sum(x => x.Amount);
 
-            var max = data.Max(x => x.Amount);
-            foreach (var d in data.OrderByDescending(x => x.Amount))
+            if (sum <= 0)
             {
-                _incomeBars.Add(new ChartBarItem
-                {
-                    Name = d.Name,
-                    Amount = d.Amount,
-                    Brush = GetRandomBrush(d.Name),
-                    BarWidth = (max <= 0) ? 0 : (200.0 * (double)(d.Amount / max))
-                });
+                IncomeCenterNameText.Text = "Brak danych";
+                IncomeCenterValueText.Text = "0,00 zł";
+                IncomeCenterPercentText.Text = string.Empty;
+                IncomeChart.Draw(new Dictionary<string, decimal>(), 0, new Brush[0]);
+                return;
             }
+
+            var palette = new[] { "#FFED7A1A", "#FF3FA7D6", "#FF7BC96F", "#FFAF7AC5", "#FFF6BF26", "#FF56C1A7", "#FFCE6A6B", "#FF9AA0A6" };
+            var used = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            int idx = 0;
+            var totals = new Dictionary<string, decimal>();
+            foreach (var item in list)
+            {
+                totals[item.Name] = item.Amount;
+            }
+            var brushes = totals.Keys.Select((k, i) => (Brush)(new BrushConverter().ConvertFromString(palette[i % palette.Length])!)).ToArray();
+
+            IncomeChart.Draw(totals, sum, brushes);
+
+            IncomeCenterNameText.Text = "Wszystko";
+            IncomeCenterValueText.Text = sum.ToString("N2") + " zł";
+            IncomeCenterPercentText.Text = string.Empty;
+        }
+
+        private void SpendingChart_SliceClicked(object? sender, SliceClickedEventArgs e)
+        {
+            if (e == null) return;
+            var total = DatabaseService.GetSpendingByCategorySafe(_uid, PeriodBar.StartDate, PeriodBar.EndDate)?.Sum(x => x.Amount) ?? 0m;
+            if (total <= 0) return;
+            var share = e.Amount / total * 100m;
+            PieCenterNameText.Text = e.Name;
+            PieCenterValueText.Text = e.Amount.ToString("N2") + " zł";
+            PieCenterPercentText.Text = $"{share:N1}% udziału";
+
+            // filter left list to this category
+            _categoriesView.Filter = obj => (obj as CategoryVm)?.Name == e.Name;
+        }
+
+        private void IncomeChart_SliceClicked(object? sender, SliceClickedEventArgs e)
+        {
+            if (e == null) return;
+            var total = DatabaseService.GetIncomeBySourceSafe(_uid, PeriodBar.StartDate, PeriodBar.EndDate)?.Sum(x => x.Amount) ?? 0m;
+            if (total <= 0) return;
+            var share = e.Amount / total * 100m;
+            IncomeCenterNameText.Text = e.Name;
+            IncomeCenterValueText.Text = e.Amount.ToString("N2") + " zł";
+            IncomeCenterPercentText.Text = $"{share:N1}% udziału";
         }
 
         // === Domyślne kategorie ===
@@ -373,37 +405,9 @@ namespace Finly.Pages
 
         // === Pomocnicze ===
 
-        private Brush GetBrushForName(string name)
-        {
-            return GetRandomBrush(name);
-        }
-
-        private static Brush GetRandomBrush(string seed)
-        {
-            // deterministyczny dobór koloru na podstawie nazwy
-            var palette = new[]
-            {
-                "#FFED7A1A","#FF3FA7D6","#FF7BC96F","#FFAF7AC5","#FFF6BF26","#FF56C1A7","#FFCE6A6B","#FF9AA0A6"
-            };
-            var idx = Math.Abs(seed?.GetHashCode() ?? 0) % palette.Length;
-            return (Brush)(new BrushConverter().ConvertFromString(palette[idx])!);
-        }
-
-        // visual helpers
         private static T? FindAncestor<T>(DependencyObject start) where T : DependencyObject
         {
             var parent = VisualTreeHelper.GetParent(start);
-            while (parent != null)
-            {
-                if (parent is T t) return t;
-                parent = VisualTreeHelper.GetParent(parent);
-            }
-            return null;
-        }
-
-        private static T? FindAncestor<T>(FrameworkElement start) where T : FrameworkElement
-        {
-            var parent = start.Parent as DependencyObject;
             while (parent != null)
             {
                 if (parent is T t) return t;
@@ -426,18 +430,30 @@ namespace Finly.Pages
             return null;
         }
 
+        private Brush GetBrushForName(string name) => GetRandomBrush(name);
+
+        private static Brush GetRandomBrush(string seed)
+        {
+            var palette = new[]
+            {
+                "#FFED7A1A","#FF3FA7D6","#FF7BC96F","#FFAF7AC5","#FFF6BF26","#FF56C1A7","#FFCE6A6B","#FF9AA0A6"
+            };
+            var idx = Math.Abs(seed?.GetHashCode() ?? 0) % palette.Length;
+            return (Brush)(new BrushConverter().ConvertFromString(palette[idx])!);
+        }
+
         private class CategoryVm
         {
             public string Name { get; set; } = "";
             public Brush ColorBrush { get; set; } = Brushes.Gray;
         }
 
-        private class ChartBarItem
+        private class PieSliceModel
         {
             public string Name { get; set; } = "";
             public decimal Amount { get; set; }
             public Brush Brush { get; set; } = Brushes.Gray;
-            public double BarWidth { get; set; } = 0.0;
+            public Geometry Geometry { get; set; } = Geometry.Empty;
         }
     }
 }

@@ -90,6 +90,18 @@ CREATE TABLE IF NOT EXISTS Expenses(
     -- CategoryId/AccountId bez FK (łatwiejsze migracje); logika w kodzie
 );
 
+CREATE TABLE IF NOT EXISTS Loans(
+    Id            INTEGER PRIMARY KEY AUTOINCREMENT,
+    UserId        INTEGER NOT NULL,
+    Name          TEXT NOT NULL,
+    Principal     NUMERIC NOT NULL DEFAULT 0,
+    InterestRate  NUMERIC NOT NULL DEFAULT 0,
+    StartDate     TEXT NOT NULL,
+    TermMonths    INTEGER NOT NULL DEFAULT 0,
+    Note          TEXT NULL,
+    FOREIGN KEY(UserId) REFERENCES Users(Id) ON DELETE CASCADE
+);
+
 CREATE TABLE IF NOT EXISTS BankConnections(
     Id            INTEGER PRIMARY KEY AUTOINCREMENT,
     UserId        INTEGER NOT NULL,

@@ -1,0 +1,12 @@
+<UserControl x:Class="Finly.Views.Controls.DonutChartControl"
+ xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+ xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+ xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+ xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+ mc:Ignorable="d">
+ <Grid>
+ <Canvas x:Name="ChartCanvas" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" />
+ <TextBlock x:Name="NoDataText" Text="Brak danych" Visibility="Collapsed" FontStyle="Italic"
+ HorizontalAlignment="Center" VerticalAlignment="Center" />
+ </Grid>
+</UserControl>
