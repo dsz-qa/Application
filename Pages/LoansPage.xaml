@@ -7,15 +7,44 @@
 			<RowDefinition Height="*"/>
 		</Grid.RowDefinitions>
 
-		<TextBlock Text="Kredyty" FontSize="20" FontWeight="Bold"
-                   Foreground="{DynamicResource App.Foreground}"/>
+		<StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+			<TextBlock Text="Kredyty" FontSize="20" FontWeight="Bold"
+                       Foreground="{DynamicResource App.Foreground}"/>
+
+			<Button Content="Dodaj kredyt" Margin="12,0,0,0" Padding="8,4" Click="AddLoan_Click"/>
+		</StackPanel>
 
 		<Border Grid.Row="1" Margin="0,12,0,0"
                 Background="{DynamicResource Surface.Background}"
                 BorderBrush="{DynamicResource Surface.Border}" BorderThickness="1"
                 CornerRadius="10" Padding="12">
-			<TextBlock Text="Tu zbudujemy listę kredytów / harmonogram spłat."
-                       Foreground="{DynamicResource App.Foreground}"/>
+			<StackPanel>
+				<ItemsControl Name="LoansList">
+					<ItemsControl.ItemTemplate>
+						<DataTemplate>
+							<Border Margin="4" Padding="8" Background="{DynamicResource Surface.Background}" CornerRadius="6">
+								<Grid>
+									<Grid.ColumnDefinitions>
+										<ColumnDefinition Width="*" />
+										<ColumnDefinition Width="Auto" />
+									</Grid.ColumnDefinitions>
+
+									<StackPanel>
+										<TextBlock Text="{Binding Name}" FontWeight="Bold"/>
+										<TextBlock Text="{Binding PrincipalStr}" Foreground="Gray"/>
+									</StackPanel>
+
+									<StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Right">
+										<Button Content="Usuń" Tag="{Binding}" Margin="4,0,0,0" Click="DeleteLoan_Click"/>
+									</StackPanel>
+								</Grid>
+							</Border>
+						</DataTemplate>
+					</ItemsControl.ItemTemplate>
+				</ItemsControl>
+
+				<TextBlock Text="Brak kredytów." Foreground="Gray" Name="EmptyText" Visibility="Collapsed"/>
+			</StackPanel>
 		</Border>
 	</Grid>
 </UserControl>

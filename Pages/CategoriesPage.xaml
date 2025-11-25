@@ -3,259 +3,223 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
-             mc:Ignorable="d"
-             d:DesignHeight="800"
-             d:DesignWidth="1400">
-    <Grid Margin="16">
-        <Grid.RowDefinitions>
-            <!-- Filtry + akcje -->
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="12"/>
-            <!-- Główna część: tabela + szczegóły -->
-            <RowDefinition Height="*"/>
-        </Grid.RowDefinitions>
+             mc:Ignorable="d">
 
-        <!-- ===================== FILTRY + AKCJE ===================== -->
-        <Border Grid.Row="0"
+    <Grid Margin="16">
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="340"/>
+            <ColumnDefinition Width="16"/>
+            <ColumnDefinition Width="*"/>
+        </Grid.ColumnDefinitions>
+
+        <!-- LEWY PANEL: Kategorie -->
+        <Border Grid.Column="0"
                 Padding="12"
+                Background="{DynamicResource Surface.Background}"
+                BorderBrush="{DynamicResource Surface.Border}"
+                BorderThickness="1"
                 CornerRadius="8"
-                Background="{DynamicResource SurfaceBrush}">
+                VerticalAlignment="Stretch">
+
             <Grid>
                 <Grid.RowDefinitions>
-                    <RowDefinition Height="Auto"/>
-                    <RowDefinition Height="8"/>
-                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/> <!-- header -->
+                    <RowDefinition Height="Auto"/> <!-- search -->
+                    <RowDefinition Height="*"/> <!-- list -->
+                    <RowDefinition Height="Auto"/> <!-- add area -->
+                    <RowDefinition Height="Auto"/> <!-- edit panel -->
                 </Grid.RowDefinitions>
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="*"/>
-                    <ColumnDefinition Width="Auto"/>
-                </Grid.ColumnDefinitions>
 
-                <!-- FILTRY -->
-                <StackPanel Orientation="Horizontal"
-                            Grid.Row="0"
-                            Grid.Column="0"
-                            VerticalAlignment="Center">
-                    <!-- Typ -->
-                    <StackPanel Orientation="Vertical" Margin="0,0,12,0">
-                        <TextBlock Text="Typ" FontSize="12" Margin="0,0,0,4"/>
-                        <ComboBox x:Name="TypeCombo"
-                                  Width="160">
-                            <ComboBoxItem Content="Wszystkie"/>
-                            <ComboBoxItem Content="Wydatki"/>
-                            <ComboBoxItem Content="Przychody"/>
-                            <ComboBoxItem Content="Obie"/>
-                        </ComboBox>
-                    </StackPanel>
+                <TextBlock Text="Kategorie"
+                           FontSize="22"
+                           FontWeight="Bold"
+                           Foreground="{DynamicResource App.Foreground}"
+                           Margin="0,0,0,12"/>
 
-                    <!-- Od -->
-                    <StackPanel Orientation="Vertical" Margin="0,0,12,0">
-                        <TextBlock Text="Od" FontSize="12" Margin="0,0,0,4"/>
-                        <DatePicker x:Name="FromDatePicker"
-                                    Width="140"/>
-                    </StackPanel>
+                <!-- Wyszukiwarka (nad listą) -->
+                <TextBox x:Name="SearchBox"
+                         Grid.Row="1"
+                         Margin="0,0,0,10"
+                         Height="28"
+                         VerticalAlignment="Top"
+                         TextChanged="SearchBox_TextChanged">
+                    <TextBox.Style>
+                        <Style TargetType="TextBox">
+                            <Setter Property="Foreground" Value="Gray"/>
+                            <Setter Property="Text" Value="Szukaj kategorii..."/>
+                            <Style.Triggers>
+                                <Trigger Property="IsKeyboardFocused" Value="True">
+                                    <Setter Property="Foreground" Value="{DynamicResource App.Foreground}"/>
+                                    <Setter Property="Text" Value=""/>
+                                </Trigger>
+                            </Style.Triggers>
+                        </Style>
+                    </TextBox.Style>
+                </TextBox>
 
-                    <!-- Do -->
-                    <StackPanel Orientation="Vertical" Margin="0,0,12,0">
-                        <TextBlock Text="Do" FontSize="12" Margin="0,0,0,4"/>
-                        <DatePicker x:Name="ToDatePicker"
-                                    Width="140"/>
-                    </StackPanel>
+                <!-- Lista kategorii (wypełnia dostępną przestrzeń) -->
+                <ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto">
+                    <ItemsControl x:Name="CategoriesList">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
 
-                    <!-- Szukajka -->
-                    <StackPanel Orientation="Vertical" Margin="0,0,12,0" Width="240">
-                        <TextBlock Text="Szukaj kategorii" FontSize="12" Margin="0,0,0,4"/>
-                        <Grid>
-                            <TextBox x:Name="SearchBox"
-                                     Margin="0,0,28,0"/>
-                            <TextBlock Text="🔍"
-                                       VerticalAlignment="Center"
-                                       HorizontalAlignment="Right"
-                                       Margin="0,0,4,0"
-                                       Opacity="0.6"/>
-                        </Grid>
-                    </StackPanel>
+                                <Border Margin="0,4,0,4"
+                                        Padding="8"
+                                        Background="{DynamicResource Surface.Background}"
+                                        BorderBrush="{DynamicResource Surface.Border}"
+                                        BorderThickness="1"
+                                        CornerRadius="6">
+                                    <StackPanel>
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="Auto"/>
+                                            </Grid.ColumnDefinitions>
 
-                    <!-- Przyciski Filtruj / Wyczyść -->
-                    <StackPanel Orientation="Horizontal"
-                                VerticalAlignment="Bottom">
-                        <Button Content="Filtruj"
-                                Width="90"
-                                Margin="0,0,8,0"
-                                Click="ApplyFilters_Click"/>
-                        <Button Content="Wyczyść"
-                                Width="90"
-                                Click="ClearFilters_Click"/>
-                    </StackPanel>
+                                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                                <Rectangle Width="12" Height="12"
+                                                           Fill="{Binding ColorBrush}"
+                                                           RadiusX="3" RadiusY="3"
+                                                           Margin="0,0,8,0"/>
+                                                <TextBlock Text="{Binding Name}"
+                                                           VerticalAlignment="Center"
+                                                           Foreground="{DynamicResource App.Foreground}"/>
+                                            </StackPanel>
+
+                                            <StackPanel Grid.Column="1"
+                                                        Orientation="Horizontal"
+                                                        HorizontalAlignment="Right"
+                                                        VerticalAlignment="Center">
+                                                <!-- Edit icon (Segoe MDL2 Assets pencil) -->
+                                                <Button Tag="{Binding}" Click="EditCategory_Click" ToolTip="Edytuj" Padding="6" Margin="0,0,8,0">
+                                                    <TextBlock FontFamily="Segoe MDL2 Assets" Text="&#xE70F;" FontSize="14" Foreground="{DynamicResource App.Foreground}"/>
+                                                </Button>
+                                                <!-- Delete icon (Segoe MDL2 Assets delete) -->
+                                                <Button Tag="{Binding}" Click="ShowDeleteConfirm_Click" ToolTip="Usuń" Padding="6">
+                                                    <TextBlock FontFamily="Segoe MDL2 Assets" Text="&#xE74D;" FontSize="14" Foreground="Tomato"/>
+                                                </Button>
+                                            </StackPanel>
+                                        </Grid>
+
+                                        <!-- inline confirmation (hidden by default) -->
+                                        <Border x:Name="DeleteConfirmPanel" Background="{DynamicResource Surface.Background}" BorderBrush="{DynamicResource Surface.Border}" BorderThickness="1" CornerRadius="6" Padding="8" Margin="0,8,0,0" Visibility="Collapsed">
+                                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                                <TextBlock Text="Czy na pewno usunąć kategorię?" VerticalAlignment="Center" Margin="0,0,12,0"/>
+                                                <Button Tag="{Binding}" Click="DeleteConfirm_Click" Content="Tak" Width="60" Margin="0,0,8,0"/>
+                                                <Button Click="DeleteCancel_Click" Content="Nie" Width="60"/>
+                                            </StackPanel>
+                                        </Border>
+                                    </StackPanel>
+                                </Border>
+
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </ScrollViewer>
+
+                <!-- Dodawanie kategorii -->
+                <StackPanel Grid.Row="3" Orientation="Vertical" Margin="0,10,0,0">
+                    <TextBlock Text="Dodaj kategorię" FontWeight="SemiBold" Foreground="{DynamicResource App.Foreground}"/>
+                    <DockPanel Margin="0,6,0,0">
+                        <TextBox x:Name="NewCategoryBox" Height="28" DockPanel.Dock="Left" Width="260"/>
+                        <Button Content="Dodaj" Width="80" Margin="8,0,0,0" Click="AddCategory_Click"/>
+                    </DockPanel>
+                    <TextBlock x:Name="MessageText" Margin="0,8,0,0" Foreground="OrangeRed" TextWrapping="Wrap"/>
                 </StackPanel>
 
-                <!-- AKCJE ADMINISTRACYJNE -->
-                <StackPanel Orientation="Horizontal"
-                            Grid.Row="0"
-                            Grid.Column="1"
-                            HorizontalAlignment="Right"
-                            VerticalAlignment="Center">
-                    <Button Content="Dodaj kategorię"
-                            Width="130"
-                            Margin="8,0,0,0"
-                            Click="AddCategory_Click"/>
-                    <Button Content="Edytuj"
-                            Width="90"
-                            Margin="8,0,0,0"
-                            Click="EditCategory_Click"/>
-                    <Button Content="Scal"
-                            Width="90"
-                            Margin="8,0,0,0"
-                            Click="MergeCategories_Click"/>
-                    <Button Content="Archiwizuj"
-                            Width="110"
-                            Margin="8,0,0,0"
-                            Click="ArchiveCategory_Click"/>
-                </StackPanel>
+                <!-- Edit panel (na dole) -->
+                <Border Grid.Row="4" x:Name="EditPanel" Background="{DynamicResource Surface.Background}" BorderBrush="{DynamicResource Surface.Border}" BorderThickness="1" CornerRadius="6" Padding="8" Margin="0,12,0,0" Visibility="Collapsed">
+                    <StackPanel>
+                        <TextBlock Text="Edytuj kategorię" FontWeight="Bold" Foreground="{DynamicResource App.Foreground}"/>
+                        <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
+                            <TextBox x:Name="EditNameBox" Width="260" Height="28" />
+                            <Button Content="Zapisz" Width="80" Margin="8,0,0,0" Click="SaveEdit_Click"/>
+                            <Button Content="Anuluj" Width="80" Margin="8,0,0,0" Click="CancelEdit_Click"/>
+                        </StackPanel>
+                        <TextBlock x:Name="EditPanelMessage" Foreground="OrangeRed" Margin="0,6,0,0"/>
+                    </StackPanel>
+                </Border>
 
-                <!-- Presety dat -->
-                <StackPanel Grid.Row="2"
-                            Grid.ColumnSpan="2"
-                            Orientation="Horizontal"
-                            HorizontalAlignment="Left">
-                    <TextBlock Text="Szybkie zakresy:"
-                               VerticalAlignment="Center"
-                               Margin="0,0,8,0"
-                               FontSize="11"
-                               Opacity="0.7"/>
-                    <Button Content="Dziś"
-                            Margin="0,0,4,0"
-                            Click="PresetToday_Click"/>
-                    <Button Content="Ten miesiąc"
-                            Margin="0,0,4,0"
-                            Click="PresetThisMonth_Click"/>
-                    <Button Content="Ten rok"
-                            Click="PresetThisYear_Click"/>
-                </StackPanel>
             </Grid>
+
         </Border>
 
-        <!-- ===================== GŁÓWNA CZĘŚĆ ===================== -->
-        <Grid Grid.Row="2">
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="3*"/>
-                <ColumnDefinition Width="12"/>
-                <ColumnDefinition Width="2*"/>
-            </Grid.ColumnDefinitions>
+        <!-- PRAWY PANEL: Wykresy -->
+        <StackPanel Grid.Column="2" Orientation="Vertical">
 
-            <!-- ====== TABELA KATEGORII ====== -->
-            <Border Grid.Column="0"
-                    Padding="8"
-                    CornerRadius="8"
-                    Background="{DynamicResource SurfaceBrush}">
-                <Grid>
-                    <Grid.RowDefinitions>
-                        <RowDefinition Height="Auto"/>
-                        <RowDefinition Height="8"/>
-                        <RowDefinition Height="*"/>
-                    </Grid.RowDefinitions>
+            <!-- Wykres1 -->
+            <Border Padding="12"
+                    Background="{DynamicResource Surface.Background}"
+                    BorderBrush="{DynamicResource Surface.Border}"
+                    BorderThickness="1"
+                    CornerRadius="8">
 
-                    <TextBlock Text="Kategorie"
-                               FontSize="16"
-                               FontWeight="SemiBold"/>
+                <StackPanel>
+                    <TextBlock Text="Wydatki wg kategorii (30 dni)"
+                               FontWeight="Bold"
+                               Foreground="{DynamicResource App.Foreground}"
+                               Margin="0,0,0,10"/>
 
-                    <DataGrid x:Name="CategoriesGrid"
-                              Grid.Row="2"
-                              AutoGenerateColumns="False"
-                              CanUserAddRows="False"
-                              IsReadOnly="True"
-                              SelectionMode="Single"
-                              SelectionChanged="CategoriesGrid_SelectionChanged">
-                        <DataGrid.Columns>
-                            <DataGridTextColumn Header="Kategoria"
-                                                Binding="{Binding Name}"
-                                                Width="*"/>
-                            <DataGridTextColumn Header="Typ"
-                                                Binding="{Binding TypeDisplay}"
-                                                Width="120"/>
-                            <DataGridTextColumn Header="Wpisów"
-                                                Binding="{Binding EntryCount}"
-                                                Width="80"/>
-                            <DataGridTextColumn Header="Suma"
-                                                Binding="{Binding TotalAmount, StringFormat={}{0:N2}}"
-                                                Width="120"/>
-                            <DataGridTextColumn Header="Udział"
-                                                Binding="{Binding SharePercent, StringFormat={}{0:N1}%}"
-                                                Width="80"/>
-                        </DataGrid.Columns>
-                    </DataGrid>
-                </Grid>
+                    <ItemsControl x:Name="SpendingChart">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <Grid Margin="0,6,0,6">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="180"/>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="80"/>
+                                    </Grid.ColumnDefinitions>
+
+                                    <TextBlock Text="{Binding Name}" VerticalAlignment="Center"/>
+                                    <Border Grid.Column="1" Background="#303030" Height="18" CornerRadius="4" VerticalAlignment="Center" Margin="8,0">
+                                        <Rectangle Fill="{Binding Brush}" Width="{Binding BarWidth}" Height="18" RadiusX="4" RadiusY="4"/>
+                                    </Border>
+                                    <TextBlock Grid.Column="2" Text="{Binding Amount, StringFormat={}{0:N2} zł}" VerticalAlignment="Center" HorizontalAlignment="Right"/>
+                                </Grid>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </StackPanel>
+
             </Border>
 
-            <!-- ====== PANEL SZCZEGÓŁÓW ====== -->
-            <Border Grid.Column="2"
-                    Padding="8"
-                    CornerRadius="8"
-                    Background="{DynamicResource SurfaceBrush}">
-                <Grid>
-                    <Grid.RowDefinitions>
-                        <RowDefinition Height="Auto"/>
-                        <RowDefinition Height="8"/>
-                        <RowDefinition Height="Auto"/>
-                        <RowDefinition Height="8"/>
-                        <RowDefinition Height="*"/>
-                    </Grid.RowDefinitions>
+            <!-- Wykres2 -->
+            <Border Padding="12"
+                    Background="{DynamicResource Surface.Background}"
+                    BorderBrush="{DynamicResource Surface.Border}"
+                    BorderThickness="1"
+                    CornerRadius="8" Margin="0,12,0,0">
 
-                    <!-- HEADER KATEGORII -->
-                    <StackPanel Grid.Row="0">
-                        <TextBlock x:Name="CategoryNameText"
-                                   Text="(Wybierz kategorię)"
-                                   FontSize="18"
-                                   FontWeight="SemiBold"
-                                   TextTrimming="CharacterEllipsis"/>
-                        <TextBlock x:Name="CategorySummaryText"
-                                   FontSize="12"
-                                   Margin="0,4,0,0"
-                                   Opacity="0.9"
-                                   Text=""/>
-                    </StackPanel>
+                <StackPanel>
+                    <TextBlock Text="Przychody wg kategorii (30 dni)"
+                               FontWeight="Bold"
+                               Foreground="{DynamicResource App.Foreground}"
+                               Margin="0,0,0,10"/>
 
-                    <!-- TREND (placeholder pod wykres) -->
-                    <GroupBox Grid.Row="2"
-                              Header="Trend w czasie"
-                              Margin="0,0,0,0">
-                        <Border Padding="4"
-                                MinHeight="120"
-                                HorizontalAlignment="Stretch"
-                                VerticalAlignment="Stretch"
-                                CornerRadius="4"
-                                Background="{DynamicResource SubtleSurfaceBrush}">
-                            <TextBlock Text="(Wykres trendu dla wybranej kategorii)"
-                                       HorizontalAlignment="Center"
-                                       VerticalAlignment="Center"
-                                       Opacity="0.6"/>
-                        </Border>
-                    </GroupBox>
+                    <ItemsControl x:Name="IncomeChart">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <Grid Margin="0,6,0,6">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="180"/>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="80"/>
+                                    </Grid.ColumnDefinitions>
 
-                    <!-- OSTATNIE TRANSAKCJE -->
-                    <GroupBox Grid.Row="4"
-                              Header="Ostatnie transakcje">
-                        <DataGrid x:Name="LastTransactionsGrid"
-                                  AutoGenerateColumns="False"
-                                  CanUserAddRows="False"
-                                  IsReadOnly="True">
-                            <DataGrid.Columns>
-                                <DataGridTextColumn Header="Data"
-                                                    Binding="{Binding Date}"
-                                                    Width="110"/>
-                                <DataGridTextColumn Header="Kwota"
-                                                    Binding="{Binding Amount, StringFormat={}{0:N2}}"
-                                                    Width="110"/>
-                                <DataGridTextColumn Header="Opis"
-                                                    Binding="{Binding Description}"
-                                                    Width="*"/>
-                            </DataGrid.Columns>
-                        </DataGrid>
-                    </GroupBox>
-                </Grid>
+                                    <TextBlock Text="{Binding Name}" VerticalAlignment="Center"/>
+                                    <Border Grid.Column="1" Background="#303030" Height="18" CornerRadius="4" VerticalAlignment="Center" Margin="8,0">
+                                        <Rectangle Fill="{Binding Brush}" Width="{Binding BarWidth}" Height="18" RadiusX="4" RadiusY="4"/>
+                                    </Border>
+                                    <TextBlock Grid.Column="2" Text="{Binding Amount, StringFormat={}{0:N2} zł}" VerticalAlignment="Center" HorizontalAlignment="Right"/>
+                                </Grid>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </StackPanel>
+
             </Border>
-        </Grid>
+
+        </StackPanel>
+
     </Grid>
 </UserControl>
-
-

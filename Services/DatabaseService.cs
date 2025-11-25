@@ -2414,5 +2414,62 @@ UPDATE BankAccounts
             if (rows == 0)
                 throw new InvalidOperationException("Nie znaleziono rachunku bankowego lub nie nale¿y do u¿ytkownika.");
         }
-    }
+
+        // ===== LOANY – operacje CRUD =====
+        // CRUD dla tabeli Loans
+
+        // ===== Loans CRUD =====
+        public static List<Models.LoanModel> GetLoans(int userId)
+        {
+            var list = new List<Models.LoanModel>();
+            using var c = OpenAndEnsureSchema();
+            using var cmd = c.CreateCommand();
+            cmd.CommandText = @"SELECT Id, UserId, Name, Principal, InterestRate, StartDate, TermMonths, Note
+ FROM Loans WHERE UserId=@u ORDER BY StartDate DESC;";
+ cmd.Parameters.AddWithValue("@u", userId);
+ using var r = cmd.ExecuteReader();
+ while (r.Read())
+ {
+ list.Add(new Models.LoanModel
+ {
+ Id = r.GetInt32(0),
+ UserId = r.GetInt32(1),
+ Name = r.IsDBNull(2) ? "" : r.GetString(2),
+ Principal = r.IsDBNull(3) ?0m : Convert.ToDecimal(r.GetValue(3)),
+ InterestRate = r.IsDBNull(4) ?0m : Convert.ToDecimal(r.GetValue(4)),
+ StartDate = r.IsDBNull(5) ? DateTime.MinValue : DateTime.Parse(r.GetString(5)),
+ TermMonths = r.IsDBNull(6) ?0 : r.GetInt32(6),
+ Note = r.IsDBNull(7) ? null : r.GetString(7)
+ });
+ }
+ return list;
+ }
+
+ public static int InsertLoan(Models.LoanModel loan)
+ {
+ using var c = OpenAndEnsureSchema();
+ using var cmd = c.CreateCommand();
+ cmd.CommandText = @"INSERT INTO Loans(UserId, Name, Principal, InterestRate, StartDate, TermMonths, Note)
+ VALUES(@u,@n,@p,@r,@s,@t,@note);
+ SELECT last_insert_rowid();";
+ cmd.Parameters.AddWithValue("@u", loan.UserId);
+ cmd.Parameters.AddWithValue("@n", loan.Name ?? "");
+ cmd.Parameters.AddWithValue("@p", loan.Principal);
+ cmd.Parameters.AddWithValue("@r", loan.InterestRate);
+ cmd.Parameters.AddWithValue("@s", loan.StartDate.ToString("yyyy-MM-dd"));
+ cmd.Parameters.AddWithValue("@t", loan.TermMonths);
+ cmd.Parameters.AddWithValue("@note", (object?)loan.Note ?? DBNull.Value);
+ var idObj = cmd.ExecuteScalar();
+ return Convert.ToInt32(idObj);
+ }
+
+ public static void DeleteLoan(int id)
+ {
+ using var c = OpenAndEnsureSchema();
+ using var cmd = c.CreateCommand();
+ cmd.CommandText = "DELETE FROM Loans WHERE Id=@id;";
+ cmd.Parameters.AddWithValue("@id", id);
+ cmd.ExecuteNonQuery();
+ }
+ }
 }

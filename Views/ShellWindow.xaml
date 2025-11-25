@@ -403,11 +403,11 @@
                   Tag="pack://application:,,,/Assets/Icons/budzety.png"
                   Click="Nav_Budgets_Click"/>
 
-                        <!-- 4: Cele -->
-                        <ToggleButton Grid.Row="4" x:Name="NavGoals" Style="{StaticResource NavItemCentered}"
-                  Content="Cele"
-                  Tag="pack://application:,,,/Assets/Icons/cele.png"
-                  Click="Nav_Goals_Click"/>
+                        <!-- 4: Inwestycje (przeniesione z Grid.Row=9) -->
+                        <ToggleButton Grid.Row="4" x:Name="NavInvestments" Style="{StaticResource NavItemCentered}"
+                  Content="Inwestycje"
+                  Tag="pack://application:,,,/Assets/Icons/inwestycje.png"
+                  Click="Nav_Investments_Click"/>
 
                         <!-- 5: Kategorie -->
                         <ToggleButton Grid.Row="5" x:Name="NavCategories" Style="{StaticResource NavItemCentered}"
@@ -433,13 +433,13 @@
                   Tag="pack://application:,,,/Assets/Icons/kredyty.png"
                   Click="Nav_Loans_Click"/>
 
-                        <!-- 9: Inwestycje -->
-                        <ToggleButton Grid.Row="9" x:Name="NavInvestments" Style="{StaticResource NavItemCentered}"
-                  Content="Inwestycje"
-                  Tag="pack://application:,,,/Assets/Icons/inwestycje.png"
-                  Click="Nav_Investments_Click"/>
+                        <!-- 9: Cele (przeniesione z Grid.Row=4, teraz znajduje się tuż nad Koperty) -->
+                        <ToggleButton Grid.Row="9" x:Name="NavGoals" Style="{StaticResource NavItemCentered}"
+                  Content="Cele"
+                  Tag="pack://application:,,,/Assets/Icons/cele.png"
+                  Click="Nav_Goals_Click"/>
 
-                        <!-- 10: Koperty -->
+                        <!-- 10: Koperty (pozostawione na miejscu) -->
                         <ToggleButton Grid.Row="10" x:Name="NavEnvelopes" Style="{StaticResource NavItemCentered}"
                   Content="Koperty"
                   Tag="pack://application:,,,/Assets/Icons/koperty.png"

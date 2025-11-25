@@ -37,6 +37,7 @@
 	  <None Remove="Assets\Icons\cele.png" />
 	  <None Remove="Assets\Icons\delete.png" />
 	  <None Remove="Assets\Icons\dodaj.png" />
+	  <None Remove="Assets\Icons\edit.png" />
 	  <None Remove="Assets\Icons\inwestycje.png" />
 	  <None Remove="Assets\Icons\kalendarz.png" />
 	  <None Remove="Assets\Icons\kategorie.png" />
@@ -67,6 +68,7 @@
 	  <Resource Include="Assets\Banks\revolutlogo.png" />
 	  <Resource Include="Assets\Banks\santanderlogo.png" />
 	  <Resource Include="Assets\Icons\delete.png" />
+	  <Resource Include="Assets\Icons\edit.png" />
 	  <Resource Include="Assets\Icons\kalendarz.png" />
 	  <Resource Include="Assets\Icons\kontabankowe.png" />
 	</ItemGroup>
