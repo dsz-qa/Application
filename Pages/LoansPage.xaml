@@ -7,6 +7,7 @@
 			<RowDefinition Height="Auto"/>
 			<RowDefinition Height="Auto"/>
 			<RowDefinition Height="*"/>
+			<RowDefinition Height="Auto"/>
 			<RowDefinition Height="200"/>
 		</Grid.RowDefinitions>
 
@@ -14,75 +15,10 @@
 			<TextBlock Text="Kredyty" FontSize="20" FontWeight="Bold"
  Foreground="{DynamicResource App.Foreground}"/>
 
-			<Button Content="Dodaj kredyt" Margin="12,0,0,0" Padding="8,4" Click="ShowAddLoan_Click"/>
+			<!-- removed small header Add button, big add tile remains inside grid -->
 		</StackPanel>
 
-		<!-- inline form (hidden by default) -->
-		<Border x:Name="FormBorder" Grid.Row="0" Grid.RowSpan="4" Background="{DynamicResource Surface.Background}" BorderBrush="{DynamicResource Surface.Border}" BorderThickness="1" CornerRadius="8" Padding="12" Visibility="Collapsed" HorizontalAlignment="Center" Width="520">
-			<StackPanel>
-				<TextBlock x:Name="FormHeader" Text="Dodaj kredyt" FontWeight="Bold" FontSize="16" Margin="0,0,0,8"/>
-				<TextBlock x:Name="LoanFormMessage" Foreground="OrangeRed" Margin="0,0,0,8"/>
-
-				<StackPanel Orientation="Vertical" Margin="0,0,0,8">
-					<TextBlock Text="Nazwa kredytu:"/>
-					<TextBox x:Name="LoanNameBox" />
-				</StackPanel>
-
-				<StackPanel Orientation="Horizontal" Margin="0,0,0,8">
-					<StackPanel Width="160">
-						<TextBlock Text="Kwota:"/>
-						<TextBox x:Name="LoanPrincipalBox" />
-					</StackPanel>
-					<StackPanel Width="120" Margin="8,0,0,0">
-						<TextBlock Text="Oprocentowanie (%):"/>
-						<TextBox x:Name="LoanInterestBox" />
-					</StackPanel>
-					<StackPanel Width="120" Margin="8,0,0,0">
-						<TextBlock Text="Okres (mies.):"/>
-						<TextBox x:Name="LoanTermBox" />
-					</StackPanel>
-				</StackPanel>
-
-				<StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
-					<DatePicker x:Name="LoanStartDatePicker" SelectedDate="{x:Static sys:DateTime.Today}" xmlns:sys="clr-namespace:System;assembly=mscorlib"/>
-					<Button Content="OK" Width="80" Margin="8,0,0,0" Click="SaveLoan_Click"/>
-					<Button Content="Anuluj" Width="80" Margin="8,0,0,0" Click="CancelLoan_Click"/>
-				</StackPanel>
-			</StackPanel>
-		</Border>
-
-		<!-- KPI Bar -->
-		<StackPanel Grid.Row="1" Orientation="Horizontal" Margin="0,12,0,0" HorizontalAlignment="Stretch" Height="96">
-			<Border Background="{DynamicResource Surface.Background}" BorderBrush="{DynamicResource Surface.Border}" BorderThickness="1" CornerRadius="8" Padding="12" Margin="0,0,12,0" Width="250">
-				<StackPanel>
-					<TextBlock Text="Łączne zadłużenie" Foreground="Gray" FontSize="12"/>
-					<TextBlock Name="TotalDebtText" Text="0 zł" FontSize="18" FontWeight="Bold" Foreground="OrangeRed"/>
-				</StackPanel>
-			</Border>
-
-			<Border Background="{DynamicResource Surface.Background}" BorderBrush="{DynamicResource Surface.Border}" BorderThickness="1" CornerRadius="8" Padding="12" Margin="0,0,12,0" Width="250">
-				<StackPanel>
-					<TextBlock Text="Raty w tym miesiącu" Foreground="Gray" FontSize="12"/>
-					<TextBlock Name="MonthlyPaymentText" Text="0 zł" FontSize="18" FontWeight="Bold" Foreground="OrangeRed"/>
-				</StackPanel>
-			</Border>
-
-			<Border Background="{DynamicResource Surface.Background}" BorderBrush="{DynamicResource Surface.Border}" BorderThickness="1" CornerRadius="8" Padding="12" Margin="0,0,12,0" Width="300">
-				<StackPanel>
-					<TextBlock Text="Średnia rata (12M)" Foreground="Gray" FontSize="12"/>
-					<TextBlock Name="AvgMonthlyText" Text="0 zł" FontSize="18" FontWeight="Bold" Foreground="OrangeRed"/>
-				</StackPanel>
-			</Border>
-
-			<Border Background="{DynamicResource Surface.Background}" BorderBrush="{DynamicResource Surface.Border}" BorderThickness="1" CornerRadius="8" Padding="12" Margin="0,0,12,0" Width="220">
-				<StackPanel>
-					<TextBlock Text="% spłaconych kredytów" Foreground="Gray" FontSize="12"/>
-					<TextBlock Name="PercentPaidText" Text="0%" FontSize="18" FontWeight="Bold" Foreground="OrangeRed"/>
-				</StackPanel>
-			</Border>
-		</StackPanel>
-
-		<!-- Loans grid -->
+		<!-- Loans grid (row2) -->
 		<ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto" Margin="0,12,0,0">
 			<ItemsControl Name="LoansGrid">
 				<ItemsControl.Resources>
@@ -150,8 +86,71 @@
 			</ItemsControl>
 		</ScrollViewer>
 
-		<!-- Bottom: timeline and insights -->
-		<Grid Grid.Row="3" Margin="0,12,0,0">
+		<!-- Inline form / details area (row3) -->
+		<Border x:Name="FormBorder" Grid.Row="3" Background="{DynamicResource Surface.Background}" BorderBrush="{DynamicResource Surface.Border}" BorderThickness="1" CornerRadius="8" Padding="12" Margin="0,12,0,0" Visibility="Collapsed">
+			<TabControl x:Name="FormTabs">
+				<TabItem Header="Dodaj / Edytuj">
+					<StackPanel Margin="0,4,0,0">
+						<TextBlock x:Name="LoanFormMessage" Foreground="OrangeRed" Margin="0,0,0,8"/>
+						<TextBlock Text="Nazwa kredytu:"/>
+						<TextBox x:Name="LoanNameBox" />
+						<StackPanel Orientation="Horizontal" Margin="0,8,0,0">
+							<StackPanel Width="160">
+								<TextBlock Text="Kwota:"/>
+								<TextBox x:Name="LoanPrincipalBox" />
+							</StackPanel>
+							<StackPanel Width="120" Margin="8,0,0,0">
+								<TextBlock Text="Oprocentowanie (%):"/>
+								<TextBox x:Name="LoanInterestBox" />
+							</StackPanel>
+							<StackPanel Width="120" Margin="8,0,0,0">
+								<TextBlock Text="Okres (mies.):"/>
+								<TextBox x:Name="LoanTermBox" />
+							</StackPanel>
+						</StackPanel>
+						<StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,8,0,0">
+							<DatePicker x:Name="LoanStartDatePicker" />
+							<Button Content="Zapisz" Width="90" Margin="8,0,0,0" Click="SaveLoan_Click"/>
+							<Button Content="Anuluj" Width="90" Margin="8,0,0,0" Click="CancelLoan_Click"/>
+						</StackPanel>
+					</StackPanel>
+				</TabItem>
+
+				<TabItem Header="Harmonogram">
+					<StackPanel>
+						<TextBlock Text="Harmonogram spłat" FontWeight="Bold" Margin="0,0,0,8"/>
+						<ItemsControl x:Name="ScheduleList">
+							<ItemsControl.ItemTemplate>
+								<DataTemplate>
+									<TextBlock Text="{Binding}"/>
+								</DataTemplate>
+							</ItemsControl.ItemTemplate>
+						</ItemsControl>
+					</StackPanel>
+				</TabItem>
+
+				<TabItem Header="Nadpłata">
+					<StackPanel>
+						<TextBlock Text="Wprowadź kwotę nadpłaty:"/>
+						<TextBox x:Name="OverpayAmountBox" />
+						<Button Content="Zatwierdź nadpłatę" Width="140" Margin="0,8,0,0" Click="OverpaySave_Click"/>
+						<TextBlock x:Name="OverpayResult" Foreground="Green" Margin="0,8,0,0"/>
+					</StackPanel>
+				</TabItem>
+
+				<TabItem Header="Symulacja">
+					<StackPanel>
+						<TextBlock Text="Podaj dodatkową wpłatę (jednorazowo):"/>
+						<TextBox x:Name="SimExtraBox" />
+						<Button Content="Symuluj" Width="120" Margin="0,8,0,0" Click="SimulateInline_Click"/>
+						<TextBlock x:Name="SimResult" Margin="0,8,0,0"/>
+					</StackPanel>
+				</TabItem>
+			</TabControl>
+		</Border>
+
+		<!-- Bottom: timeline and insights (row4) -->
+		<Grid Grid.Row="4" Margin="0,12,0,0">
 			<Grid.ColumnDefinitions>
 				<ColumnDefinition Width="*" />
 				<ColumnDefinition Width="320" />

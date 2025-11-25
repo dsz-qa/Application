@@ -82,6 +82,21 @@ namespace Finly.Services
             return GetConnection();
         }
 
+        // Add a simple event to notify UI about data changes so pages can refresh
+        public static event EventHandler? DataChanged;
+
+        private static void RaiseDataChanged()
+        {
+            try
+            {
+                DataChanged?.Invoke(null, EventArgs.Empty);
+            }
+            catch
+            {
+                // ignore exceptions from handlers
+            }
+        }
+
         // ===== PRZENOSZENIE GOTÓWKI MIÊDZY PULAMI =====
         /// <summary>
         /// Przeniesienie z wolnej gotówki do od³o¿onej.
@@ -106,6 +121,8 @@ namespace Finly.Services
 
             SetSavedCash(userId, newSaved);
             SetCashOnHand(userId, newAll);
+
+            RaiseDataChanged();
         }
 
         /// <summary>
@@ -131,6 +148,8 @@ namespace Finly.Services
 
             SetSavedCash(userId, newSaved);
             SetCashOnHand(userId, newAll);
+
+            RaiseDataChanged();
         }
 
         /// <summary>
@@ -164,6 +183,8 @@ UPDATE BankAccounts
             var rows = cmd.ExecuteNonQuery();
             if (rows == 0)
                 throw new InvalidOperationException("Nie znaleziono rachunku bankowego lub nie nale¿y do u¿ytkownika.");
+
+            RaiseDataChanged();
         }
 
         /// <summary>
@@ -1589,7 +1610,11 @@ SELECT last_insert_rowid();";
             cmd.Parameters.AddWithValue("@note", (object?)note ?? DBNull.Value);
 
             var idObj = cmd.ExecuteScalar();
-            return Convert.ToInt32(idObj);
+            var id = Convert.ToInt32(idObj);
+
+            RaiseDataChanged();
+
+            return id;
         }
 
         public static void UpdateEnvelope(int id, int userId, string name, decimal target, decimal allocated, string? note)
@@ -1607,6 +1632,8 @@ WHERE Id=@id AND UserId=@u;";
             cmd.Parameters.AddWithValue("@a", allocated);
             cmd.Parameters.AddWithValue("@note", (object?)note ?? DBNull.Value);
             cmd.ExecuteNonQuery();
+
+            RaiseDataChanged();
         }
 
         public static void DeleteEnvelope(int id)
@@ -1616,12 +1643,11 @@ WHERE Id=@id AND UserId=@u;";
             cmd.CommandText = "DELETE FROM Envelopes WHERE Id=@id;";
             cmd.Parameters.AddWithValue("@id", id);
             cmd.ExecuteNonQuery();
+
+            RaiseDataChanged();
         }
 
-        // =========================================================
-        // ======================== GOTÓWKA ========================
-        // =========================================================
-
+        // GOTÓWKA
         public static decimal GetCashOnHand(int userId)
         {
             using var c = OpenAndEnsureSchema();
@@ -1644,6 +1670,8 @@ SET Amount=excluded.Amount, UpdatedAt=CURRENT_TIMESTAMP;";
             up.Parameters.AddWithValue("@u", userId);
             up.Parameters.AddWithValue("@a", amount);
             up.ExecuteNonQuery();
+
+            RaiseDataChanged();
         }
 
         // ===== GOTÓWKA OD£O¯ONA (SavedCash) =====
@@ -1671,15 +1699,17 @@ SET Amount = excluded.Amount,
             cmd.Parameters.AddWithValue("@u", userId);
             cmd.Parameters.AddWithValue("@a", amount);
             cmd.ExecuteNonQuery();
-        }
 
-        // ===== OPERACJE NA GOTÓWCE OD£O¯ONEJ I KOPERTACH =====
+            RaiseDataChanged();
+        }
 
         public static void AddToSavedCash(int userId, decimal amount)
         {
             if (amount <= 0) return;
             var current = GetSavedCash(userId);
             SetSavedCash(userId, current + amount);
+
+            // SetSavedCash already raises DataChanged
         }
 
         public static void SubtractFromSavedCash(int userId, decimal amount)
@@ -1691,6 +1721,8 @@ SET Amount = excluded.Amount,
                 throw new InvalidOperationException("Za ma³o œrodków w gotówce od³o¿onej.");
 
             SetSavedCash(userId, current - amount);
+
+            // SetSavedCash raises DataChanged
         }
 
         public static void AddToEnvelopeAllocated(int userId, int envelopeId, decimal amount)
@@ -1710,6 +1742,8 @@ UPDATE Envelopes
             var rows = cmd.ExecuteNonQuery();
             if (rows == 0)
                 throw new InvalidOperationException("Nie znaleziono wybranej koperty.");
+
+            RaiseDataChanged();
         }
 
         public static void SubtractFromEnvelopeAllocated(int userId, int envelopeId, decimal amount)
@@ -1745,6 +1779,8 @@ UPDATE Envelopes
                 cmd.Parameters.AddWithValue("@u", userId);
                 cmd.ExecuteNonQuery();
             }
+
+            RaiseDataChanged();
         }
 
         // =========================================================
@@ -2385,7 +2421,7 @@ VALUES (@u, @a, @d, @desc, @s);";
 
         /// <summary>
         /// Przychód bezpoœrednio na konto bankowe.
-        /// Zwiêksza Incomes oraz saldo wskazanego rachunku.
+        /// Zmniejsza Incomes oraz saldo wskazanego rachunku.
         /// </summary>
         public static void AddIncomeToBankAccount(
             int userId,
@@ -2414,62 +2450,5 @@ UPDATE BankAccounts
             if (rows == 0)
                 throw new InvalidOperationException("Nie znaleziono rachunku bankowego lub nie nale¿y do u¿ytkownika.");
         }
-
-        // ===== LOANY – operacje CRUD =====
-        // CRUD dla tabeli Loans
-
-        // ===== Loans CRUD =====
-        public static List<Models.LoanModel> GetLoans(int userId)
-        {
-            var list = new List<Models.LoanModel>();
-            using var c = OpenAndEnsureSchema();
-            using var cmd = c.CreateCommand();
-            cmd.CommandText = @"SELECT Id, UserId, Name, Principal, InterestRate, StartDate, TermMonths, Note
- FROM Loans WHERE UserId=@u ORDER BY StartDate DESC;";
- cmd.Parameters.AddWithValue("@u", userId);
- using var r = cmd.ExecuteReader();
- while (r.Read())
- {
- list.Add(new Models.LoanModel
- {
- Id = r.GetInt32(0),
- UserId = r.GetInt32(1),
- Name = r.IsDBNull(2) ? "" : r.GetString(2),
- Principal = r.IsDBNull(3) ?0m : Convert.ToDecimal(r.GetValue(3)),
- InterestRate = r.IsDBNull(4) ?0m : Convert.ToDecimal(r.GetValue(4)),
- StartDate = r.IsDBNull(5) ? DateTime.MinValue : DateTime.Parse(r.GetString(5)),
- TermMonths = r.IsDBNull(6) ?0 : r.GetInt32(6),
- Note = r.IsDBNull(7) ? null : r.GetString(7)
- });
- }
- return list;
- }
-
- public static int InsertLoan(Models.LoanModel loan)
- {
- using var c = OpenAndEnsureSchema();
- using var cmd = c.CreateCommand();
- cmd.CommandText = @"INSERT INTO Loans(UserId, Name, Principal, InterestRate, StartDate, TermMonths, Note)
- VALUES(@u,@n,@p,@r,@s,@t,@note);
- SELECT last_insert_rowid();";
- cmd.Parameters.AddWithValue("@u", loan.UserId);
- cmd.Parameters.AddWithValue("@n", loan.Name ?? "");
- cmd.Parameters.AddWithValue("@p", loan.Principal);
- cmd.Parameters.AddWithValue("@r", loan.InterestRate);
- cmd.Parameters.AddWithValue("@s", loan.StartDate.ToString("yyyy-MM-dd"));
- cmd.Parameters.AddWithValue("@t", loan.TermMonths);
- cmd.Parameters.AddWithValue("@note", (object?)loan.Note ?? DBNull.Value);
- var idObj = cmd.ExecuteScalar();
- return Convert.ToInt32(idObj);
- }
-
- public static void DeleteLoan(int id)
- {
- using var c = OpenAndEnsureSchema();
- using var cmd = c.CreateCommand();
- cmd.CommandText = "DELETE FROM Loans WHERE Id=@id;";
- cmd.Parameters.AddWithValue("@id", id);
- cmd.ExecuteNonQuery();
- }
- }
+    }
 }

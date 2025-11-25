@@ -42,8 +42,8 @@
             <Setter Property="Foreground" Value="{DynamicResource App.Foreground}"/>
         </Style>
 
-        <!-- ===== KAFEL ISTNIEJĄCEJ KOPERTY (DataRowView) ===== -->
-        <DataTemplate DataType="{x:Type data:DataRowView}">
+        <!-- ===== KAFEL ISTNIEJĄCEJ KOPERTY (EnvelopeVm) ===== -->
+        <DataTemplate DataType="{x:Type local:EnvelopeVm}">
             <Border Style="{StaticResource Card}"
                     Width="260">
                 <Grid>
@@ -65,11 +65,13 @@
                                        FontSize="18"
                                        Margin="0,0,6,0"
                                        VerticalAlignment="Center"/>
-                            <TextBlock Text="{Binding Row[Name]}"
+                            <TextBlock Text="{Binding Name}"
                                        FontSize="16"
                                        FontWeight="Bold"
                                        Foreground="White"
-                                       VerticalAlignment="Center"/>
+                                       VerticalAlignment="Center"
+                                       TextWrapping="Wrap"
+                                       MaxWidth="200"/>
                         </StackPanel>
 
                         <!-- Docelowa kwota -->
@@ -77,7 +79,7 @@
                                    FontWeight="SemiBold"
                                    Foreground="{DynamicResource App.Foreground}"
                                    Opacity="0.9"/>
-                        <TextBlock Text="{Binding Row[Target], StringFormat={}{0:N2} zł}"
+                        <TextBlock Text="{Binding Target, StringFormat={}{0:N2} zł}"
                                    Margin="0,2,0,4"
                                    Foreground="{DynamicResource App.Foreground}"/>
 
@@ -86,7 +88,7 @@
                                    FontWeight="SemiBold"
                                    Foreground="{DynamicResource App.Foreground}"
                                    Opacity="0.9"/>
-                        <TextBlock Text="{Binding Row[Allocated], StringFormat={}{0:N2} zł}"
+                        <TextBlock Text="{Binding Allocated, StringFormat={}{0:N2} zł}"
                                    Margin="0,2,0,4"
                                    Foreground="{DynamicResource App.Foreground}"/>
 
@@ -95,7 +97,17 @@
                                    FontWeight="SemiBold"
                                    Foreground="{DynamicResource App.Foreground}"
                                    Opacity="0.9"/>
-                        <TextBlock Text="{Binding Row[GoalText]}"
+                        <TextBlock Text="{Binding GoalText}"
+                                   Margin="0,2,0,4"
+                                   Foreground="{DynamicResource App.Foreground}"
+                                   TextWrapping="Wrap"/>
+
+                        <!-- Opis (z notatki) -->
+                        <TextBlock Text="Opis"
+                                   FontWeight="SemiBold"
+                                   Foreground="{DynamicResource App.Foreground}"
+                                   Opacity="0.9"/>
+                        <TextBlock Text="{Binding Description}"
                                    Margin="0,2,0,4"
                                    Foreground="{DynamicResource App.Foreground}"
                                    TextWrapping="Wrap"/>
@@ -105,7 +117,7 @@
                                    FontWeight="SemiBold"
                                    Foreground="{DynamicResource App.Foreground}"
                                    Opacity="0.9"/>
-                        <TextBlock Text="{Binding Row[Deadline]}"
+                        <TextBlock Text="{Binding Deadline}"
                                    Margin="0,2,0,4"
                                    Foreground="{DynamicResource App.Foreground}"
                                    TextWrapping="Wrap"/>
@@ -116,17 +128,18 @@
                                 Orientation="Horizontal"
                                 Margin="0,10,0,0"
                                 HorizontalAlignment="Right">
-                        <Button Content="Edytuj"
-                                Margin="0,0,8,0"
-                                Padding="8,4"
-                                MinWidth="70"
-                                Tag="{Binding}"
-                                Click="EditEnvelope_Click"/>
-                        <Button Content="Usuń"
-                                Padding="8,4"
-                                MinWidth="70"
-                                Tag="{Binding}"
-                                Click="DeleteEnvelope_Click"/>
+                        <Button Margin="0,0,8,0" Padding="6,4" MinWidth="70" Tag="{Binding}" Click="EditEnvelope_Click">
+                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                                <TextBlock FontFamily="Segoe MDL2 Assets" Text="\uE70F" Margin="0,0,6,0" />
+                                <TextBlock Text="Edytuj" />
+                            </StackPanel>
+                        </Button>
+                        <Button Padding="6,4" MinWidth="70" Tag="{Binding}" Click="DeleteEnvelope_Click">
+                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                                <TextBlock FontFamily="Segoe MDL2 Assets" Text="\uE74D" Margin="0,0,6,0" />
+                                <TextBlock Text="Usuń" />
+                            </StackPanel>
+                        </Button>
                     </StackPanel>
 
                     <!-- Panel potwierdzenia usunięcia koperty -->
@@ -301,7 +314,7 @@
             <Border x:Name="FormBorder"
                     Grid.Row="2"
                     Margin="0,16,0,24"
-                    Background="{DynamicResource Surface.Background}"
+                    Background="Transparent"
                     BorderBrush="{DynamicResource Surface.Border}"
                     BorderThickness="1"
                     CornerRadius="10"

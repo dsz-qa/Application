@@ -1,5 +1,6 @@
 ﻿using Finly.Services;
 using System;
+using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Data;
 using System.Globalization;
@@ -13,6 +14,8 @@ namespace Finly.Pages
 {
     // marker do kafelka "Dodaj kopertę"
     public sealed class AddEnvelopeTile { }
+
+    // EnvelopeVm defined in Pages/EnvelopeVm.cs
 
     public partial class EnvelopesPage : UserControl
     {
@@ -54,6 +57,8 @@ namespace Finly.Pages
 
         private void LoadAll()
         {
+            // Always ensure cards collection exists and contains the Add tile.
+            _cards.Clear();
             try
             {
                 _savedTotal = DatabaseService.GetSavedCash(_userId);
@@ -74,6 +79,8 @@ namespace Finly.Pages
                     if (!_dt.Columns.Contains("MonthlyRequired"))
                         _dt.Columns.Add("MonthlyRequired", typeof(decimal));
 
+                    var envList = new List<EnvelopeVm>();
+
                     foreach (DataRow r in _dt.Rows)
                     {
                         var target = SafeDec(r["Target"]);
@@ -82,21 +89,23 @@ namespace Finly.Pages
 
                         SplitNote(r["Note"]?.ToString(), out var goal, out var description, out var deadline);
                         r["GoalText"] = goal;
+                        r["Description"] = description; // expose description for tile
 
+                        string dl = "";
                         if (deadline.HasValue)
                         {
-                            r["Deadline"] = deadline.Value.ToString("d", CultureInfo.CurrentCulture);
+                            dl = deadline.Value.ToString("d", CultureInfo.CurrentCulture);
 
                             var remaining = target - alloc;
-                            if (remaining <= 0m)
+                            if (remaining <=0m)
                             {
-                                r["MonthlyRequired"] = 0m;
+                                r["MonthlyRequired"] =0m;
                             }
                             else
                             {
                                 int monthsLeft = MonthsBetween(DateTime.Today, deadline.Value);
-                                if (monthsLeft <= 0)
-                                    monthsLeft = 1;
+                                if (monthsLeft <=0)
+                                    monthsLeft =1;
 
                                 r["MonthlyRequired"] = remaining / monthsLeft;
                             }
@@ -104,34 +113,56 @@ namespace Finly.Pages
                         else
                         {
                             r["Deadline"] = "";
-                            r["MonthlyRequired"] = 0m;
+                            r["MonthlyRequired"] =0m;
                         }
+
+                        // create VM for UI
+                        var vm = new EnvelopeVm
+                        {
+                            Id = Convert.ToInt32(r["Id"]),
+                            Name = r["Name"]?.ToString() ?? "(bez nazwy)",
+                            Target = target,
+                            Allocated = alloc,
+                            GoalText = goal,
+                            Description = description,
+                            Deadline = dl,
+                            Note = r["Note"]?.ToString() ?? ""
+                        };
+
+                        envList.Add(vm);
                     }
+
+                    foreach (var ev in envList)
+                        _cards.Add(ev);
                 }
 
-                _cards.Clear();
-                if (_dt != null)
-                {
-                    foreach (DataRowView rowView in _dt.DefaultView)
-                        _cards.Add(rowView);
-                }
-                _cards.Add(new AddEnvelopeTile());
-
-                var allocated = _dt?.AsEnumerable().Sum(r => SafeDec(r["Allocated"])) ?? 0m;
+                var allocated = _dt?.AsEnumerable().Sum(r => SafeDec(r["Allocated"])) ??0m;
                 var unassigned = _savedTotal - allocated;
+                // treat tiny rounding differences as zero
+                if (Math.Abs(decimal.Round(unassigned,2)) ==0m) unassigned =0m;
 
                 TotalEnvelopesText.Text = allocated.ToString("N2") + " zł";
                 SavedCashText.Text = _savedTotal.ToString("N2") + " zł";
                 EnvelopesSumText.Text = allocated.ToString("N2") + " zł";
 
                 UnassignedText.Text = unassigned.ToString("N2") + " zł";
-                UnassignedText.Foreground = unassigned < 0
+                UnassignedText.Foreground = unassigned <0
                     ? Brushes.IndianRed
                     : (Brush)FindResource("App.Foreground");
             }
             catch (Exception ex)
             {
                 FormMessage.Text = "Błąd odczytu: " + ex.Message;
+                // set defaults so UI isn't empty
+                TotalEnvelopesText.Text = "0,00 zł";
+                SavedCashText.Text = "0,00 zł";
+                EnvelopesSumText.Text = "0,00 zł";
+                UnassignedText.Text = "0,00 zł";
+            }
+            finally
+            {
+                // Ensure Add tile is always present so user can add new envelope even if DB failed
+                _cards.Add(new AddEnvelopeTile());
             }
         }
 
@@ -283,16 +314,17 @@ namespace Finly.Pages
             FormBorder.Visibility = Visibility.Visible;
         }
 
-        private void SetEditMode(int id, DataRow row)
+        private void SetEditMode(int id, EnvelopeVm vm)
         {
             _editingId = id;
             FormHeader.Text = "Edytuj kopertę";
 
-            NameBox.Text = row["Name"]?.ToString() ?? "";
-            TargetBox.Text = SafeDec(row["Target"]).ToString("N2");
-            AllocatedBox.Text = SafeDec(row["Allocated"]).ToString("N2");
+            NameBox.Text = vm.Name;
+            TargetBox.Text = vm.Target.ToString("N2");
+            AllocatedBox.Text = vm.Allocated.ToString("N2");
 
-            SplitNote(row["Note"]?.ToString(), out var goal, out var description, out var deadline);
+            // parse note into fields
+            SplitNote(vm.Note, out var goal, out var description, out var deadline);
             GoalBox.Text = goal;
             DescriptionBox.Text = description;
             DeadlinePicker.SelectedDate = deadline;
@@ -358,10 +390,10 @@ namespace Finly.Pages
 
         private void EditEnvelope_Click(object sender, RoutedEventArgs e)
         {
-            if ((sender as Button)?.Tag is not DataRowView drv) return;
-            var row = drv.Row;
-            var id = Convert.ToInt32(row["Id"]);
-            SetEditMode(id, row);
+            if ((sender as Button)?.Tag is EnvelopeVm vm)
+            {
+                SetEditMode(vm.Id, vm);
+            }
         }
 
         /// <summary>
@@ -392,11 +424,17 @@ namespace Finly.Pages
         /// </summary>
         private void DeleteEnvelopeConfirm_Click(object sender, RoutedEventArgs e)
         {
-            if ((sender as FrameworkElement)?.DataContext is not DataRowView drv) return;
+            EnvelopeVm? vm = null;
+            if ((sender as FrameworkElement)?.DataContext is EnvelopeVm dctx)
+                vm = dctx;
 
-            var row = drv.Row;
-            var id = Convert.ToInt32(row["Id"]);
-            var allocated = SafeDec(row["Allocated"]);
+            if (vm == null && (sender as FrameworkElement)?.Tag is EnvelopeVm tagVm)
+                vm = tagVm;
+
+            if (vm == null) return;
+
+            var id = vm.Id;
+            var allocated = vm.Allocated;
 
             try
             {
@@ -409,13 +447,6 @@ namespace Finly.Pages
                 LoadAll();
                 FormBorder.Visibility = Visibility.Collapsed;
                 FormMessage.Text = "Kopertę usunięto.";
-
-                if (sender is FrameworkElement fe)
-                {
-                    var panel = FindTemplateChild<StackPanel>(fe, "EnvelopeDeleteConfirmPanel");
-                    if (panel != null)
-                        panel.Visibility = Visibility.Collapsed;
-                }
             }
             catch (Exception ex)
             {
@@ -438,26 +469,25 @@ namespace Finly.Pages
                 return;
             }
 
-            if (allocated < 0 || target < 0)
+            if (allocated <0 || target <0)
             {
                 FormMessage.Text = "Kwoty nie mogą być ujemne.";
                 return;
             }
 
-            // różnica przydzielonej kwoty względem poprzedniego stanu
-            decimal previousAllocated = 0m;
-            if (_editingId is int idExisting && _dt != null)
+            // previous allocated from existing VM if editing
+            decimal previousAllocated =0m;
+            if (_editingId is int idExisting)
             {
-                var row = _dt.AsEnumerable()
-                             .FirstOrDefault(r => Convert.ToInt32(r["Id"]) == idExisting);
-                if (row != null)
-                    previousAllocated = SafeDec(row["Allocated"]);
+                var existingVm = _cards.OfType<EnvelopeVm>().FirstOrDefault(x => x.Id == idExisting);
+                if (existingVm != null)
+                    previousAllocated = existingVm.Allocated;
             }
 
-            var delta = allocated - previousAllocated;   // ile nowej kasy dokładamy
-            var newSavedTotal = _savedTotal - delta;     // zdejmujemy z odłożonej gotówki
+            var delta = allocated - previousAllocated; // ile nowej kasy dokładamy
+            var newSavedTotal = _savedTotal - delta; // zdejmujemy z odłożonej gotówki
 
-            if (newSavedTotal < 0)
+            if (newSavedTotal <0)
             {
                 FormMessage.Text = "Nie masz tyle odłożonej gotówki, aby przydzielić tę kwotę do kopert.";
                 return;
