@@ -15,6 +15,9 @@ namespace Finly.Pages
         // powiązanie 1:1 z kopertą
         public int EnvelopeId { get; set; }
 
+        // Tekst nagłówka "Cel: ..."
+        public string GoalTitle { get; set; } = "";
+
         public string Name { get; set; } = "";
         public decimal TargetAmount { get; set; }
         public decimal CurrentAmount { get; set; }
@@ -101,20 +104,24 @@ namespace Finly.Pages
             var list = DatabaseService.GetEnvelopeGoals(_uid);
             foreach (var g in list)
             {
+                var (goalTitle, description) = SplitGoalText(g.GoalText, g.Name);
+
                 _goals.Add(new GoalVm
                 {
                     EnvelopeId = g.EnvelopeId,
                     Name = g.Name,
+                    GoalTitle = goalTitle,
                     TargetAmount = g.Target,
                     CurrentAmount = g.Allocated,
                     DueDate = g.Deadline,
-                    Description = g.GoalText ?? string.Empty
+                    Description = description
                 });
             }
 
             RebuildItems();
             RefreshKpis();
         }
+
 
         private void RebuildItems()
         {
@@ -150,6 +157,45 @@ namespace Finly.Pages
             TotalGoalsSavedText.Text = totalSaved.ToString("N2") + " zł";
             TotalMonthlyNeededText.Text = totalMonthly.ToString("N2") + " zł";
         }
+
+        private static (string goalTitle, string description) SplitGoalText(string? raw, string fallbackName)
+        {
+            if (string.IsNullOrWhiteSpace(raw))
+                return (fallbackName, string.Empty);
+
+            string goalTitle = "";
+            var descLines = new System.Collections.Generic.List<string>();
+
+            var lines = raw.Split(new[] { '\n' }, StringSplitOptions.RemoveEmptyEntries);
+            foreach (var rawLine in lines)
+            {
+                var line = rawLine.Trim();
+                if (line.Length == 0) continue;
+
+                if (line.StartsWith("Cel:", StringComparison.OrdinalIgnoreCase))
+                {
+                    // "Cel: Spłata pożyczki u Pani Beaty" -> "Spłata pożyczki u Pani Beaty"
+                    goalTitle = line.Substring(4).Trim();
+                }
+                else if (line.StartsWith("Termin:", StringComparison.OrdinalIgnoreCase))
+                {
+                    // tę linię pomijamy – termin już pokazujemy wyżej w osobnym polu
+                    continue;
+                }
+                else
+                {
+                    // reszta (np. "Opis: ...") leci do opisu
+                    descLines.Add(line);
+                }
+            }
+
+            if (string.IsNullOrWhiteSpace(goalTitle))
+                goalTitle = fallbackName;  // awaryjnie weź nazwę koperty
+
+            var description = string.Join(Environment.NewLine, descLines);
+            return (goalTitle, description);
+        }
+
 
         // ========= helper do szukania panelu potwierdzenia w szablonie =========
 
