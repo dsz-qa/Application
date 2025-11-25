@@ -3,10 +3,10 @@ using System;
 using System.Collections.ObjectModel;
 using System.Globalization;
 using System.Linq;
-using System.Reflection.PortableExecutable;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
+using System.Windows.Media;
 
 namespace Finly.Pages
 {
@@ -151,6 +151,26 @@ namespace Finly.Pages
             TotalMonthlyNeededText.Text = totalMonthly.ToString("N2") + " zł";
         }
 
+        // ========= helper do szukania panelu potwierdzenia w szablonie =========
+
+        private static T? FindTemplateChild<T>(DependencyObject start, string childName)
+            where T : FrameworkElement
+        {
+            var current = start;
+            while (current != null)
+            {
+                if (current is FrameworkElement fe)
+                {
+                    var candidate = fe.FindName(childName) as T;
+                    if (candidate != null)
+                        return candidate;
+                }
+
+                current = VisualTreeHelper.GetParent(current);
+            }
+            return null;
+        }
+
         // ========= kafel „Dodaj cel” =========
 
         private void AddGoalCard_Click(object sender, MouseButtonEventArgs e)
@@ -184,7 +204,33 @@ namespace Finly.Pages
             GoalDescriptionBox.Text = vm.Description ?? "";
         }
 
+        /// <summary>
+        /// Kliknięcie "Usuń" – tylko pokazuje panel potwierdzenia.
+        /// </summary>
         private void DeleteGoal_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is FrameworkElement fe)
+            {
+                var panel = FindTemplateChild<StackPanel>(fe, "GoalDeleteConfirmPanel");
+                if (panel != null)
+                    panel.Visibility = Visibility.Visible;
+            }
+        }
+
+        private void DeleteGoalCancel_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is FrameworkElement fe)
+            {
+                var panel = FindTemplateChild<StackPanel>(fe, "GoalDeleteConfirmPanel");
+                if (panel != null)
+                    panel.Visibility = Visibility.Collapsed;
+            }
+        }
+
+        /// <summary>
+        /// Faktyczne usunięcie celu po kliknięciu "Tak".
+        /// </summary>
+        private void DeleteGoalConfirm_Click(object sender, RoutedEventArgs e)
         {
             if ((sender as FrameworkElement)?.DataContext is not GoalVm vm)
                 return;
@@ -197,6 +243,13 @@ namespace Finly.Pages
                 _goals.Remove(vm);
                 RebuildItems();
                 RefreshKpis();
+
+                if (sender is FrameworkElement fe)
+                {
+                    var panel = FindTemplateChild<StackPanel>(fe, "GoalDeleteConfirmPanel");
+                    if (panel != null)
+                        panel.Visibility = Visibility.Collapsed;
+                }
             }
             catch (Exception ex)
             {

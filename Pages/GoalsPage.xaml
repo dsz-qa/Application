@@ -147,6 +147,29 @@
                         </Button>
                     </StackPanel>
 
+                    <!-- PANEL POTWIERDZENIA USUNIĘCIA CELU -->
+                    <StackPanel x:Name="GoalDeleteConfirmPanel"
+                                Orientation="Vertical"
+                                Margin="0,6,0,0"
+                                Visibility="Collapsed">
+                        <TextBlock Text="Czy na pewno chcesz usunąć ten cel?"
+                                   FontSize="12"
+                                   Foreground="{DynamicResource App.Foreground}"
+                                   Margin="0,0,0,4"/>
+                        <StackPanel Orientation="Horizontal"
+                                    HorizontalAlignment="Right">
+                            <Button Content="Tak"
+                                    Margin="0,0,8,0"
+                                    Padding="8,3"
+                                    MinWidth="60"
+                                    Click="DeleteGoalConfirm_Click"/>
+                            <Button Content="Nie"
+                                    Padding="8,3"
+                                    MinWidth="60"
+                                    Click="DeleteGoalCancel_Click"/>
+                        </StackPanel>
+                    </StackPanel>
+
                 </StackPanel>
             </Border>
         </DataTemplate>

@@ -304,6 +304,25 @@ namespace Finly.Pages
             FormBorder.Visibility = Visibility.Visible;
         }
 
+        // helper do szukania panelu potwierdzenia w szablonie
+        private static T? FindTemplateChild<T>(DependencyObject start, string childName)
+            where T : FrameworkElement
+        {
+            var current = start;
+            while (current != null)
+            {
+                if (current is FrameworkElement fe)
+                {
+                    var candidate = fe.FindName(childName) as T;
+                    if (candidate != null)
+                        return candidate;
+                }
+
+                current = VisualTreeHelper.GetParent(current);
+            }
+            return null;
+        }
+
         // ===================== ZDARZENIA UI =====================
 
         private void AddEnvelopeCard_Click(object sender, MouseButtonEventArgs e)
@@ -345,22 +364,39 @@ namespace Finly.Pages
             SetEditMode(id, row);
         }
 
+        /// <summary>
+        /// Kliknięcie "Usuń" – tylko pokazuje panel potwierdzenia.
+        /// </summary>
         private void DeleteEnvelope_Click(object sender, RoutedEventArgs e)
         {
-            if ((sender as Button)?.Tag is not DataRowView drv) return;
+            if (sender is FrameworkElement fe)
+            {
+                var panel = FindTemplateChild<StackPanel>(fe, "EnvelopeDeleteConfirmPanel");
+                if (panel != null)
+                    panel.Visibility = Visibility.Visible;
+            }
+        }
+
+        private void DeleteEnvelopeCancel_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is FrameworkElement fe)
+            {
+                var panel = FindTemplateChild<StackPanel>(fe, "EnvelopeDeleteConfirmPanel");
+                if (panel != null)
+                    panel.Visibility = Visibility.Collapsed;
+            }
+        }
+
+        /// <summary>
+        /// Faktyczne usunięcie koperty po kliknięciu "Tak".
+        /// </summary>
+        private void DeleteEnvelopeConfirm_Click(object sender, RoutedEventArgs e)
+        {
+            if ((sender as FrameworkElement)?.DataContext is not DataRowView drv) return;
 
             var row = drv.Row;
             var id = Convert.ToInt32(row["Id"]);
             var allocated = SafeDec(row["Allocated"]);
-
-            var result = MessageBox.Show(
-                "Usunąć tę kopertę? Operacja nieodwracalna.",
-                "Usuń kopertę",
-                MessageBoxButton.YesNo,
-                MessageBoxImage.Warning);
-
-            if (result != MessageBoxResult.Yes)
-                return;
 
             try
             {
@@ -373,6 +409,13 @@ namespace Finly.Pages
                 LoadAll();
                 FormBorder.Visibility = Visibility.Collapsed;
                 FormMessage.Text = "Kopertę usunięto.";
+
+                if (sender is FrameworkElement fe)
+                {
+                    var panel = FindTemplateChild<StackPanel>(fe, "EnvelopeDeleteConfirmPanel");
+                    if (panel != null)
+                        panel.Visibility = Visibility.Collapsed;
+                }
             }
             catch (Exception ex)
             {
@@ -442,8 +485,7 @@ namespace Finly.Pages
                 DatabaseService.SetSavedCash(_userId, newSavedTotal);
                 _savedTotal = newSavedTotal;
 
-                // *** NOWE: zapisujemy cel/termin także w kolumnach używanych przez stronę „Cele” ***
-                //      Dzięki temu GoalsPage widzi ten sam termin i liczy miesięczną kwotę
+                // zapisujemy też cel/termin pod stronę "Cele"
                 if (deadline.HasValue)
                 {
                     DatabaseService.UpdateEnvelopeGoal(
@@ -452,7 +494,7 @@ namespace Finly.Pages
                         target,
                         allocated,
                         deadline.Value,
-                        note   // tu możesz równie dobrze podać sam goal/description, ważne że deadline idzie do bazy
+                        note
                     );
                 }
 

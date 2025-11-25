@@ -49,7 +49,11 @@
                 <Grid>
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto"/>
+                        <!-- dane -->
                         <RowDefinition Height="Auto"/>
+                        <!-- przyciski -->
+                        <RowDefinition Height="Auto"/>
+                        <!-- potwierdzenie -->
                     </Grid.RowDefinitions>
 
                     <StackPanel Grid.Row="0">
@@ -96,7 +100,7 @@
                                    Foreground="{DynamicResource App.Foreground}"
                                    TextWrapping="Wrap"/>
 
-                        <!-- Termin (tylko data, bez miesięcznej kwoty) -->
+                        <!-- Termin -->
                         <TextBlock Text="Termin"
                                    FontWeight="SemiBold"
                                    Foreground="{DynamicResource App.Foreground}"
@@ -123,6 +127,30 @@
                                 MinWidth="70"
                                 Tag="{Binding}"
                                 Click="DeleteEnvelope_Click"/>
+                    </StackPanel>
+
+                    <!-- Panel potwierdzenia usunięcia koperty -->
+                    <StackPanel x:Name="EnvelopeDeleteConfirmPanel"
+                                Grid.Row="2"
+                                Orientation="Vertical"
+                                Margin="0,6,0,0"
+                                Visibility="Collapsed">
+                        <TextBlock Text="Czy na pewno chcesz usunąć tę kopertę?"
+                                   FontSize="12"
+                                   Foreground="{DynamicResource App.Foreground}"
+                                   Margin="0,0,0,4"/>
+                        <StackPanel Orientation="Horizontal"
+                                    HorizontalAlignment="Right">
+                            <Button Content="Tak"
+                                    Margin="0,0,8,0"
+                                    Padding="8,3"
+                                    MinWidth="60"
+                                    Click="DeleteEnvelopeConfirm_Click"/>
+                            <Button Content="Nie"
+                                    Padding="8,3"
+                                    MinWidth="60"
+                                    Click="DeleteEnvelopeCancel_Click"/>
+                        </StackPanel>
                     </StackPanel>
                 </Grid>
             </Border>

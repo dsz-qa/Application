@@ -1372,6 +1372,7 @@ ORDER BY Name COLLATE NOCASE;";
             bool hasDeadline = ColumnExists(c, "Envelopes", "Deadline");
             bool hasGoalText = ColumnExists(c, "Envelopes", "GoalText");
 
+            // ===== budowa SQL =====
             var sql = @"
 SELECT 
     Id,
@@ -1379,14 +1380,26 @@ SELECT
     Target,
     COALESCE(Allocated,0) AS Allocated";
 
+            // kolumna z deadlinem (jeœli nie ma – zwracamy NULL)
             sql += hasDeadline ? ", Deadline" : ", NULL AS Deadline";
+
+            // tekst celu: osobna kolumna GoalText lub fallback na Note
             sql += hasGoalText ? ", GoalText" : ", Note AS GoalText";
 
             sql += @"
 FROM Envelopes
-WHERE UserId=@u
+WHERE UserId = @u
   AND Target IS NOT NULL
-  AND Target > 0
+  AND Target > 0";
+
+            // jeœli mamy kolumnê Deadline, traktujemy j¹ jako warunek:
+            // cel jest tylko wtedy, gdy Deadline nie jest NULL
+            if (hasDeadline)
+            {
+                sql += " AND Deadline IS NOT NULL";
+            }
+
+            sql += @"
 ORDER BY Name COLLATE NOCASE;";
 
             cmd.CommandText = sql;
@@ -1404,10 +1417,17 @@ ORDER BY Name COLLATE NOCASE;";
                     GoalText = GetNullableString(r, 5)
                 };
 
+                // 1) próba odczytu Deadline z kolumny (jeœli istnieje)
                 if (hasDeadline)
                 {
                     var dt = GetDate(r, 4);
                     dto.Deadline = dt == DateTime.MinValue ? (DateTime?)null : dt;
+                }
+
+                // 2) jeœli Deadline jest puste, spróbujmy wyci¹gn¹æ je z tekstu celu / notatki
+                if (dto.Deadline == null && !string.IsNullOrWhiteSpace(dto.GoalText))
+                {
+                    dto.Deadline = TryParseDeadlineFromGoalText(dto.GoalText);
                 }
 
                 list.Add(dto);
@@ -1416,9 +1436,53 @@ ORDER BY Name COLLATE NOCASE;";
             return list;
         }
 
+
+        // === POMOCNICZE: parsowanie terminu z tekstu notatki / celu ===
+        private static DateTime? TryParseDeadlineFromGoalText(string? text)
+        {
+            if (string.IsNullOrWhiteSpace(text))
+                return null;
+
+            var lines = text.Split(new[] { '\n' }, StringSplitOptions.RemoveEmptyEntries);
+
+            foreach (var rawLine in lines)
+            {
+                var line = rawLine.Trim();
+
+                if (line.StartsWith("Termin:", StringComparison.OrdinalIgnoreCase))
+                {
+                    var dateText = line.Substring(7).Trim();
+
+                    // najpierw format "yyyy-MM-dd"
+                    if (DateTime.TryParseExact(
+                            dateText,
+                            "yyyy-MM-dd",
+                            CultureInfo.InvariantCulture,
+                            DateTimeStyles.None,
+                            out var d1))
+                    {
+                        return d1.Date;
+                    }
+
+                    // potem lokalny format (np. 12.10.2026)
+                    if (DateTime.TryParse(
+                            dateText,
+                            CultureInfo.CurrentCulture,
+                            DateTimeStyles.None,
+                            out var d2))
+                    {
+                        return d2.Date;
+                    }
+                }
+            }
+
+            return null;
+        }
+
         /// <summary>
-        /// Czyœci dane celu w kopercie (Target, Allocated, Deadline, GoalText/Note),
-        /// ale NIE usuwa samej koperty.
+        /// Czyœci dane celu w kopercie, ale NIE usuwa samej koperty
+        /// i NIE zmienia Target / Allocated (¿eby nie waliæ w NOT NULL).
+        /// Dziêki temu koperta zostaje, a znikaj¹ tylko dane celu.
         /// </summary>
         public static void ClearEnvelopeGoal(int userId, int envelopeId)
         {
@@ -1427,20 +1491,28 @@ ORDER BY Name COLLATE NOCASE;";
             bool hasDeadline = ColumnExists(c, "Envelopes", "Deadline");
             bool hasGoalText = ColumnExists(c, "Envelopes", "GoalText");
 
-            var sb = new StringBuilder(@"
-UPDATE Envelopes
-   SET Target = NULL,
-       Allocated = NULL");
+            var sb = new StringBuilder("UPDATE Envelopes SET ");
+
+            bool first = true;
 
             if (hasDeadline)
-                sb.Append(", Deadline = NULL");
+            {
+                sb.Append("Deadline = NULL");
+                first = false;
+            }
 
             // jeœli mamy osobn¹ kolumnê GoalText – czyœcimy j¹,
-            // w przeciwnym razie czyœcimy Note (bo tam trzymamy opis celu)
+            // w przeciwnym razie czyœcimy Note (tam trzymamy opis celu)
             if (hasGoalText)
-                sb.Append(", GoalText = NULL");
+            {
+                if (!first) sb.Append(", ");
+                sb.Append("GoalText = NULL");
+            }
             else
-                sb.Append(", Note = NULL");
+            {
+                if (!first) sb.Append(", ");
+                sb.Append("Note = NULL");
+            }
 
             sb.Append(" WHERE Id=@id AND UserId=@u;");
 
@@ -1450,6 +1522,7 @@ UPDATE Envelopes
             cmd.Parameters.AddWithValue("@u", userId);
             cmd.ExecuteNonQuery();
         }
+
 
         /// <summary>
         /// Ustawia / aktualizuje dane celu dla danej koperty:
