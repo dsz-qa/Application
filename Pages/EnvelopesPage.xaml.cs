@@ -1,6 +1,5 @@
 ﻿using Finly.Services;
 using System;
-using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Data;
 using System.Globalization;
@@ -9,13 +8,12 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
+using System.Windows.Media.Imaging;
 
 namespace Finly.Pages
 {
     // marker do kafelka "Dodaj kopertę"
     public sealed class AddEnvelopeTile { }
-
-    // EnvelopeVm defined in Pages/EnvelopeVm.cs
 
     public partial class EnvelopesPage : UserControl
     {
@@ -57,8 +55,6 @@ namespace Finly.Pages
 
         private void LoadAll()
         {
-            // Always ensure cards collection exists and contains the Add tile.
-            _cards.Clear();
             try
             {
                 _savedTotal = DatabaseService.GetSavedCash(_userId);
@@ -73,13 +69,14 @@ namespace Finly.Pages
                     if (!_dt.Columns.Contains("GoalText"))
                         _dt.Columns.Add("GoalText", typeof(string));
 
+                    if (!_dt.Columns.Contains("Description"))
+                        _dt.Columns.Add("Description", typeof(string));
+
                     if (!_dt.Columns.Contains("Deadline"))
                         _dt.Columns.Add("Deadline", typeof(string));
 
                     if (!_dt.Columns.Contains("MonthlyRequired"))
                         _dt.Columns.Add("MonthlyRequired", typeof(decimal));
-
-                    var envList = new List<EnvelopeVm>();
 
                     foreach (DataRow r in _dt.Rows)
                     {
@@ -89,23 +86,22 @@ namespace Finly.Pages
 
                         SplitNote(r["Note"]?.ToString(), out var goal, out var description, out var deadline);
                         r["GoalText"] = goal;
-                        r["Description"] = description; // expose description for tile
+                        r["Description"] = description; // <- now description is available to XAML
 
-                        string dl = "";
                         if (deadline.HasValue)
                         {
-                            dl = deadline.Value.ToString("d", CultureInfo.CurrentCulture);
+                            r["Deadline"] = deadline.Value.ToString("d", CultureInfo.CurrentCulture);
 
                             var remaining = target - alloc;
-                            if (remaining <=0m)
+                            if (remaining <= 0m)
                             {
-                                r["MonthlyRequired"] =0m;
+                                r["MonthlyRequired"] = 0m;
                             }
                             else
                             {
                                 int monthsLeft = MonthsBetween(DateTime.Today, deadline.Value);
-                                if (monthsLeft <=0)
-                                    monthsLeft =1;
+                                if (monthsLeft <= 0)
+                                    monthsLeft = 1;
 
                                 r["MonthlyRequired"] = remaining / monthsLeft;
                             }
@@ -113,56 +109,34 @@ namespace Finly.Pages
                         else
                         {
                             r["Deadline"] = "";
-                            r["MonthlyRequired"] =0m;
+                            r["MonthlyRequired"] = 0m;
                         }
-
-                        // create VM for UI
-                        var vm = new EnvelopeVm
-                        {
-                            Id = Convert.ToInt32(r["Id"]),
-                            Name = r["Name"]?.ToString() ?? "(bez nazwy)",
-                            Target = target,
-                            Allocated = alloc,
-                            GoalText = goal,
-                            Description = description,
-                            Deadline = dl,
-                            Note = r["Note"]?.ToString() ?? ""
-                        };
-
-                        envList.Add(vm);
                     }
-
-                    foreach (var ev in envList)
-                        _cards.Add(ev);
                 }
 
-                var allocated = _dt?.AsEnumerable().Sum(r => SafeDec(r["Allocated"])) ??0m;
+                _cards.Clear();
+                if (_dt != null)
+                {
+                    foreach (DataRowView rowView in _dt.DefaultView)
+                        _cards.Add(rowView);
+                }
+                _cards.Add(new AddEnvelopeTile());
+
+                var allocated = _dt?.AsEnumerable().Sum(r => SafeDec(r["Allocated"])) ?? 0m;
                 var unassigned = _savedTotal - allocated;
-                // treat tiny rounding differences as zero
-                if (Math.Abs(decimal.Round(unassigned,2)) ==0m) unassigned =0m;
 
                 TotalEnvelopesText.Text = allocated.ToString("N2") + " zł";
                 SavedCashText.Text = _savedTotal.ToString("N2") + " zł";
                 EnvelopesSumText.Text = allocated.ToString("N2") + " zł";
 
                 UnassignedText.Text = unassigned.ToString("N2") + " zł";
-                UnassignedText.Foreground = unassigned <0
+                UnassignedText.Foreground = unassigned < 0
                     ? Brushes.IndianRed
                     : (Brush)FindResource("App.Foreground");
             }
             catch (Exception ex)
             {
                 FormMessage.Text = "Błąd odczytu: " + ex.Message;
-                // set defaults so UI isn't empty
-                TotalEnvelopesText.Text = "0,00 zł";
-                SavedCashText.Text = "0,00 zł";
-                EnvelopesSumText.Text = "0,00 zł";
-                UnassignedText.Text = "0,00 zł";
-            }
-            finally
-            {
-                // Ensure Add tile is always present so user can add new envelope even if DB failed
-                _cards.Add(new AddEnvelopeTile());
             }
         }
 
@@ -314,17 +288,16 @@ namespace Finly.Pages
             FormBorder.Visibility = Visibility.Visible;
         }
 
-        private void SetEditMode(int id, EnvelopeVm vm)
+        private void SetEditMode(int id, DataRow row)
         {
             _editingId = id;
             FormHeader.Text = "Edytuj kopertę";
 
-            NameBox.Text = vm.Name;
-            TargetBox.Text = vm.Target.ToString("N2");
-            AllocatedBox.Text = vm.Allocated.ToString("N2");
+            NameBox.Text = row["Name"]?.ToString() ?? "";
+            TargetBox.Text = SafeDec(row["Target"]).ToString("N2");
+            AllocatedBox.Text = SafeDec(row["Allocated"]).ToString("N2");
 
-            // parse note into fields
-            SplitNote(vm.Note, out var goal, out var description, out var deadline);
+            SplitNote(row["Note"]?.ToString(), out var goal, out var description, out var deadline);
             GoalBox.Text = goal;
             DescriptionBox.Text = description;
             DeadlinePicker.SelectedDate = deadline;
@@ -334,25 +307,6 @@ namespace Finly.Pages
             FormMessage.Text = string.Empty;
             SaveEnvelopeBtn.Content = "Zapisz zmiany";
             FormBorder.Visibility = Visibility.Visible;
-        }
-
-        // helper do szukania panelu potwierdzenia w szablonie
-        private static T? FindTemplateChild<T>(DependencyObject start, string childName)
-            where T : FrameworkElement
-        {
-            var current = start;
-            while (current != null)
-            {
-                if (current is FrameworkElement fe)
-                {
-                    var candidate = fe.FindName(childName) as T;
-                    if (candidate != null)
-                        return candidate;
-                }
-
-                current = VisualTreeHelper.GetParent(current);
-            }
-            return null;
         }
 
         // ===================== ZDARZENIA UI =====================
@@ -390,51 +344,45 @@ namespace Finly.Pages
 
         private void EditEnvelope_Click(object sender, RoutedEventArgs e)
         {
-            if ((sender as Button)?.Tag is EnvelopeVm vm)
-            {
-                SetEditMode(vm.Id, vm);
-            }
+            if ((sender as Button)?.Tag is not DataRowView drv) return;
+            var row = drv.Row;
+            var id = Convert.ToInt32(row["Id"]);
+            SetEditMode(id, row);
         }
 
-        /// <summary>
-        /// Kliknięcie "Usuń" – tylko pokazuje panel potwierdzenia.
-        /// </summary>
+        // show / hide inline confirmation (nie MsgBox)
         private void DeleteEnvelope_Click(object sender, RoutedEventArgs e)
         {
-            if (sender is FrameworkElement fe)
+            if ((sender as Button)?.Tag is not DataRowView drv) return;
+            var btn = sender as Button;
+
+            // znajdź kontener karty (Border) i panel potwierdzenia wewnątrz niej
+            var cardBorder = FindVisualParent<Border>(btn);
+            if (cardBorder == null) return;
+
+            var confirmPanel = FindDescendantByName<FrameworkElement>(cardBorder, "DeleteConfirmPanel");
+            if (confirmPanel == null) return;
+
+            // przełącz widoczność; przed pokazaniem ukryj inne panele
+            if (confirmPanel.Visibility == Visibility.Visible)
             {
-                var panel = FindTemplateChild<StackPanel>(fe, "EnvelopeDeleteConfirmPanel");
-                if (panel != null)
-                    panel.Visibility = Visibility.Visible;
+                confirmPanel.Visibility = Visibility.Collapsed;
+            }
+            else
+            {
+                HideAllDeleteConfirmPanels();
+                confirmPanel.Visibility = Visibility.Visible;
             }
         }
 
-        private void DeleteEnvelopeCancel_Click(object sender, RoutedEventArgs e)
+        // potwierdź usunięcie (Tak)
+        private void ConfirmDeleteEnvelope_Click(object sender, RoutedEventArgs e)
         {
-            if (sender is FrameworkElement fe)
-            {
-                var panel = FindTemplateChild<StackPanel>(fe, "EnvelopeDeleteConfirmPanel");
-                if (panel != null)
-                    panel.Visibility = Visibility.Collapsed;
-            }
-        }
+            if ((sender as Button)?.Tag is not DataRowView drv) return;
 
-        /// <summary>
-        /// Faktyczne usunięcie koperty po kliknięciu "Tak".
-        /// </summary>
-        private void DeleteEnvelopeConfirm_Click(object sender, RoutedEventArgs e)
-        {
-            EnvelopeVm? vm = null;
-            if ((sender as FrameworkElement)?.DataContext is EnvelopeVm dctx)
-                vm = dctx;
-
-            if (vm == null && (sender as FrameworkElement)?.Tag is EnvelopeVm tagVm)
-                vm = tagVm;
-
-            if (vm == null) return;
-
-            var id = vm.Id;
-            var allocated = vm.Allocated;
+            var row = drv.Row;
+            var id = Convert.ToInt32(row["Id"]);
+            var allocated = SafeDec(row["Allocated"]);
 
             try
             {
@@ -454,6 +402,16 @@ namespace Finly.Pages
             }
         }
 
+        // anuluj potwierdzenie (Nie)
+        private void CancelDeleteEnvelope_Click(object sender, RoutedEventArgs e)
+        {
+            var btn = sender as Button;
+            var cardBorder = FindVisualParent<Border>(btn);
+            if (cardBorder == null) return;
+            var confirmPanel = FindDescendantByName<FrameworkElement>(cardBorder, "DeleteConfirmPanel");
+            if (confirmPanel != null) confirmPanel.Visibility = Visibility.Collapsed;
+        }
+
         private void SaveEnvelope_Click(object sender, RoutedEventArgs e)
         {
             var name = (NameBox.Text ?? "").Trim();
@@ -469,25 +427,26 @@ namespace Finly.Pages
                 return;
             }
 
-            if (allocated <0 || target <0)
+            if (allocated < 0 || target < 0)
             {
                 FormMessage.Text = "Kwoty nie mogą być ujemne.";
                 return;
             }
 
-            // previous allocated from existing VM if editing
-            decimal previousAllocated =0m;
-            if (_editingId is int idExisting)
+            // różnica przydzielonej kwoty względem poprzedniego stanu
+            decimal previousAllocated = 0m;
+            if (_editingId is int idExisting && _dt != null)
             {
-                var existingVm = _cards.OfType<EnvelopeVm>().FirstOrDefault(x => x.Id == idExisting);
-                if (existingVm != null)
-                    previousAllocated = existingVm.Allocated;
+                var row = _dt.AsEnumerable()
+                             .FirstOrDefault(r => Convert.ToInt32(r["Id"]) == idExisting);
+                if (row != null)
+                    previousAllocated = SafeDec(row["Allocated"]);
             }
 
-            var delta = allocated - previousAllocated; // ile nowej kasy dokładamy
-            var newSavedTotal = _savedTotal - delta; // zdejmujemy z odłożonej gotówki
+            var delta = allocated - previousAllocated;   // ile nowej kasy dokładamy
+            var newSavedTotal = _savedTotal - delta;     // zdejmujemy z odłożonej gotówki
 
-            if (newSavedTotal <0)
+            if (newSavedTotal < 0)
             {
                 FormMessage.Text = "Nie masz tyle odłożonej gotówki, aby przydzielić tę kwotę do kopert.";
                 return;
@@ -515,7 +474,7 @@ namespace Finly.Pages
                 DatabaseService.SetSavedCash(_userId, newSavedTotal);
                 _savedTotal = newSavedTotal;
 
-                // zapisujemy też cel/termin pod stronę "Cele"
+                // *** NOWE: zapisujemy cel/termin także w kolumnach używanych przez stronę „Cele” ***
                 if (deadline.HasValue)
                 {
                     DatabaseService.UpdateEnvelopeGoal(
@@ -543,6 +502,53 @@ namespace Finly.Pages
             _editingId = null;
             FormBorder.Visibility = Visibility.Collapsed;
             FormMessage.Text = string.Empty;
+        }
+
+        // ===================== VisualTree helpers =====================
+
+        private static T? FindVisualParent<T>(DependencyObject? child) where T : DependencyObject
+        {
+            if (child == null) return null;
+            DependencyObject? parent = VisualTreeHelper.GetParent(child);
+            while (parent != null && parent is not T)
+            {
+                parent = VisualTreeHelper.GetParent(parent);
+            }
+            return parent as T;
+        }
+
+        private static T? FindDescendantByName<T>(DependencyObject? start, string name) where T : FrameworkElement
+        {
+            if (start == null) return null;
+            int cnt = VisualTreeHelper.GetChildrenCount(start);
+            for (int i = 0; i < cnt; i++)
+            {
+                var ch = VisualTreeHelper.GetChild(start, i);
+                if (ch is T fe && fe.Name == name) return fe;
+                var deeper = FindDescendantByName<T>(ch, name);
+                if (deeper != null) return deeper;
+            }
+            return null;
+        }
+
+        private void HideAllDeleteConfirmPanels()
+        {
+            // przeszukaj visual tree od kontrolki EnvelopesCards i ukryj wszystkie panele DeleteConfirmPanel
+            CollapseDeleteConfirm(EnvelopesCards);
+        }
+
+        private void CollapseDeleteConfirm(DependencyObject? parent)
+        {
+            if (parent == null) return;
+            int cnt = VisualTreeHelper.GetChildrenCount(parent);
+            for (int i = 0; i < cnt; i++)
+            {
+                var ch = VisualTreeHelper.GetChild(parent, i) as FrameworkElement;
+                if (ch == null) continue;
+                if (ch.Name == "DeleteConfirmPanel")
+                    ch.Visibility = Visibility.Collapsed;
+                CollapseDeleteConfirm(ch);
+            }
         }
     }
 }

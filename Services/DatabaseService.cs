@@ -478,6 +478,66 @@ ORDER BY Name;";
             return DateTime.TryParse(v?.ToString(), out var p) ? p : DateTime.MinValue;
         }
 
+
+
+        // =========================================================
+        // ======================= KREDYTY =======================
+        // =========================================================
+        // Dodaj poni¿sze metody wewn¹trz klasy `DatabaseService` (namespace Finly.Services).
+
+        public static System.Collections.Generic.List<Finly.Models.LoanModel> GetLoans(int userId)
+        {
+            var list = new System.Collections.Generic.List<Finly.Models.LoanModel>();
+            using var c = OpenAndEnsureSchema();
+            using var cmd = c.CreateCommand();
+            cmd.CommandText = @"
+SELECT Id, UserId, Name, Principal, InterestRate, StartDate, TermMonths, Note
+FROM Loans
+WHERE UserId=@u
+ORDER BY Name;";
+            cmd.Parameters.AddWithValue("@u", userId);
+
+            using var r = cmd.ExecuteReader();
+            while (r.Read())
+            {
+                list.Add(new Finly.Models.LoanModel
+                {
+                    Id = r.IsDBNull(0) ? 0 : r.GetInt32(0),
+                    UserId = r.IsDBNull(1) ? userId : r.GetInt32(1),
+                    Name = GetStringSafe(r, 2),
+                    Principal = r.IsDBNull(3) ? 0m : Convert.ToDecimal(r.GetValue(3)),
+                    InterestRate = r.IsDBNull(4) ? 0m : Convert.ToDecimal(r.GetValue(4)),
+                    StartDate = GetDate(r, 5),
+                    TermMonths = r.IsDBNull(6) ? 0 : r.GetInt32(6),
+                    Note = GetNullableString(r, 7)
+                });
+            }
+
+            return list;
+        }
+
+        public static int InsertLoan(Finly.Models.LoanModel loan)
+        {
+            using var c = OpenAndEnsureSchema();
+            using var cmd = c.CreateCommand();
+            cmd.CommandText = @"
+INSERT INTO Loans(UserId, Name, Principal, InterestRate, StartDate, TermMonths, Note)
+VALUES (@u, @n, @p, @ir, @d, @tm, @note);
+SELECT last_insert_rowid();";
+            cmd.Parameters.AddWithValue("@u", loan.UserId);
+            cmd.Parameters.AddWithValue("@n", loan.Name ?? "");
+            cmd.Parameters.AddWithValue("@p", loan.Principal);
+            cmd.Parameters.AddWithValue("@ir", loan.InterestRate);
+            cmd.Parameters.AddWithValue("@d", ToIsoDate(loan.StartDate));
+            cmd.Parameters.AddWithValue("@tm", loan.TermMonths);
+            cmd.Parameters.AddWithValue("@note", (object?)loan.Note ?? DBNull.Value);
+
+            var idObj = cmd.ExecuteScalar();
+            var id = Convert.ToInt32(idObj);
+            RaiseDataChanged();
+            return id;
+        }
+
         // =========================================================
         // ======================= KATEGORIE =======================
         // =========================================================

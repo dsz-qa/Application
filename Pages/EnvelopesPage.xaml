@@ -42,18 +42,14 @@
             <Setter Property="Foreground" Value="{DynamicResource App.Foreground}"/>
         </Style>
 
-        <!-- ===== KAFEL ISTNIEJĄCEJ KOPERTY (EnvelopeVm) ===== -->
-        <DataTemplate DataType="{x:Type local:EnvelopeVm}">
+        <!-- ===== KAFEL ISTNIEJĄCEJ KOPERTY (DataRowView) ===== -->
+        <DataTemplate DataType="{x:Type data:DataRowView}">
             <Border Style="{StaticResource Card}"
                     Width="260">
                 <Grid>
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto"/>
-                        <!-- dane -->
                         <RowDefinition Height="Auto"/>
-                        <!-- przyciski -->
-                        <RowDefinition Height="Auto"/>
-                        <!-- potwierdzenie -->
                     </Grid.RowDefinitions>
 
                     <StackPanel Grid.Row="0">
@@ -65,13 +61,11 @@
                                        FontSize="18"
                                        Margin="0,0,6,0"
                                        VerticalAlignment="Center"/>
-                            <TextBlock Text="{Binding Name}"
+                            <TextBlock Text="{Binding Row[Name]}"
                                        FontSize="16"
                                        FontWeight="Bold"
                                        Foreground="White"
-                                       VerticalAlignment="Center"
-                                       TextWrapping="Wrap"
-                                       MaxWidth="200"/>
+                                       VerticalAlignment="Center"/>
                         </StackPanel>
 
                         <!-- Docelowa kwota -->
@@ -79,7 +73,7 @@
                                    FontWeight="SemiBold"
                                    Foreground="{DynamicResource App.Foreground}"
                                    Opacity="0.9"/>
-                        <TextBlock Text="{Binding Target, StringFormat={}{0:N2} zł}"
+                        <TextBlock Text="{Binding Row[Target], StringFormat={}{0:N2} zł}"
                                    Margin="0,2,0,4"
                                    Foreground="{DynamicResource App.Foreground}"/>
 
@@ -88,7 +82,7 @@
                                    FontWeight="SemiBold"
                                    Foreground="{DynamicResource App.Foreground}"
                                    Opacity="0.9"/>
-                        <TextBlock Text="{Binding Allocated, StringFormat={}{0:N2} zł}"
+                        <TextBlock Text="{Binding Row[Allocated], StringFormat={}{0:N2} zł}"
                                    Margin="0,2,0,4"
                                    Foreground="{DynamicResource App.Foreground}"/>
 
@@ -97,7 +91,7 @@
                                    FontWeight="SemiBold"
                                    Foreground="{DynamicResource App.Foreground}"
                                    Opacity="0.9"/>
-                        <TextBlock Text="{Binding GoalText}"
+                        <TextBlock Text="{Binding Row[GoalText]}"
                                    Margin="0,2,0,4"
                                    Foreground="{DynamicResource App.Foreground}"
                                    TextWrapping="Wrap"/>
@@ -107,62 +101,71 @@
                                    FontWeight="SemiBold"
                                    Foreground="{DynamicResource App.Foreground}"
                                    Opacity="0.9"/>
-                        <TextBlock Text="{Binding Description}"
+                        <TextBlock Text="{Binding Row[Description]}"
                                    Margin="0,2,0,4"
                                    Foreground="{DynamicResource App.Foreground}"
                                    TextWrapping="Wrap"/>
 
-                        <!-- Termin -->
+                        <!-- Termin (tylko data, bez miesięcznej kwoty) -->
                         <TextBlock Text="Termin"
                                    FontWeight="SemiBold"
                                    Foreground="{DynamicResource App.Foreground}"
                                    Opacity="0.9"/>
-                        <TextBlock Text="{Binding Deadline}"
+                        <TextBlock Text="{Binding Row[Deadline]}"
                                    Margin="0,2,0,4"
                                    Foreground="{DynamicResource App.Foreground}"
                                    TextWrapping="Wrap"/>
                     </StackPanel>
 
-                    <!-- Przyciski -->
+                    <!-- Przyciski + potwierdzenie (inline) -->
                     <StackPanel Grid.Row="1"
-                                Orientation="Horizontal"
                                 Margin="0,10,0,0"
                                 HorizontalAlignment="Right">
-                        <Button Margin="0,0,8,0" Padding="6,4" MinWidth="70" Tag="{Binding}" Click="EditEnvelope_Click">
-                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
-                                <TextBlock FontFamily="Segoe MDL2 Assets" Text="\uE70F" Margin="0,0,6,0" />
-                                <TextBlock Text="Edytuj" />
-                            </StackPanel>
-                        </Button>
-                        <Button Padding="6,4" MinWidth="70" Tag="{Binding}" Click="DeleteEnvelope_Click">
-                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
-                                <TextBlock FontFamily="Segoe MDL2 Assets" Text="\uE74D" Margin="0,0,6,0" />
-                                <TextBlock Text="Usuń" />
-                            </StackPanel>
-                        </Button>
-                    </StackPanel>
 
-                    <!-- Panel potwierdzenia usunięcia koperty -->
-                    <StackPanel x:Name="EnvelopeDeleteConfirmPanel"
-                                Grid.Row="2"
-                                Orientation="Vertical"
-                                Margin="0,6,0,0"
-                                Visibility="Collapsed">
-                        <TextBlock Text="Czy na pewno chcesz usunąć tę kopertę?"
-                                   FontSize="12"
-                                   Foreground="{DynamicResource App.Foreground}"
-                                   Margin="0,0,0,4"/>
+                        <!-- Przyciski -->
                         <StackPanel Orientation="Horizontal"
                                     HorizontalAlignment="Right">
+                            <Button Margin="0,0,8,0"
+                                    Padding="8,4"
+                                    MinWidth="70"
+                                    Tag="{Binding}"
+                                    Click="EditEnvelope_Click">
+                                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                    <Image Source="/Assets/Icons/edit.png" Width="16" Height="16" Margin="0,0,6,0"/>
+                                    <TextBlock Text="Edytuj" VerticalAlignment="Center"/>
+                                </StackPanel>
+                            </Button>
+                            <Button Padding="8,4"
+                                    MinWidth="70"
+                                    Tag="{Binding}"
+                                    Click="DeleteEnvelope_Click">
+                                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                    <Image Source="/Assets/Icons/delete.png" Width="16" Height="16" Margin="0,0,6,0"/>
+                                    <TextBlock Text="Usuń" VerticalAlignment="Center"/>
+                                </StackPanel>
+                            </Button>
+                        </StackPanel>
+
+                        <!-- Inline confirmation: hidden by default -->
+                        <StackPanel x:Name="DeleteConfirmPanel"
+                                    Orientation="Horizontal"
+                                    Visibility="Collapsed"
+                                    HorizontalAlignment="Right"
+                                    Margin="0,8,0,0">
+                            <TextBlock Text="Czy na pewno chcesz usunąć kopertę?"
+                                       Margin="0,0,8,0"
+                                       VerticalAlignment="Center"
+                                       Foreground="{DynamicResource App.Foreground}"/>
                             <Button Content="Tak"
-                                    Margin="0,0,8,0"
-                                    Padding="8,3"
-                                    MinWidth="60"
-                                    Click="DeleteEnvelopeConfirm_Click"/>
+                                    Padding="8,4"
+                                    MinWidth="70"
+                                    Tag="{Binding}"
+                                    Click="ConfirmDeleteEnvelope_Click"
+                                    Margin="0,0,8,0"/>
                             <Button Content="Nie"
-                                    Padding="8,3"
-                                    MinWidth="60"
-                                    Click="DeleteEnvelopeCancel_Click"/>
+                                    Padding="8,4"
+                                    MinWidth="70"
+                                    Click="CancelDeleteEnvelope_Click"/>
                         </StackPanel>
                     </StackPanel>
                 </Grid>
@@ -314,7 +317,7 @@
             <Border x:Name="FormBorder"
                     Grid.Row="2"
                     Margin="0,16,0,24"
-                    Background="Transparent"
+                    Background="{DynamicResource Surface.Background}"
                     BorderBrush="{DynamicResource Surface.Border}"
                     BorderThickness="1"
                     CornerRadius="10"
