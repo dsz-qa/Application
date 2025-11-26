@@ -172,11 +172,22 @@ namespace Finly.Pages
                     TermMonths = term
                 };
 
-                var id = DatabaseService.InsertLoan(loan);
-                loan.Id = id;
+                if (_selectedVm != null)
+                {
+                    // update existing
+                    loan.Id = _selectedVm.Id;
+                    DatabaseService.UpdateLoan(loan);
+                    ToastService.Success("Kredyt zaktualizowany.");
+                }
+                else
+                {
+                    var id = DatabaseService.InsertLoan(loan);
+                    loan.Id = id;
+                    ToastService.Success("Kredyt dodany.");
+                }
+
                 LoadLoans();
                 RefreshKpisAndLists();
-                ToastService.Success("Kredyt dodany.");
             }
             catch (Exception ex)
             {
@@ -185,6 +196,7 @@ namespace Finly.Pages
             finally
             {
                 try { FormBorder.Visibility = Visibility.Collapsed; } catch { }
+                _selectedVm = null;
             }
         }
 
@@ -340,6 +352,41 @@ namespace Finly.Pages
             var saved = Math.Round(extra * 0.05m, 2);
             var months = (int)(extra / Math.Max(1, _selectedVm.Principal));
             SimResult.Text = $"Oszczedzisz ~{saved:N2} zl na odsetkach i skrocisz kredyt o ~{months} miesiecy (szac.).";
+        }
+
+        // New handlers: Edit and Delete
+        private void EditLoan_Click(object sender, RoutedEventArgs e)
+        {
+            if ((sender as FrameworkElement)?.Tag is LoanCardVm vm)
+            {
+                _selectedVm = vm;
+                LoanNameBox.Text = vm.Name;
+                LoanPrincipalBox.Text = vm.Principal.ToString();
+                LoanInterestBox.Text = vm.InterestRate.ToString();
+                LoanTermBox.Text = vm.TermMonths.ToString();
+                LoanStartDatePicker.SelectedDate = vm.StartDate;
+                FormTabs.SelectedIndex = 0;
+                FormBorder.Visibility = Visibility.Visible;
+                ComputeAndShowMonthlyBreakdown();
+            }
+        }
+
+        private void DeleteLoan_Click(object sender, RoutedEventArgs e)
+        {
+            if ((sender as FrameworkElement)?.Tag is LoanCardVm vm)
+            {
+                try
+                {
+                    DatabaseService.DeleteLoan(vm.Id, _userId);
+                    LoadLoans();
+                    RefreshKpisAndLists();
+                    ToastService.Success("Kredyt usunięty.");
+                }
+                catch (Exception ex)
+                {
+                    ToastService.Error("Błąd usuwania kredytu: " + ex.Message);
+                }
+            }
         }
     }
 

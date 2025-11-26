@@ -538,6 +538,44 @@ SELECT last_insert_rowid();";
             return id;
         }
 
+        public static void UpdateLoan(Finly.Models.LoanModel loan)
+        {
+            using var c = OpenAndEnsureSchema();
+            using var cmd = c.CreateCommand();
+            cmd.CommandText = @"
+UPDATE Loans
+   SET Name = @n,
+       Principal = @p,
+       InterestRate = @ir,
+       StartDate = @d,
+       TermMonths = @tm,
+       Note = @note
+ WHERE Id = @id AND UserId = @u;";
+            cmd.Parameters.AddWithValue("@id", loan.Id);
+            cmd.Parameters.AddWithValue("@u", loan.UserId);
+            cmd.Parameters.AddWithValue("@n", loan.Name ?? "");
+            cmd.Parameters.AddWithValue("@p", loan.Principal);
+            cmd.Parameters.AddWithValue("@ir", loan.InterestRate);
+            cmd.Parameters.AddWithValue("@d", ToIsoDate(loan.StartDate));
+            cmd.Parameters.AddWithValue("@tm", loan.TermMonths);
+            cmd.Parameters.AddWithValue("@note", (object?)loan.Note ?? DBNull.Value);
+
+            cmd.ExecuteNonQuery();
+            RaiseDataChanged();
+        }
+
+        public static void DeleteLoan(int id, int userId)
+        {
+            using var c = OpenAndEnsureSchema();
+            using var cmd = c.CreateCommand();
+            cmd.CommandText = "DELETE FROM Loans WHERE Id=@id AND UserId=@u;";
+            cmd.Parameters.AddWithValue("@id", id);
+            cmd.Parameters.AddWithValue("@u", userId);
+            cmd.ExecuteNonQuery();
+
+            RaiseDataChanged();
+        }
+
         // =========================================================
         // ======================= KATEGORIE =======================
         // =========================================================
