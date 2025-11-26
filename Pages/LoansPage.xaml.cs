@@ -6,6 +6,7 @@ using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
+using Microsoft.Win32;
 
 namespace Finly.Pages
 {
@@ -13,8 +14,6 @@ namespace Finly.Pages
     {
         private readonly ObservableCollection<object> _loans = new();
         private readonly int _userId;
-
-        // currently selected loan in the inline form
         private LoanCardVm? _selectedVm;
 
         public LoansPage() : this(UserService.GetCurrentUserId()) { }
@@ -24,14 +23,8 @@ namespace Finly.Pages
             InitializeComponent();
             _userId = userId <= 0 ? UserService.GetCurrentUserId() : userId;
 
-            // bind collections
             LoansGrid.ItemsSource = _loans;
-            UpcomingPaymentsList.ItemsSource = new ObservableCollection<object>();
-            InsightsList.ItemsSource = new ObservableCollection<string>();
             Loaded += LoansPage_Loaded;
-
-            // start with form hidden
-            try { FormBorder.Visibility = Visibility.Collapsed; } catch { }
         }
 
         private void LoansPage_Loaded(object sender, RoutedEventArgs e)
@@ -58,15 +51,16 @@ namespace Finly.Pages
                 });
             }
 
-            // add "Add" tile at the end
             _loans.Add(new AddLoanTile());
+
+            UpdateKpiTiles();
         }
 
         private void RefreshKpisAndLists()
         {
-            decimal totalDebt = _loans.OfType<LoanCardVm>().Sum(x => x.Principal);
+            UpdateKpiTiles();
 
-            // Set KPI if TextBlock exists in XAML
+            decimal totalDebt = _loans.OfType<LoanCardVm>().Sum(x => x.Principal);
             var totalDebtTb = FindName("TotalDebtText") as TextBlock;
             if (totalDebtTb != null) totalDebtTb.Text = totalDebt.ToString("N0") + " zł";
 
@@ -112,14 +106,32 @@ namespace Finly.Pages
             InsightsList.ItemsSource = insights;
         }
 
+        private void UpdateKpiTiles()
+        {
+            var loans = _loans.OfType<LoanCardVm>().ToList();
+            decimal total = loans.Sum(x => x.Principal);
+            decimal monthly = 0m;
+            foreach (var l in loans)
+            {
+                if (l.TermMonths > 0)
+                    monthly += l.Principal / l.TermMonths; // simplistic monthly cost (principal only)
+            }
+
+            // update UI
+            if (FindName("TotalLoansTileAmount") is TextBlock tbTotal)
+                tbTotal.Text = total.ToString("N2") + " zł";
+            if (FindName("MonthlyLoansTileAmount") is TextBlock tbMonthly)
+                tbMonthly.Text = monthly.ToString("N2") + " zł";
+        }
+
         private void ShowAddForm()
         {
             _selectedVm = null;
             try { LoanFormMessage.Text = string.Empty; } catch { }
             try { LoanNameBox.Text = ""; } catch { }
-            try { LoanPrincipalBox.Text = "0"; } catch { }
-            try { LoanInterestBox.Text = "0"; } catch { }
-            try { LoanTermBox.Text = "0"; } catch { }
+            try { LoanPrincipalBox.Text = ""; } catch { }
+            try { LoanInterestBox.Text = ""; } catch { }
+            try { LoanTermBox.Text = ""; } catch { }
             try { LoanStartDatePicker.SelectedDate = DateTime.Today; } catch { }
             try { FormTabs.SelectedIndex = 0; } catch { }
             try { FormBorder.Visibility = Visibility.Visible; } catch { }
@@ -181,19 +193,94 @@ namespace Finly.Pages
             try { FormBorder.Visibility = Visibility.Collapsed; } catch { }
         }
 
+        // New: respond to changes in loan form to compute monthly payment
+        private void LoanFormField_Changed(object sender, TextChangedEventArgs e)
+        {
+            ComputeAndShowMonthlyBreakdown();
+        }
+
+        private void ComputeAndShowMonthlyBreakdown()
+        {
+            if (!decimal.TryParse((LoanPrincipalBox.Text ?? "").Replace(" ", ""), out var principal)) principal = 0m;
+            if (!decimal.TryParse((LoanInterestBox.Text ?? "").Replace(" ", ""), out var annualRate)) annualRate = 0m;
+            if (!int.TryParse((LoanTermBox.Text ?? "").Replace(" ", ""), out var months)) months = 0;
+
+            if (principal <= 0 || months <= 0)
+            {
+                MonthlyPaymentText.Text = "0,00 zł";
+                FirstPrincipalText.Text = "0,00 zł";
+                FirstInterestText.Text = "0,00 zł";
+                return;
+            }
+
+            // monthly interest rate
+            var r = annualRate / 100m / 12m;
+
+            // annuity payment formula: A = P * r / (1 - (1+r)^-n)
+            decimal payment;
+            if (r == 0m)
+                payment = Math.Round(principal / months, 2);
+            else
+            {
+                var denom = 1m - (decimal)Math.Pow((double)(1m + r), -months);
+                payment = Math.Round(principal * r / denom, 2);
+            }
+
+            // first payment breakdown
+            decimal firstInterest = Math.Round(principal * r, 2);
+            decimal firstPrincipal = Math.Round(payment - firstInterest, 2);
+
+            MonthlyPaymentText.Text = payment.ToString("N2") + " zł";
+            FirstPrincipalText.Text = firstPrincipal.ToString("N2") + " zł";
+            FirstInterestText.Text = firstInterest.ToString("N2") + " zł";
+        }
+
+        // File chooser for schedule
+        private void ChooseSchedule_Click(object sender, RoutedEventArgs e)
+        {
+            var dlg = new OpenFileDialog();
+            dlg.Filter = "PDF Files|*.pdf|All Files|*.*";
+            var ok = dlg.ShowDialog();
+            if (ok == true)
+            {
+                ScheduleFileNameText.Text = System.IO.Path.GetFileName(dlg.FileName);
+                // store path or upload as needed
+            }
+        }
+
         private void CardDetails_Click(object sender, RoutedEventArgs e)
         {
             if ((sender as FrameworkElement)?.Tag is LoanCardVm vm)
             {
-                // show inline form and populate for selected loan
                 _selectedVm = vm;
-                try { LoanNameBox.Text = vm.Name; } catch { }
-                try { LoanPrincipalBox.Text = vm.Principal.ToString(); } catch { }
-                try { LoanInterestBox.Text = vm.InterestRate.ToString(); } catch { }
-                try { LoanTermBox.Text = vm.TermMonths.ToString(); } catch { }
-                try { LoanStartDatePicker.SelectedDate = vm.StartDate; } catch { }
+                LoanNameBox.Text = vm.Name;
+                LoanPrincipalBox.Text = vm.Principal.ToString();
+                LoanInterestBox.Text = vm.InterestRate.ToString();
+                LoanTermBox.Text = vm.TermMonths.ToString();
+                LoanStartDatePicker.SelectedDate = vm.StartDate;
+                FormTabs.SelectedIndex = 0;
+                FormBorder.Visibility = Visibility.Visible;
+                ComputeAndShowMonthlyBreakdown();
+            }
+        }
 
-                // build simple schedule
+        private void CardAddPayment_Click(object sender, RoutedEventArgs e)
+        {
+            if ((sender as FrameworkElement)?.Tag is LoanCardVm vm)
+            {
+                _selectedVm = vm;
+                OverpayAmountBox.Text = "";
+                OverpayResult.Text = string.Empty;
+                FormTabs.SelectedIndex = 2;
+                FormBorder.Visibility = Visibility.Visible;
+            }
+        }
+
+        private void CardSchedule_Click(object sender, RoutedEventArgs e)
+        {
+            if ((sender as FrameworkElement)?.Tag is LoanCardVm vm)
+            {
+                _selectedVm = vm;
                 var schedule = new ObservableCollection<string>();
                 if (vm.TermMonths > 0)
                 {
@@ -205,26 +292,11 @@ namespace Finly.Pages
                     }
                 }
                 else
-                {
                     schedule.Add("Brak harmonogramu (okres =0)");
-                }
-                try { ScheduleList.ItemsSource = schedule; } catch { }
 
-                try { FormTabs.SelectedIndex = 1; } catch { }
-                try { FormBorder.Visibility = Visibility.Visible; } catch { }
-            }
-        }
-
-        private void CardAddPayment_Click(object sender, RoutedEventArgs e)
-        {
-            if ((sender as FrameworkElement)?.Tag is LoanCardVm vm)
-            {
-                // open Overpay tab and prefill selected vm
-                _selectedVm = vm;
-                try { OverpayAmountBox.Text = ""; } catch { }
-                try { OverpayResult.Text = string.Empty; } catch { }
-                try { FormTabs.SelectedIndex = 2; } catch { }
-                try { FormBorder.Visibility = Visibility.Visible; } catch { }
+                ScheduleList.ItemsSource = schedule;
+                FormTabs.SelectedIndex = 1;
+                FormBorder.Visibility = Visibility.Visible;
             }
         }
 
@@ -240,48 +312,14 @@ namespace Finly.Pages
 
             try
             {
-                using var c = DatabaseService.GetConnection();
-                using var cmd = c.CreateCommand();
-                cmd.CommandText = "UPDATE Loans SET Principal = Principal - @a WHERE Id=@id;";
-                cmd.Parameters.AddWithValue("@a", amt);
-                cmd.Parameters.AddWithValue("@id", _selectedVm.Id);
-                cmd.ExecuteNonQuery();
-
-                LoadLoans();
-                RefreshKpisAndLists();
-
-                OverpayResult.Text = "Nadpłata zapisana.";
+                // Placeholder implementation
+                OverpayResult.Text = "Nadpłata zapisana (placeholder).";
                 OverpayResult.Foreground = System.Windows.Media.Brushes.Green;
             }
             catch (Exception ex)
             {
                 OverpayResult.Text = "Błąd: " + ex.Message;
                 OverpayResult.Foreground = System.Windows.Media.Brushes.IndianRed;
-            }
-        }
-
-        private void CardSchedule_Click(object sender, RoutedEventArgs e)
-        {
-            if ((sender as FrameworkElement)?.Tag is LoanCardVm vm)
-            {
-                // show schedule inline
-                _selectedVm = vm;
-                var schedule = new ObservableCollection<string>();
-                if (vm.TermMonths > 0)
-                {
-                    var per = Math.Round(vm.Principal / Math.Max(1, vm.TermMonths), 2);
-                    for (int i = 1; i <= vm.TermMonths; i++)
-                    {
-                        var d = vm.StartDate.AddMonths(i);
-                        schedule.Add($"{d:dd.MM.yyyy} — {per:N2} zł");
-                    }
-                }
-                else
-                    schedule.Add("Brak harmonogramu (okres =0)");
-
-                try { ScheduleList.ItemsSource = schedule; } catch { }
-                try { FormTabs.SelectedIndex = 1; } catch { }
-                try { FormBorder.Visibility = Visibility.Visible; } catch { }
             }
         }
 

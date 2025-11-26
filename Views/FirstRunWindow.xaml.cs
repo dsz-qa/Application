@@ -181,7 +181,9 @@ namespace Finly.Views
                 return;
 
             // 1) Gotówka i gotówka odłożona
-            DatabaseService.SetCashOnHand(_userId, freeCash);
+            // CashOnHand stores TOTAL cash (wolna + odłożona), so save sum here.
+            var totalCash = freeCash + savedCash;
+            DatabaseService.SetCashOnHand(_userId, totalCash);
             DatabaseService.SetSavedCash(_userId, savedCash);
 
             // 2) Konto bankowe na start

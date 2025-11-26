@@ -32,6 +32,10 @@ namespace Finly.Pages
             InitializeComponent();
             EnvelopesCards.ItemsSource = _cards;
             Loaded += EnvelopesPage_Loaded;
+            Unloaded += EnvelopesPage_Unloaded;
+
+            // subskrybuj zmiany w DB żeby UI odświeżało się automatycznie
+            DatabaseService.DataChanged += DatabaseService_DataChanged;
         }
 
         public EnvelopesPage(int userId) : this()
@@ -57,8 +61,13 @@ namespace Finly.Pages
         {
             try
             {
+                // 1) odłożona gotówka (total saved cash)
                 _savedTotal = DatabaseService.GetSavedCash(_userId);
 
+                // 2) cała gotówka (wolna + odłożona + w kopertach)
+                var cashOnHand = DatabaseService.GetCashOnHand(_userId);
+
+                // 3) tabela kopert
                 _dt = DatabaseService.GetEnvelopesTable(_userId);
 
                 if (_dt != null)
@@ -86,7 +95,7 @@ namespace Finly.Pages
 
                         SplitNote(r["Note"]?.ToString(), out var goal, out var description, out var deadline);
                         r["GoalText"] = goal;
-                        r["Description"] = description; // <- now description is available to XAML
+                        r["Description"] = description;
 
                         if (deadline.HasValue)
                         {
@@ -122,15 +131,25 @@ namespace Finly.Pages
                 }
                 _cards.Add(new AddEnvelopeTile());
 
+                // ===== AGREGATY =====
                 var allocated = _dt?.AsEnumerable().Sum(r => SafeDec(r["Allocated"])) ?? 0m;
-                var unassigned = _savedTotal - allocated;
 
+                // wolna gotówka do wydawania = cała gotówka - (odłożona całkowita)
+                // cashOnHand = free + savedTotal, so free = cashOnHand - savedTotal
+                var freeSpending = cashOnHand - _savedTotal;
+                if (freeSpending < 0m) freeSpending = 0m;
+
+                // Gotówka w kopertach
                 TotalEnvelopesText.Text = allocated.ToString("N2") + " zł";
-                SavedCashText.Text = _savedTotal.ToString("N2") + " zł";
-                EnvelopesSumText.Text = allocated.ToString("N2") + " zł";
 
-                UnassignedText.Text = unassigned.ToString("N2") + " zł";
-                UnassignedText.Foreground = unassigned < 0
+                // Wolna gotówka
+                SavedCashText.Text = freeSpending.ToString("N2") + " zł";
+
+                // Odłożona gotówka (POZA kopertami) -> pokaż pulę do rozdysponowania
+                // Pula odłożonej gotówki do rozdysponowania na koperty = SavedTotal - suma Allocated
+                var distributable = _savedTotal - allocated;
+                EnvelopesSumText.Text = distributable.ToString("N2") + " zł";
+                EnvelopesSumText.Foreground = distributable < 0
                     ? Brushes.IndianRed
                     : (Brush)FindResource("App.Foreground");
             }
@@ -139,6 +158,8 @@ namespace Finly.Pages
                 FormMessage.Text = "Błąd odczytu: " + ex.Message;
             }
         }
+
+
 
         // ===================== HELPERS =====================
 
@@ -382,14 +403,13 @@ namespace Finly.Pages
 
             var row = drv.Row;
             var id = Convert.ToInt32(row["Id"]);
-            var allocated = SafeDec(row["Allocated"]);
+            // var allocated = SafeDec(row["Allocated"]);
 
             try
             {
-                var newSaved = _savedTotal + allocated;
-                DatabaseService.SetSavedCash(_userId, newSaved);
-                _savedTotal = newSaved;
-
+                // Usuwamy kopertę. Nie modyfikujemy SavedCash tutaj –
+                // SavedCash w DB reprezentuje całą pulę odłożonej gotówki,
+                // a przydział do kopert jest odzielną kolumną Allocated.
                 DatabaseService.DeleteEnvelope(id);
 
                 LoadAll();
@@ -401,6 +421,7 @@ namespace Finly.Pages
                 FormMessage.Text = "Błąd usuwania: " + ex.Message;
             }
         }
+
 
         // anuluj potwierdzenie (Nie)
         private void CancelDeleteEnvelope_Click(object sender, RoutedEventArgs e)
@@ -433,9 +454,11 @@ namespace Finly.Pages
                 return;
             }
 
-            // różnica przydzielonej kwoty względem poprzedniego stanu
+            // poprzednia przydzielona kwota w tej kopercie (gdy edycja)
             decimal previousAllocated = 0m;
-            if (_editingId is int idExisting && _dt != null)
+            int? editingId = _editingId;
+
+            if (editingId is int idExisting && _dt != null)
             {
                 var row = _dt.AsEnumerable()
                              .FirstOrDefault(r => Convert.ToInt32(r["Id"]) == idExisting);
@@ -443,12 +466,19 @@ namespace Finly.Pages
                     previousAllocated = SafeDec(row["Allocated"]);
             }
 
-            var delta = allocated - previousAllocated;   // ile nowej kasy dokładamy
-            var newSavedTotal = _savedTotal - delta;     // zdejmujemy z odłożonej gotówki
+            // różnica: ile DODAJEMY ( >0 ) albo ZABIERAMY ( <0 ) z tej koperty
+            var diff = allocated - previousAllocated;
 
-            if (newSavedTotal < 0)
+            // Sum of all allocated BEFORE this change
+            var totalAllocatedBefore = _dt?.AsEnumerable().Sum(r => SafeDec(r["Allocated"])) ?? 0m;
+
+            // available unassigned saved cash BEFORE change
+            var unassignedBefore = _savedTotal - totalAllocatedBefore;
+
+            // jeśli zwiększamy przydział – sprawdź, czy mamy tyle odłożonej gotówki poza kopertami
+            if (diff > 0m && diff > unassignedBefore)
             {
-                FormMessage.Text = "Nie masz tyle odłożonej gotówki, aby przydzielić tę kwotę do kopert.";
+                FormMessage.Text = "Nie masz tyle odłożonej gotówki poza kopertami, aby przydzielić tę kwotę.";
                 return;
             }
 
@@ -458,7 +488,7 @@ namespace Finly.Pages
             {
                 int envelopeId;
 
-                if (_editingId is int id)
+                if (editingId is int id)
                 {
                     DatabaseService.UpdateEnvelope(id, _userId, name, target, allocated, note);
                     envelopeId = id;
@@ -470,11 +500,11 @@ namespace Finly.Pages
                     FormMessage.Text = "Dodano kopertę.";
                 }
 
-                // zapisujemy nową wartość odłożonej gotówki
-                DatabaseService.SetSavedCash(_userId, newSavedTotal);
-                _savedTotal = newSavedTotal;
+                // Nie modyfikujemy SavedCash tutaj. SavedCash przechowuje całą pulę odłożonej gotówki,
+                // a przydział do kopert jest zapisywany w kolumnie Allocated. UI zostanie odświeżone
+                // i pokaże poprawną pulę do rozdysponowania (SavedTotal - suma Allocated).
 
-                // *** NOWE: zapisujemy cel/termin także w kolumnach używanych przez stronę „Cele” ***
+                // zapisujemy dane celu/terminu dla zakładki „Cele”
                 if (deadline.HasValue)
                 {
                     DatabaseService.UpdateEnvelopeGoal(
@@ -496,6 +526,7 @@ namespace Finly.Pages
                 FormMessage.Text = "Błąd zapisu: " + ex.Message;
             }
         }
+
 
         private void CancelEdit_Click(object sender, RoutedEventArgs e)
         {
@@ -523,7 +554,8 @@ namespace Finly.Pages
             int cnt = VisualTreeHelper.GetChildrenCount(start);
             for (int i = 0; i < cnt; i++)
             {
-                var ch = VisualTreeHelper.GetChild(start, i);
+                var ch = VisualTreeHelper.GetChild(start, i) as FrameworkElement;
+                if (ch == null) continue;
                 if (ch is T fe && fe.Name == name) return fe;
                 var deeper = FindDescendantByName<T>(ch, name);
                 if (deeper != null) return deeper;
@@ -549,6 +581,28 @@ namespace Finly.Pages
                     ch.Visibility = Visibility.Collapsed;
                 CollapseDeleteConfirm(ch);
             }
+        }
+
+        private void EnvelopesPage_Unloaded(object sender, RoutedEventArgs e)
+        {
+            // Odsubskrybuj zdarzenia, aby uniknąć wycieków pamięci
+            Unloaded -= EnvelopesPage_Unloaded;
+            Loaded -= EnvelopesPage_Loaded;
+
+            try
+            {
+                DatabaseService.DataChanged -= DatabaseService_DataChanged;
+            }
+            catch
+            {
+                // jeśli handler nie istnieje lub już został odsubskrybowany, nic nie rób
+            }
+        }
+
+        private void DatabaseService_DataChanged(object? sender, EventArgs e)
+        {
+            // Odśwież dane po zmianie w bazie
+            LoadAll();
         }
     }
 }

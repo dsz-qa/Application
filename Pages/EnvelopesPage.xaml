@@ -62,10 +62,13 @@
                                        Margin="0,0,6,0"
                                        VerticalAlignment="Center"/>
                             <TextBlock Text="{Binding Row[Name]}"
-                                       FontSize="16"
-                                       FontWeight="Bold"
-                                       Foreground="White"
-                                       VerticalAlignment="Center"/>
+           FontSize="16"
+           FontWeight="Bold"
+           Foreground="White"
+           VerticalAlignment="Center"
+           TextWrapping="Wrap"
+           MaxWidth="180"/>
+
                         </StackPanel>
 
                         <!-- Docelowa kwota -->
@@ -106,7 +109,7 @@
                                    Foreground="{DynamicResource App.Foreground}"
                                    TextWrapping="Wrap"/>
 
-                        <!-- Termin (tylko data, bez miesięcznej kwoty) -->
+                        <!-- Termin -->
                         <TextBlock Text="Termin"
                                    FontWeight="SemiBold"
                                    Foreground="{DynamicResource App.Foreground}"
@@ -131,8 +134,12 @@
                                     Tag="{Binding}"
                                     Click="EditEnvelope_Click">
                                 <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                                    <Image Source="/Assets/Icons/edit.png" Width="16" Height="16" Margin="0,0,6,0"/>
-                                    <TextBlock Text="Edytuj" VerticalAlignment="Center"/>
+                                    <Image Source="/Assets/Icons/edit.png"
+                                           Width="16"
+                                           Height="16"
+                                           Margin="0,0,6,0"/>
+                                    <TextBlock Text="Edytuj"
+                                               VerticalAlignment="Center"/>
                                 </StackPanel>
                             </Button>
                             <Button Padding="8,4"
@@ -140,33 +147,44 @@
                                     Tag="{Binding}"
                                     Click="DeleteEnvelope_Click">
                                 <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                                    <Image Source="/Assets/Icons/delete.png" Width="16" Height="16" Margin="0,0,6,0"/>
-                                    <TextBlock Text="Usuń" VerticalAlignment="Center"/>
+                                    <Image Source="/Assets/Icons/delete.png"
+                                           Width="16"
+                                           Height="16"
+                                           Margin="0,0,6,0"/>
+                                    <TextBlock Text="Usuń"
+                                               VerticalAlignment="Center"/>
                                 </StackPanel>
                             </Button>
                         </StackPanel>
 
                         <!-- Inline confirmation: hidden by default -->
                         <StackPanel x:Name="DeleteConfirmPanel"
-                                    Orientation="Horizontal"
-                                    Visibility="Collapsed"
-                                    HorizontalAlignment="Right"
-                                    Margin="0,8,0,0">
+            Visibility="Collapsed"
+            HorizontalAlignment="Stretch"
+            Margin="0,8,0,0">
+
+                            <!-- Tekst w osobnym wierszu -->
                             <TextBlock Text="Czy na pewno chcesz usunąć kopertę?"
-                                       Margin="0,0,8,0"
-                                       VerticalAlignment="Center"
-                                       Foreground="{DynamicResource App.Foreground}"/>
-                            <Button Content="Tak"
-                                    Padding="8,4"
-                                    MinWidth="70"
-                                    Tag="{Binding}"
-                                    Click="ConfirmDeleteEnvelope_Click"
-                                    Margin="0,0,8,0"/>
-                            <Button Content="Nie"
-                                    Padding="8,4"
-                                    MinWidth="70"
-                                    Click="CancelDeleteEnvelope_Click"/>
+               TextWrapping="Wrap"
+               Margin="0,0,0,8"
+               Foreground="{DynamicResource App.Foreground}"/>
+
+                            <!-- Przyciski obok siebie -->
+                            <StackPanel Orientation="Horizontal"
+                HorizontalAlignment="Right">
+                                <Button Content="Tak"
+                Padding="8,4"
+                MinWidth="70"
+                Tag="{Binding}"
+                Click="ConfirmDeleteEnvelope_Click"
+                Margin="0,0,8,0"/>
+                                <Button Content="Nie"
+                Padding="8,4"
+                MinWidth="70"
+                Click="CancelDeleteEnvelope_Click"/>
+                            </StackPanel>
                         </StackPanel>
+
                     </StackPanel>
                 </Grid>
             </Border>
@@ -204,92 +222,77 @@
     <ScrollViewer VerticalScrollBarVisibility="Auto">
         <Grid Margin="24">
             <Grid.RowDefinitions>
-                <RowDefinition Height="Auto"/>
                 <!-- KPI -->
-                <RowDefinition Height="*"/>
+                <RowDefinition Height="Auto"/>
                 <!-- Koperty -->
                 <RowDefinition Height="Auto"/>
                 <!-- Formularz -->
+                <RowDefinition Height="Auto"/>
             </Grid.RowDefinitions>
 
+            <!-- ==================== GÓRNE KPI ==================== -->
             <!-- ==================== GÓRNE KPI ==================== -->
             <Grid Grid.Row="0">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*"/>
                     <ColumnDefinition Width="*"/>
                     <ColumnDefinition Width="*"/>
-                    <ColumnDefinition Width="*"/>
                 </Grid.ColumnDefinitions>
 
-                <!-- Razem wszystkie koperty -->
+                <!-- Gotówka w kopertach = suma przydzielonych -->
                 <Border Grid.Column="0" Style="{StaticResource AccentCard}">
                     <StackPanel>
-                        <TextBlock Text="Razem wszystkie koperty"
-                                   Style="{StaticResource CardHeader}"
-                                   FontSize="18"
-                                   FontWeight="Bold"
-                                   Margin="0,0,0,4"
-                                   TextWrapping="Wrap"/>
+                        <TextBlock Text="Gotówka w kopertach"
+                       Style="{StaticResource CardHeader}"
+                       FontSize="18"
+                       FontWeight="Bold"
+                       Margin="0,0,0,4"
+                       TextWrapping="Wrap"/>
                         <TextBlock Text="Suma środków przydzielonych do wszystkich kopert."
-                                   Margin="0,2,0,0"
-                                   Foreground="{DynamicResource App.Foreground}"
-                                   Opacity="0.7"
-                                   TextWrapping="Wrap"/>
+                       Margin="0,2,0,0"
+                       Foreground="{DynamicResource App.Foreground}"
+                       Opacity="0.7"
+                       TextWrapping="Wrap"/>
                         <TextBlock x:Name="TotalEnvelopesText"
-                                   Style="{StaticResource KpiValueStyle}"
-                                   FontSize="24"
-                                   Text="0,00 zł"/>
+                       Style="{StaticResource KpiValueStyle}"
+                       FontSize="24"
+                       Text="0,00 zł"/>
                     </StackPanel>
                 </Border>
 
-                <!-- Odłożona gotówka -->
+                <!-- Wolna gotówka = CashOnHand - SavedCash -->
                 <Border Grid.Column="1" Style="{StaticResource AccentCard}">
                     <StackPanel>
-                        <TextBlock Text="Odłożona gotówka"
-                                   Style="{StaticResource CardHeader}"
-                                   FontSize="18"
-                                   FontWeight="Bold"
-                                   Margin="0,0,0,4"
-                                   TextWrapping="Wrap"/>
+                        <TextBlock Text="Wolna gotówka"
+                       Style="{StaticResource CardHeader}"
+                       FontSize="18"
+                       FontWeight="Bold"
+                       Margin="0,0,0,4"
+                       TextWrapping="Wrap"/>
                         <TextBlock x:Name="SavedCashText"
-                                   Style="{StaticResource KpiValueStyle}"
-                                   FontSize="24"
-                                   Text="0,00 zł"/>
+                       Style="{StaticResource KpiValueStyle}"
+                       FontSize="24"
+                       Text="0,00 zł"/>
                     </StackPanel>
                 </Border>
 
-                <!-- Gotówka w kopertach -->
+                <!-- Odłożona gotówka (do rozdysponowania) = SavedCash - suma Allocated -->
                 <Border Grid.Column="2" Style="{StaticResource AccentCard}">
                     <StackPanel>
-                        <TextBlock Text="Gotówka w kopertach"
-                                   Style="{StaticResource CardHeader}"
-                                   FontSize="18"
-                                   FontWeight="Bold"
-                                   Margin="0,0,0,4"
-                                   TextWrapping="Wrap"/>
+                        <TextBlock Text="Odłożona gotówka (do rozdysponowania)"
+                       Style="{StaticResource CardHeader}"
+                       FontSize="18"
+                       FontWeight="Bold"
+                       Margin="0,0,0,4"
+                       TextWrapping="Wrap"/>
                         <TextBlock x:Name="EnvelopesSumText"
-                                   Style="{StaticResource KpiValueStyle}"
-                                   FontSize="24"
-                                   Text="0,00 zł"/>
-                    </StackPanel>
-                </Border>
-
-                <!-- Gotówka do rozdysponowania -->
-                <Border Grid.Column="3" Style="{StaticResource AccentCard}">
-                    <StackPanel>
-                        <TextBlock Text="Gotówka do rozdysponowania"
-                                   Style="{StaticResource CardHeader}"
-                                   FontSize="18"
-                                   FontWeight="Bold"
-                                   Margin="0,0,0,4"
-                                   TextWrapping="Wrap"/>
-                        <TextBlock x:Name="UnassignedText"
-                                   Style="{StaticResource KpiValueStyle}"
-                                   FontSize="24"
-                                   Text="0,00 zł"/>
+                       Style="{StaticResource KpiValueStyle}"
+                       FontSize="24"
+                       Text="0,00 zł"/>
                     </StackPanel>
                 </Border>
             </Grid>
+
 
             <!-- ==================== LISTA KOPERT + DODAJ ==================== -->
             <StackPanel Grid.Row="1" Margin="0,12,0,0">
@@ -314,14 +317,15 @@
             </StackPanel>
 
             <!-- ==================== FORMULARZ DODAJ / EDYTUJ ==================== -->
+            <!-- Usunięcie „podwójnego tła”: brak własnego tła i ramki,
+                 formularz leży bezpośrednio na tle strony -->
             <Border x:Name="FormBorder"
                     Grid.Row="2"
                     Margin="0,16,0,24"
-                    Background="{DynamicResource Surface.Background}"
-                    BorderBrush="{DynamicResource Surface.Border}"
-                    BorderThickness="1"
-                    CornerRadius="10"
-                    Padding="16"
+                    Background="Transparent"
+                    BorderThickness="0"
+                    CornerRadius="0"
+                    Padding="0"
                     Visibility="Collapsed">
                 <StackPanel HorizontalAlignment="Center"
                             MaxWidth="600">
@@ -453,6 +457,7 @@
                 </StackPanel>
             </Border>
 
+            <TextBlock x:Name="UnassignedText" Text="Brak przypisanej gotówki" Visibility="Collapsed" />
         </Grid>
     </ScrollViewer>
 </UserControl>
