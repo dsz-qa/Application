@@ -6,6 +6,7 @@ using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
+using System.Windows.Media;
 using Microsoft.Win32;
 
 namespace Finly.Pages
@@ -47,7 +48,8 @@ namespace Finly.Pages
                     Principal = l.Principal,
                     InterestRate = l.InterestRate,
                     StartDate = l.StartDate,
-                    TermMonths = l.TermMonths
+                    TermMonths = l.TermMonths,
+                    PaymentDay = l.PaymentDay
                 });
             }
 
@@ -133,7 +135,21 @@ namespace Finly.Pages
             try { LoanInterestBox.Text = ""; } catch { }
             try { LoanTermBox.Text = ""; } catch { }
             try { LoanStartDatePicker.SelectedDate = DateTime.Today; } catch { }
-            try { FormTabs.SelectedIndex = 0; } catch { }
+
+            // reset payment day selector
+            try
+            {
+                if (LoanPaymentDayBox != null) LoanPaymentDayBox.SelectedIndex = 0;
+            }
+            catch { }
+
+            // show only Add tab
+            try { AddTab.Visibility = Visibility.Visible; } catch { }
+            try { ScheduleTab.Visibility = Visibility.Collapsed; } catch { }
+            try { OverpayTab.Visibility = Visibility.Collapsed; } catch { }
+            try { SimTab.Visibility = Visibility.Collapsed; } catch { }
+
+            try { FormTabs.SelectedItem = AddTab; } catch { }
             try { FormBorder.Visibility = Visibility.Visible; } catch { }
         }
 
@@ -160,6 +176,16 @@ namespace Finly.Pages
             if (!int.TryParse((LoanTermBox.Text ?? "").Trim(), out var term)) term = 0;
             var start = LoanStartDatePicker.SelectedDate ?? DateTime.Today;
 
+            int paymentDay = 0;
+            try
+            {
+                if (LoanPaymentDayBox?.SelectedItem is ComboBoxItem ci && ci.Tag != null)
+                {
+                    if (!int.TryParse(ci.Tag.ToString(), out paymentDay)) paymentDay = 0;
+                }
+            }
+            catch { paymentDay = 0; }
+
             try
             {
                 var loan = new LoanModel
@@ -169,7 +195,8 @@ namespace Finly.Pages
                     Principal = principal,
                     InterestRate = interest,
                     StartDate = start,
-                    TermMonths = term
+                    TermMonths = term,
+                    PaymentDay = paymentDay
                 };
 
                 if (_selectedVm != null)
@@ -270,8 +297,39 @@ namespace Finly.Pages
                 LoanInterestBox.Text = vm.InterestRate.ToString();
                 LoanTermBox.Text = vm.TermMonths.ToString();
                 LoanStartDatePicker.SelectedDate = vm.StartDate;
+
+                // set payment day selector
+                try
+                {
+                    if (LoanPaymentDayBox != null)
+                    {
+                        int pd = vm.PaymentDay;
+                        // find item with matching Tag
+                        for (int i = 0; i < LoanPaymentDayBox.Items.Count; i++)
+                        {
+                            if (LoanPaymentDayBox.Items[i] is ComboBoxItem ci)
+                            {
+                                if (ci.Tag != null && int.TryParse(ci.Tag.ToString(), out var tagVal) && tagVal == pd)
+                                {
+                                    LoanPaymentDayBox.SelectedIndex = i;
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                }
+                catch { }
+
                 FormTabs.SelectedIndex = 0;
                 FormBorder.Visibility = Visibility.Visible;
+
+                // show only details (AddTab reused for edit/details) - hide other tabs
+                AddTab.Visibility = Visibility.Visible;
+                ScheduleTab.Visibility = Visibility.Collapsed;
+                OverpayTab.Visibility = Visibility.Collapsed;
+                SimTab.Visibility = Visibility.Collapsed;
+                FormTabs.SelectedItem = AddTab;
+
                 ComputeAndShowMonthlyBreakdown();
             }
         }
@@ -285,6 +343,13 @@ namespace Finly.Pages
                 OverpayResult.Text = string.Empty;
                 FormTabs.SelectedIndex = 2;
                 FormBorder.Visibility = Visibility.Visible;
+
+                // show only Overpay tab
+                AddTab.Visibility = Visibility.Collapsed;
+                ScheduleTab.Visibility = Visibility.Collapsed;
+                OverpayTab.Visibility = Visibility.Visible;
+                SimTab.Visibility = Visibility.Collapsed;
+                try { FormTabs.SelectedItem = OverpayTab; } catch { }
             }
         }
 
@@ -309,6 +374,13 @@ namespace Finly.Pages
                 ScheduleList.ItemsSource = schedule;
                 FormTabs.SelectedIndex = 1;
                 FormBorder.Visibility = Visibility.Visible;
+
+                // show only Schedule tab
+                AddTab.Visibility = Visibility.Collapsed;
+                ScheduleTab.Visibility = Visibility.Visible;
+                OverpayTab.Visibility = Visibility.Collapsed;
+                SimTab.Visibility = Visibility.Collapsed;
+                try { FormTabs.SelectedItem = ScheduleTab; } catch { }
             }
         }
 
@@ -355,6 +427,7 @@ namespace Finly.Pages
         }
 
         // New handlers: Edit and Delete
+        // Edit/Delete handlers referenced in XAML
         private void EditLoan_Click(object sender, RoutedEventArgs e)
         {
             if ((sender as FrameworkElement)?.Tag is LoanCardVm vm)
@@ -366,70 +439,141 @@ namespace Finly.Pages
                 LoanTermBox.Text = vm.TermMonths.ToString();
                 LoanStartDatePicker.SelectedDate = vm.StartDate;
                 FormTabs.SelectedIndex = 0;
+
+                // set payment day selector
+                try
+                {
+                    if (LoanPaymentDayBox != null)
+                    {
+                        int pd = vm.PaymentDay;
+                        for (int i = 0; i < LoanPaymentDayBox.Items.Count; i++)
+                        {
+                            if (LoanPaymentDayBox.Items[i] is ComboBoxItem ci)
+                            {
+                                if (ci.Tag != null && int.TryParse(ci.Tag.ToString(), out var tagVal) && tagVal == pd)
+                                {
+                                    LoanPaymentDayBox.SelectedIndex = i;
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                }
+                catch { }
+
+                // show only Add/Edit tab
+                AddTab.Visibility = Visibility.Visible;
+                ScheduleTab.Visibility = Visibility.Collapsed;
+                OverpayTab.Visibility = Visibility.Collapsed;
+                SimTab.Visibility = Visibility.Collapsed;
+                FormTabs.SelectedItem = AddTab;
                 FormBorder.Visibility = Visibility.Visible;
+
                 ComputeAndShowMonthlyBreakdown();
             }
         }
 
         private void DeleteLoan_Click(object sender, RoutedEventArgs e)
         {
+            // Instead of deleting immediately, toggle inline confirmation panel for this card
+            if (sender is not FrameworkElement fe) return;
+
+            // Hide other panels first
+            // hide other confirm panels
+            HideAllDeletePanels();
+
+            // find nearest container (ContentPresenter or Border)
+            // find nearest card container
+            FrameworkElement? container = fe;
+            while (container != null && container is not ContentPresenter && container is not Border)
+            {
+                container = VisualTreeHelper.GetParent(container) as FrameworkElement;
+            }
+
+            if (container == null) return;
+
+            var panel = FindDescendantByName<FrameworkElement>(container, "DeleteConfirmPanel");
+            if (panel == null) return;
+
+            panel.Visibility = panel.Visibility == Visibility.Visible ? Visibility.Collapsed : Visibility.Visible;
+        }
+
+        private void ConfirmDeleteLoan_Click(object sender, RoutedEventArgs e)
+        {
             if ((sender as FrameworkElement)?.Tag is LoanCardVm vm)
             {
                 try
                 {
                     DatabaseService.DeleteLoan(vm.Id, _userId);
+                    ToastService.Success("Kredyt usunięty.");
                     LoadLoans();
                     RefreshKpisAndLists();
-                    ToastService.Success("Kredyt usunięty.");
                 }
                 catch (Exception ex)
                 {
                     ToastService.Error("Błąd usuwania kredytu: " + ex.Message);
                 }
             }
+
+            // hide all confirm panels
+            HideAllDeletePanels();
         }
-    }
 
-    // marker dla kafelka "Dodaj kredyt"
-    public sealed class AddLoanTile { }
-
-    public sealed class LoanCardVm
-    {
-        public int Id { get; set; }
-        public int UserId { get; set; }
-        public string Name { get; set; } = "";
-        public decimal Principal { get; set; }
-        public decimal InterestRate { get; set; }
-        public DateTime StartDate { get; set; }
-        public int TermMonths { get; set; }
-
-        public string PrincipalStr => Principal.ToString("N0") + " zł";
-
-        public double PercentPaidClamped
+        private void DeleteCancel_Click(object sender, RoutedEventArgs e)
         {
-            get
+            // Find parent card and hide its DeleteConfirmPanel
+            var btn = sender as FrameworkElement;
+            if (btn == null) return;
+
+            var card = FindVisualParent<Border>(btn);
+            if (card == null)
             {
-                // If principal is zero or negative, consider fully paid
-                if (Principal <= 0) return 100.0;
-                // No original principal stored here; return0% paid as default
-                return 0.0;
+                // fallback: hide all
+                HideAllDeletePanels();
+                return;
+            }
+
+            var panel = FindDescendantByName<FrameworkElement>(card, "DeleteConfirmPanel");
+            if (panel != null) panel.Visibility = Visibility.Collapsed;
+        }
+
+        private void HideAllDeletePanels()
+        {
+            foreach (var item in LoansGrid.Items)
+            {
+                var container = LoansGrid.ItemContainerGenerator.ContainerFromItem(item) as FrameworkElement;
+                if (container == null) continue;
+                var panel = FindDescendantByName<FrameworkElement>(container, "DeleteConfirmPanel");
+                if (panel != null)
+                    panel.Visibility = Visibility.Collapsed;
             }
         }
 
-        public DateTime NextPaymentDate => StartDate.AddMonths(1);
-        public decimal NextPayment => Math.Round(Principal > 0 ? Principal / Math.Max(1, TermMonths) : 0m, 0);
-        public string NextPaymentInfo => NextPayment.ToString("N0") + " zł · " + NextPaymentDate.ToString("dd.MM.yyyy");
-
-        public string RemainingTermStr
+        // Visual tree helpers
+        private static T? FindVisualParent<T>(DependencyObject? child) where T : DependencyObject
         {
-            get
+            if (child == null) return null;
+            DependencyObject? parent = VisualTreeHelper.GetParent(child);
+            while (parent != null && parent is not T)
             {
-                if (TermMonths <= 0) return "—";
-                var monthsLeft = Math.Max(0, TermMonths - ((DateTime.Today.Year - StartDate.Year) * 12 + DateTime.Today.Month - StartDate.Month));
-                var years = monthsLeft / 12;
-                var months = monthsLeft % 12;
-                return $"{years} lat {months} mies.";
+                parent = VisualTreeHelper.GetParent(parent);
             }
+            return parent as T;
+        }
+
+        private static T? FindDescendantByName<T>(DependencyObject? start, string name) where T : FrameworkElement
+        {
+            if (start == null) return null;
+            int cnt = VisualTreeHelper.GetChildrenCount(start);
+            for (int i = 0; i < cnt; i++)
+            {
+                var ch = VisualTreeHelper.GetChild(start, i) as FrameworkElement;
+                if (ch == null) continue;
+                if (ch is T fe && fe.Name == name) return fe;
+                var deeper = FindDescendantByName<T>(ch, name);
+                if (deeper != null) return deeper;
+            }
+            return null;
         }
     }
 }

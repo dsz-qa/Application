@@ -222,6 +222,15 @@ CREATE TABLE IF NOT EXISTS SavedCash(
                 AddColumnIfMissing(con, tx, "Envelopes", "Note", "TEXT");
                 AddColumnIfMissing(con, tx, "Envelopes", "CreatedAt", "TEXT", "NOT NULL DEFAULT CURRENT_TIMESTAMP");
 
+                // Enforce Loans table columns
+                AddColumnIfMissing(con, tx, "Loans", "Principal", "NUMERIC", "NOT NULL DEFAULT 0");
+                AddColumnIfMissing(con, tx, "Loans", "InterestRate", "NUMERIC", "NOT NULL DEFAULT 0");
+                AddColumnIfMissing(con, tx, "Loans", "StartDate", "TEXT", "NOT NULL DEFAULT (date('now'))");
+                AddColumnIfMissing(con, tx, "Loans", "TermMonths", "INTEGER", "NOT NULL DEFAULT 0");
+                AddColumnIfMissing(con, tx, "Loans", "Note", "TEXT");
+                // Payment day of month for loan (1-31), 0 = unspecified
+                AddColumnIfMissing(con, tx, "Loans", "PaymentDay", "INTEGER", "NOT NULL DEFAULT 0");
+
                 // Backfill: Title = Description, jeśli Title puste
                 if (ColExists("Expenses", "Title") && ColExists("Expenses", "Description"))
                 {
@@ -343,6 +352,19 @@ FROM BankAccounts;";
         }
     }
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 

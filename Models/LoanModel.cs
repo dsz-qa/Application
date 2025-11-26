@@ -11,6 +11,7 @@ namespace Finly.Models
  public decimal InterestRate { get; set; } =0m; // roczna np.5.5
  public DateTime StartDate { get; set; } = DateTime.Today;
  public int TermMonths { get; set; } =0;
+ public int PaymentDay { get; set; } = 0; // 0 = unspecified, otherwise day of month (1-31)
  public string? Note { get; set; }
  }
 }

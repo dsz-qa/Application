@@ -491,7 +491,7 @@ ORDER BY Name;";
             using var c = OpenAndEnsureSchema();
             using var cmd = c.CreateCommand();
             cmd.CommandText = @"
-SELECT Id, UserId, Name, Principal, InterestRate, StartDate, TermMonths, Note
+SELECT Id, UserId, Name, Principal, InterestRate, StartDate, TermMonths, Note, PaymentDay
 FROM Loans
 WHERE UserId=@u
 ORDER BY Name;";
@@ -509,7 +509,8 @@ ORDER BY Name;";
                     InterestRate = r.IsDBNull(4) ? 0m : Convert.ToDecimal(r.GetValue(4)),
                     StartDate = GetDate(r, 5),
                     TermMonths = r.IsDBNull(6) ? 0 : r.GetInt32(6),
-                    Note = GetNullableString(r, 7)
+                    Note = GetNullableString(r, 7),
+                    PaymentDay = r.IsDBNull(8) ? 0 : r.GetInt32(8)
                 });
             }
 
@@ -521,8 +522,8 @@ ORDER BY Name;";
             using var c = OpenAndEnsureSchema();
             using var cmd = c.CreateCommand();
             cmd.CommandText = @"
-INSERT INTO Loans(UserId, Name, Principal, InterestRate, StartDate, TermMonths, Note)
-VALUES (@u, @n, @p, @ir, @d, @tm, @note);
+INSERT INTO Loans(UserId, Name, Principal, InterestRate, StartDate, TermMonths, Note, PaymentDay)
+VALUES (@u, @n, @p, @ir, @d, @tm, @note, @pd);
 SELECT last_insert_rowid();";
             cmd.Parameters.AddWithValue("@u", loan.UserId);
             cmd.Parameters.AddWithValue("@n", loan.Name ?? "");
@@ -531,6 +532,7 @@ SELECT last_insert_rowid();";
             cmd.Parameters.AddWithValue("@d", ToIsoDate(loan.StartDate));
             cmd.Parameters.AddWithValue("@tm", loan.TermMonths);
             cmd.Parameters.AddWithValue("@note", (object?)loan.Note ?? DBNull.Value);
+            cmd.Parameters.AddWithValue("@pd", loan.PaymentDay);
 
             var idObj = cmd.ExecuteScalar();
             var id = Convert.ToInt32(idObj);
@@ -549,7 +551,8 @@ UPDATE Loans
        InterestRate = @ir,
        StartDate = @d,
        TermMonths = @tm,
-       Note = @note
+       Note = @note,
+       PaymentDay = @pd
  WHERE Id = @id AND UserId = @u;";
             cmd.Parameters.AddWithValue("@id", loan.Id);
             cmd.Parameters.AddWithValue("@u", loan.UserId);
@@ -559,6 +562,7 @@ UPDATE Loans
             cmd.Parameters.AddWithValue("@d", ToIsoDate(loan.StartDate));
             cmd.Parameters.AddWithValue("@tm", loan.TermMonths);
             cmd.Parameters.AddWithValue("@note", (object?)loan.Note ?? DBNull.Value);
+            cmd.Parameters.AddWithValue("@pd", loan.PaymentDay);
 
             cmd.ExecuteNonQuery();
             RaiseDataChanged();
