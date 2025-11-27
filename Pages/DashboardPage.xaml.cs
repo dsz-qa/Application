@@ -45,6 +45,14 @@ namespace Finly.Pages
             _uid = userId <= 0 ? UserService.GetCurrentUserId() : userId;
             DataContext = this;
 
+            // Ensure PeriodBar events are wired
+            if (FindName("PeriodBar") is Views.Controls.PeriodBarControl pb)
+            {
+                pb.RangeChanged += PeriodBar_RangeChanged;
+                pb.SearchClicked += PeriodBar_SearchClicked;
+                pb.ClearClicked += PeriodBar_ClearClicked;
+            }
+
             ApplyPreset(DateRangeMode.Day, DateTime.Today);
             RefreshMoneySummary();
             LoadCharts();
@@ -116,28 +124,20 @@ namespace Finly.Pages
                     break;
             }
 
+            // Update PeriodBar control to reflect the selected preset/range
             UpdatePeriodLabel();
-
-            if (StartPicker != null) StartPicker.SelectedDate = null;
-            if (EndPicker != null) EndPicker.SelectedDate = null;
         }
 
         private void UpdatePeriodLabel()
         {
-            if (FindName("PeriodLabelText") is not TextBlock label) return;
-
-            string text = _mode switch
+            // Instead of manipulating a TextBlock, update the PeriodBarControl so both look and state stay in sync
+            if (FindName("PeriodBar") is Views.Controls.PeriodBarControl pb)
             {
-                DateRangeMode.Day => "Dzisiaj",
-                DateRangeMode.Week => "Ten tydzień",
-                DateRangeMode.Month => "Ten miesiąc",
-                DateRangeMode.Quarter => "Ten kwartał",
-                DateRangeMode.Year => "Ten rok",
-                DateRangeMode.Custom => $"{_startDate:dd.MM.yyyy} – {_endDate:dd.MM.yyyy}",
-                _ => $"{_startDate:dd.MM.yyyy} – {_endDate:dd.MM.yyyy}"
-            };
-
-            label.Text = text;
+                if (_mode == DateRangeMode.Custom)
+                    pb.SetCustomRange(_startDate, _endDate);
+                else
+                    pb.SetPreset(_mode);
+            }
         }
 
         private void PrevPeriod_Click(object sender, RoutedEventArgs e)
@@ -160,27 +160,35 @@ namespace Finly.Pages
             LoadCharts();
         }
 
-        private void Search_Click(object sender, RoutedEventArgs e)
+        // These methods previously referenced DatePicker controls; dashboard now uses PeriodBar events.
+        // Hooked handlers for PeriodBar:
+
+        private void PeriodBar_RangeChanged(object? sender, EventArgs e)
         {
-            if (StartPicker.SelectedDate is not DateTime s ||
-                EndPicker.SelectedDate is not DateTime ed)
-                return;
-
-            if (s > ed) (s, ed) = (ed, s);
-
-            _startDate = s.Date;
-            _endDate = ed.Date;
-            _mode = DateRangeMode.Custom;
-
-            UpdatePeriodLabel();
-            LoadCharts();
+            if (sender is Views.Controls.PeriodBarControl pb)
+            {
+                _mode = pb.Mode;
+                _startDate = pb.StartDate;
+                _endDate = pb.EndDate;
+                LoadCharts();
+            }
         }
 
-        private void Clear_Click(object sender, RoutedEventArgs e)
+        private void PeriodBar_SearchClicked(object? sender, EventArgs e)
         {
-            StartPicker.SelectedDate = null;
-            EndPicker.SelectedDate = null;
+            // SearchClicked implies user applied a custom range — update and reload
+            if (sender is Views.Controls.PeriodBarControl pb)
+            {
+                _mode = pb.Mode;
+                _startDate = pb.StartDate;
+                _endDate = pb.EndDate;
+                LoadCharts();
+            }
+        }
 
+        private void PeriodBar_ClearClicked(object? sender, EventArgs e)
+        {
+            // Reset to default preset (Day) for dashboard behaviour
             ApplyPreset(DateRangeMode.Day, DateTime.Today);
             LoadCharts();
         }

@@ -43,7 +43,6 @@ namespace Finly.ViewModels
                 new("goals",        "Cele",             () => new GoalsPage()),
                 new("categories",   "Kategorie",        () => new CategoriesPage()),
                 new("reports",      "Raporty",          () => new ReportsPage()),
-                new("import",       "Import / Sync",    () => new ImportPage()),
                 new("settings",     "Ustawienia",       () => new SettingsPage())
             };
 
