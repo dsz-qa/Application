@@ -45,7 +45,7 @@ namespace Finly.Pages
             _uid = userId <= 0 ? UserService.GetCurrentUserId() : userId;
             DataContext = this;
 
-            // Ensure PeriodBar events are wired
+            // If PeriodBar exists in XAML ensure it's in sync and events are hooked
             if (FindName("PeriodBar") is Views.Controls.PeriodBarControl pb)
             {
                 pb.RangeChanged += PeriodBar_RangeChanged;
@@ -130,13 +130,28 @@ namespace Finly.Pages
 
         private void UpdatePeriodLabel()
         {
-            // Instead of manipulating a TextBlock, update the PeriodBarControl so both look and state stay in sync
+            // Sync PeriodBar control with current internal state
             if (FindName("PeriodBar") is Views.Controls.PeriodBarControl pb)
             {
                 if (_mode == DateRangeMode.Custom)
                     pb.SetCustomRange(_startDate, _endDate);
                 else
                     pb.SetPreset(_mode);
+            }
+
+            if (FindName("PeriodLabelText") is TextBlock label)
+            {
+                string text = _mode switch
+                {
+                    DateRangeMode.Day => "Dzisiaj",
+                    DateRangeMode.Week => "Ten tydzień",
+                    DateRangeMode.Month => "Ten miesiąc",
+                    DateRangeMode.Quarter => "Ten kwartał",
+                    DateRangeMode.Year => "Ten rok",
+                    DateRangeMode.Custom => $"{_startDate:dd.MM.yyyy} – {_endDate:dd.MM.yyyy}",
+                    _ => $"{_startDate:dd.MM.yyyy} – {_endDate:dd.MM.yyyy}"
+                };
+                label.Text = text;
             }
         }
 
@@ -160,9 +175,7 @@ namespace Finly.Pages
             LoadCharts();
         }
 
-        // These methods previously referenced DatePicker controls; dashboard now uses PeriodBar events.
         // Hooked handlers for PeriodBar:
-
         private void PeriodBar_RangeChanged(object? sender, EventArgs e)
         {
             if (sender is Views.Controls.PeriodBarControl pb)
@@ -176,7 +189,6 @@ namespace Finly.Pages
 
         private void PeriodBar_SearchClicked(object? sender, EventArgs e)
         {
-            // SearchClicked implies user applied a custom range — update and reload
             if (sender is Views.Controls.PeriodBarControl pb)
             {
                 _mode = pb.Mode;
@@ -188,9 +200,15 @@ namespace Finly.Pages
 
         private void PeriodBar_ClearClicked(object? sender, EventArgs e)
         {
-            // Reset to default preset (Day) for dashboard behaviour
             ApplyPreset(DateRangeMode.Day, DateTime.Today);
             LoadCharts();
+        }
+
+        // Helper to set UI element visibility safely
+        private void SetVisibility(string name, bool visible)
+        {
+            if (FindName(name) is UIElement el)
+                el.Visibility = visible ? Visibility.Visible : Visibility.Collapsed;
         }
 
         // =====================================================================
@@ -199,6 +217,14 @@ namespace Finly.Pages
 
         private void LoadCharts()
         {
+            // Prefer PeriodBar control values if available (ensure dashboard follows UI)
+            if (FindName("PeriodBar") is Views.Controls.PeriodBarControl pb)
+            {
+                _mode = pb.Mode;
+                _startDate = pb.StartDate;
+                _endDate = pb.EndDate;
+            }
+
             DateTime start = _startDate == default ? DateTime.Today : _startDate;
             DateTime end = _endDate == default ? DateTime.Today : _endDate;
             if (start > end) (start, end) = (end, start);
@@ -237,8 +263,16 @@ namespace Finly.Pages
                 if (FindName("PieCenterNameText") is TextBlock n) n.Text = "Brak danych";
                 if (FindName("PieCenterValueText") is TextBlock v) v.Text = "0,00 zł";
                 if (FindName("PieCenterPercentText") is TextBlock p) p.Text = "";
+
+                // show empty placeholder inside the donut area but keep the viewbox visible
+                SetVisibility("DonutExpenseEmptyText", true);
+                SetVisibility("ExpenseDonutViewbox", true);
                 return;
             }
+
+            // hide empty placeholder, show donut
+            SetVisibility("DonutExpenseEmptyText", false);
+            SetVisibility("ExpenseDonutViewbox", true);
 
             var sum = data.Sum(x => x.Amount);
             _currentTotalExpenses = sum;
@@ -293,8 +327,16 @@ namespace Finly.Pages
                 if (FindName("IncomeCenterNameText") is TextBlock n) n.Text = "Brak danych";
                 if (FindName("IncomeCenterValueText") is TextBlock v) v.Text = "0,00 zł";
                 if (FindName("IncomeCenterPercentText") is TextBlock p) p.Text = "";
+
+                // show empty placeholder inside the donut area but keep the viewbox visible
+                SetVisibility("DonutIncomeEmptyText", true);
+                SetVisibility("IncomeDonutViewbox", true);
                 return;
             }
+
+            // hide empty placeholder, show donut
+            SetVisibility("DonutIncomeEmptyText", false);
+            SetVisibility("IncomeDonutViewbox", true);
 
             var sum = data.Sum(x => x.Amount);
             _currentTotalIncome = sum;
@@ -353,6 +395,12 @@ namespace Finly.Pages
 
             if (FindName("TopCategoryBars") is ItemsControl catBars)
                 catBars.ItemsSource = rows.Take(5).ToList();
+
+            // Toggle empty placeholder / content
+            SetVisibility("ExpenseEmptyText", rows.Count == 0);
+            SetVisibility("ExpenseTable", rows.Count > 0);
+            SetVisibility("TopCategoryEmptyText", rows.Count == 0);
+            SetVisibility("TopCategoryBars", rows.Count > 0);
         }
 
         private void BindIncomeTable(IEnumerable<DatabaseService.CategoryAmountDto> data)
@@ -382,6 +430,10 @@ namespace Finly.Pages
 
             if (FindName("IncomeCenterPercentText") is TextBlock p)
                 p.Text = rows.Count == 0 ? "" : "100,0% udziału";
+
+            // Toggle empty placeholder / content
+            SetVisibility("IncomeEmptyText", rows.Count == 0);
+            SetVisibility("IncomeTable", rows.Count > 0);
         }
 
         // =====================================================================
@@ -409,6 +461,22 @@ namespace Finly.Pages
                 var prevCats = DatabaseService.GetSpendingByCategorySafe(_uid, prevStart, prevEnd)
                                ?? Enumerable.Empty<DatabaseService.CategoryAmountDto>();
                 var prevTotal = prevCats.Sum(x => x.Amount);
+
+                // If both previous and current totals are zero, show empty placeholder
+                if (currentTotal == 0m && prevTotal == 0m)
+                {
+                    canvas.Children.Clear();
+                    labels.ItemsSource = Array.Empty<ExpenseTrendItem>();
+                    // show empty placeholder but keep canvas visible (preserve layout)
+                    SetVisibility("ExpenseTrendEmptyText", true);
+                    SetVisibility("ExpenseTrendCanvas", true);
+                    SetVisibility("ExpenseTrendLabels", false);
+                    return;
+                }
+
+                SetVisibility("ExpenseTrendEmptyText", false);
+                SetVisibility("ExpenseTrendCanvas", true);
+                SetVisibility("ExpenseTrendLabels", true);
 
                 var max = Math.Max(currentTotal, prevTotal);
                 if (max <= 0) max = 1;

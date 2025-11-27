@@ -134,7 +134,12 @@
  <Border Grid.Row="1" Grid.RowSpan="2" Style="{StaticResource AccentCard}" Padding="16" HorizontalAlignment="Stretch">
  <StackPanel>
  <!-- Reuse the PeriodBarControl from Reports for identical look/behavior -->
- <controls:PeriodBarControl HorizontalAlignment="Center" Margin="0,0,0,8" />
+ <controls:PeriodBarControl x:Name="PeriodBar"
+ HorizontalAlignment="Center"
+ Margin="0,0,0,8"
+ RangeChanged="PeriodBar_RangeChanged"
+ SearchClicked="PeriodBar_SearchClicked"
+ ClearClicked="PeriodBar_ClearClicked" />
 
  <!-- ========== TREŚĆ (content) ========== -->
  <Grid Margin="0,8,0,0">
@@ -153,7 +158,7 @@
  </Grid.RowDefinitions>
 
  <!-- DONUT WYDATKÓW -->
- <Border Grid.Row="0" Style="{StaticResource Card}">
+ <Border Grid.Row="0" Style="{StaticResource Card}" MinHeight="260">
  <StackPanel>
  <TextBlock Text="Wydatki wg kategorii — bieżący okres"
  Style="{StaticResource CardHeader}"
@@ -161,7 +166,7 @@
  TextWrapping="Wrap"/>
 
  <!-- Viewbox skaluje wykres tak, żeby zawsze mieścił się w karcie -->
- <Viewbox Height="220"
+ <Viewbox x:Name="ExpenseDonutViewbox" Height="220"
  HorizontalAlignment="Center"
  VerticalAlignment="Center"
  Stretch="Uniform">
@@ -212,20 +217,23 @@
  TextAlignment="Center"
  TextWrapping="Wrap"/>
  </StackPanel>
+
+ <!-- Empty placeholder -->
+ <TextBlock x:Name="DonutExpenseEmptyText" Text="Brak danych w tym okresie" Foreground="{DynamicResource App.Foreground}" HorizontalAlignment="Center" VerticalAlignment="Center" Visibility="Collapsed" FontStyle="Italic"/>
  </Grid>
  </Viewbox>
  </StackPanel>
  </Border>
 
  <!-- DONUT PRZYCHODÓW -->
- <Border Grid.Row="1" Style="{StaticResource Card}" Margin="0,12,0,0">
+ <Border Grid.Row="1" Style="{StaticResource Card}" Margin="0,12,0,0" MinHeight="260">
  <StackPanel>
  <TextBlock Text="Źródła przychodu — bieżący okres"
  Style="{StaticResource CardHeader}"
  Margin="0,0,0,8"
  TextWrapping="Wrap"/>
 
- <Viewbox Height="220"
+ <Viewbox x:Name="IncomeDonutViewbox" Height="220"
  HorizontalAlignment="Center"
  VerticalAlignment="Center"
  Stretch="Uniform">
@@ -255,7 +263,8 @@
  <StackPanel HorizontalAlignment="Center"
  VerticalAlignment="Center"
  MaxWidth="170">
- <TextBlock Text="Przychód"
+ <TextBlock x:Name="IncomeCenterNameText"
+ Text="Przychód"
  FontSize="14"
  FontWeight="SemiBold"
  Foreground="White"
@@ -274,6 +283,9 @@
  TextAlignment="Center"
  TextWrapping="Wrap"/>
  </StackPanel>
+
+ <!-- Empty placeholder -->
+ <TextBlock x:Name="DonutIncomeEmptyText" Text="Brak danych w tym okresie" Foreground="{DynamicResource App.Foreground}" HorizontalAlignment="Center" VerticalAlignment="Center" Visibility="Collapsed" FontStyle="Italic"/>
  </Grid>
  </Viewbox>
  </StackPanel>
@@ -288,7 +300,7 @@
  </Grid.RowDefinitions>
 
  <!-- PRZYCHODY -->
- <Border Grid.Row="0" Style="{StaticResource Card}">
+ <Border Grid.Row="0" Style="{StaticResource Card}" MinHeight="120">
  <StackPanel>
  <TextBlock Text="Przychody — bieżący okres"
  Style="{StaticResource CardHeader}"
@@ -328,6 +340,7 @@
  </Grid>
 
  <!-- bez brzydkiego nagłówka – ItemsControl zamiast ListView -->
+ <Grid>
  <ItemsControl x:Name="IncomeTable">
  <ItemsControl.ItemTemplate>
  <DataTemplate>
@@ -357,11 +370,13 @@
  </DataTemplate>
  </ItemsControl.ItemTemplate>
  </ItemsControl>
+ <TextBlock x:Name="IncomeEmptyText" Text="Brak danych w tym okresie" Foreground="{DynamicResource App.Foreground}" Visibility="Collapsed" HorizontalAlignment="Center" Margin="0,8,0,0" FontStyle="Italic"/>
+ </Grid>
  </StackPanel>
  </Border>
 
  <!-- WYDATKI -->
- <Border Grid.Row="1" Style="{StaticResource Card}" Margin="0,12,0,0">
+ <Border Grid.Row="1" Style="{StaticResource Card}" Margin="0,12,0,0" MinHeight="120">
  <StackPanel>
  <TextBlock Text="Wydatki — bieżący okres"
  Style="{StaticResource CardHeader}"
@@ -429,6 +444,7 @@
  </DataTemplate>
  </ItemsControl.ItemTemplate>
  </ItemsControl>
+ <TextBlock x:Name="ExpenseEmptyText" Text="Brak danych w tym okresie" Foreground="{DynamicResource App.Foreground}" Visibility="Collapsed" HorizontalAlignment="Center" Margin="0,8,0,0" FontStyle="Italic"/>
  </StackPanel>
  </Border>
  </Grid>
@@ -441,7 +457,7 @@
  </Grid.RowDefinitions>
 
  <!-- NAJWYŻSZE WYDATKI -->
- <Border Grid.Row="0" Style="{StaticResource Card}">
+ <Border Grid.Row="0" Style="{StaticResource Card}" MinHeight="120">
  <StackPanel>
  <TextBlock Text="Najwyższe wydatki — kategorie"
  Style="{StaticResource CardHeader}"
@@ -471,11 +487,12 @@
  </DataTemplate>
  </ItemsControl.ItemTemplate>
  </ItemsControl>
+ <TextBlock x:Name="TopCategoryEmptyText" Text="Brak danych w tym okresie" Foreground="{DynamicResource App.Foreground}" Visibility="Collapsed" HorizontalAlignment="Center" Margin="4,8,4,0" FontStyle="Italic"/>
  </StackPanel>
  </Border>
 
  <!-- TREND WYDATKÓW - wykres liniowy z dwóch punktów -->
- <Border Grid.Row="1" Style="{StaticResource Card}" Margin="0,12,0,0">
+ <Border Grid.Row="1" Style="{StaticResource Card}" Margin="0,12,0,0" MinHeight="140">
  <Grid>
  <Grid.RowDefinitions>
  <RowDefinition Height="Auto"/>
@@ -513,6 +530,7 @@
  </DataTemplate>
  </ItemsControl.ItemTemplate>
  </ItemsControl>
+ <TextBlock x:Name="ExpenseTrendEmptyText" Text="Brak danych w tym okresie" Foreground="{DynamicResource App.Foreground}" Visibility="Collapsed" HorizontalAlignment="Center" Margin="0,8,0,0" FontStyle="Italic" Grid.Row="1"/>
  </Grid>
  </Border>
  </Grid>
