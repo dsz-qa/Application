@@ -52,7 +52,7 @@
 
  <!-- Wrap content in a ScrollViewer so dashboard can scroll vertically on smaller screens -->
  <ScrollViewer VerticalScrollBarVisibility="Auto"
-               HorizontalScrollBarVisibility="Disabled"
+               HorizontalScrollBarVisibility="Auto"
                PanningMode="VerticalOnly">
 
    <Grid Margin="16">
@@ -131,9 +131,9 @@
          <Grid Margin="0,8,0,0">
            <Grid.ColumnDefinitions>
  <!--3 kolumny: wykresy, tabele, trend -->
- <ColumnDefinition Width="*" MinWidth="380"/>
- <ColumnDefinition Width="*" MinWidth="380"/>
- <ColumnDefinition Width="*" MinWidth="380"/>
+ <ColumnDefinition Width="*" MinWidth="300"/>
+ <ColumnDefinition Width="*" MinWidth="300"/>
+ <ColumnDefinition Width="*" MinWidth="300"/>
            </Grid.ColumnDefinitions>
 
            <!-- Column 1: Donuts -->
