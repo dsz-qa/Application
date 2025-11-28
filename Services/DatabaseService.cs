@@ -2211,15 +2211,30 @@ HAVING SUM(ABS(e.Amount)) > 0
             if (hasTrans)
             {
                 AppendUnionIfNeeded();
+
+                // Determine expression to use for the name when selecting from Transactions.
+                // Some DBs may not have column 'Source' in Transactions, so fall back to category name or literal.
+                string txSourceExpr;
+                if (ColumnExists(con, "Transactions", "Source"))
+                {
+                    // prefer t.Source, fallback to category name (if exists) or literal
+                    txSourceExpr = "COALESCE(t.Source, " + (hasCats ? "COALESCE(c.Name,'Przychody')" : "'Przychody'") + ")";
+                }
+                else
+                {
+                    // no t.Source column -> use category name (if exists) or literal 'Przychody'
+                    txSourceExpr = hasCats ? "COALESCE(c.Name,'Przychody')" : "'Przychody'";
+                }
+
                 sb.AppendLine(@"
-SELECT COALESCE(t.Source, " + (hasCats ? "COALESCE(c.Name,'Przychody')" : "'Przychody'") + @") AS Name,
+SELECT " + txSourceExpr + @" AS Name,
        SUM(ABS(t.Amount)) AS Amount
 FROM Transactions t
 " + (hasCats ? "LEFT JOIN Categories c ON c.Id = t.CategoryId" : "") + @"
 WHERE t.UserId = $uid
   AND date(t.Date) BETWEEN date($start) AND date($end)
   AND (LOWER(t.Type) = 'income' OR t.Type = 1)
-GROUP BY COALESCE(t.Source, " + (hasCats ? "COALESCE(c.Name,'Przychody')" : "'Przychody'") + @")
+GROUP BY " + txSourceExpr + @"
 HAVING SUM(ABS(t.Amount)) > 0
 ");
             }
