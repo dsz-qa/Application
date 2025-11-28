@@ -26,8 +26,15 @@ namespace Finly.Models
             set => _categoryName = value ?? string.Empty;
         }
 
+        // Nowe: konto/Ÿród³o u¿ywane do p³atnoœci/odbioru
+        public string Account { get; set; } = string.Empty;
+
+        // Nowe: rodzaj transakcji (Wydatek/Przychód/Transfer)
+        public string Kind { get; set; } = string.Empty;
+
         // Wygodne pola do bindowania w tabeli (opcjonalne)
-        public string DateDisplay => Date.ToString("yyyy-MM-dd");
-        public string AmountDisplay => Amount.ToString("0.##");
+        public string DateDisplay => Date.ToString("d");
+        public string AmountDisplay => Amount.ToString("N2") + " z³";
+        public string AmountStr => AmountDisplay;
     }
 }

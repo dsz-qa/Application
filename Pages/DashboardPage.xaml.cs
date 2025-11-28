@@ -12,12 +12,14 @@ using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Shapes;
 using System.Windows.Threading;
+using Finly.ViewModels;
 
 namespace Finly.Pages
 {
     public partial class DashboardPage : UserControl
     {
         private readonly int _uid;
+        private readonly DashboardViewModel _vm;
 
         // Kolekcje do donutów
         public ObservableCollection<PieSlice> PieCurrent { get; } = new();
@@ -44,7 +46,8 @@ namespace Finly.Pages
             InitializeComponent();
 
             _uid = userId <=0 ? UserService.GetCurrentUserId() : userId;
-            DataContext = this;
+            _vm = new DashboardViewModel(_uid);
+            DataContext = _vm;
 
             // If PeriodBar exists in XAML ensure it's in sync and events are hooked
             if (FindName("PeriodBar") is Views.Controls.PeriodBarControl pb)
@@ -208,8 +211,12 @@ namespace Finly.Pages
                 _mode = pb.Mode;
                 _startDate = pb.StartDate;
                 _endDate = pb.EndDate;
+                _vm.LoadTransactions(_startDate, _endDate);
+                _vm.GenerateInsights(_startDate, _endDate);
+                _vm.GenerateAlerts(_startDate, _endDate);
+                _vm.GenerateForecast(_startDate, _endDate);
+                _vm.RefreshCharts(_startDate, _endDate);
                 LoadCharts();
-                LoadPlannedTransactions();
             }
         }
 
@@ -220,16 +227,24 @@ namespace Finly.Pages
                 _mode = pb.Mode;
                 _startDate = pb.StartDate;
                 _endDate = pb.EndDate;
+                _vm.LoadTransactions(_startDate, _endDate);
+                _vm.GenerateInsights(_startDate, _endDate);
+                _vm.GenerateAlerts(_startDate, _endDate);
+                _vm.GenerateForecast(_startDate, _endDate);
+                _vm.RefreshCharts(_startDate, _endDate);
                 LoadCharts();
-                LoadPlannedTransactions();
             }
         }
 
         private void PeriodBar_ClearClicked(object? sender, EventArgs e)
         {
             ApplyPreset(DateRangeMode.Day, DateTime.Today);
+            _vm.LoadTransactions(_startDate, _endDate);
+            _vm.GenerateInsights(_startDate, _endDate);
+            _vm.GenerateAlerts(_startDate, _endDate);
+            _vm.GenerateForecast(_startDate, _endDate);
+            _vm.RefreshCharts(_startDate, _endDate);
             LoadCharts();
-            LoadPlannedTransactions();
         }
 
         // Helper to set UI element visibility safely
@@ -260,6 +275,13 @@ namespace Finly.Pages
             var expenses = DatabaseService.GetSpendingByCategorySafe(_uid, start, end);
             var incomes = DatabaseService.GetIncomeBySourceSafe(_uid, start, end);
 
+            // Update VM collections for tables and smart cards
+            _vm.LoadTransactions(start, end);
+            _vm.GenerateInsights(start, end);
+            _vm.GenerateAlerts(start, end);
+            _vm.GenerateForecast(start, end);
+            _vm.RefreshCharts(start, end);
+
             BuildExpensePie(expenses);
             BuildIncomePie(incomes);
 
@@ -278,47 +300,30 @@ namespace Finly.Pages
                 var plannedExpenses = DatabaseService.GetPlannedExpenses(_uid, start: null, end: null, limit:50) ?? new List<DatabaseService.CategoryTransactionDto>();
                 var plannedIncomes = DatabaseService.GetPlannedIncomes(_uid, start: null, end: null, limit:50) ?? new List<DatabaseService.CategoryTransactionDto>();
 
-                // Klucz: data (bez czasu) + kwota zaokrąglona do2 miejsc
                 static string Key(DateTime d, decimal amount) => $"{d.Date:yyyy-MM-dd}|{Math.Round(Math.Abs(amount),2)}";
 
-                var expDict = plannedExpenses
-                    .GroupBy(e => Key(e.Date, e.Amount))
-                    .ToDictionary(g => g.Key, g => g.ToList());
-                var incDict = plannedIncomes
-                    .GroupBy(i => Key(i.Date, i.Amount))
-                    .ToDictionary(g => g.Key, g => g.ToList());
+                var expDict = plannedExpenses.GroupBy(e => Key(e.Date, e.Amount)).ToDictionary(g => g.Key, g => g.ToList());
+                var incDict = plannedIncomes.GroupBy(i => Key(i.Date, i.Amount)).ToDictionary(g => g.Key, g => g.ToList());
 
                 var combined = new List<object>();
-
-                // Wspólne klucze -> Transfer
                 foreach (var key in expDict.Keys.Intersect(incDict.Keys))
                 {
                     var e = expDict[key].First();
                     var i = incDict[key].First();
                     var desc = string.IsNullOrWhiteSpace(e.Description) ? i.Description : e.Description;
                     combined.Add(new { Date = e.Date, Description = desc, Amount = Math.Abs(e.Amount), Kind = "Transfer" });
-
                     expDict[key].RemoveAt(0);
                     incDict[key].RemoveAt(0);
                 }
-
-                // Pozostałe: zwykłe wpisy
                 foreach (var list in expDict.Values)
-                {
                     foreach (var e in list)
                         combined.Add(new { Date = e.Date, Description = e.Description, Amount = Math.Abs(e.Amount), Kind = "Wydatek" });
-                }
                 foreach (var list in incDict.Values)
-                {
                     foreach (var i in list)
                         combined.Add(new { Date = i.Date, Description = i.Description, Amount = Math.Abs(i.Amount), Kind = "Przychód" });
-                }
 
                 combined = combined.OrderBy(x => (DateTime)x.GetType().GetProperty("Date")!.GetValue(x)!).ToList();
-
-                if (FindName("PlannedTransactionsList") is ItemsControl pl)
-                    pl.ItemsSource = combined;
-
+                if (FindName("PlannedTransactionsList") is ItemsControl pl) pl.ItemsSource = combined;
                 SetVisibility("PlannedEmptyText", combined.Count ==0);
                 SetVisibility("PlannedTransactionsList", combined.Count >0);
             }

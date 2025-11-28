@@ -79,6 +79,8 @@
 	<!-- Pakiety używane w projekcie -->
 	<ItemGroup>
 		<PackageReference Include="Microsoft.Data.Sqlite" Version="9.0.10" />
+		<PackageReference Include="LiveChartsCore" Version="2.0.0-rc6.1" />
+		<PackageReference Include="LiveChartsCore.SkiaSharpView" Version="2.0.0-rc6.1" />
 		<PackageReference Include="LiveChartsCore.SkiaSharpView.WPF" Version="2.0.0-rc6.1" />
 		<PackageReference Include="SkiaSharp" Version="3.119.1" />
 		<PackageReference Include="SkiaSharp.Views.WPF" Version="3.119.1" />
