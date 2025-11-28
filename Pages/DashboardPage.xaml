@@ -486,7 +486,24 @@
              <!-- Planned transactions moved here as separate card -->
              <Border Grid.Row="1" Style="{StaticResource Card}" Margin="0,12,0,0" MinHeight="100">
                <StackPanel>
-                 <TextBlock Text="Zaplanowane w tym okresie" Style="{StaticResource CardHeader}" Margin="0,0,0,8" />
+                 <TextBlock Text="Zaplanowane transakcje" Style="{StaticResource CardHeader}" Margin="0,0,0,8" />
+
+                 <!-- Nagłówki kolumn: Data | Kategoria | Typ transakcji | Kwota -->
+                 <Border Margin="0,0,0,4" Background="{DynamicResource Surface.Background}" Padding="6,4,6,4">
+                   <Grid>
+                     <Grid.ColumnDefinitions>
+                       <ColumnDefinition Width="120" />
+                       <ColumnDefinition Width="*" />
+                       <ColumnDefinition Width="120" />
+                       <ColumnDefinition Width="70" />
+                     </Grid.ColumnDefinitions>
+                     <TextBlock Grid.Column="0" Text="Data" FontSize="11" FontWeight="SemiBold" Foreground="{DynamicResource App.Foreground}" Opacity="0.8"/>
+                     <TextBlock Grid.Column="1" Text="Kategoria" FontSize="11" FontWeight="SemiBold" Foreground="{DynamicResource App.Foreground}" Opacity="0.8"/>
+                     <TextBlock Grid.Column="2" Text="Typ transakcji" FontSize="11" FontWeight="SemiBold" Foreground="{DynamicResource App.Foreground}" Opacity="0.8"/>
+                     <TextBlock Grid.Column="3" Text="Kwota" FontSize="11" FontWeight="SemiBold" Foreground="{DynamicResource App.Foreground}" Opacity="0.8" HorizontalAlignment="Right"/>
+                   </Grid>
+                 </Border>
+
                  <ItemsControl x:Name="PlannedTransactionsList">
                    <ItemsControl.ItemTemplate>
                      <DataTemplate>
@@ -494,11 +511,13 @@
                          <Grid.ColumnDefinitions>
                            <ColumnDefinition Width="120" />
                            <ColumnDefinition Width="*" />
-                           <ColumnDefinition Width="90" />
+                           <ColumnDefinition Width="120" />
+                           <ColumnDefinition Width="70" />
                          </Grid.ColumnDefinitions>
                          <TextBlock Grid.Column="0" Text="{Binding Date, StringFormat=d}" Foreground="{DynamicResource App.Foreground}" />
                          <TextBlock Grid.Column="1" Text="{Binding Description}" Foreground="{DynamicResource App.Foreground}" TextTrimming="CharacterEllipsis" />
-                         <TextBlock Grid.Column="2" Text="{Binding Amount, StringFormat={}{0:N2} zł}" HorizontalAlignment="Right" Foreground="{DynamicResource App.Foreground}" />
+                         <TextBlock Grid.Column="2" Text="{Binding Kind}" Foreground="{DynamicResource App.Foreground}" HorizontalAlignment="Left" />
+                         <TextBlock Grid.Column="3" Text="{Binding Amount, StringFormat={}{0:N2} zł}" HorizontalAlignment="Right" Foreground="{DynamicResource App.Foreground}" />
                        </Grid>
                      </DataTemplate>
                    </ItemsControl.ItemTemplate>

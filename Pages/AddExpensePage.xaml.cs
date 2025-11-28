@@ -508,9 +508,9 @@ namespace Finly.Pages
             IncomePlannedPanel.Visibility = Visibility.Visible;
 
             bool hasAmount = TryParseAmount(IncomeAmountBox.Text, out var amount) && amount > 0m;
-            bool hasSourceOrCategory = !string.IsNullOrWhiteSpace(IncomeSourceBox.Text) || (IncomeCategoryBox.SelectedItem is string s && !string.IsNullOrWhiteSpace(s)) || !string.IsNullOrWhiteSpace(IncomeNewCategoryBox.Text);
+            bool hasCategory = (IncomeCategoryBox.SelectedItem is string s && !string.IsNullOrWhiteSpace(s)) || !string.IsNullOrWhiteSpace(IncomeNewCategoryBox.Text);
 
-            IncomePlannedButton.IsEnabled = hasAmount && hasSourceOrCategory;
+            IncomePlannedButton.IsEnabled = hasAmount && hasCategory;
         }
 
         private void UpdateTransferPlannedVisibility()
@@ -677,9 +677,7 @@ namespace Finly.Pages
 
             var formTag = formItem.Tag as string ?? "";
             var date = IncomeDatePicker.SelectedDate ?? DateTime.Today;
-            var source = string.IsNullOrWhiteSpace(IncomeSourceBox.Text)
-                ? "Przychód"
-                : IncomeSourceBox.Text.Trim();
+            var source = "Przychód";
             var desc = string.IsNullOrWhiteSpace(IncomeDescBox.Text)
                 ? null
                 : IncomeDescBox.Text.Trim();
@@ -741,24 +739,16 @@ namespace Finly.Pages
             var date = IncomePlannedDatePicker.SelectedDate ?? DateTime.Today;
             var desc = string.IsNullOrWhiteSpace(IncomePlannedDescBox.Text) ? null : IncomePlannedDescBox.Text.Trim();
 
-            // Determine source string from planned source combo
             string source = "Przychód";
             var sourceTag = (IncomePlannedSourceCombo.SelectedItem as ComboBoxItem)?.Tag as string ?? "";
             if (IncomePlannedSourceCombo.SelectedItem is ComboBoxItem selItem && !string.IsNullOrWhiteSpace(selItem.Content as string))
-            {
-                // Prefer the displayed text as source name
                 source = selItem.Content as string ?? source;
-            }
-            // If transfer selected, optionally append account name if chosen
             if (string.Equals(sourceTag, "transfer", StringComparison.OrdinalIgnoreCase))
             {
                 if (IncomePlannedAccountCombo.SelectedItem is string accName && !string.IsNullOrWhiteSpace(accName))
-                {
                     source = $"Przelew -> {accName}";
-                }
                 else
                 {
-                    // No account chosen — inform user
                     ToastService.Info("Wybierz konto docelowe dla planowanego przelewu.");
                     return;
                 }

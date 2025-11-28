@@ -275,25 +275,52 @@ namespace Finly.Pages
         {
             try
             {
-                // Show ALL planned expenses regardless of dashboard date range
-                var planned = DatabaseService.GetPlannedExpenses(_uid, start: null, end: null, limit: 50);
-                if (FindName("PlannedTransactionsList") is ItemsControl pl)
-                {
-                    // Only show future dates or today
-                    var items = planned.Select(p => new
-                    {
-                        Date = p.Date,
-                        Description = p.Description,
-                        Amount = p.Amount
-                    })
-                    .OrderBy(p => p.Date)
-                    .ToList();
+                var plannedExpenses = DatabaseService.GetPlannedExpenses(_uid, start: null, end: null, limit: 50) ?? new List<DatabaseService.CategoryTransactionDto>();
+                var plannedIncomes = DatabaseService.GetPlannedIncomes(_uid, start: null, end: null, limit: 50) ?? new List<DatabaseService.CategoryTransactionDto>();
 
-                    pl.ItemsSource = items;
+                // Klucz: data (bez czasu) + kwota zaokrąglona do 2 miejsc
+                static string Key(DateTime d, decimal amount) => $"{d.Date:yyyy-MM-dd}|{Math.Round(Math.Abs(amount), 2)}";
+
+                var expDict = plannedExpenses
+                    .GroupBy(e => Key(e.Date, e.Amount))
+                    .ToDictionary(g => g.Key, g => g.ToList());
+                var incDict = plannedIncomes
+                    .GroupBy(i => Key(i.Date, i.Amount))
+                    .ToDictionary(g => g.Key, g => g.ToList());
+
+                var combined = new List<object>();
+
+                // Wspólne klucze -> Transfer
+                foreach (var key in expDict.Keys.Intersect(incDict.Keys))
+                {
+                    var e = expDict[key].First();
+                    var i = incDict[key].First();
+                    var desc = string.IsNullOrWhiteSpace(e.Description) ? i.Description : e.Description;
+                    combined.Add(new { Date = e.Date, Description = desc, Amount = Math.Abs(e.Amount), Kind = "Transfer" });
+
+                    expDict[key].RemoveAt(0);
+                    incDict[key].RemoveAt(0);
                 }
 
-                SetVisibility("PlannedEmptyText", planned.Count == 0);
-                SetVisibility("PlannedTransactionsList", planned.Count > 0);
+                // Pozostałe: zwykłe wpisy
+                foreach (var list in expDict.Values)
+                {
+                    foreach (var e in list)
+                        combined.Add(new { Date = e.Date, Description = e.Description, Amount = Math.Abs(e.Amount), Kind = "Wydatek" });
+                }
+                foreach (var list in incDict.Values)
+                {
+                    foreach (var i in list)
+                        combined.Add(new { Date = i.Date, Description = i.Description, Amount = Math.Abs(i.Amount), Kind = "Przychód" });
+                }
+
+                combined = combined.OrderBy(x => (DateTime)x.GetType().GetProperty("Date")!.GetValue(x)!).ToList();
+
+                if (FindName("PlannedTransactionsList") is ItemsControl pl)
+                    pl.ItemsSource = combined;
+
+                SetVisibility("PlannedEmptyText", combined.Count == 0);
+                SetVisibility("PlannedTransactionsList", combined.Count > 0);
             }
             catch
             {

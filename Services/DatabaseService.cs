@@ -2296,7 +2296,7 @@ HAVING SUM(ABS(i.Amount)) > 0
         /// Najwy¿sze wydatki wg „sklepu/kontrahenta” – SAFE:
         /// Transactions: u¿ywa kolumn (w kolejnoœci priorytetu): Merchant, Payee, Title, Note.
         /// Expenses: u¿ywa Description (albo Title, jeœli Description brak).
-        /// Uwzglêdnia tylko wydatki i sumuje wartoœci bezwzglêdne.
+        /// Uwzglêdnia tylko wydatki i sumuje wartoœci bezwglêdne.
         /// </summary>
         public static List<CategoryAmountDto> GetSpendingByMerchantSafe(int userId, DateTime start, DateTime end)
         {
@@ -2414,7 +2414,10 @@ SELECT last_insert_rowid();";
             cmd.Parameters.AddWithValue("@desc", (object?)i.Description ?? DBNull.Value);
             cmd.Parameters.AddWithValue("@s", (object?)i.Source ?? DBNull.Value);
             cmd.Parameters.AddWithValue("@planned", i.IsPlanned ? 1 : 0);
-            return Convert.ToInt32((long)(cmd.ExecuteScalar() ?? 0L));
+            var newId = Convert.ToInt32((long)(cmd.ExecuteScalar() ?? 0L));
+            // notify UI also for incomes
+            try { RaiseDataChanged(); } catch { }
+            return newId;
         }
 
         public static void UpdateIncome(Income i)
@@ -2480,20 +2483,20 @@ WHERE UserId=@u");
             using var c = OpenAndEnsureSchema();
             using var cmd = c.CreateCommand();
             cmd.CommandText = @"
-INSERT INTO Incomes(UserId, Amount, Date, Description, Source)
+INSERT INTO Incomes(UserId, Amount, Date, Description, Source) 
 VALUES (@u, @a, @d, @desc, @s);";
             cmd.Parameters.AddWithValue("@u", userId);
             cmd.Parameters.AddWithValue("@a", amount);
             cmd.Parameters.AddWithValue("@d", ToIsoDate(date));
             cmd.Parameters.AddWithValue("@desc", (object?)note ?? DBNull.Value);
             cmd.Parameters.AddWithValue("@s", source ?? "Przychody");
-            // try to set IsPlanned if column exists
             if (ColumnExists(c, "Incomes", "IsPlanned"))
             {
                 cmd.CommandText = @"INSERT INTO Incomes(UserId, Amount, Date, Description, Source, IsPlanned) VALUES (@u, @a, @d, @desc, @s, @planned);";
                 cmd.Parameters.AddWithValue("@planned", isPlanned ? 1 : 0);
             }
             cmd.ExecuteNonQuery();
+            try { RaiseDataChanged(); } catch { }
         }
 
         /// <summary>
@@ -2520,13 +2523,12 @@ VALUES (@u, @a, @d, @desc, @s);";
         public static void AddIncomeToFreeCash(int userId, decimal amount, DateTime date, int? categoryId, string source, string? note)
         {
             if (amount <= 0) return;
-
-            // 1) Zapis przychodu
+            // Record income
             InsertIncome(userId, amount, date, categoryId, source, note, false);
-
-            // 2) Zwiêkszamy CashOnHand (wolna gotówka roœnie o amount)
+            // Increase CashOnHand (free cash grows)
             var current = GetCashOnHand(userId);
             SetCashOnHand(userId, current + amount);
+            RaiseDataChanged();
         }
 
         /// <summary>
@@ -2538,17 +2540,14 @@ VALUES (@u, @a, @d, @desc, @s);";
         public static void AddIncomeToSavedCash(int userId, decimal amount, DateTime date, int? categoryId, string source, string? note)
         {
             if (amount <= 0) return;
-
-            // 1) Zapis przychodu
+            // Record income
             InsertIncome(userId, amount, date, categoryId, source, note, false);
-
-            // 2) Zwiêkszamy SavedCash
+            // Saved cash increases and total cash increases so free cash stays same
             var saved = GetSavedCash(userId);
             SetSavedCash(userId, saved + amount);
-
-            // 3) Zwiêkszamy ca³kowit¹ gotówkê w portfelu (CashOnHand), aby suma ros³a
             var all = GetCashOnHand(userId);
             SetCashOnHand(userId, all + amount);
+            RaiseDataChanged();
         }
 
         /// <summary>
@@ -2557,10 +2556,8 @@ VALUES (@u, @a, @d, @desc, @s);";
         public static void AddIncomeToBankAccount(int userId, int accountId, decimal amount, DateTime date, int? categoryId, string source, string? note)
         {
             if (amount <= 0) return;
-
             using var c = OpenAndEnsureSchema();
             using var tx = c.BeginTransaction();
-
             using (var upd = c.CreateCommand())
             {
                 upd.Transaction = tx;
@@ -2572,13 +2569,9 @@ VALUES (@u, @a, @d, @desc, @s);";
                 if (rows == 0)
                     throw new InvalidOperationException("Nie znaleziono rachunku bankowego lub nie nale¿y do u¿ytkownika.");
             }
-
             tx.Commit();
-
-            // Zapis przychodu
+            // Record income
             InsertIncome(userId, amount, date, categoryId, source, note, false);
-
-            // Notify UI
             RaiseDataChanged();
         }
 
@@ -2635,6 +2628,47 @@ WHERE UserId = @u AND IsPlanned = 1
                 });
             }
 
+            return list;
+        }
+
+        /// <summary>
+        /// Zwraca zaplanowane przychody (IsPlanned = 1) dla u¿ytkownika, najnowsze pierwsze.
+        /// U¿ywane przez Dashboard do wyœwietlenia krótkiej listy zaplanowanych przychodów.
+        /// </summary>
+        public static List<CategoryTransactionDto> GetPlannedIncomes(int userId, DateTime? start = null, DateTime? end = null, int limit = 10)
+        {
+            var list = new List<CategoryTransactionDto>();
+            using var c = OpenAndEnsureSchema();
+            using var cmd = c.CreateCommand();
+            var sb = new StringBuilder(@"
+SELECT Date, Amount, COALESCE(Description, Source, 'Przychód') AS DescOrSource
+FROM Incomes
+WHERE UserId = @u AND IsPlanned = 1
+");
+            if (start.HasValue)
+            {
+                sb.Append("  AND date(Date) >= date(@start)\n");
+                cmd.Parameters.AddWithValue("@start", start.Value.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture));
+            }
+            if (end.HasValue)
+            {
+                sb.Append("  AND date(Date) <= date(@end)\n");
+                cmd.Parameters.AddWithValue("@end", end.Value.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture));
+            }
+            sb.Append("ORDER BY date(Date) DESC, Id DESC\nLIMIT @limit;");
+            cmd.CommandText = sb.ToString();
+            cmd.Parameters.AddWithValue("@u", userId);
+            cmd.Parameters.AddWithValue("@limit", limit);
+            using var r = cmd.ExecuteReader();
+            while (r.Read())
+            {
+                var date = GetDate(r, 0);
+                decimal amount;
+                var val = r.GetValue(1);
+                if (val is decimal dec) amount = dec; else if (val is double d) amount = (decimal)d; else amount = Convert.ToDecimal(val);
+                var desc = GetNullableString(r, 2) ?? string.Empty;
+                list.Add(new CategoryTransactionDto { Date = date, Amount = amount, Description = desc });
+            }
             return list;
         }
     }
