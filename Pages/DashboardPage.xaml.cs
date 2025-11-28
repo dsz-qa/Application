@@ -54,9 +54,33 @@ namespace Finly.Pages
                 pb.ClearClicked += PeriodBar_ClearClicked;
             }
 
+            // subscribe to DatabaseService data changes so we refresh planned list when new planned tx added
+            DatabaseService.DataChanged += (_, __) => Dispatcher.BeginInvoke(new Action(() => LoadPlannedTransactions()), DispatcherPriority.Background);
+
+            // redraw trend when canvas resizes (to avoid initial draw then disappearing after layout)
+            if (FindName("ExpenseTrendCanvas") is Canvas canvas)
+            {
+                canvas.SizeChanged += (s, e) => {
+                    // rebind trend on UI thread
+                    Dispatcher.BeginInvoke(new Action(() => BindExpenseTrend(_startDate == default ? DateTime.Today : _startDate,
+                                                                                 _endDate == default ? DateTime.Today : _endDate)), DispatcherPriority.Background);
+                };
+            }
+
+            // ensure charts are refreshed once control is loaded (layout established)
+            this.Loaded += DashboardPage_Loaded;
+
             ApplyPreset(DateRangeMode.Day, DateTime.Today);
             RefreshMoneySummary();
             LoadCharts();
+            LoadPlannedTransactions();
+        }
+
+        private void DashboardPage_Loaded(object? sender, RoutedEventArgs e)
+        {
+            // After initial layout, redraw charts/trend to ensure correct sizing
+            LoadCharts();
+            LoadPlannedTransactions();
         }
 
         public DashboardPage() : this(UserService.GetCurrentUserId()) { }
@@ -185,6 +209,7 @@ namespace Finly.Pages
                 _startDate = pb.StartDate;
                 _endDate = pb.EndDate;
                 LoadCharts();
+                LoadPlannedTransactions();
             }
         }
 
@@ -196,6 +221,7 @@ namespace Finly.Pages
                 _startDate = pb.StartDate;
                 _endDate = pb.EndDate;
                 LoadCharts();
+                LoadPlannedTransactions();
             }
         }
 
@@ -203,6 +229,7 @@ namespace Finly.Pages
         {
             ApplyPreset(DateRangeMode.Day, DateTime.Today);
             LoadCharts();
+            LoadPlannedTransactions();
         }
 
         // Helper to set UI element visibility safely
@@ -242,6 +269,35 @@ namespace Finly.Pages
                 BindIncomeTable(incomes);
                 BindExpenseTrend(start, end);
             }), DispatcherPriority.Loaded);
+        }
+
+        private void LoadPlannedTransactions()
+        {
+            try
+            {
+                DateTime start = _startDate == default ? DateTime.Today : _startDate;
+                DateTime end = _endDate == default ? DateTime.Today : _endDate;
+                if (start > end) (start, end) = (end, start);
+
+                var planned = DatabaseService.GetPlannedExpenses(_uid, start, end, limit: 20);
+                if (FindName("PlannedTransactionsList") is ItemsControl pl)
+                {
+                    pl.ItemsSource = planned.Select(p => new
+                    {
+                        Date = p.Date,
+                        Description = p.Description,
+                        Amount = p.Amount
+                    }).ToList();
+                }
+
+                SetVisibility("PlannedEmptyText", planned.Count == 0);
+                SetVisibility("PlannedTransactionsList", planned.Count > 0);
+            }
+            catch
+            {
+                SetVisibility("PlannedEmptyText", true);
+                SetVisibility("PlannedTransactionsList", false);
+            }
         }
 
         // =====================================================================

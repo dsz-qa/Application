@@ -426,6 +426,7 @@
              <Grid.RowDefinitions>
                <RowDefinition Height="*" />
                <RowDefinition Height="*" />
+               <RowDefinition Height="Auto" />
              </Grid.RowDefinitions>
 
              <Border Grid.Row="0" Style="{StaticResource Card}" MinHeight="120">
@@ -476,30 +477,30 @@
                    </ItemsControl.ItemTemplate>
                  </ItemsControl>
                  <TextBlock x:Name="ExpenseTrendEmptyText" Text="Brak danych w tym okresie" Foreground="{DynamicResource App.Foreground}" Visibility="Collapsed" HorizontalAlignment="Center" Margin="0,8,0,0" FontStyle="Italic"/>
+               </StackPanel>
+             </Border>
 
-                 <!-- Planned transactions panel -->
-                 <Border Style="{StaticResource Card}" Margin="0,12,0,0" MinHeight="100">
-                   <StackPanel>
-                     <TextBlock Text="Zaplanowane w tym okresie" Style="{StaticResource CardHeader}" Margin="0,0,0,8" />
-                     <ItemsControl x:Name="PlannedTransactionsList">
-                       <ItemsControl.ItemTemplate>
-                         <DataTemplate>
-                           <Grid Margin="0,2,0,2">
-                             <Grid.ColumnDefinitions>
-                               <ColumnDefinition Width="120" />
-                               <ColumnDefinition Width="*" />
-                               <ColumnDefinition Width="90" />
-                             </Grid.ColumnDefinitions>
-                             <TextBlock Grid.Column="0" Text="{Binding Date, StringFormat=d}" Foreground="{DynamicResource App.Foreground}" />
-                             <TextBlock Grid.Column="1" Text="{Binding Description}" Foreground="{DynamicResource App.Foreground}" TextTrimming="CharacterEllipsis" />
-                             <TextBlock Grid.Column="2" Text="{Binding Amount, StringFormat={}{0:N2} zł}" HorizontalAlignment="Right" Foreground="{DynamicResource App.Foreground}" />
-                           </Grid>
-                         </DataTemplate>
-                       </ItemsControl.ItemTemplate>
-                     </ItemsControl>
-                     <TextBlock x:Name="PlannedEmptyText" Text="Brak zaplanowanych transakcji" Foreground="{DynamicResource App.Foreground}" Visibility="Collapsed" HorizontalAlignment="Center" Margin="0,8,0,0" FontStyle="Italic" />
-                   </StackPanel>
-                 </Border>
+             <!-- Separate planned transactions card under the trend -->
+             <Border Grid.Row="2" Style="{StaticResource Card}" Margin="0,12,0,0" MinHeight="100">
+               <StackPanel>
+                 <TextBlock Text="Zaplanowane transakcje — bieżący okres" Style="{StaticResource CardHeader}" Margin="0,0,0,8" />
+                 <ItemsControl x:Name="PlannedTransactionsList">
+                   <ItemsControl.ItemTemplate>
+                     <DataTemplate>
+                       <Grid Margin="0,2,0,2">
+                         <Grid.ColumnDefinitions>
+                           <ColumnDefinition Width="120" />
+                           <ColumnDefinition Width="*" />
+                           <ColumnDefinition Width="90" />
+                         </Grid.ColumnDefinitions>
+                         <TextBlock Grid.Column="0" Text="{Binding Date, StringFormat=d}" Foreground="{DynamicResource App.Foreground}" />
+                         <TextBlock Grid.Column="1" Text="{Binding Description}" Foreground="{DynamicResource App.Foreground}" TextTrimming="CharacterEllipsis" />
+                         <TextBlock Grid.Column="2" Text="{Binding Amount, StringFormat={}{0:N2} zł}" HorizontalAlignment="Right" Foreground="{DynamicResource App.Foreground}" />
+                       </Grid>
+                     </DataTemplate>
+                   </ItemsControl.ItemTemplate>
+                 </ItemsControl>
+                 <TextBlock x:Name="PlannedEmptyText" Text="Brak zaplanowanych transakcji" Foreground="{DynamicResource App.Foreground}" Visibility="Collapsed" HorizontalAlignment="Center" Margin="0,8,0,0" FontStyle="Italic" />
                </StackPanel>
              </Border>
 
