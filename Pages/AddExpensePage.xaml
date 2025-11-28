@@ -454,17 +454,21 @@
                         <DatePicker Grid.Row="6" Grid.Column="1" x:Name="ExpensePlannedDatePicker" Height="28"/>
 
                         <TextBlock Grid.Row="8" Grid.Column="0" Text="Opis:" VerticalAlignment="Top"/>
-                        <TextBox Grid.Row="8" Grid.Column="1" x:Name="ExpensePlannedDescBox" Height="80" TextWrapping="Wrap" AcceptsReturn="True"/>
+                        <TextBox x:Name="ExpensePlannedDescBox"
+                         Grid.Row="8" Grid.Column="1"
+                         Height="80"
+                         TextWrapping="Wrap"
+                         AcceptsReturn="True"/>
 
                         <StackPanel Grid.Row="9" Grid.ColumnSpan="2" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,8,0,0">
                             <Button x:Name="ExpensePlannedButton" Content="Dodaj jako zaplanowany" Click="SaveExpensePlanned_Click" Style="{StaticResource PrimaryButton}"/>
                             <Button Content="Anuluj" Margin="8,0,0,0" Click="Cancel_Click"/>
                         </StackPanel>
-                    </Grid>
-                </StackPanel>
-            </Grid>
-            </ScrollViewer>
-        </Border>
+                     </Grid>
+                 </StackPanel>
+             </Grid>
+             </ScrollViewer>
+         </Border>
 
         <!-- ========== PRZYCHÓD ========== -->
         <Border x:Name="IncomePanel"
@@ -660,7 +664,21 @@
                         <DatePicker Grid.Row="6" Grid.Column="1" x:Name="IncomePlannedDatePicker" Height="28"/>
 
                         <TextBlock Grid.Row="8" Grid.Column="0" Text="Źródło przychodu:" VerticalAlignment="Top"/>
-                        <TextBox Grid.Row="8" Grid.Column="1" x:Name="IncomePlannedSourceBox" Height="28"/>
+                        <ComboBox Grid.Row="8" Grid.Column="1" x:Name="IncomePlannedSourceCombo" Height="28" SelectionChanged="IncomePlannedSourceCombo_SelectionChanged">
+                            <ComboBoxItem Content="Wolna gotówka" Tag="cash_free"/>
+                            <ComboBoxItem Content="Odłożona gotówka" Tag="cash_saved"/>
+                            <ComboBoxItem Content="Przelew" Tag="transfer"/>
+                        </ComboBox>
+
+                        <!-- Account row for planned income (visible when transfer selected) -->
+                        <Grid x:Name="IncomePlannedAccountRow" Grid.Row="9" Grid.ColumnSpan="2" Visibility="Collapsed">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="220" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0" Text="Na jakie konto trafia przychód:" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                            <ComboBox Grid.Column="1" x:Name="IncomePlannedAccountCombo" Height="28" />
+                        </Grid>
 
                         <TextBlock Grid.Row="10" Grid.Column="0" Text="Opis:" VerticalAlignment="Top"/>
                         <TextBox Grid.Row="10" Grid.Column="1" x:Name="IncomePlannedDescBox" Height="80" TextWrapping="Wrap" AcceptsReturn="True"/>

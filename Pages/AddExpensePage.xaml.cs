@@ -45,10 +45,8 @@ namespace Finly.Pages
 
             Loaded += (_, __) =>
             {
-                // KPI – tak jak na Dashboardzie
                 RefreshMoneySummary();
 
-                // start – żadna zakładka nie wybrana
                 ModeTabs.SelectedIndex = -1;
                 ShowPanels(null);
 
@@ -57,13 +55,11 @@ namespace Finly.Pages
                 LoadEnvelopes();
                 LoadIncomeAccounts();
 
-                // Domyślne daty
                 var today = DateTime.Today;
                 ExpenseDatePicker.SelectedDate = today;
                 IncomeDatePicker.SelectedDate = today;
                 TransferDatePicker.SelectedDate = today;
 
-                // default planned pickers (if present)
                 if (FindName("ExpensePlannedDatePicker") is DatePicker ep) ep.SelectedDate = today;
                 if (FindName("IncomePlannedDatePicker") is DatePicker ip) ip.SelectedDate = today;
                 if (FindName("TransferPlannedDatePicker") is DatePicker tp) tp.SelectedDate = today;
@@ -72,16 +68,24 @@ namespace Finly.Pages
                 ExpensePlannedCategoryBox.ItemsSource = ExpenseCategoryBox.ItemsSource;
                 IncomePlannedCategoryBox.ItemsSource = IncomeCategoryBox.ItemsSource;
 
-                if (TransferPlannedFromBox != null && TransferFromBox != null)
+                // populate income planned source/account
+                if (IncomePlannedAccountCombo != null)
                 {
-                    TransferPlannedFromBox.ItemsSource = TransferFromBox.ItemsSource;
-                    TransferPlannedToBox.ItemsSource = TransferToBox.ItemsSource;
+                    IncomePlannedAccountCombo.ItemsSource = DatabaseService.GetAccounts(_uid)?.Select(a => a.AccountName).ToList() ?? new List<string>();
                 }
+
+                // populate transfer planned accounts
+                TransferPlannedFromBox.ItemsSource = TransferFromBox.ItemsSource;
+                TransferPlannedToBox.ItemsSource = TransferToBox.ItemsSource;
 
                 // enable/disable planned save buttons based on amount
                 ExpensePlannedAmountBox.TextChanged += (s, e) => ExpensePlannedButton.IsEnabled = TryParseAmount(ExpensePlannedAmountBox.Text, out var a) && a > 0m;
                 IncomePlannedAmountBox.TextChanged += (s, e) => IncomePlannedButton.IsEnabled = TryParseAmount(IncomePlannedAmountBox.Text, out var b) && b > 0m;
                 TransferPlannedAmountBox.TextChanged += (s, e) => TransferPlannedButton.IsEnabled = TryParseAmount(TransferPlannedAmountBox.Text, out var c) && c > 0m;
+
+                // source selection handler for planned income
+                if (IncomePlannedSourceCombo != null)
+                    IncomePlannedSourceCombo.SelectionChanged += IncomePlannedSourceCombo_SelectionChanged;
             };
         }
 
@@ -131,6 +135,11 @@ namespace Finly.Pages
             TransferPanel.Visibility =
                 string.Equals(header, "Transfer", StringComparison.OrdinalIgnoreCase)
                     ? Visibility.Visible : Visibility.Collapsed;
+
+            // Update planned panels whenever panels are shown/hidden (so they appear immediately on tab switch)
+            UpdateExpensePlannedVisibility();
+            UpdateIncomePlannedVisibility();
+            UpdateTransferPlannedVisibility();
         }
 
         // ================== DANE SŁOWNIKOWE ==================
@@ -351,6 +360,25 @@ namespace Finly.Pages
             }
         }
 
+        private void IncomePlannedSourceCombo_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            if (!(IncomePlannedSourceCombo.SelectedItem is ComboBoxItem item))
+            {
+                IncomePlannedAccountRow.Visibility = Visibility.Collapsed;
+                return;
+            }
+
+            var tag = item.Tag as string ?? "";
+            if (string.Equals(tag, "transfer", StringComparison.OrdinalIgnoreCase))
+            {
+                IncomePlannedAccountRow.Visibility = Visibility.Visible;
+            }
+            else
+            {
+                IncomePlannedAccountRow.Visibility = Visibility.Collapsed;
+            }
+        }
+
         // ================== POMOCNICZE ==================
 
         private void ClearAmountErrors()
@@ -403,28 +431,34 @@ namespace Finly.Pages
 
         private void UpdateExpensePlannedVisibility()
         {
+            // Always show the planned panel when the expense panel exists (visibility of the parent controls which panel is visible)
+            ExpensePlannedPanel.Visibility = Visibility.Visible;
+
             bool hasAmount = TryParseAmount(ExpenseAmountBox.Text, out var amount) && amount > 0m;
             bool hasCategory = (ExpenseCategoryBox.SelectedItem is string s && !string.IsNullOrWhiteSpace(s)) || !string.IsNullOrWhiteSpace(ExpenseNewCategoryBox.Text);
 
-            ExpensePlannedPanel.Visibility = hasAmount && hasCategory ? Visibility.Visible : Visibility.Collapsed;
             ExpensePlannedButton.IsEnabled = hasAmount && hasCategory;
         }
 
         private void UpdateIncomePlannedVisibility()
         {
+            // Always show planned panel for income
+            IncomePlannedPanel.Visibility = Visibility.Visible;
+
             bool hasAmount = TryParseAmount(IncomeAmountBox.Text, out var amount) && amount > 0m;
             bool hasSourceOrCategory = !string.IsNullOrWhiteSpace(IncomeSourceBox.Text) || (IncomeCategoryBox.SelectedItem is string s && !string.IsNullOrWhiteSpace(s)) || !string.IsNullOrWhiteSpace(IncomeNewCategoryBox.Text);
 
-            IncomePlannedPanel.Visibility = hasAmount && hasSourceOrCategory ? Visibility.Visible : Visibility.Collapsed;
             IncomePlannedButton.IsEnabled = hasAmount && hasSourceOrCategory;
         }
 
         private void UpdateTransferPlannedVisibility()
         {
+            // Always show planned panel for transfer
+            TransferPlannedPanel.Visibility = Visibility.Visible;
+
             bool hasAmount = TryParseAmount(TransferAmountBox.Text, out var amount) && amount > 0m;
             bool endpointsSelected = TransferFromBox.SelectedItem != null && TransferToBox.SelectedItem != null && TransferFromBox.SelectedIndex != TransferToBox.SelectedIndex;
 
-            TransferPlannedPanel.Visibility = hasAmount && endpointsSelected ? Visibility.Visible : Visibility.Collapsed;
             TransferPlannedButton.IsEnabled = hasAmount && endpointsSelected;
         }
 
@@ -643,8 +677,30 @@ namespace Finly.Pages
             }
 
             var date = IncomePlannedDatePicker.SelectedDate ?? DateTime.Today;
-            var source = string.IsNullOrWhiteSpace(IncomePlannedSourceBox.Text) ? "Przychód" : IncomePlannedSourceBox.Text.Trim();
             var desc = string.IsNullOrWhiteSpace(IncomePlannedDescBox.Text) ? null : IncomePlannedDescBox.Text.Trim();
+
+            // Determine source string from planned source combo
+            string source = "Przychód";
+            var sourceTag = (IncomePlannedSourceCombo.SelectedItem as ComboBoxItem)?.Tag as string ?? "";
+            if (IncomePlannedSourceCombo.SelectedItem is ComboBoxItem selItem && !string.IsNullOrWhiteSpace(selItem.Content as string))
+            {
+                // Prefer the displayed text as source name
+                source = selItem.Content as string ?? source;
+            }
+            // If transfer selected, optionally append account name if chosen
+            if (string.Equals(sourceTag, "transfer", StringComparison.OrdinalIgnoreCase))
+            {
+                if (IncomePlannedAccountCombo.SelectedItem is string accName && !string.IsNullOrWhiteSpace(accName))
+                {
+                    source = $"Przelew -> {accName}";
+                }
+                else
+                {
+                    // No account chosen — inform user
+                    ToastService.Info("Wybierz konto docelowe dla planowanego przelewu.");
+                    return;
+                }
+            }
 
             var catName = IncomePlannedCategoryBox.SelectedItem as string;
             if (string.IsNullOrWhiteSpace(catName) && !string.IsNullOrWhiteSpace(IncomePlannedNewCategoryBox.Text))
