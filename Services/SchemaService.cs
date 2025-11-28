@@ -211,10 +211,14 @@ CREATE TABLE IF NOT EXISTS SavedCash(
                 AddColumnIfMissing(con, tx, "Expenses", "CategoryId", "INTEGER");
                 AddColumnIfMissing(con, tx, "Expenses", "AccountId", "INTEGER");
                 AddColumnIfMissing(con, tx, "Expenses", "Note", "TEXT");
+                // Flag for planned transactions
+                AddColumnIfMissing(con, tx, "Expenses", "IsPlanned", "INTEGER", "NOT NULL DEFAULT 0");
 
                 // Incomes – dopilnuj Description / Source przy starych bazach
                 AddColumnIfMissing(con, tx, "Incomes", "Description", "TEXT");
                 AddColumnIfMissing(con, tx, "Incomes", "Source", "TEXT");
+                // Flag for planned incomes
+                AddColumnIfMissing(con, tx, "Incomes", "IsPlanned", "INTEGER", "NOT NULL DEFAULT 0");
 
                 // Envelopes – gdy baza była starsza
                 AddColumnIfMissing(con, tx, "Envelopes", "Target", "NUMERIC", "NOT NULL DEFAULT 0");
@@ -352,6 +356,32 @@ FROM BankAccounts;";
         }
     }
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 

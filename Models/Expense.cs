@@ -20,6 +20,9 @@ namespace Finly.Models
 
         public int UserId { get; set; }
 
+        // Czy transakcja jest zaplanowana (nie wp³ywa na salda)
+        public bool IsPlanned { get; set; } = false;
+
         // Alias zgodnoœci: czêœæ kodu mog³a u¿ywaæ 'Category'
         // => wskazuje na CategoryName, wiêc nic siê nie rozsypie.
         public string Category

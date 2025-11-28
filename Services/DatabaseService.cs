@@ -1214,7 +1214,8 @@ SELECT
     e.Description,
     e.CategoryId,
     COALESCE(c.Name,'(brak)') AS CategoryName,
-    e.AccountId
+    e.AccountId,
+    e.IsPlanned
 FROM Expenses e
 LEFT JOIN Categories c ON c.Id = e.CategoryId
 WHERE e.UserId = @uid");
@@ -1325,7 +1326,7 @@ ORDER BY e.Date DESC, e.Id DESC;";
             using var c = OpenAndEnsureSchema();
             using var cmd = c.CreateCommand();
             cmd.CommandText = @"
-SELECT Id, UserId, Amount, Date, Description, CategoryId
+SELECT Id, UserId, Amount, Date, Description, CategoryId, IsPlanned
 FROM Expenses 
 WHERE Id=@id 
 LIMIT 1;";
@@ -1343,7 +1344,8 @@ LIMIT 1;";
                 Amount = Convert.ToDouble(r.GetValue(2)),
                 Date = GetDate(r, 3),
                 Description = GetNullableString(r, 4),
-                CategoryId = catId
+                CategoryId = catId,
+                IsPlanned = !r.IsDBNull(6) && Convert.ToInt32(r.GetValue(6)) == 1
             };
         }
 
@@ -1352,8 +1354,8 @@ LIMIT 1;";
             using var c = OpenAndEnsureSchema();
             using var cmd = c.CreateCommand();
             cmd.CommandText = @"
-INSERT INTO Expenses(UserId, Amount, Date, Description, CategoryId)
-VALUES (@u,@a,@d,@desc,@c);
+INSERT INTO Expenses(UserId, Amount, Date, Description, CategoryId, IsPlanned)
+VALUES (@u,@a,@d,@desc,@c,@planned);
 SELECT last_insert_rowid();";
 
             cmd.Parameters.AddWithValue("@u", e.UserId);
@@ -1365,6 +1367,8 @@ SELECT last_insert_rowid();";
                 cmd.Parameters.AddWithValue("@c", cid);
             else
                 cmd.Parameters.AddWithValue("@c", DBNull.Value);
+
+            cmd.Parameters.AddWithValue("@planned", e.IsPlanned ? 1 : 0);
 
             var rowId = (long)(cmd.ExecuteScalar() ?? 0L);
             return (int)rowId;
@@ -1380,7 +1384,8 @@ UPDATE Expenses SET
     Amount=@a, 
     Date=@d, 
     Description=@desc, 
-    CategoryId=@c
+    CategoryId=@c,
+    IsPlanned=@planned
 WHERE Id=@id;";
 
             cmd.Parameters.AddWithValue("@id", e.Id);
@@ -1393,6 +1398,8 @@ WHERE Id=@id;";
                 cmd.Parameters.AddWithValue("@c", cid);
             else
                 cmd.Parameters.AddWithValue("@c", DBNull.Value);
+
+            cmd.Parameters.AddWithValue("@planned", e.IsPlanned ? 1 : 0);
 
             cmd.ExecuteNonQuery();
         }
@@ -1547,7 +1554,7 @@ ORDER BY Name COLLATE NOCASE;";
                     dto.Deadline = dt == DateTime.MinValue ? (DateTime?)null : dt;
                 }
 
-                // 2) jeœli Deadline jest puste, spróbujmy wyci¹gn¹æ je z tekstu celu / notatki
+                // 2) jeœli Deadline jest puste, spróbajmy wyci¹gn¹æ je z tekstu celu / notatki
                 if (dto.Deadline == null && !string.IsNullOrWhiteSpace(dto.GoalText))
                 {
                     dto.Deadline = TryParseDeadlineFromGoalText(dto.GoalText);
@@ -1969,10 +1976,7 @@ LIMIT 1;";
             using (var up = c.CreateCommand())
             {
                 up.Transaction = tx;
-                up.CommandText = @"
-UPDATE BankAccounts 
-SET Balance = Balance - @a 
-WHERE Id=@id AND UserId=@u;";
+                up.CommandText = @"UPDATE BankAccounts SET Balance = Balance - @a WHERE Id=@id AND UserId=@u;";
                 up.Parameters.AddWithValue("@a", amount);
                 up.Parameters.AddWithValue("@id", accountId);
                 up.Parameters.AddWithValue("@u", userId);
@@ -2108,13 +2112,13 @@ UPDATE BankAccounts
         {
             if (!TableExists(con, "BankAccounts")) return;
 
-            if (!ColumnExists(con, "BankAccounts", "BankName"))
-            {
-                using var cmd = con.CreateCommand();
-                cmd.CommandText = "ALTER TABLE BankAccounts ADD COLUMN BankName TEXT;";
-                cmd.ExecuteNonQuery();
-            }
-        }
+             if (!ColumnExists(con, "BankAccounts", "BankName"))
+             {
+                 using var cmd = con.CreateCommand();
+                 cmd.CommandText = "ALTER TABLE BankAccounts ADD COLUMN BankName TEXT;";
+                 cmd.ExecuteNonQuery();
+             }
+         }
 
         public sealed class CategoryAmountDto
         {
@@ -2122,7 +2126,7 @@ UPDATE BankAccounts
             public decimal Amount { get; set; }
         }
 
-        public static List<CategoryAmountDto> GetSpendingByCategorySafe(int userId, DateTime start, DateTime end)
+        public static List<CategoryAmountDto> GetSpendingByCategorySafe(int userId, DateTime start, DateTime end, bool includePlanned = true)
         {
             using var con = OpenAndEnsureSchema();
 
@@ -2164,7 +2168,14 @@ SELECT COALESCE(" + (hasCats ? "c.Name" : "NULL") + @", '(brak kategorii)') AS N
 FROM Expenses e
 " + (hasCats ? "LEFT JOIN Categories c ON c.Id = e.CategoryId" : "") + @"
 WHERE e.UserId = $uid
-  AND date(e.Date) BETWEEN date($start) AND date($end)
+  AND date(e.Date) BETWEEN date($start) AND date($end)");
+
+                if (!includePlanned)
+                {
+                    sb.AppendLine("  AND (e.IsPlanned = 0 OR e.IsPlanned IS NULL)");
+                }
+
+                sb.AppendLine(@"
 GROUP BY COALESCE(" + (hasCats ? "c.Name" : "NULL") + @", '(brak kategorii)') 
 HAVING SUM(ABS(e.Amount)) > 0
 ");
@@ -2191,7 +2202,7 @@ HAVING SUM(ABS(e.Amount)) > 0
                        .ToList();
         }
 
-        public static List<CategoryAmountDto> GetIncomeBySourceSafe(int userId, DateTime start, DateTime end)
+        public static List<CategoryAmountDto> GetIncomeBySourceSafe(int userId, DateTime start, DateTime end, bool includePlanned = true)
         {
             using var con = OpenAndEnsureSchema();
 
@@ -2212,31 +2223,27 @@ HAVING SUM(ABS(e.Amount)) > 0
             {
                 AppendUnionIfNeeded();
 
-                // Determine expression to use for the name when selecting from Transactions.
-                // Some DBs may not have column 'Source' in Transactions, so fall back to category name or literal.
                 string txSourceExpr;
                 if (ColumnExists(con, "Transactions", "Source"))
                 {
-                    // prefer t.Source, fallback to category name (if exists) or literal
                     txSourceExpr = "COALESCE(t.Source, " + (hasCats ? "COALESCE(c.Name,'Przychody')" : "'Przychody'") + ")";
                 }
                 else
                 {
-                    // no t.Source column -> use category name (if exists) or literal 'Przychody'
                     txSourceExpr = hasCats ? "COALESCE(c.Name,'Przychody')" : "'Przychody'";
                 }
 
-                sb.AppendLine(@"
-SELECT " + txSourceExpr + @" AS Name,
-       SUM(ABS(t.Amount)) AS Amount
-FROM Transactions t
-" + (hasCats ? "LEFT JOIN Categories c ON c.Id = t.CategoryId" : "") + @"
-WHERE t.UserId = $uid
-  AND date(t.Date) BETWEEN date($start) AND date($end)
-  AND (LOWER(t.Type) = 'income' OR t.Type = 1)
-GROUP BY " + txSourceExpr + @"
-HAVING SUM(ABS(t.Amount)) > 0
-");
+                sb.AppendLine(
+                    "SELECT " + txSourceExpr + " AS Name,\n" +
+                    "       SUM(ABS(t.Amount)) AS Amount\n" +
+                    "FROM Transactions t\n" +
+                    (hasCats ? "LEFT JOIN Categories c ON c.Id = t.CategoryId\n" : "") +
+                    "WHERE t.UserId = $uid\n" +
+                    "  AND date(t.Date) BETWEEN date($start) AND date($end)\n" +
+                    "  AND (LOWER(t.Type) = 'income' OR t.Type = 1)\n" +
+                    "GROUP BY " + txSourceExpr + "\n" +
+                    "HAVING SUM(ABS(t.Amount)) > 0\n"
+                );
             }
 
             if (hasIncomes)
@@ -2247,7 +2254,14 @@ SELECT COALESCE(i.Source,'Przychody') AS Name,
        SUM(ABS(i.Amount)) AS Amount
 FROM Incomes i
 WHERE i.UserId = $uid
-  AND date(i.Date) BETWEEN date($start) AND date($end)
+  AND date(i.Date) BETWEEN date($start) AND date($end)");
+
+                if (!includePlanned)
+                {
+                    sb.AppendLine("  AND (i.IsPlanned = 0 OR i.IsPlanned IS NULL)");
+                }
+
+                sb.AppendLine(@"
 GROUP BY COALESCE(i.Source,'Przychody')
 HAVING SUM(ABS(i.Amount)) > 0
 ");
@@ -2286,6 +2300,7 @@ HAVING SUM(ABS(i.Amount)) > 0
 
             bool hasTrans = TableExists(con, "Transactions");
             bool hasExpenses = TableExists(con, "Expenses");
+            bool hasCats = TableExists(con, "Categories");
 
             if (!hasTrans && !hasExpenses)
                 return new List<CategoryAmountDto>();
@@ -2318,16 +2333,17 @@ HAVING SUM(ABS(i.Amount)) > 0
             if (hasTrans)
             {
                 AppendUnionIfNeeded();
-                sb.AppendLine($@"
-SELECT {txNameExpr} AS Name,
-       SUM(ABS(t.Amount)) AS Amount
-FROM Transactions t
-WHERE t.UserId = $uid
-  AND date(t.Date) BETWEEN date($start) AND date($end)
-  AND (LOWER(t.Type) = 'expense' OR t.Type = 0)
-GROUP BY {txNameExpr}
-HAVING SUM(ABS(t.Amount)) > 0
-");
+                sb.AppendLine(@"
+SELECT " + txNameExpr + " AS Name,\n" +
+                "       SUM(ABS(t.Amount)) AS Amount\n" +
+                "FROM Transactions t\n" +
+                (hasCats ? "LEFT JOIN Categories c ON c.Id = t.CategoryId\n" : "") +
+                "WHERE t.UserId = $uid\n" +
+                "  AND date(t.Date) BETWEEN date($start) AND date($end)\n" +
+                "  AND (LOWER(t.Type) = 'expense' OR t.Type = 0)\n" +
+                "GROUP BY " + txNameExpr + "\n" +
+                "HAVING SUM(ABS(t.Amount)) > 0\n"
+                );
             }
 
             if (hasExpenses)
@@ -2377,6 +2393,7 @@ HAVING SUM(ABS(e.Amount)) > 0
             public DateTime Date { get; set; }
             public string? Description { get; set; }
             public string? Source { get; set; }   // opcjonalne pole
+            public bool IsPlanned { get; set; } = false;
         }
 
         public static int InsertIncome(Income i)
@@ -2384,14 +2401,15 @@ HAVING SUM(ABS(e.Amount)) > 0
             using var c = OpenAndEnsureSchema();
             using var cmd = c.CreateCommand();
             cmd.CommandText = @"
-INSERT INTO Incomes(UserId, Amount, Date, Description, Source)
-VALUES (@u,@a,@d,@desc,@s);
+INSERT INTO Incomes(UserId, Amount, Date, Description, Source, IsPlanned)
+VALUES (@u,@a,@d,@desc,@s,@planned);
 SELECT last_insert_rowid();";
             cmd.Parameters.AddWithValue("@u", i.UserId);
             cmd.Parameters.AddWithValue("@a", i.Amount);
             cmd.Parameters.AddWithValue("@d", ToIsoDate(i.Date));
             cmd.Parameters.AddWithValue("@desc", (object?)i.Description ?? DBNull.Value);
             cmd.Parameters.AddWithValue("@s", (object?)i.Source ?? DBNull.Value);
+            cmd.Parameters.AddWithValue("@planned", i.IsPlanned ? 1 : 0);
             return Convert.ToInt32((long)(cmd.ExecuteScalar() ?? 0L));
         }
 
@@ -2401,7 +2419,7 @@ SELECT last_insert_rowid();";
             using var cmd = c.CreateCommand();
             cmd.CommandText = @"
 UPDATE Incomes SET
-  UserId=@u, Amount=@a, Date=@d, Description=@desc, Source=@s
+  UserId=@u, Amount=@a, Date=@d, Description=@desc, Source=@s, IsPlanned=@planned
 WHERE Id=@id;";
             cmd.Parameters.AddWithValue("@id", i.Id);
             cmd.Parameters.AddWithValue("@u", i.UserId);
@@ -2409,15 +2427,7 @@ WHERE Id=@id;";
             cmd.Parameters.AddWithValue("@d", ToIsoDate(i.Date));
             cmd.Parameters.AddWithValue("@desc", (object?)i.Description ?? DBNull.Value);
             cmd.Parameters.AddWithValue("@s", (object?)i.Source ?? DBNull.Value);
-            cmd.ExecuteNonQuery();
-        }
-
-        public static void DeleteIncome(int id)
-        {
-            using var c = OpenAndEnsureSchema();
-            using var cmd = c.CreateCommand();
-            cmd.CommandText = "DELETE FROM Incomes WHERE Id=@id;";
-            cmd.Parameters.AddWithValue("@id", id);
+            cmd.Parameters.AddWithValue("@planned", i.IsPlanned ? 1 : 0);
             cmd.ExecuteNonQuery();
         }
 
@@ -2427,7 +2437,7 @@ WHERE Id=@id;";
             using var c = OpenAndEnsureSchema();
             using var cmd = c.CreateCommand();
             var sb = new StringBuilder(@"
-SELECT Id, UserId, Amount, Date, Description, Source
+SELECT Id, UserId, Amount, Date, Description, Source, IsPlanned
 FROM Incomes
 WHERE UserId=@u");
             cmd.Parameters.AddWithValue("@u", userId);
@@ -2458,10 +2468,10 @@ WHERE UserId=@u");
         }
 
         /// <summary>
-        /// Prostszy insert przychodów – mapuje parametr note na Description.
+        /// Prostszy insert przychodu – mapuje parametr note na Description.
         /// U¿ywany m.in. przez ekran „Dodaj”.
         /// </summary>
-        public static void InsertIncome(int userId, decimal amount, DateTime date, string source, string? note)
+        public static void InsertIncome(int userId, decimal amount, DateTime date, string source, string? note, bool isPlanned = false)
         {
             using var c = OpenAndEnsureSchema();
             using var cmd = c.CreateCommand();
@@ -2473,6 +2483,12 @@ VALUES (@u, @a, @d, @desc, @s);";
             cmd.Parameters.AddWithValue("@d", ToIsoDate(date));
             cmd.Parameters.AddWithValue("@desc", (object?)note ?? DBNull.Value);
             cmd.Parameters.AddWithValue("@s", source ?? "Przychody");
+            // try to set IsPlanned if column exists
+            if (ColumnExists(c, "Incomes", "IsPlanned"))
+            {
+                cmd.CommandText = @"INSERT INTO Incomes(UserId, Amount, Date, Description, Source, IsPlanned) VALUES (@u, @a, @d, @desc, @s, @planned);";
+                cmd.Parameters.AddWithValue("@planned", isPlanned ? 1 : 0);
+            }
             cmd.ExecuteNonQuery();
         }
 
@@ -2487,85 +2503,135 @@ VALUES (@u, @a, @d, @desc, @s);";
             DateTime date,
             int? categoryId,
             string source,
-            string? note)
+            string? note,
+            bool isPlanned = false)
         {
-            InsertIncome(userId, amount, date, source, note);
-        }
-
-        // ===== PRZYCHODY – operacje na Ÿród³ach =====
-
-        /// <summary>
-        /// Przychód do wolnej gotówki.
-        /// Zwiêksza Incomes + CashOnHand. SavedCash zostaje bez zmian.
-        /// </summary>
-        public static void AddIncomeToFreeCash(
-            int userId,
-            decimal amount,
-            DateTime date,
-            int? categoryId,
-            string source,
-            string? note)
-        {
-            if (amount <= 0) return;
-
-            InsertIncome(userId, amount, date, categoryId, source, note);
-
-            var allCash = GetCashOnHand(userId);
-            SetCashOnHand(userId, allCash + amount);
+            InsertIncome(userId, amount, date, source, note, isPlanned);
         }
 
         /// <summary>
-        /// Przychód do od³o¿onej gotówki.
-        /// Zwiêksza Incomes + CashOnHand + SavedCash o tê sam¹ kwotê.
+        /// Dodaje przychód do "wolnej gotówki" (CashOnHand zwiêksza siê o amount)
+        /// oraz zapisuje wpis w tabeli Incomes. Nie modyfikuje SavedCash ani kopert.
         /// </summary>
-        public static void AddIncomeToSavedCash(
-            int userId,
-            decimal amount,
-            DateTime date,
-            int? categoryId,
-            string source,
-            string? note)
+        public static void AddIncomeToFreeCash(int userId, decimal amount, DateTime date, int? categoryId, string source, string? note)
         {
             if (amount <= 0) return;
 
-            InsertIncome(userId, amount, date, categoryId, source, note);
+            // 1) Zapis przychodu
+            InsertIncome(userId, amount, date, categoryId, source, note, false);
 
-            var allCash = GetCashOnHand(userId);
-            SetCashOnHand(userId, allCash + amount);
-
-            AddToSavedCash(userId, amount);
+            // 2) Zwiêkszamy CashOnHand (wolna gotówka roœnie o amount)
+            var current = GetCashOnHand(userId);
+            SetCashOnHand(userId, current + amount);
         }
 
         /// <summary>
-        /// Przychód bezpoœrednio na konto bankowe.
-        /// Zmniejsza Incomes oraz saldo wskazanego rachunku.
+        /// Dodaje przychód bezpoœrednio do puli od³o¿onej gotówki (SavedCash).
+        /// Aby zachowaæ spójnoœæ: SavedCash zwiêksza siê o amount a CashOnHand
+        /// równie¿ zwiêksza siê o amount (suma roœnie, free pozostaje bez zmian).
+        /// Zapisuje wpis w tabeli Incomes.
         /// </summary>
-        public static void AddIncomeToBankAccount(
-            int userId,
-            int accountId,
-            decimal amount,
-            DateTime date,
-            int? categoryId,
-            string source,
-            string? note)
+        public static void AddIncomeToSavedCash(int userId, decimal amount, DateTime date, int? categoryId, string source, string? note)
         {
             if (amount <= 0) return;
 
-            InsertIncome(userId, amount, date, categoryId, source, note);
+            // 1) Zapis przychodu
+            InsertIncome(userId, amount, date, categoryId, source, note, false);
+
+            // 2) Zwiêkszamy SavedCash
+            var saved = GetSavedCash(userId);
+            SetSavedCash(userId, saved + amount);
+
+            // 3) Zwiêkszamy ca³kowit¹ gotówkê w portfelu (CashOnHand), aby suma ros³a
+            var all = GetCashOnHand(userId);
+            SetCashOnHand(userId, all + amount);
+        }
+
+        /// <summary>
+        /// Dodaje przychód wp³ywaj¹cy na rachunek bankowy: aktualizuje saldo konta i zapisuje wpis w Incomes.
+        /// </summary>
+        public static void AddIncomeToBankAccount(int userId, int accountId, decimal amount, DateTime date, int? categoryId, string source, string? note)
+        {
+            if (amount <= 0) return;
 
             using var c = OpenAndEnsureSchema();
-            using var cmd = c.CreateCommand();
-            cmd.CommandText = @"
-UPDATE BankAccounts
-   SET Balance = Balance + @a
- WHERE Id=@id AND UserId=@u;";
-            cmd.Parameters.AddWithValue("@a", amount);
-            cmd.Parameters.AddWithValue("@id", accountId);
-            cmd.Parameters.AddWithValue("@u", userId);
+            using var tx = c.BeginTransaction();
 
-            var rows = cmd.ExecuteNonQuery();
-            if (rows == 0)
-                throw new InvalidOperationException("Nie znaleziono rachunku bankowego lub nie nale¿y do u¿ytkownika.");
+            using (var upd = c.CreateCommand())
+            {
+                upd.Transaction = tx;
+                upd.CommandText = @"UPDATE BankAccounts SET Balance = Balance + @a WHERE Id=@id AND UserId=@u;";
+                upd.Parameters.AddWithValue("@a", amount);
+                upd.Parameters.AddWithValue("@id", accountId);
+                upd.Parameters.AddWithValue("@u", userId);
+                var rows = upd.ExecuteNonQuery();
+                if (rows == 0)
+                    throw new InvalidOperationException("Nie znaleziono rachunku bankowego lub nie nale¿y do u¿ytkownika.");
+            }
+
+            tx.Commit();
+
+            // Zapis przychodu
+            InsertIncome(userId, amount, date, categoryId, source, note, false);
+
+            // Notify UI
+            RaiseDataChanged();
+        }
+
+        /// <summary>
+        /// Zwraca zaplanowane wydatki (IsPlanned = 1) dla u¿ytkownika, najnowsze pierwsze.
+        /// U¿ywane przez Dashboard do wyœwietlenia krótkiej listy zaplanowanych transakcji.
+        /// </summary>
+        public static List<CategoryTransactionDto> GetPlannedExpenses(int userId, DateTime? start = null, DateTime? end = null, int limit = 10)
+        {
+            var list = new List<CategoryTransactionDto>();
+            using var c = OpenAndEnsureSchema();
+            using var cmd = c.CreateCommand();
+
+            var sb = new StringBuilder(@"
+SELECT Date, Amount, Description
+FROM Expenses
+WHERE UserId = @u AND IsPlanned = 1
+");
+
+            if (start.HasValue)
+            {
+                sb.Append("  AND date(Date) >= date(@start)\n");
+                cmd.Parameters.AddWithValue("@start", start.Value.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture));
+            }
+            if (end.HasValue)
+            {
+                sb.Append("  AND date(Date) <= date(@end)\n");
+                cmd.Parameters.AddWithValue("@end", end.Value.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture));
+            }
+
+            sb.Append("ORDER BY date(Date) DESC, Id DESC\nLIMIT @limit;");
+
+            cmd.CommandText = sb.ToString();
+            cmd.Parameters.AddWithValue("@u", userId);
+            cmd.Parameters.AddWithValue("@limit", limit);
+
+            using var r = cmd.ExecuteReader();
+            while (r.Read())
+            {
+                var date = GetDate(r, 0);
+                decimal amount;
+                var val = r.GetValue(1);
+                if (val is decimal dec) amount = dec;
+                else if (val is double d) amount = (decimal)d;
+                else amount = Convert.ToDecimal(val);
+
+                var desc = GetNullableString(r, 2) ?? string.Empty;
+
+                list.Add(new CategoryTransactionDto
+                {
+                    Date = date,
+                    Amount = amount,
+                    Description = desc
+                });
+            }
+
+            return list;
         }
     }
 }
