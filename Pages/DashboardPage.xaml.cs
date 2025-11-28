@@ -3,6 +3,7 @@ using Finly.Services;
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
+using System.Data;
 using System.Globalization;
 using System.Linq;
 using System.Windows;
@@ -260,11 +261,12 @@ namespace Finly.Pages
             {
                 _currentTotalExpenses = 0m;
 
-                if (FindName("PieCenterNameText") is TextBlock n) n.Text = "Brak danych";
-                if (FindName("PieCenterValueText") is TextBlock v) v.Text = "0,00 zł";
+                // Remove center texts so only the "Brak danych w tym okresie" placeholder is visible
+                if (FindName("PieCenterNameText") is TextBlock n) n.Text = "";
+                if (FindName("PieCenterValueText") is TextBlock v) v.Text = "";
                 if (FindName("PieCenterPercentText") is TextBlock p) p.Text = "";
 
-                // show empty placeholder inside the donut area but keep the viewbox visible
+                // show empty placeholder inside the donut area (keep viewbox so placeholder is shown)
                 SetVisibility("DonutExpenseEmptyText", true);
                 SetVisibility("ExpenseDonutViewbox", true);
                 return;
@@ -324,11 +326,12 @@ namespace Finly.Pages
             {
                 _currentTotalIncome = 0m;
 
-                if (FindName("IncomeCenterNameText") is TextBlock n) n.Text = "Brak danych";
-                if (FindName("IncomeCenterValueText") is TextBlock v) v.Text = "0,00 zł";
+                // Remove center texts so only the "Brak danych w tym okresie" placeholder is visible
+                if (FindName("IncomeCenterNameText") is TextBlock n) n.Text = "";
+                if (FindName("IncomeCenterValueText") is TextBlock v) v.Text = "";
                 if (FindName("IncomeCenterPercentText") is TextBlock p) p.Text = "";
 
-                // show empty placeholder inside the donut area but keep the viewbox visible
+                // show empty placeholder inside the donut area (keep viewbox so placeholder is shown)
                 SetVisibility("DonutIncomeEmptyText", true);
                 SetVisibility("IncomeDonutViewbox", true);
                 return;
@@ -423,10 +426,10 @@ namespace Finly.Pages
 
             // Środek donuta przychodów – całość
             if (FindName("IncomeCenterNameText") is TextBlock n)
-                n.Text = rows.Count == 0 ? "Brak danych" : "Przychód";
+                n.Text = rows.Count == 0 ? "" : "Przychód";
 
             if (FindName("IncomeCenterValueText") is TextBlock v)
-                v.Text = sum.ToString("N2", CultureInfo.CurrentCulture) + " zł";
+                v.Text = rows.Count == 0 ? "" : sum.ToString("N2", CultureInfo.CurrentCulture) + " zł";
 
             if (FindName("IncomeCenterPercentText") is TextBlock p)
                 p.Text = rows.Count == 0 ? "" : "100,0% udziału";
@@ -448,26 +451,60 @@ namespace Finly.Pages
 
             try
             {
-                var currentCats = DatabaseService.GetSpendingByCategorySafe(_uid, start, end)
-                                   ?? Enumerable.Empty<DatabaseService.CategoryAmountDto>();
-                var currentTotal = currentCats.Sum(x => x.Amount);
+                // Ensure start <= end
+                if (start > end) (start, end) = (end, start);
 
                 int days = (end.Date - start.Date).Days + 1;
                 if (days <= 0) days = 1;
 
-                var prevEnd = start.AddDays(-1);
-                var prevStart = prevEnd.AddDays(-days + 1);
+                // Read raw expenses in the range
+                DataTable dt = null;
+                try { dt = DatabaseService.GetExpenses(_uid, start, end); } catch { dt = null; }
+                var rows = (dt == null) ? Enumerable.Empty<DataRow>() : dt.AsEnumerable();
 
-                var prevCats = DatabaseService.GetSpendingByCategorySafe(_uid, prevStart, prevEnd)
-                               ?? Enumerable.Empty<DatabaseService.CategoryAmountDto>();
-                var prevTotal = prevCats.Sum(x => x.Amount);
+                var items = new List<ExpenseTrendItem>(days);
+                decimal maxAmount = 0m;
 
-                // If both previous and current totals are zero, show empty placeholder
-                if (currentTotal == 0m && prevTotal == 0m)
+                for (int i = 0; i < days; i++)
+                {
+                    var date = start.Date.AddDays(i);
+                    decimal sumDay = 0m;
+
+                    foreach (var r in rows)
+                    {
+                        try
+                        {
+                            var obj = r["Date"];
+                            DateTime d;
+                            if (obj is DateTime dtv) d = dtv;
+                            else if (!DateTime.TryParse(obj?.ToString(), out d)) continue;
+
+                            if (d.Date == date)
+                            {
+                                var amtObj = r["Amount"];
+                                if (amtObj == DBNull.Value) continue;
+                                var dec = Convert.ToDecimal(amtObj);
+                                sumDay += Math.Abs(dec);
+                            }
+                        }
+                        catch { /* ignore malformed rows */ }
+                    }
+
+                    if (sumDay > maxAmount) maxAmount = sumDay;
+
+                    items.Add(new ExpenseTrendItem
+                    {
+                        DateLabel = date.ToString("dd.MM"),
+                        Amount = sumDay,
+                        Percent = 0.0 // will compute after we know max
+                    });
+                }
+
+                // If all zeros, show empty placeholder
+                if (items.All(it => it.Amount == 0m))
                 {
                     canvas.Children.Clear();
                     labels.ItemsSource = Array.Empty<ExpenseTrendItem>();
-                    // show empty placeholder but keep canvas visible (preserve layout)
                     SetVisibility("ExpenseTrendEmptyText", true);
                     SetVisibility("ExpenseTrendCanvas", true);
                     SetVisibility("ExpenseTrendLabels", false);
@@ -478,32 +515,16 @@ namespace Finly.Pages
                 SetVisibility("ExpenseTrendCanvas", true);
                 SetVisibility("ExpenseTrendLabels", true);
 
-                var max = Math.Max(currentTotal, prevTotal);
-                if (max <= 0) max = 1;
+                if (maxAmount <= 0m) maxAmount = 1m;
 
-                var items = new[]
-                {
-                    new ExpenseTrendItem
-                    {
-                        DateLabel = $"{prevStart:dd.MM}–{prevEnd:dd.MM}",
-                        Amount    = prevTotal,
-                        Percent   = (double)(prevTotal / max * 100m)
-                    },
-                    new ExpenseTrendItem
-                    {
-                        DateLabel = $"{start:dd.MM}–{end:dd.MM}",
-                        Amount    = currentTotal,
-                        Percent   = (double)(currentTotal / max * 100m)
-                    }
-                };
+                // compute percent for each item
+                foreach (var it in items)
+                    it.Percent = (double)(it.Amount / maxAmount * 100m);
 
                 labels.ItemsSource = items;
 
-                // Rysowanie linii
+                // Draw polyline
                 canvas.Children.Clear();
-
-                if (items.Length == 0)
-                    return;
 
                 double width = canvas.ActualWidth;
                 if (width <= 0) width = 200;
@@ -516,12 +537,9 @@ namespace Finly.Pages
                     StrokeThickness = 2
                 };
 
-                for (int i = 0; i < items.Length; i++)
+                for (int i = 0; i < items.Count; i++)
                 {
-                    double x = (items.Length == 1)
-                        ? width / 2.0
-                        : i * (width / (items.Length - 1));
-
+                    double x = (items.Count == 1) ? width / 2.0 : i * (width / (items.Count - 1));
                     double y = height - (items[i].Percent / 100.0) * (height - 4) - 2;
 
                     line.Points.Add(new Point(x, y));

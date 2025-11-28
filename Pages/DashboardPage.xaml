@@ -6,7 +6,7 @@
  <UserControl.Resources>
  <!-- Karty -->
  <Style x:Key="Card" TargetType="Border">
- <Setter Property="Background" Value="{DynamicResource Surface.Background}"/>
+ <Setter Property="Background" Value="Transparent"/>
  <Setter Property="BorderBrush" Value="{DynamicResource Surface.Border}"/>
  <Setter Property="BorderThickness" Value="1"/>
  <Setter Property="CornerRadius" Value="10"/>
@@ -34,7 +34,7 @@
  </Style>
 
  <Style x:Key="KpiCard" TargetType="Border">
- <Setter Property="Background" Value="{DynamicResource Surface.Background}"/>
+ <Setter Property="Background" Value="Transparent"/>
  <Setter Property="BorderBrush" Value="{DynamicResource Brand.Blue}"/>
  <Setter Property="BorderThickness" Value="2"/>
  <Setter Property="CornerRadius" Value="10"/>
@@ -50,7 +50,12 @@
  </Style>
  </UserControl.Resources>
 
- <Grid Margin="16">
+ <!-- Wrap content in a ScrollViewer so dashboard can scroll vertically on smaller screens -->
+ <ScrollViewer VerticalScrollBarVisibility="Auto"
+              HorizontalScrollBarVisibility="Disabled"
+              PanningMode="VerticalOnly">
+
+   <Grid Margin="16">
  <Grid.RowDefinitions>
  <RowDefinition Height="Auto"/>
  <RowDefinition Height="Auto"/>
@@ -172,7 +177,6 @@
  Stretch="Uniform">
  <Grid Width="220" Height="220">
  <Ellipse Width="220" Height="220"
- Fill="#11000000"
  Stroke="{DynamicResource Surface.Border}"
  StrokeThickness="1"/>
 
@@ -239,7 +243,6 @@
  Stretch="Uniform">
  <Grid Width="220" Height="220">
  <Ellipse Width="220" Height="220"
- Fill="#11000000"
  Stroke="{DynamicResource Surface.Border}"
  StrokeThickness="1"/>
 
@@ -308,36 +311,38 @@
  TextWrapping="Wrap"/>
 
  <!-- NAGŁÓWEK: Kategoria | Kwota | Procent -->
- <Grid Margin="0,0,0,4">
- <Grid.ColumnDefinitions>
- <ColumnDefinition Width="*" />
- <ColumnDefinition Width="110" />
- <ColumnDefinition Width="70" />
- </Grid.ColumnDefinitions>
+ <Border Margin="0,0,0,4" Background="{DynamicResource Surface.Background}" Padding="6,4,6,4">
+   <Grid>
+     <Grid.ColumnDefinitions>
+       <ColumnDefinition Width="*" />
+       <ColumnDefinition Width="110" />
+       <ColumnDefinition Width="70" />
+     </Grid.ColumnDefinitions>
 
- <TextBlock Grid.Column="0"
- Text="Kategoria"
- FontSize="11"
- FontWeight="SemiBold"
- Foreground="{DynamicResource App.Foreground}"
- Opacity="0.8"/>
+     <TextBlock Grid.Column="0"
+                Text="Kategoria"
+                FontSize="11"
+                FontWeight="SemiBold"
+                Foreground="{DynamicResource App.Foreground}"
+                Opacity="0.8"/>
 
- <TextBlock Grid.Column="1"
- Text="Kwota"
- FontSize="11"
- FontWeight="SemiBold"
- Foreground="{DynamicResource App.Foreground}"
- Opacity="0.8"
- HorizontalAlignment="Right"/>
+     <TextBlock Grid.Column="1"
+                Text="Kwota"
+                FontSize="11"
+                FontWeight="SemiBold"
+                Foreground="{DynamicResource App.Foreground}"
+                Opacity="0.8"
+                HorizontalAlignment="Right"/>
 
- <TextBlock Grid.Column="2"
- Text="Procent"
- FontSize="11"
- FontWeight="SemiBold"
- Foreground="{DynamicResource App.Foreground}"
- Opacity="0.8"
- HorizontalAlignment="Right"/>
- </Grid>
+     <TextBlock Grid.Column="2"
+                Text="Procent"
+                FontSize="11"
+                FontWeight="SemiBold"
+                Foreground="{DynamicResource App.Foreground}"
+                Opacity="0.8"
+                HorizontalAlignment="Right"/>
+   </Grid>
+ </Border>
 
  <!-- bez brzydkiego nagłówka – ItemsControl zamiast ListView -->
  <Grid>
@@ -384,36 +389,38 @@
  TextWrapping="Wrap"/>
 
  <!-- NAGŁÓWEK: Kategoria | Kwota | Procent -->
- <Grid Margin="0,0,0,4">
- <Grid.ColumnDefinitions>
- <ColumnDefinition Width="*" />
- <ColumnDefinition Width="110" />
- <ColumnDefinition Width="70" />
- </Grid.ColumnDefinitions>
+ <Border Margin="0,0,0,4" Background="{DynamicResource Surface.Background}" Padding="6,4,6,4">
+   <Grid>
+     <Grid.ColumnDefinitions>
+       <ColumnDefinition Width="*" />
+       <ColumnDefinition Width="110" />
+       <ColumnDefinition Width="70" />
+     </Grid.ColumnDefinitions>
 
- <TextBlock Grid.Column="0"
- Text="Kategoria"
- FontSize="11"
- FontWeight="SemiBold"
- Foreground="{DynamicResource App.Foreground}"
- Opacity="0.8"/>
+     <TextBlock Grid.Column="0"
+                Text="Kategoria"
+                FontSize="11"
+                FontWeight="SemiBold"
+                Foreground="{DynamicResource App.Foreground}"
+                Opacity="0.8"/>
 
- <TextBlock Grid.Column="1"
- Text="Kwota"
- FontSize="11"
- FontWeight="SemiBold"
- Foreground="{DynamicResource App.Foreground}"
- Opacity="0.8"
- HorizontalAlignment="Right"/>
+     <TextBlock Grid.Column="1"
+                Text="Kwota"
+                FontSize="11"
+                FontWeight="SemiBold"
+                Foreground="{DynamicResource App.Foreground}"
+                Opacity="0.8"
+                HorizontalAlignment="Right"/>
 
- <TextBlock Grid.Column="2"
- Text="Procent"
- FontSize="11"
- FontWeight="SemiBold"
- Foreground="{DynamicResource App.Foreground}"
- Opacity="0.8"
- HorizontalAlignment="Right"/>
- </Grid>
+     <TextBlock Grid.Column="2"
+                Text="Procent"
+                FontSize="11"
+                FontWeight="SemiBold"
+                Foreground="{DynamicResource App.Foreground}"
+                Opacity="0.8"
+                HorizontalAlignment="Right"/>
+   </Grid>
+ </Border>
 
  <ItemsControl x:Name="ExpenseTable">
  <ItemsControl.ItemTemplate>
@@ -500,7 +507,7 @@
  <RowDefinition Height="Auto"/>
  </Grid.RowDefinitions>
 
- <TextBlock Text="Trend wydatków — ostatnie30 dni"
+ <TextBlock Text="Trend wydatków — bieżący okres"
  Style="{StaticResource CardHeader}"
  Margin="0,0,0,8"
  TextWrapping="Wrap"
@@ -537,6 +544,7 @@
  </Grid>
  </StackPanel>
  </Border>
+  </Grid>
+  </ScrollViewer>
 
- </Grid>
-</UserControl>
+ </UserControl>

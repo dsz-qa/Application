@@ -200,7 +200,6 @@ namespace Finly.Views
                 "categories" => new CategoriesPage(),
                 "goals" => new GoalsPage(),
                 "charts" => new ChartsPage(uid),
-                "import" => new ImportPage(),
                 "reports" => new ReportsPage(),
                 "settings" => new SettingsPage(),
                 "banks" => new BanksPage(),
@@ -275,12 +274,6 @@ namespace Finly.Views
             SetActiveFooter(null);
         }
 
-        private void Nav_Import_Click(object s, RoutedEventArgs e)
-        {
-            RightHost.Content = new ImportPage();
-            SetActiveNav(null);
-            SetActiveFooter(null);
-        }
 
         private void Nav_Banks_Click(object s, RoutedEventArgs e)
         {
