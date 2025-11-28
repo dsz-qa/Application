@@ -1371,6 +1371,10 @@ SELECT last_insert_rowid();";
             cmd.Parameters.AddWithValue("@planned", e.IsPlanned ? 1 : 0);
 
             var rowId = (long)(cmd.ExecuteScalar() ?? 0L);
+
+            // Notify listeners that data changed (so dashboard and other pages can refresh)
+            try { RaiseDataChanged(); } catch { }
+
             return (int)rowId;
         }
 
@@ -2337,11 +2341,11 @@ HAVING SUM(ABS(i.Amount)) > 0
 SELECT " + txNameExpr + " AS Name,\n" +
                 "       SUM(ABS(t.Amount)) AS Amount\n" +
                 "FROM Transactions t\n" +
-                (hasCats ? "LEFT JOIN Categories c ON c.Id = t.CategoryId\n" : "") +
-                "WHERE t.UserId = $uid\n" +
-                "  AND date(t.Date) BETWEEN date($start) AND date($end)\n" +
-                "  AND (LOWER(t.Type) = 'expense' OR t.Type = 0)\n" +
-                "GROUP BY " + txNameExpr + "\n" +
+                (hasCats ? "LEFT JOIN Categories c ON c.Id = t.CategoryId" : "") + @"
+WHERE t.UserId = $uid
+  AND date(t.Date) BETWEEN date($start) AND date($end)
+  AND (LOWER(t.Type) = 'expense' OR t.Type = 0)
+GROUP BY " + txNameExpr + "\n" +
                 "HAVING SUM(ABS(t.Amount)) > 0\n"
                 );
             }

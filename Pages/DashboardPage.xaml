@@ -52,8 +52,8 @@
 
  <!-- Wrap content in a ScrollViewer so dashboard can scroll vertically on smaller screens -->
  <ScrollViewer VerticalScrollBarVisibility="Auto"
-              HorizontalScrollBarVisibility="Disabled"
-              PanningMode="VerticalOnly">
+               HorizontalScrollBarVisibility="Disabled"
+               PanningMode="VerticalOnly">
 
    <Grid Margin="16">
      <Grid.RowDefinitions>
@@ -141,6 +141,7 @@
              <Grid.RowDefinitions>
                <RowDefinition Height="*" />
                <RowDefinition Height="*" />
+               <RowDefinition Height="Auto" />
              </Grid.RowDefinitions>
 
              <Border Grid.Row="0" Style="{StaticResource Card}" MinHeight="260">
@@ -204,7 +205,7 @@
  </StackPanel>
  </Border>
 
- <Border Grid.Row="1" Style="{StaticResource Card}" Margin="0,12,0,0" MinHeight="260">
+             <Border Grid.Row="1" Style="{StaticResource Card}" Margin="0,12,0,0" MinHeight="260">
  <StackPanel>
  <TextBlock Text="Źródła przychodu — bieżący okres"
  Style="{StaticResource CardHeader}"
@@ -267,7 +268,29 @@
  </Viewbox>
  </StackPanel>
  </Border>
- </Grid>
+
+             <!-- NEW: Expense trend moved here under income donut to ensure it is visible on smaller screens -->
+             <Border Grid.Row="2" Style="{StaticResource Card}" Margin="0,12,0,0" MinHeight="140">
+               <StackPanel>
+                 <TextBlock Text="Trend wydatków — bieżący okres" Style="{StaticResource CardHeader}" Margin="0,0,0,8" TextWrapping="Wrap"/>
+                 <!-- Increased height so at least ~1 month of trend is visible -->
+                 <Canvas x:Name="ExpenseTrendCanvas" Height="180" Margin="0,4,0,4" Background="Transparent"/>
+                 <ItemsControl x:Name="ExpenseTrendLabels" Margin="0,2,0,0">
+                   <ItemsControl.ItemsPanel>
+                     <ItemsPanelTemplate>
+                       <UniformGrid Rows="1"/>
+                     </ItemsPanelTemplate>
+                   </ItemsControl.ItemsPanel>
+                   <ItemsControl.ItemTemplate>
+                     <DataTemplate>
+                       <TextBlock Text="{Binding DateLabel}" FontSize="10" Foreground="{DynamicResource App.Foreground}" HorizontalAlignment="Center"/>
+                     </DataTemplate>
+                   </ItemsControl.ItemTemplate>
+                 </ItemsControl>
+                 <TextBlock x:Name="ExpenseTrendEmptyText" Text="Brak danych w tym okresie" Foreground="{DynamicResource App.Foreground}" Visibility="Collapsed" HorizontalAlignment="Center" Margin="0,8,0,0" FontStyle="Italic"/>
+               </StackPanel>
+             </Border>
+           </Grid>
 
            <!-- Column 2: Tables -->
            <Grid Grid.Column="1" Margin="4,0,4,0">
@@ -349,7 +372,7 @@
  </StackPanel>
  </Border>
 
- <Border Grid.Row="1" Style="{StaticResource Card}" Margin="0,12,0,0" MinHeight="120">
+             <Border Grid.Row="1" Style="{StaticResource Card}" Margin="0,12,0,0" MinHeight="120">
  <StackPanel>
  <TextBlock Text="Wydatki — bieżący okres" Style="{StaticResource CardHeader}" Margin="0,0,0,8" TextWrapping="Wrap"/>
 
@@ -421,7 +444,7 @@
  </Border>
  </Grid>
 
-           <!-- Column 3: Top categories + Trend + Planned -->
+           <!-- Column 3: Top categories (keep next to Income) -->
            <Grid Grid.Column="2" Margin="8,0,0,0">
              <Grid.RowDefinitions>
                <RowDefinition Height="*" />
@@ -460,30 +483,10 @@
                </StackPanel>
              </Border>
 
-             <Border Grid.Row="1" Style="{StaticResource Card}" Margin="0,12,0,0" MinHeight="140">
+             <!-- Planned transactions moved here as separate card -->
+             <Border Grid.Row="1" Style="{StaticResource Card}" Margin="0,12,0,0" MinHeight="100">
                <StackPanel>
-                 <TextBlock Text="Trend wydatków — bieżący okres" Style="{StaticResource CardHeader}" Margin="0,0,0,8" TextWrapping="Wrap"/>
-                 <Canvas x:Name="ExpenseTrendCanvas" Height="140" Margin="0,4,0,4" Background="Transparent"/>
-                 <ItemsControl x:Name="ExpenseTrendLabels" Margin="0,2,0,0">
-                   <ItemsControl.ItemsPanel>
-                     <ItemsPanelTemplate>
-                       <UniformGrid Rows="1"/>
-                     </ItemsPanelTemplate>
-                   </ItemsControl.ItemsPanel>
-                   <ItemsControl.ItemTemplate>
-                     <DataTemplate>
-                       <TextBlock Text="{Binding DateLabel}" FontSize="10" Foreground="{DynamicResource App.Foreground}" HorizontalAlignment="Center"/>
-                     </DataTemplate>
-                   </ItemsControl.ItemTemplate>
-                 </ItemsControl>
-                 <TextBlock x:Name="ExpenseTrendEmptyText" Text="Brak danych w tym okresie" Foreground="{DynamicResource App.Foreground}" Visibility="Collapsed" HorizontalAlignment="Center" Margin="0,8,0,0" FontStyle="Italic"/>
-               </StackPanel>
-             </Border>
-
-             <!-- Separate planned transactions card under the trend -->
-             <Border Grid.Row="2" Style="{StaticResource Card}" Margin="0,12,0,0" MinHeight="100">
-               <StackPanel>
-                 <TextBlock Text="Zaplanowane transakcje — bieżący okres" Style="{StaticResource CardHeader}" Margin="0,0,0,8" />
+                 <TextBlock Text="Zaplanowane w tym okresie" Style="{StaticResource CardHeader}" Margin="0,0,0,8" />
                  <ItemsControl x:Name="PlannedTransactionsList">
                    <ItemsControl.ItemTemplate>
                      <DataTemplate>

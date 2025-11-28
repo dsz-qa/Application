@@ -62,6 +62,26 @@ namespace Finly.Pages
                 ExpenseDatePicker.SelectedDate = today;
                 IncomeDatePicker.SelectedDate = today;
                 TransferDatePicker.SelectedDate = today;
+
+                // default planned pickers (if present)
+                if (FindName("ExpensePlannedDatePicker") is DatePicker ep) ep.SelectedDate = today;
+                if (FindName("IncomePlannedDatePicker") is DatePicker ip) ip.SelectedDate = today;
+                if (FindName("TransferPlannedDatePicker") is DatePicker tp) tp.SelectedDate = today;
+
+                // copy lists into planned combos
+                ExpensePlannedCategoryBox.ItemsSource = ExpenseCategoryBox.ItemsSource;
+                IncomePlannedCategoryBox.ItemsSource = IncomeCategoryBox.ItemsSource;
+
+                if (TransferPlannedFromBox != null && TransferFromBox != null)
+                {
+                    TransferPlannedFromBox.ItemsSource = TransferFromBox.ItemsSource;
+                    TransferPlannedToBox.ItemsSource = TransferToBox.ItemsSource;
+                }
+
+                // enable/disable planned save buttons based on amount
+                ExpensePlannedAmountBox.TextChanged += (s, e) => ExpensePlannedButton.IsEnabled = TryParseAmount(ExpensePlannedAmountBox.Text, out var a) && a > 0m;
+                IncomePlannedAmountBox.TextChanged += (s, e) => IncomePlannedButton.IsEnabled = TryParseAmount(IncomePlannedAmountBox.Text, out var b) && b > 0m;
+                TransferPlannedAmountBox.TextChanged += (s, e) => TransferPlannedButton.IsEnabled = TryParseAmount(TransferPlannedAmountBox.Text, out var c) && c > 0m;
             };
         }
 
@@ -296,7 +316,7 @@ namespace Finly.Pages
             LoadIncomeAccounts();
         }
 
-        // ================== OBSŁUGA FORM PRZYCHODU / SKĄD PŁACISZ ==================
+        // ================== OBSŁUGA FORM PRZYCHODU / SKĄD PłACISZ ==================
 
         private void ExpenseSourceCombo_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
@@ -365,6 +385,49 @@ namespace Finly.Pages
             }
         }
 
+        // New: react to form changes to show/hide planned area and enable planned button
+        private void ExpenseForm_Changed(object sender, RoutedEventArgs e)
+        {
+            UpdateExpensePlannedVisibility();
+        }
+
+        private void IncomeForm_Changed(object sender, RoutedEventArgs e)
+        {
+            UpdateIncomePlannedVisibility();
+        }
+
+        private void TransferForm_Changed(object sender, RoutedEventArgs e)
+        {
+            UpdateTransferPlannedVisibility();
+        }
+
+        private void UpdateExpensePlannedVisibility()
+        {
+            bool hasAmount = TryParseAmount(ExpenseAmountBox.Text, out var amount) && amount > 0m;
+            bool hasCategory = (ExpenseCategoryBox.SelectedItem is string s && !string.IsNullOrWhiteSpace(s)) || !string.IsNullOrWhiteSpace(ExpenseNewCategoryBox.Text);
+
+            ExpensePlannedPanel.Visibility = hasAmount && hasCategory ? Visibility.Visible : Visibility.Collapsed;
+            ExpensePlannedButton.IsEnabled = hasAmount && hasCategory;
+        }
+
+        private void UpdateIncomePlannedVisibility()
+        {
+            bool hasAmount = TryParseAmount(IncomeAmountBox.Text, out var amount) && amount > 0m;
+            bool hasSourceOrCategory = !string.IsNullOrWhiteSpace(IncomeSourceBox.Text) || (IncomeCategoryBox.SelectedItem is string s && !string.IsNullOrWhiteSpace(s)) || !string.IsNullOrWhiteSpace(IncomeNewCategoryBox.Text);
+
+            IncomePlannedPanel.Visibility = hasAmount && hasSourceOrCategory ? Visibility.Visible : Visibility.Collapsed;
+            IncomePlannedButton.IsEnabled = hasAmount && hasSourceOrCategory;
+        }
+
+        private void UpdateTransferPlannedVisibility()
+        {
+            bool hasAmount = TryParseAmount(TransferAmountBox.Text, out var amount) && amount > 0m;
+            bool endpointsSelected = TransferFromBox.SelectedItem != null && TransferToBox.SelectedItem != null && TransferFromBox.SelectedIndex != TransferToBox.SelectedIndex;
+
+            TransferPlannedPanel.Visibility = hasAmount && endpointsSelected ? Visibility.Visible : Visibility.Collapsed;
+            TransferPlannedButton.IsEnabled = hasAmount && endpointsSelected;
+        }
+
         // ================== WYDATEK ==================
 
         private void SaveExpense_Click(object sender, RoutedEventArgs e)
@@ -385,7 +448,6 @@ namespace Finly.Pages
 
             var sourceTag = sourceItem.Tag as string ?? "";
             var date = ExpenseDatePicker.SelectedDate ?? DateTime.Today;
-            var isPlanned = ExpenseIsPlannedCheck.IsChecked == true;
             var desc = string.IsNullOrWhiteSpace(ExpenseDescBox.Text)
                 ? null
                 : ExpenseDescBox.Text.Trim();
@@ -404,24 +466,6 @@ namespace Finly.Pages
 
             try
             {
-                // If planned -> do NOT modify balances; just insert expense with planned flag
-                if (isPlanned)
-                {
-                    // We'll store planned expenses in Expenses table but not affect balances.
-                    // To mark planned, we add special prefix to Note (simple approach without DB schema change).
-                    eModel.Description = (eModel.Description ?? "") + " [PLANNED]";
-                    DatabaseService.InsertExpense(eModel);
-                    ToastService.Success("Dodano zaplanowany wydatek.");
-
-                    LoadCategories();
-                    LoadEnvelopes();
-                    LoadIncomeAccounts();
-
-                    // Do not refresh balances (planned doesn't affect)
-                    Cancel_Click(sender, e);
-                    return;
-                }
-
                 // 1) Odejmujemy z właściwego źródła
                 switch (sourceTag)
                 {
@@ -485,6 +529,38 @@ namespace Finly.Pages
             }
         }
 
+        // New handler for adding planned expense from the separate planned area
+        private void SaveExpensePlanned_Click(object sender, RoutedEventArgs e)
+        {
+            if (!TryParseAmount(ExpensePlannedAmountBox.Text, out var amount) || amount <= 0m)
+            {
+                ToastService.Info("Podaj poprawną kwotę.");
+                return;
+            }
+
+            var date = ExpensePlannedDatePicker.SelectedDate ?? DateTime.Today;
+            var desc = string.IsNullOrWhiteSpace(ExpensePlannedDescBox.Text) ? null : ExpensePlannedDescBox.Text.Trim();
+
+            var catName = ExpensePlannedCategoryBox.SelectedItem as string;
+            if (string.IsNullOrWhiteSpace(catName) && !string.IsNullOrWhiteSpace(ExpensePlannedNewCategoryBox.Text))
+                catName = ExpensePlannedNewCategoryBox.Text.Trim();
+
+            var catId = 0;
+            try { catId = DatabaseService.GetOrCreateCategoryId(_uid, catName ?? ""); } catch { catId = 0; }
+
+            var eModel = new Expense { UserId = _uid, Amount = (double)amount, Date = date, Description = desc, CategoryId = catId, IsPlanned = true };
+            try
+            {
+                DatabaseService.InsertExpense(eModel);
+                ToastService.Success("Dodano zaplanowany wydatek.");
+                Cancel_Click(sender, e);
+            }
+            catch (Exception ex)
+            {
+                ToastService.Error("Nie udało się dodać zaplanowanego wydatku.\n" + ex.Message);
+            }
+        }
+
         // ================== PRZYCHÓD ==================
 
         private void SaveIncome_Click(object sender, RoutedEventArgs e)
@@ -505,7 +581,6 @@ namespace Finly.Pages
 
             var formTag = formItem.Tag as string ?? "";
             var date = IncomeDatePicker.SelectedDate ?? DateTime.Today;
-            var isPlanned = IncomeIsPlannedCheck.IsChecked == true;
             var source = string.IsNullOrWhiteSpace(IncomeSourceBox.Text)
                 ? "Przychód"
                 : IncomeSourceBox.Text.Trim();
@@ -519,20 +594,6 @@ namespace Finly.Pages
 
             try
             {
-                if (isPlanned)
-                {
-                    // store planned income without affecting balances
-                    DatabaseService.InsertIncome(_uid, amount, date, source, desc);
-                    ToastService.Success("Dodano zaplanowany przychód.");
-
-                    LoadCategories();
-                    LoadIncomeAccounts();
-
-                    // do not refresh balances
-                    Cancel_Click(sender, e);
-                    return;
-                }
-
                 switch (formTag)
                 {
                     case "cash_free":
@@ -573,6 +634,37 @@ namespace Finly.Pages
             }
         }
 
+        private void SaveIncomePlanned_Click(object sender, RoutedEventArgs e)
+        {
+            if (!TryParseAmount(IncomePlannedAmountBox.Text, out var amount) || amount <= 0m)
+            {
+                ToastService.Info("Podaj poprawną kwotę.");
+                return;
+            }
+
+            var date = IncomePlannedDatePicker.SelectedDate ?? DateTime.Today;
+            var source = string.IsNullOrWhiteSpace(IncomePlannedSourceBox.Text) ? "Przychód" : IncomePlannedSourceBox.Text.Trim();
+            var desc = string.IsNullOrWhiteSpace(IncomePlannedDescBox.Text) ? null : IncomePlannedDescBox.Text.Trim();
+
+            var catName = IncomePlannedCategoryBox.SelectedItem as string;
+            if (string.IsNullOrWhiteSpace(catName) && !string.IsNullOrWhiteSpace(IncomePlannedNewCategoryBox.Text))
+                catName = IncomePlannedNewCategoryBox.Text.Trim();
+
+            int? catId = null;
+            try { var id = DatabaseService.GetOrCreateCategoryId(_uid, catName ?? ""); if (id > 0) catId = id; } catch { }
+
+            try
+            {
+                DatabaseService.InsertIncome(_uid, amount, date, catId, source, desc, true);
+                ToastService.Success("Dodano zaplanowany przychód.");
+                Cancel_Click(sender, e);
+            }
+            catch (Exception ex)
+            {
+                ToastService.Error("Nie udało się dodać zaplanowanego przychodu.\n" + ex.Message);
+            }
+        }
+
         // ================== TRANSFER ==================
 
         private void SaveTransfer_Click(object sender, RoutedEventArgs e)
@@ -584,8 +676,6 @@ namespace Finly.Pages
                 TransferAmountErrorText.Visibility = Visibility.Visible;
                 return;
             }
-
-            var isPlanned = TransferIsPlannedCheck.IsChecked == true;
 
             var from = TransferFromBox.SelectedItem as TransferItem;
             var to = TransferToBox.SelectedItem as TransferItem;
@@ -601,25 +691,6 @@ namespace Finly.Pages
 
             try
             {
-                if (isPlanned)
-                {
-                    // simple approach: record planned transfer as income/expense pair with [PLANNED] in note
-                    // Insert expense from source (but do not adjust balances) and income to target (no balances)
-                    var note = string.IsNullOrWhiteSpace(TransferDescBox.Text) ? "" : TransferDescBox.Text.Trim();
-                    note += " [PLANNED]";
-
-                    // create expense record if source is not free internal wallet (we'll put generic entries)
-                    var exp = new Expense { UserId = _uid, Amount = (double)amount, Date = TransferDatePicker.SelectedDate ?? DateTime.Today, Description = note, CategoryId = 0 };
-                    DatabaseService.InsertExpense(exp);
-
-                    // create income record
-                    DatabaseService.InsertIncome(_uid, amount, TransferDatePicker.SelectedDate ?? DateTime.Today, "Przelew", note);
-
-                    ToastService.Success("Dodano zaplanowany transfer.");
-                    Cancel_Click(sender, e);
-                    return;
-                }
-
                 bool handled = false;
 
                 // BANK <-> BANK
@@ -760,6 +831,40 @@ namespace Finly.Pages
             catch (Exception ex)
             {
                 ToastService.Error("Nie udało się zapisać transferu.\n" + ex.Message);
+            }
+        }
+
+        private void SaveTransferPlanned_Click(object sender, RoutedEventArgs e)
+        {
+            if (!TryParseAmount(TransferPlannedAmountBox.Text, out var amount) || amount <= 0m)
+            {
+                ToastService.Info("Podaj poprawną kwotę.");
+                return;
+            }
+
+            var date = TransferPlannedDatePicker.SelectedDate ?? DateTime.Today;
+            var desc = string.IsNullOrWhiteSpace(TransferPlannedDescBox.Text) ? null : TransferPlannedDescBox.Text.Trim();
+
+            var from = TransferPlannedFromBox.SelectedItem as TransferItem;
+            var to = TransferPlannedToBox.SelectedItem as TransferItem;
+            if (from == null || to == null || from.Key == to.Key)
+            {
+                ToastService.Info("Wybierz różne konta źródłowe i docelowe.");
+                return;
+            }
+
+            try
+            {
+                var exp = new Expense { UserId = _uid, Amount = (double)amount, Date = date, Description = desc ?? "", CategoryId = 0, IsPlanned = true };
+                DatabaseService.InsertExpense(exp);
+                DatabaseService.InsertIncome(_uid, amount, date, null, "Przelew", desc, true);
+
+                ToastService.Success("Dodano zaplanowany transfer.");
+                Cancel_Click(sender, e);
+            }
+            catch (Exception ex)
+            {
+                ToastService.Error("Nie udało się dodać zaplanowanego transferu.\n" + ex.Message);
             }
         }
 

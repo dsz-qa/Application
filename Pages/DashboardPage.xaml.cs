@@ -275,19 +275,21 @@ namespace Finly.Pages
         {
             try
             {
-                DateTime start = _startDate == default ? DateTime.Today : _startDate;
-                DateTime end = _endDate == default ? DateTime.Today : _endDate;
-                if (start > end) (start, end) = (end, start);
-
-                var planned = DatabaseService.GetPlannedExpenses(_uid, start, end, limit: 20);
+                // Show ALL planned expenses regardless of dashboard date range
+                var planned = DatabaseService.GetPlannedExpenses(_uid, start: null, end: null, limit: 50);
                 if (FindName("PlannedTransactionsList") is ItemsControl pl)
                 {
-                    pl.ItemsSource = planned.Select(p => new
+                    // Only show future dates or today
+                    var items = planned.Select(p => new
                     {
                         Date = p.Date,
                         Description = p.Description,
                         Amount = p.Amount
-                    }).ToList();
+                    })
+                    .OrderBy(p => p.Date)
+                    .ToList();
+
+                    pl.ItemsSource = items;
                 }
 
                 SetVisibility("PlannedEmptyText", planned.Count == 0);
