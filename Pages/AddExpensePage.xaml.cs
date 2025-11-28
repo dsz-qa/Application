@@ -7,6 +7,7 @@ using System.Globalization;
 using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Data;
 
 namespace Finly.Pages
 {
@@ -77,6 +78,30 @@ namespace Finly.Pages
                 // populate transfer planned accounts
                 TransferPlannedFromBox.ItemsSource = TransferFromBox.ItemsSource;
                 TransferPlannedToBox.ItemsSource = TransferToBox.ItemsSource;
+
+                // populate planned expense source combos (and account/envelope lists)
+                if (ExpensePlannedSourceCombo != null)
+                {
+                    ExpensePlannedSourceCombo.SelectionChanged += ExpensePlannedSourceCombo_SelectionChanged;
+                }
+
+                // populate planned envelopes and bank accounts
+                if (ExpensePlannedEnvelopeCombo != null)
+                {
+                    var envNames = DatabaseService.GetEnvelopesNames(_uid) ?? new List<string>();
+                    ExpensePlannedEnvelopeCombo.ItemsSource = envNames;
+                    if (envNames.Count > 0)
+                        ExpensePlannedEnvelopeCombo.SelectedIndex = 0;
+                }
+                if (ExpensePlannedBankAccountCombo != null)
+                {
+                    var accs = DatabaseService.GetAccounts(_uid) ?? new List<BankAccountModel>();
+                    // bind full BankAccountModel list so SelectedValue can be account Id like other controls
+                    ExpensePlannedBankAccountCombo.ItemsSource = accs;
+                    ExpensePlannedBankAccountCombo.DisplayMemberPath = "AccountName";
+                    ExpensePlannedBankAccountCombo.SelectedValuePath = "Id";
+                    if (accs.Count > 0) ExpensePlannedBankAccountCombo.SelectedIndex = 0;
+                }
 
                 // enable/disable planned save buttons based on amount
                 ExpensePlannedAmountBox.TextChanged += (s, e) => ExpensePlannedButton.IsEnabled = TryParseAmount(ExpensePlannedAmountBox.Text, out var a) && a > 0m;
@@ -376,6 +401,43 @@ namespace Finly.Pages
             else
             {
                 IncomePlannedAccountRow.Visibility = Visibility.Collapsed;
+            }
+        }
+
+        private void ExpensePlannedSourceCombo_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            ExpensePlannedEnvelopeRow.Visibility = Visibility.Collapsed;
+            ExpensePlannedBankRow.Visibility = Visibility.Collapsed;
+
+            if (ExpensePlannedSourceCombo.SelectedItem is ComboBoxItem item)
+            {
+                var tag = item.Tag as string ?? "";
+                if (string.Equals(tag, "envelope", StringComparison.OrdinalIgnoreCase))
+                {
+                    // populate envelopes and show
+                    try
+                    {
+                        var envNames = DatabaseService.GetEnvelopesNames(_uid) ?? new List<string>();
+                        ExpensePlannedEnvelopeCombo.ItemsSource = envNames;
+                        if (envNames.Count > 0) ExpensePlannedEnvelopeCombo.SelectedIndex = 0;
+                    }
+                    catch { }
+                    ExpensePlannedEnvelopeRow.Visibility = Visibility.Visible;
+                }
+                else if (string.Equals(tag, "bank", StringComparison.OrdinalIgnoreCase))
+                {
+                    // populate bank accounts and show
+                    try
+                    {
+                        var accs = DatabaseService.GetAccounts(_uid) ?? new List<BankAccountModel>();
+                        ExpensePlannedBankAccountCombo.ItemsSource = accs;
+                        ExpensePlannedBankAccountCombo.DisplayMemberPath = "AccountName";
+                        ExpensePlannedBankAccountCombo.SelectedValuePath = "Id";
+                        if (accs.Count > 0) ExpensePlannedBankAccountCombo.SelectedIndex = 0;
+                    }
+                    catch { }
+                    ExpensePlannedBankRow.Visibility = Visibility.Visible;
+                }
             }
         }
 
