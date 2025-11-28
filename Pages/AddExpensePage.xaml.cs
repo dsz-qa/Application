@@ -385,6 +385,7 @@ namespace Finly.Pages
 
             var sourceTag = sourceItem.Tag as string ?? "";
             var date = ExpenseDatePicker.SelectedDate ?? DateTime.Today;
+            var isPlanned = ExpenseIsPlannedCheck.IsChecked == true;
             var desc = string.IsNullOrWhiteSpace(ExpenseDescBox.Text)
                 ? null
                 : ExpenseDescBox.Text.Trim();
@@ -403,6 +404,24 @@ namespace Finly.Pages
 
             try
             {
+                // If planned -> do NOT modify balances; just insert expense with planned flag
+                if (isPlanned)
+                {
+                    // We'll store planned expenses in Expenses table but not affect balances.
+                    // To mark planned, we add special prefix to Note (simple approach without DB schema change).
+                    eModel.Description = (eModel.Description ?? "") + " [PLANNED]";
+                    DatabaseService.InsertExpense(eModel);
+                    ToastService.Success("Dodano zaplanowany wydatek.");
+
+                    LoadCategories();
+                    LoadEnvelopes();
+                    LoadIncomeAccounts();
+
+                    // Do not refresh balances (planned doesn't affect)
+                    Cancel_Click(sender, e);
+                    return;
+                }
+
                 // 1) Odejmujemy z właściwego źródła
                 switch (sourceTag)
                 {
@@ -486,6 +505,7 @@ namespace Finly.Pages
 
             var formTag = formItem.Tag as string ?? "";
             var date = IncomeDatePicker.SelectedDate ?? DateTime.Today;
+            var isPlanned = IncomeIsPlannedCheck.IsChecked == true;
             var source = string.IsNullOrWhiteSpace(IncomeSourceBox.Text)
                 ? "Przychód"
                 : IncomeSourceBox.Text.Trim();
@@ -499,6 +519,20 @@ namespace Finly.Pages
 
             try
             {
+                if (isPlanned)
+                {
+                    // store planned income without affecting balances
+                    DatabaseService.InsertIncome(_uid, amount, date, source, desc);
+                    ToastService.Success("Dodano zaplanowany przychód.");
+
+                    LoadCategories();
+                    LoadIncomeAccounts();
+
+                    // do not refresh balances
+                    Cancel_Click(sender, e);
+                    return;
+                }
+
                 switch (formTag)
                 {
                     case "cash_free":
@@ -551,6 +585,8 @@ namespace Finly.Pages
                 return;
             }
 
+            var isPlanned = TransferIsPlannedCheck.IsChecked == true;
+
             var from = TransferFromBox.SelectedItem as TransferItem;
             var to = TransferToBox.SelectedItem as TransferItem;
 
@@ -565,6 +601,25 @@ namespace Finly.Pages
 
             try
             {
+                if (isPlanned)
+                {
+                    // simple approach: record planned transfer as income/expense pair with [PLANNED] in note
+                    // Insert expense from source (but do not adjust balances) and income to target (no balances)
+                    var note = string.IsNullOrWhiteSpace(TransferDescBox.Text) ? "" : TransferDescBox.Text.Trim();
+                    note += " [PLANNED]";
+
+                    // create expense record if source is not free internal wallet (we'll put generic entries)
+                    var exp = new Expense { UserId = _uid, Amount = (double)amount, Date = TransferDatePicker.SelectedDate ?? DateTime.Today, Description = note, CategoryId = 0 };
+                    DatabaseService.InsertExpense(exp);
+
+                    // create income record
+                    DatabaseService.InsertIncome(_uid, amount, TransferDatePicker.SelectedDate ?? DateTime.Today, "Przelew", note);
+
+                    ToastService.Success("Dodano zaplanowany transfer.");
+                    Cancel_Click(sender, e);
+                    return;
+                }
+
                 bool handled = false;
 
                 // BANK <-> BANK
