@@ -36,14 +36,14 @@ namespace Finly.Pages
         private DateTime _startDate;
         private DateTime _endDate;
 
-        private decimal _currentTotalExpenses = 0m;
-        private decimal _currentTotalIncome = 0m;
+        private decimal _currentTotalExpenses =0m;
+        private decimal _currentTotalIncome =0m;
 
         public DashboardPage(int userId)
         {
             InitializeComponent();
 
-            _uid = userId <= 0 ? UserService.GetCurrentUserId() : userId;
+            _uid = userId <=0 ? UserService.GetCurrentUserId() : userId;
             DataContext = this;
 
             // If PeriodBar exists in XAML ensure it's in sync and events are hooked
@@ -97,7 +97,7 @@ namespace Finly.Pages
 
         private void RefreshMoneySummary()
         {
-            if (_uid <= 0) return;
+            if (_uid <=0) return;
 
             var snap = DatabaseService.GetMoneySnapshot(_uid);
 
@@ -110,7 +110,7 @@ namespace Finly.Pages
             SetKpiText("SavedToAllocateText", snap.SavedUnallocated);
             SetKpiText("EnvelopesDashboardText", snap.Envelopes);
 
-            SetKpiText("InvestmentsText", 0m);
+            SetKpiText("InvestmentsText",0m);
         }
 
 
@@ -128,22 +128,22 @@ namespace Finly.Pages
                     _startDate = _endDate = anchor.Date;
                     break;
                 case DateRangeMode.Week:
-                    int diff = ((int)anchor.DayOfWeek + 6) % 7; // pon = 0
+                    int diff = ((int)anchor.DayOfWeek +6) %7; // pon =0
                     _startDate = anchor.AddDays(-diff).Date;
                     _endDate = _startDate.AddDays(6);
                     break;
                 case DateRangeMode.Month:
-                    _startDate = new DateTime(anchor.Year, anchor.Month, 1);
+                    _startDate = new DateTime(anchor.Year, anchor.Month,1);
                     _endDate = _startDate.AddMonths(1).AddDays(-1);
                     break;
                 case DateRangeMode.Quarter:
-                    int qStartMonth = (((anchor.Month - 1) / 3) * 3) + 1;
-                    _startDate = new DateTime(anchor.Year, qStartMonth, 1);
+                    int qStartMonth = (((anchor.Month -1) /3) *3) +1;
+                    _startDate = new DateTime(anchor.Year, qStartMonth,1);
                     _endDate = _startDate.AddMonths(3).AddDays(-1);
                     break;
                 case DateRangeMode.Year:
-                    _startDate = new DateTime(anchor.Year, 1, 1);
-                    _endDate = new DateTime(anchor.Year, 12, 31);
+                    _startDate = new DateTime(anchor.Year,1,1);
+                    _endDate = new DateTime(anchor.Year,12,31);
                     break;
                 case DateRangeMode.Custom:
                     break;
@@ -183,9 +183,9 @@ namespace Finly.Pages
         private void PrevPeriod_Click(object sender, RoutedEventArgs e)
         {
             int idx = Array.IndexOf(PresetOrder, _mode);
-            if (idx < 0) idx = 0;
+            if (idx <0) idx =0;
 
-            idx = (idx - 1 + PresetOrder.Length) % PresetOrder.Length;
+            idx = (idx -1 + PresetOrder.Length) % PresetOrder.Length;
             ApplyPreset(PresetOrder[idx], DateTime.Today);
             LoadCharts();
         }
@@ -193,9 +193,9 @@ namespace Finly.Pages
         private void NextPeriod_Click(object sender, RoutedEventArgs e)
         {
             int idx = Array.IndexOf(PresetOrder, _mode);
-            if (idx < 0) idx = 0;
+            if (idx <0) idx =0;
 
-            idx = (idx + 1) % PresetOrder.Length;
+            idx = (idx +1) % PresetOrder.Length;
             ApplyPreset(PresetOrder[idx], DateTime.Today);
             LoadCharts();
         }
@@ -275,11 +275,11 @@ namespace Finly.Pages
         {
             try
             {
-                var plannedExpenses = DatabaseService.GetPlannedExpenses(_uid, start: null, end: null, limit: 50) ?? new List<DatabaseService.CategoryTransactionDto>();
-                var plannedIncomes = DatabaseService.GetPlannedIncomes(_uid, start: null, end: null, limit: 50) ?? new List<DatabaseService.CategoryTransactionDto>();
+                var plannedExpenses = DatabaseService.GetPlannedExpenses(_uid, start: null, end: null, limit:50) ?? new List<DatabaseService.CategoryTransactionDto>();
+                var plannedIncomes = DatabaseService.GetPlannedIncomes(_uid, start: null, end: null, limit:50) ?? new List<DatabaseService.CategoryTransactionDto>();
 
-                // Klucz: data (bez czasu) + kwota zaokrąglona do 2 miejsc
-                static string Key(DateTime d, decimal amount) => $"{d.Date:yyyy-MM-dd}|{Math.Round(Math.Abs(amount), 2)}";
+                // Klucz: data (bez czasu) + kwota zaokrąglona do2 miejsc
+                static string Key(DateTime d, decimal amount) => $"{d.Date:yyyy-MM-dd}|{Math.Round(Math.Abs(amount),2)}";
 
                 var expDict = plannedExpenses
                     .GroupBy(e => Key(e.Date, e.Amount))
@@ -319,8 +319,8 @@ namespace Finly.Pages
                 if (FindName("PlannedTransactionsList") is ItemsControl pl)
                     pl.ItemsSource = combined;
 
-                SetVisibility("PlannedEmptyText", combined.Count == 0);
-                SetVisibility("PlannedTransactionsList", combined.Count > 0);
+                SetVisibility("PlannedEmptyText", combined.Count ==0);
+                SetVisibility("PlannedTransactionsList", combined.Count >0);
             }
             catch
             {
@@ -338,13 +338,13 @@ namespace Finly.Pages
             PieCurrent.Clear();
 
             var data = (source ?? Enumerable.Empty<DatabaseService.CategoryAmountDto>())
-                .Where(x => x.Amount > 0m)
+                .Where(x => x.Amount >0m)
                 .OrderByDescending(x => x.Amount)
                 .ToList();
 
-            if (data.Count == 0)
+            if (data.Count ==0)
             {
-                _currentTotalExpenses = 0m;
+                _currentTotalExpenses =0m;
 
                 // Remove center texts so only the "Brak danych w tym okresie" placeholder is visible
                 if (FindName("PieCenterNameText") is TextBlock n) n.Text = "";
@@ -368,18 +368,18 @@ namespace Finly.Pages
             if (FindName("PieCenterValueText") is TextBlock vAll) vAll.Text = sum.ToString("N2") + " zł";
             if (FindName("PieCenterPercentText") is TextBlock pAll) pAll.Text = "";
 
-            double startAngle = 0;
-            int colorIndex = 0;
+            double startAngle =0;
+            int colorIndex =0;
 
-            const double centerX = 110;
-            const double centerY = 110;
-            const double outerRadius = 100;
-            const double innerRadius = 60;
+            const double centerX =110;
+            const double centerY =110;
+            const double outerRadius =100;
+            const double innerRadius =60;
 
             foreach (var item in data)
             {
-                var sweep = (double)(item.Amount / sum) * 360.0;
-                if (sweep <= 0) continue;
+                var sweep = (double)(item.Amount / sum) *360.0;
+                if (sweep <=0) continue;
 
                 var slice = PieSlice.CreateDonut(
                     centerX, centerY,
@@ -403,13 +403,13 @@ namespace Finly.Pages
             PieIncome.Clear();
 
             var data = (source ?? Enumerable.Empty<DatabaseService.CategoryAmountDto>())
-                .Where(x => x.Amount > 0m)
+                .Where(x => x.Amount >0m)
                 .OrderByDescending(x => x.Amount)
                 .ToList();
 
-            if (data.Count == 0)
+            if (data.Count ==0)
             {
-                _currentTotalIncome = 0m;
+                _currentTotalIncome =0m;
 
                 // Remove center texts so only the "Brak danych w tym okresie" placeholder is visible
                 if (FindName("IncomeCenterNameText") is TextBlock n) n.Text = "";
@@ -433,18 +433,18 @@ namespace Finly.Pages
             if (FindName("IncomeCenterValueText") is TextBlock vAll) vAll.Text = sum.ToString("N2") + " zł";
             if (FindName("IncomeCenterPercentText") is TextBlock pAll) pAll.Text = "";
 
-            double startAngle = 0;
-            int colorIndex = 0;
+            double startAngle =0;
+            int colorIndex =0;
 
-            const double centerX = 110;
-            const double centerY = 110;
-            const double outerRadius = 100;
-            const double innerRadius = 60;
+            const double centerX =110;
+            const double centerY =110;
+            const double outerRadius =100;
+            const double innerRadius =60;
 
             foreach (var item in data)
             {
-                var sweep = (double)(item.Amount / sum) * 360.0;
-                if (sweep <= 0) continue;
+                var sweep = (double)(item.Amount / sum) *360.0;
+                if (sweep <=0) continue;
 
                 var slice = PieSlice.CreateDonut(
                     centerX, centerY,
@@ -474,7 +474,7 @@ namespace Finly.Pages
                 {
                     Name = x.Name,
                     Amount = x.Amount,
-                    Percent = sum > 0 ? (double)(x.Amount / sum) * 100.0 : 0.0
+                    Percent = sum >0 ? (double)(x.Amount / sum) *100.0 :0.0
                 })
                 .ToList();
 
@@ -485,10 +485,10 @@ namespace Finly.Pages
                 catBars.ItemsSource = rows.Take(5).ToList();
 
             // Toggle empty placeholder / content
-            SetVisibility("ExpenseEmptyText", rows.Count == 0);
-            SetVisibility("ExpenseTable", rows.Count > 0);
-            SetVisibility("TopCategoryEmptyText", rows.Count == 0);
-            SetVisibility("TopCategoryBars", rows.Count > 0);
+            SetVisibility("ExpenseEmptyText", rows.Count ==0);
+            SetVisibility("ExpenseTable", rows.Count >0);
+            SetVisibility("TopCategoryEmptyText", rows.Count ==0);
+            SetVisibility("TopCategoryBars", rows.Count >0);
         }
 
         private void BindIncomeTable(IEnumerable<DatabaseService.CategoryAmountDto> data)
@@ -502,7 +502,7 @@ namespace Finly.Pages
                 {
                     Name = x.Name,
                     Amount = x.Amount,
-                    Percent = sum > 0 ? (double)(x.Amount / sum) * 100.0 : 0.0
+                    Percent = sum >0 ? (double)(x.Amount / sum) *100.0 :0.0
                 })
                 .ToList();
 
@@ -511,17 +511,139 @@ namespace Finly.Pages
 
             // Środek donuta przychodów – całość
             if (FindName("IncomeCenterNameText") is TextBlock n)
-                n.Text = rows.Count == 0 ? "" : "Przychód";
+                n.Text = rows.Count ==0 ? "" : "Przychód";
 
             if (FindName("IncomeCenterValueText") is TextBlock v)
-                v.Text = rows.Count == 0 ? "" : sum.ToString("N2", CultureInfo.CurrentCulture) + " zł";
+                v.Text = rows.Count ==0 ? "" : sum.ToString("N2", CultureInfo.CurrentCulture) + " zł";
 
             if (FindName("IncomeCenterPercentText") is TextBlock p)
-                p.Text = rows.Count == 0 ? "" : "100,0% udziału";
+                p.Text = rows.Count ==0 ? "" : "100,0% udziału";
 
             // Toggle empty placeholder / content
-            SetVisibility("IncomeEmptyText", rows.Count == 0);
-            SetVisibility("IncomeTable", rows.Count > 0);
+            SetVisibility("IncomeEmptyText", rows.Count ==0);
+            SetVisibility("IncomeTable", rows.Count >0);
+        }
+
+        // =====================================================================
+        // Agregacja na potrzeby trendu (day/week/month)
+        // =====================================================================
+
+        private enum TrendAggregateMode { Day, Week, Month }
+
+        private List<ExpenseTrendItem> AggregateExpensesForTrend(DateTime dateFrom, DateTime dateTo, TrendAggregateMode mode)
+        {
+            // Bezpieczne pobranie danych (DataTable z kolumnami Date, Amount)
+            DataTable dt = null;
+            try { dt = DatabaseService.GetExpenses(_uid, dateFrom, dateTo); } catch { dt = null; }
+            var rows = (dt == null) ? Enumerable.Empty<DataRow>() : dt.AsEnumerable();
+
+            var items = new List<ExpenseTrendItem>();
+
+            switch (mode)
+            {
+                case TrendAggregateMode.Day:
+                {
+                    int days = (dateTo.Date - dateFrom.Date).Days +1;
+                    for (int i =0; i < days; i++)
+                    {
+                        var d = dateFrom.Date.AddDays(i);
+                        decimal sum = SumForDate(rows, d);
+                        items.Add(new ExpenseTrendItem
+                        {
+                            DateLabel = d.ToString("dd.MM"),
+                            Amount = sum
+                        });
+                    }
+                    break;
+                }
+                case TrendAggregateMode.Week:
+                {
+                    // Tygodnie liczymy od poniedziałku; numerujemy lokalnie od1 w obrębie zakresu
+                    var start = StartOfWeek(dateFrom);
+                    var end = dateTo.Date;
+                    int weekIndex =1;
+                    for (var cursor = start; cursor <= end; cursor = cursor.AddDays(7))
+                    {
+                        var wStart = cursor;
+                        var wEnd = cursor.AddDays(6);
+                        if (wEnd > end) wEnd = end;
+                        decimal sum = SumForRange(rows, wStart, wEnd);
+                        items.Add(new ExpenseTrendItem
+                        {
+                            DateLabel = $"Tydzień {weekIndex}",
+                            Amount = sum
+                        });
+                        weekIndex++;
+                    }
+                    break;
+                }
+                case TrendAggregateMode.Month:
+                {
+                    var startMonth = new DateTime(dateFrom.Year, dateFrom.Month,1);
+                    var endMonth = new DateTime(dateTo.Year, dateTo.Month,1);
+                    for (var cursor = startMonth; cursor <= endMonth; cursor = cursor.AddMonths(1))
+                    {
+                        var mStart = new DateTime(cursor.Year, cursor.Month,1);
+                        var mEnd = mStart.AddMonths(1).AddDays(-1);
+                        if (mEnd > dateTo) mEnd = dateTo;
+                        decimal sum = SumForRange(rows, mStart, mEnd);
+                        items.Add(new ExpenseTrendItem
+                        {
+                            DateLabel = CultureInfo.CurrentCulture.DateTimeFormat.GetMonthName(cursor.Month),
+                            Amount = sum
+                        });
+                    }
+                    break;
+                }
+            }
+
+            // Oblicz normalizację procentową względem maksimum
+            var max = items.Count ==0 ?0m : items.Max(i => i.Amount);
+            if (max <=0m) max =1m;
+            foreach (var it in items)
+                it.Percent = (double)(it.Amount / max *100m);
+
+            return items;
+        }
+
+        private static DateTime StartOfWeek(DateTime date)
+        {
+            int diff = ((int)date.DayOfWeek +6) %7; // Monday=0
+            return date.AddDays(-diff).Date;
+        }
+
+        private static decimal SumForDate(IEnumerable<DataRow> rows, DateTime day)
+        {
+            decimal sum =0m;
+            foreach (var r in rows)
+            {
+                try
+                {
+                    var obj = r["Date"]; DateTime d;
+                    if (obj is DateTime dtv) d = dtv; else if (!DateTime.TryParse(obj?.ToString(), out d)) continue;
+                    if (d.Date != day.Date) continue;
+                    var amtObj = r["Amount"]; if (amtObj == DBNull.Value) continue; sum += Math.Abs(Convert.ToDecimal(amtObj));
+                }
+                catch { }
+            }
+            return sum;
+        }
+
+        private static decimal SumForRange(IEnumerable<DataRow> rows, DateTime from, DateTime to)
+        {
+            decimal sum =0m;
+            foreach (var r in rows)
+            {
+                try
+                {
+                    var obj = r["Date"]; DateTime d;
+                    if (obj is DateTime dtv) d = dtv; else if (!DateTime.TryParse(obj?.ToString(), out d)) continue;
+                    if (d.Date < from.Date || d.Date > to.Date) continue;
+                    var amtObj = r["Amount"]; if (amtObj == DBNull.Value) continue; sum += Math.Abs(Convert.ToDecimal(amtObj));
+                }
+                catch { }
+            }
+            return sum;
         }
 
         // =====================================================================
@@ -536,57 +658,34 @@ namespace Finly.Pages
 
             try
             {
-                // Ensure start <= end
                 if (start > end) (start, end) = (end, start);
 
-                int days = (end.Date - start.Date).Days + 1;
-                if (days <= 0) days = 1;
-
-                // Read raw expenses in the range
-                DataTable dt = null;
-                try { dt = DatabaseService.GetExpenses(_uid, start, end); } catch { dt = null; }
-                var rows = (dt == null) ? Enumerable.Empty<DataRow>() : dt.AsEnumerable();
-
-                var items = new List<ExpenseTrendItem>(days);
-                decimal maxAmount = 0m;
-
-                for (int i = 0; i < days; i++)
+                // Ustal agregację zależnie od presetów
+                TrendAggregateMode agg = TrendAggregateMode.Day;
+                switch (_mode)
                 {
-                    var date = start.Date.AddDays(i);
-                    decimal sumDay = 0m;
-
-                    foreach (var r in rows)
-                    {
-                        try
-                        {
-                            var obj = r["Date"];
-                            DateTime d;
-                            if (obj is DateTime dtv) d = dtv;
-                            else if (!DateTime.TryParse(obj?.ToString(), out d)) continue;
-
-                            if (d.Date == date)
-                            {
-                                var amtObj = r["Amount"];
-                                if (amtObj == DBNull.Value) continue;
-                                var dec = Convert.ToDecimal(amtObj);
-                                sumDay += Math.Abs(dec);
-                            }
-                        }
-                        catch { /* ignore malformed rows */ }
-                    }
-
-                    if (sumDay > maxAmount) maxAmount = sumDay;
-
-                    items.Add(new ExpenseTrendItem
-                    {
-                        DateLabel = date.ToString("dd.MM"),
-                        Amount = sumDay,
-                        Percent = 0.0 // will compute after we know max
-                    });
+                    case DateRangeMode.Day:
+                    case DateRangeMode.Week:
+                        agg = TrendAggregateMode.Day; // dla tygodnia – dzienne punkty
+                        break;
+                    case DateRangeMode.Month:
+                    case DateRangeMode.Quarter:
+                        agg = TrendAggregateMode.Week; // tygodniowo
+                        break;
+                    case DateRangeMode.Year:
+                        agg = TrendAggregateMode.Month; // miesięcznie
+                        break;
+                    case DateRangeMode.Custom:
+                        // heurystyka: jeśli zakres >60 dni -> tygodnie, >200 dni -> miesiące
+                        var days = (end - start).Days;
+                        agg = days <=31 ? TrendAggregateMode.Day : (days <=180 ? TrendAggregateMode.Week : TrendAggregateMode.Month);
+                        break;
                 }
 
-                // If all zeros, show empty placeholder
-                if (items.All(it => it.Amount == 0m))
+                var items = AggregateExpensesForTrend(start, end, agg);
+
+                // Jeśli wszystko zero – placeholder
+                if (items.All(it => it.Amount ==0m))
                 {
                     canvas.Children.Clear();
                     labels.ItemsSource = Array.Empty<ExpenseTrendItem>();
@@ -600,45 +699,38 @@ namespace Finly.Pages
                 SetVisibility("ExpenseTrendCanvas", true);
                 SetVisibility("ExpenseTrendLabels", true);
 
-                if (maxAmount <= 0m) maxAmount = 1m;
-
-                // compute percent for each item
-                foreach (var it in items)
-                    it.Percent = (double)(it.Amount / maxAmount * 100m);
-
+                // Etykiety – bez zlewania
                 labels.ItemsSource = items;
 
-                // Draw polyline
+                // Rysowanie linii
                 canvas.Children.Clear();
 
-                double width = canvas.ActualWidth;
-                if (width <= 0) width = 200;
-                double height = canvas.ActualHeight;
-                if (height <= 0) height = 80;
+                double width = canvas.ActualWidth; if (width <=0) width =200;
+                double height = canvas.ActualHeight; if (height <=0) height =180;
 
                 var line = new Polyline
                 {
                     Stroke = (Brush)Application.Current.TryFindResource("Brand.Green") ?? Brushes.LimeGreen,
-                    StrokeThickness = 2
+                    StrokeThickness =2
                 };
 
-                for (int i = 0; i < items.Count; i++)
+                for (int i =0; i < items.Count; i++)
                 {
-                    double x = (items.Count == 1) ? width / 2.0 : i * (width / (items.Count - 1));
-                    double y = height - (items[i].Percent / 100.0) * (height - 4) - 2;
+                    double x = (items.Count ==1) ? width /2.0 : i * (width / (items.Count -1));
+                    double y = height - (items[i].Percent /100.0) * (height -4) -2;
 
                     line.Points.Add(new Point(x, y));
 
                     var dot = new Ellipse
                     {
-                        Width = 6,
-                        Height = 6,
+                        Width =6,
+                        Height =6,
                         Fill = Brushes.White,
                         Stroke = line.Stroke,
-                        StrokeThickness = 1
+                        StrokeThickness =1
                     };
-                    Canvas.SetLeft(dot, x - 3);
-                    Canvas.SetTop(dot, y - 3);
+                    Canvas.SetLeft(dot, x -3);
+                    Canvas.SetTop(dot, y -3);
                     canvas.Children.Add(dot);
                 }
 
@@ -661,12 +753,12 @@ namespace Finly.Pages
 
         private void ExpensePieSlice_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
         {
-            if (_currentTotalExpenses <= 0)
+            if (_currentTotalExpenses <=0)
                 return;
 
             if ((sender as FrameworkElement)?.DataContext is PieSlice slice)
             {
-                var share = slice.Amount / _currentTotalExpenses * 100m;
+                var share = slice.Amount / _currentTotalExpenses *100m;
 
                 if (FindName("PieCenterNameText") is TextBlock n)
                     n.Text = slice.Name;
@@ -679,12 +771,12 @@ namespace Finly.Pages
 
         private void IncomePieSlice_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
         {
-            if (_currentTotalIncome <= 0)
+            if (_currentTotalIncome <=0)
                 return;
 
             if ((sender as FrameworkElement)?.DataContext is PieSlice slice)
             {
-                var share = slice.Amount / _currentTotalIncome * 100m;
+                var share = slice.Amount / _currentTotalIncome *100m;
 
                 if (FindName("IncomeCenterNameText") is TextBlock n)
                     n.Text = slice.Name;
@@ -735,11 +827,11 @@ namespace Finly.Pages
             double startAngle, double sweepAngle,
             Brush brush, string name, decimal amount)
         {
-            if (sweepAngle <= 0) sweepAngle = 0.1;
-            if (sweepAngle >= 360) sweepAngle = 359.999;
+            if (sweepAngle <=0) sweepAngle =0.1;
+            if (sweepAngle >=360) sweepAngle =359.999;
 
-            double a0 = DegToRad(startAngle - 90);
-            double a1 = DegToRad(startAngle + sweepAngle - 90);
+            double a0 = DegToRad(startAngle -90);
+            double a1 = DegToRad(startAngle + sweepAngle -90);
 
             Point pOuter0 = new(centerX + outerRadius * Math.Cos(a0),
                                 centerY + outerRadius * Math.Sin(a0));
@@ -751,19 +843,19 @@ namespace Finly.Pages
             Point pInner0 = new(centerX + innerRadius * Math.Cos(a0),
                                 centerY + innerRadius * Math.Sin(a0));
 
-            bool large = sweepAngle > 180;
+            bool large = sweepAngle >180;
 
             var g = new StreamGeometry();
             using (var ctx = g.Open())
             {
                 ctx.BeginFigure(pOuter0, isFilled: true, isClosed: true);
 
-                ctx.ArcTo(pOuter1, new Size(outerRadius, outerRadius), 0,
+                ctx.ArcTo(pOuter1, new Size(outerRadius, outerRadius),0,
                           large, SweepDirection.Clockwise, true, true);
 
                 ctx.LineTo(pInner1, true, true);
 
-                ctx.ArcTo(pInner0, new Size(innerRadius, innerRadius), 0,
+                ctx.ArcTo(pInner0, new Size(innerRadius, innerRadius),0,
                           large, SweepDirection.Counterclockwise, true, true);
             }
             g.Freeze();
@@ -777,7 +869,7 @@ namespace Finly.Pages
             };
         }
 
-        private static double DegToRad(double deg) => Math.PI / 180 * deg;
+        private static double DegToRad(double deg) => Math.PI /180 * deg;
     }
 
     public sealed class TableRow
@@ -786,7 +878,7 @@ namespace Finly.Pages
         public decimal Amount { get; set; }
         public string AmountStr => Amount.ToString("N2") + " zł";
         public double Percent { get; set; }
-        public string PercentStr => Math.Round(Percent, 0) + "%";
+        public string PercentStr => Math.Round(Percent,0) + "%";
     }
 
     public sealed class ExpenseTrendItem

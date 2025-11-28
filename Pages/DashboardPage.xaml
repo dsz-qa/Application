@@ -52,7 +52,7 @@
 
  <!-- Wrap content in a ScrollViewer so dashboard can scroll vertically on smaller screens -->
  <ScrollViewer VerticalScrollBarVisibility="Auto"
-               HorizontalScrollBarVisibility="Auto"
+               HorizontalScrollBarVisibility="Disabled"
                PanningMode="VerticalOnly">
 
    <Grid Margin="16">
@@ -269,28 +269,34 @@
  </StackPanel>
  </Border>
 
-             <!-- NEW: Expense trend moved here under income donut to ensure it is visible on smaller screens -->
-             <Border Grid.Row="2" Style="{StaticResource Card}" Margin="0,12,0,0" MinHeight="140">
-               <StackPanel>
-                 <TextBlock Text="Trend wydatków — bieżący okres" Style="{StaticResource CardHeader}" Margin="0,0,0,8" TextWrapping="Wrap"/>
-                 <!-- Increased height so at least ~1 month of trend is visible -->
-                 <Canvas x:Name="ExpenseTrendCanvas" Height="180" Margin="0,4,0,4" Background="Transparent"/>
-                 <ItemsControl x:Name="ExpenseTrendLabels" Margin="0,2,0,0">
-                   <ItemsControl.ItemsPanel>
-                     <ItemsPanelTemplate>
-                       <UniformGrid Rows="1"/>
-                     </ItemsPanelTemplate>
-                   </ItemsControl.ItemsPanel>
-                   <ItemsControl.ItemTemplate>
-                     <DataTemplate>
-                       <TextBlock Text="{Binding DateLabel}" FontSize="10" Foreground="{DynamicResource App.Foreground}" HorizontalAlignment="Center"/>
-                     </DataTemplate>
-                   </ItemsControl.ItemTemplate>
-                 </ItemsControl>
-                 <TextBlock x:Name="ExpenseTrendEmptyText" Text="Brak danych w tym okresie" Foreground="{DynamicResource App.Foreground}" Visibility="Collapsed" HorizontalAlignment="Center" Margin="0,8,0,0" FontStyle="Italic"/>
-               </StackPanel>
-             </Border>
-           </Grid>
+ <!-- NEW: Expense trend moved here under income donut to ensure it is visible on smaller screens -->
+ <Border Grid.Row="2" Style="{StaticResource Card}" Margin="0,12,0,0" MinHeight="140">
+ <Grid>
+ <Grid.RowDefinitions>
+ <RowDefinition Height="Auto"/>
+ <RowDefinition Height="180"/>
+ <RowDefinition Height="Auto"/>
+ <RowDefinition Height="Auto"/>
+ </Grid.RowDefinitions>
+ <TextBlock Grid.Row="0" Text="Trend wydatków — bieżący okres" Style="{StaticResource CardHeader}" Margin="0,0,0,8" TextWrapping="Wrap"/>
+ <!-- Fixed row height to keep canvas from growing with labels -->
+ <Canvas Grid.Row="1" x:Name="ExpenseTrendCanvas" Margin="0,4,0,4" Background="Transparent"/>
+ <ItemsControl Grid.Row="2" x:Name="ExpenseTrendLabels" Margin="0,2,0,0" HorizontalAlignment="Stretch">
+ <ItemsControl.ItemsPanel>
+ <ItemsPanelTemplate>
+ <UniformGrid Rows="1"/>
+ </ItemsPanelTemplate>
+ </ItemsControl.ItemsPanel>
+ <ItemsControl.ItemTemplate>
+ <DataTemplate>
+ <TextBlock Text="{Binding DateLabel}" FontSize="10" Foreground="{DynamicResource App.Foreground}" HorizontalAlignment="Center"/>
+ </DataTemplate>
+ </ItemsControl.ItemTemplate>
+ </ItemsControl>
+ <TextBlock Grid.Row="3" x:Name="ExpenseTrendEmptyText" Text="Brak danych w tym okresie" Foreground="{DynamicResource App.Foreground}" Visibility="Collapsed" HorizontalAlignment="Center" Margin="0,8,0,0" FontStyle="Italic"/>
+ </Grid>
+ </Border>
+ </Grid>
 
            <!-- Column 2: Tables -->
            <Grid Grid.Column="1" Margin="4,0,4,0">
