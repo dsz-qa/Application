@@ -2,7 +2,7 @@
  xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
  xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
  xmlns:local="clr-namespace:Finly.Pages">
-	<Grid Margin="16">
+	<Grid Margin="16" ShowGridLines="False">
 		<Grid.RowDefinitions>
 			<RowDefinition Height="Auto"/>
 			<RowDefinition Height="Auto"/>
@@ -66,7 +66,8 @@
 					<ItemsControl.Resources>
 						<!-- Loan card template -->
 						<DataTemplate DataType="{x:Type local:LoanCardVm}">
-							<Border Margin="8" Padding="12" Background="{DynamicResource Surface.Background}" BorderBrush="{DynamicResource Surface.Border}" BorderThickness="1" CornerRadius="8">
+							<!-- removed visible border separators by setting BorderThickness=0 -->
+							<Border Margin="8" Padding="12" Background="{DynamicResource Surface.Background}" BorderBrush="{DynamicResource Surface.Border}" BorderThickness="0" CornerRadius="8">
 								<Grid>
 									<Grid.RowDefinitions>
 										<RowDefinition Height="Auto"/>
@@ -74,9 +75,10 @@
 										<RowDefinition Height="Auto"/>
 									</Grid.RowDefinitions>
 
-									<StackPanel Orientation="Horizontal">
-										<TextBlock Text="🏠" FontSize="16" Margin="0,0,6,0"/>
-										<TextBlock Text="{Binding Name}" FontWeight="Bold"/>
+									<StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+										<!-- Only the house icon is enlarged -->
+										<TextBlock x:Name="HouseIcon" Text="🏠" FontSize="40" Margin="0,0,8,0" VerticalAlignment="Center"/>
+										<TextBlock Text="{Binding Name}" FontWeight="Bold" VerticalAlignment="Center"/>
 									</StackPanel>
 
 									<StackPanel Grid.Row="1" Margin="0,8,0,8">
@@ -107,7 +109,7 @@
 												<TextBlock Text="{Binding RemainingTermStr}" FontSize="12"/>
 											</StackPanel>
 											</Grid>
-										</StackPanel>
+									</StackPanel>
 
 									<!-- Bottom area: buttons and simplified delete confirmation -->
 									<DockPanel Grid.Row="2" LastChildFill="False" Margin="0,4,0,0">
@@ -150,7 +152,8 @@
 
 						<!-- Add tile template -->
 						<DataTemplate DataType="{x:Type local:AddLoanTile}">
-							<Border Margin="8" Padding="24" Background="{DynamicResource Surface.Background}" BorderBrush="{DynamicResource Surface.Border}" BorderThickness="1" CornerRadius="8" Cursor="Hand" MouseDown="AddLoanCard_Click">
+							<!-- remove border on add tile to avoid separator lines -->
+							<Border Margin="8" Padding="24" Background="{DynamicResource Surface.Background}" BorderBrush="{DynamicResource Surface.Border}" BorderThickness="0" CornerRadius="8" Cursor="Hand" MouseDown="AddLoanCard_Click">
 								<StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
 									<TextBlock Text="➕" FontSize="24" HorizontalAlignment="Center"/>
 									<TextBlock Text="Dodaj kredyt" FontWeight="SemiBold" HorizontalAlignment="Center"/>
