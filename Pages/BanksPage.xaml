@@ -229,12 +229,17 @@
                                 <ColumnDefinition Width="Auto"/>
                             </Grid.ColumnDefinitions>
 
+                            <!-- Zmienione: dodano ikonę edit.png po lewej stronie -->
                             <Button Grid.Column="0"
-                                    Content="Edytuj"
                                     Padding="8,4"
                                     MinWidth="80"
                                     Click="EditAccount_Click"
-                                    Tag="{Binding}"/>
+                                    Tag="{Binding}">
+                                <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                                    <Image Source="/Assets/Icons/edit.png" Width="16" Height="16" Margin="0,0,4,0"/>
+                                    <TextBlock Text="Edytuj"/>
+                                </StackPanel>
+                            </Button>
 
                             <Button Grid.Column="2"
                                     Padding="8,4"
