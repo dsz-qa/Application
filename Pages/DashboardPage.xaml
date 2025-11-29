@@ -154,8 +154,12 @@
  Height="220"
  LegendPosition="Right"
  Background="Transparent"
- DrawMargin="0"
- />
+ Foreground="{DynamicResource App.Foreground}"
+ DrawMargin="0">
+ <lvc:PieChart.LegendTextPaint>
+ <lvc:SolidColorPaint Color="#FFFFFFFF"/>
+ </lvc:PieChart.LegendTextPaint>
+ </lvc:PieChart>
  </StackPanel>
  </Border>
  <Border Grid.Row="1" Style="{StaticResource Card}" Margin="0,12,0,0" MinHeight="260">
@@ -166,8 +170,12 @@
  Height="220"
  LegendPosition="Right"
  Background="Transparent"
- DrawMargin="0"
- />
+ Foreground="{DynamicResource App.Foreground}"
+ DrawMargin="0">
+ <lvc:PieChart.LegendTextPaint>
+ <lvc:SolidColorPaint Color="#FFFFFFFF"/>
+ </lvc:PieChart.LegendTextPaint>
+ </lvc:PieChart>
  </StackPanel>
  </Border>
  <Border Grid.Row="2" Style="{StaticResource Card}" Margin="0,12,0,0" MinHeight="140">

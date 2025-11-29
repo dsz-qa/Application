@@ -49,7 +49,7 @@ namespace Finly.Pages
             _vm = new DashboardViewModel(_uid);
             DataContext = _vm;
 
-            // If PeriodBar exists in XAML ensure it's in sync and events are hooked
+            // Hook PeriodBar events
             if (FindName("PeriodBar") is Views.Controls.PeriodBarControl pb)
             {
                 pb.RangeChanged += PeriodBar_RangeChanged;
@@ -73,7 +73,8 @@ namespace Finly.Pages
             // ensure charts are refreshed once control is loaded (layout established)
             this.Loaded += DashboardPage_Loaded;
 
-            ApplyPreset(DateRangeMode.Day, DateTime.Today);
+            // Default preset: Ten miesiąc
+            ApplyPreset(DateRangeMode.Month, DateTime.Today);
             RefreshMoneySummary();
             LoadCharts();
             LoadPlannedTransactions();
@@ -238,7 +239,8 @@ namespace Finly.Pages
 
         private void PeriodBar_ClearClicked(object? sender, EventArgs e)
         {
-            ApplyPreset(DateRangeMode.Day, DateTime.Today);
+            // When clearing, default to Month
+            ApplyPreset(DateRangeMode.Month, DateTime.Today);
             _vm.LoadTransactions(_startDate, _endDate);
             _vm.GenerateInsights(_startDate, _endDate);
             _vm.GenerateAlerts(_startDate, _endDate);
