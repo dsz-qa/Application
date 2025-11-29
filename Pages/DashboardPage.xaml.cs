@@ -81,7 +81,14 @@ namespace Finly.Pages
             }
 
             // subscribe to DatabaseService data changes so we refresh planned list when new planned tx added
-            DatabaseService.DataChanged += (_, __) => Dispatcher.BeginInvoke(new Action(() => LoadPlannedTransactions()), DispatcherPriority.Background);
+            DatabaseService.DataChanged += (_, __) => Dispatcher.BeginInvoke(new Action(() =>
+            {
+                // reload transactions for current range, then charts and visibilities
+                _vm.LoadTransactions(_startDate == default ? DateTime.Today : _startDate,
+                                     _endDate == default ? DateTime.Today : _endDate);
+                LoadCharts();
+                UpdateTablesVisibility();
+            }), DispatcherPriority.Background);
 
             // redraw trend when canvas resizes (to avoid initial draw then disappearing after layout)
             if (FindName("ExpenseTrendCanvas") is Canvas canvas)
@@ -100,14 +107,14 @@ namespace Finly.Pages
             ApplyPreset(DateRangeMode.Month, DateTime.Today);
             RefreshMoneySummary();
             LoadCharts();
-            LoadPlannedTransactions();
+            UpdateTablesVisibility();
         }
 
         private void DashboardPage_Loaded(object? sender, RoutedEventArgs e)
         {
             // After initial layout, redraw charts/trend to ensure correct sizing
             LoadCharts();
-            LoadPlannedTransactions();
+            UpdateTablesVisibility();
         }
 
         public DashboardPage() : this(UserService.GetCurrentUserId()) { }
@@ -215,6 +222,7 @@ namespace Finly.Pages
             idx = (idx -1 + PresetOrder.Length) % PresetOrder.Length;
             ApplyPreset(PresetOrder[idx], DateTime.Today);
             LoadCharts();
+            UpdateTablesVisibility();
         }
 
         private void NextPeriod_Click(object sender, RoutedEventArgs e)
@@ -225,6 +233,7 @@ namespace Finly.Pages
             idx = (idx +1) % PresetOrder.Length;
             ApplyPreset(PresetOrder[idx], DateTime.Today);
             LoadCharts();
+            UpdateTablesVisibility();
         }
 
         // Hooked handlers for PeriodBar:
@@ -241,6 +250,7 @@ namespace Finly.Pages
                 _vm.GenerateForecast(_startDate, _endDate);
                 _vm.RefreshCharts(_startDate, _endDate);
                 LoadCharts();
+                UpdateTablesVisibility();
             }
         }
 
@@ -257,6 +267,7 @@ namespace Finly.Pages
                 _vm.GenerateForecast(_startDate, _endDate);
                 _vm.RefreshCharts(_startDate, _endDate);
                 LoadCharts();
+                UpdateTablesVisibility();
             }
         }
 
@@ -270,6 +281,7 @@ namespace Finly.Pages
             _vm.GenerateForecast(_startDate, _endDate);
             _vm.RefreshCharts(_startDate, _endDate);
             LoadCharts();
+            UpdateTablesVisibility();
         }
 
         // Helper to set UI element visibility safely
@@ -320,7 +332,28 @@ namespace Finly.Pages
                 BindExpenseTable(expenses);
                 BindIncomeTable(incomes);
                 BindExpenseTrend(start, end);
+                UpdateTablesVisibility();
             }), DispatcherPriority.Loaded);
+        }
+
+        private void UpdateTablesVisibility()
+        {
+            try
+            {
+                var incCount = _vm?.Incomes?.Count ??0;
+                var expCount = _vm?.Expenses?.Count ??0;
+                var plannedCount = _vm?.PlannedTransactions?.Count ??0;
+
+                SetVisibility("IncomeEmptyText", incCount ==0);
+                SetVisibility("IncomeTable", incCount >0);
+
+                SetVisibility("ExpenseEmptyText", expCount ==0);
+                SetVisibility("ExpenseTable", expCount >0);
+
+                SetVisibility("PlannedEmptyText", plannedCount ==0);
+                SetVisibility("PlannedTransactionsList", plannedCount >0);
+            }
+            catch { }
         }
 
         private sealed class PlannedTransactionRow
@@ -339,62 +372,11 @@ namespace Finly.Pages
         {
             try
             {
-                var plannedExpenses = DatabaseService.GetPlannedExpenses(_uid, start: null, end: null, limit:50) ?? new List<DatabaseService.CategoryTransactionDto>();
-                var plannedIncomes = DatabaseService.GetPlannedIncomes(_uid, start: null, end: null, limit:50) ?? new List<DatabaseService.CategoryTransactionDto>();
-
-                static string Key(DateTime d, decimal amount) => $"{d.Date:yyyy-MM-dd}|{Math.Round(Math.Abs(amount),2)}";
-
-                var expDict = plannedExpenses.GroupBy(e => Key(e.Date, e.Amount)).ToDictionary(g => g.Key, g => g.ToList());
-                var incDict = plannedIncomes.GroupBy(i => Key(i.Date, i.Amount)).ToDictionary(g => g.Key, g => g.ToList());
-
-                var combined = new List<PlannedTransactionRow>();
-                // Najpierw pary transferów (wydatek + przychód tego samego dnia i kwoty)
-                foreach (var key in expDict.Keys.Intersect(incDict.Keys))
-                {
-                    var e = expDict[key].First();
-                    var i = incDict[key].First();
-                    var desc = string.IsNullOrWhiteSpace(e.Description) ? (i.Description ?? "") : e.Description;
-                    combined.Add(new PlannedTransactionRow
-                    {
-                        Date = e.Date,
-                        Amount = Math.Abs(e.Amount),
-                        Category = e.CategoryName ?? i.CategoryName ?? "",
-                        Account = e.AccountName ?? i.AccountName ?? "",
-                        Description = desc,
-                        Kind = "Transfer"
-                    });
-                    expDict[key].RemoveAt(0);
-                    incDict[key].RemoveAt(0);
-                }
-                // Pozostałe wydatki
-                foreach (var list in expDict.Values)
-                    foreach (var e in list)
-                        combined.Add(new PlannedTransactionRow
-                        {
-                            Date = e.Date,
-                            Amount = Math.Abs(e.Amount),
-                            Category = e.CategoryName ?? "",
-                            Account = e.AccountName ?? "",
-                            Description = e.Description ?? "",
-                            Kind = "Wydatek"
-                        });
-                // Pozostałe przychody
-                foreach (var list in incDict.Values)
-                    foreach (var i in list)
-                        combined.Add(new PlannedTransactionRow
-                        {
-                            Date = i.Date,
-                            Amount = Math.Abs(i.Amount),
-                            Category = i.CategoryName ?? "",
-                            Account = i.AccountName ?? "",
-                            Description = i.Description ?? (i.Source ?? ""),
-                            Kind = "Przychód"
-                        });
-
-                combined = combined.OrderBy(x => x.Date).ToList();
-                if (FindName("PlannedTransactionsList") is ItemsControl pl) pl.ItemsSource = combined;
-                SetVisibility("PlannedEmptyText", combined.Count ==0);
-                SetVisibility("PlannedTransactionsList", combined.Count >0);
+                // rely on ViewModel's PlannedTransactions (already populated by LoadTransactions)
+                var planned = _vm?.PlannedTransactions ?? new ObservableCollection<TransactionItem>();
+                if (FindName("PlannedTransactionsList") is ItemsControl pl) pl.ItemsSource = planned;
+                SetVisibility("PlannedEmptyText", planned.Count ==0);
+                SetVisibility("PlannedTransactionsList", planned.Count >0);
             }
             catch
             {
@@ -552,9 +534,6 @@ namespace Finly.Pages
                     Percent = sum >0 ? (double)(x.Amount / sum) *100.0 :0.0
                 })
                 .ToList();
-
-            // NIE ustawiamy ExpenseTable.ItemsSource – XAML ma ItemsSource="{Binding DataContext.Expenses, ElementName=Root}"
-            // dzięki temu każdy wiersz korzysta z właściwości modelu: DateDisplay, AmountStr, Category, Account, Description.
 
             if (FindName("TopCategoryBars") is ItemsControl catBars)
                 catBars.ItemsSource = rows.Take(5).ToList();

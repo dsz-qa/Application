@@ -542,12 +542,9 @@ namespace Finly.Pages
                 return;
             }
 
-            var sourceTag = sourceItem.Tag as string ?? "";
+            var sourceTag = sourceItem.Tag as string ?? string.Empty;
             var date = ExpenseDatePicker.SelectedDate ?? DateTime.Today;
-            var desc = string.IsNullOrWhiteSpace(ExpenseDescBox.Text)
-                ? null
-                : ExpenseDescBox.Text.Trim();
-
+            var desc = string.IsNullOrWhiteSpace(ExpenseDescBox.Text) ? null : ExpenseDescBox.Text.Trim();
             var catName = ResolveCategoryName(ExpenseCategoryBox, ExpenseNewCategoryBox);
             int categoryId = GetCategoryIdOrZero(catName);
 
@@ -556,49 +553,39 @@ namespace Finly.Pages
                 UserId = _uid,
                 Amount = (double)amount,
                 Date = date,
-                Description = desc,
-                CategoryId = categoryId
+                Description = desc ?? string.Empty,
+                CategoryId = categoryId,
+                Account = string.Empty // ustawimy poniżej
             };
 
             try
             {
-                // 1) Odejmujemy z właściwego źródła
                 switch (sourceTag)
                 {
                     case "cash_free":
                         DatabaseService.SpendFromFreeCash(_uid, amount);
+                        eModel.Account = "Wolna gotówka";
                         break;
 
                     case "cash_saved":
                         DatabaseService.SpendFromSavedCash(_uid, amount);
+                        eModel.Account = "Odłożona gotówka";
                         break;
 
                     case "envelope":
-                        if (ExpenseEnvelopeCombo.SelectedItem is not string envName ||
-                            string.IsNullOrWhiteSpace(envName))
-                        {
-                            ToastService.Info("Wybierz kopertę, z której chcesz zapłacić.");
-                            return;
-                        }
-
+                        if (ExpenseEnvelopeCombo.SelectedItem is not string envName || string.IsNullOrWhiteSpace(envName))
+                        { ToastService.Info("Wybierz kopertę, z której chcesz zapłacić."); return; }
                         var envId = DatabaseService.GetEnvelopeIdByName(_uid, envName);
-                        if (envId == null)
-                        {
-                            ToastService.Error("Nie udało się odnaleźć wybranej koperty.");
-                            return;
-                        }
-
+                        if (envId == null) { ToastService.Error("Nie udało się odnaleźć wybranej koperty."); return; }
                         DatabaseService.SpendFromEnvelope(_uid, envId.Value, amount);
+                        eModel.Account = $"Koperta: {envName}";
                         break;
 
                     case "bank":
                         if (ExpenseBankAccountCombo.SelectedItem is not BankAccountModel acc)
-                        {
-                            ToastService.Info("Wybierz konto bankowe, z którego ma zejść wydatek.");
-                            return;
-                        }
-
+                        { ToastService.Info("Wybierz konto bankowe, z którego ma zejść wydatek."); return; }
                         DatabaseService.SpendFromBankAccount(_uid, acc.Id, amount);
+                        eModel.Account = $"Konto: {acc.AccountName}";
                         break;
 
                     default:
@@ -606,7 +593,6 @@ namespace Finly.Pages
                         return;
                 }
 
-                // 2) Zapisujemy wydatek
                 DatabaseService.InsertExpense(eModel);
                 ToastService.Success("Dodano wydatek.");
 
@@ -614,7 +600,6 @@ namespace Finly.Pages
                 LoadEnvelopes();
                 LoadIncomeAccounts();
 
-                // odśwież KPI
                 RefreshMoneySummary();
 
                 Cancel_Click(sender, e);
@@ -625,36 +610,40 @@ namespace Finly.Pages
             }
         }
 
-        // New handler for adding planned expense from the separate planned area
         private void SaveExpensePlanned_Click(object sender, RoutedEventArgs e)
         {
             if (!TryParseAmount(ExpensePlannedAmountBox.Text, out var amount) || amount <= 0m)
-            {
-                ToastService.Info("Podaj poprawną kwotę.");
-                return;
-            }
-
+            { ToastService.Info("Podaj poprawną kwotę."); return; }
             var date = ExpensePlannedDatePicker.SelectedDate ?? DateTime.Today;
             var desc = string.IsNullOrWhiteSpace(ExpensePlannedDescBox.Text) ? null : ExpensePlannedDescBox.Text.Trim();
-
             var catName = ExpensePlannedCategoryBox.SelectedItem as string;
             if (string.IsNullOrWhiteSpace(catName) && !string.IsNullOrWhiteSpace(ExpensePlannedNewCategoryBox.Text))
                 catName = ExpensePlannedNewCategoryBox.Text.Trim();
+            var catId =0; try { catId = DatabaseService.GetOrCreateCategoryId(_uid, catName ?? ""); } catch { catId =0; }
 
-            var catId = 0;
-            try { catId = DatabaseService.GetOrCreateCategoryId(_uid, catName ?? ""); } catch { catId = 0; }
+            string accountDisplay = string.Empty;
+            if (ExpensePlannedSourceCombo.SelectedItem is ComboBoxItem srcItem)
+            {
+                var tag = srcItem.Tag as string ?? string.Empty;
+                switch (tag)
+                {
+                    case "cash_free": accountDisplay = "Wolna gotówka"; break;
+                    case "cash_saved": accountDisplay = "Odłożona gotówka"; break;
+                    case "envelope":
+                        if (ExpensePlannedEnvelopeCombo.SelectedItem is string envName && !string.IsNullOrWhiteSpace(envName))
+                            accountDisplay = $"Koperta: {envName}";
+                        break;
+                    case "bank":
+                        if (ExpensePlannedBankAccountCombo.SelectedItem is BankAccountModel acc)
+                            accountDisplay = $"Konto: {acc.AccountName}";
+                        break;
+                }
+            }
 
-            var eModel = new Expense { UserId = _uid, Amount = (double)amount, Date = date, Description = desc, CategoryId = catId, IsPlanned = true };
+            var eModel = new Expense { UserId = _uid, Amount = (double)amount, Date = date, Description = (desc ?? string.Empty), CategoryId = catId, IsPlanned = true, Account = accountDisplay };
             try
-            {
-                DatabaseService.InsertExpense(eModel);
-                ToastService.Success("Dodano zaplanowany wydatek.");
-                Cancel_Click(sender, e);
-            }
-            catch (Exception ex)
-            {
-                ToastService.Error("Nie udało się dodać zaplanowanego wydatku.\n" + ex.Message);
-            }
+            { DatabaseService.InsertExpense(eModel); ToastService.Success("Dodano zaplanowany wydatek."); Cancel_Click(sender, e); }
+            catch (Exception ex) { ToastService.Error("Nie udało się dodać zaplanowanego wydatek.\n" + ex.Message); }
         }
 
         // ================== PRZYCHÓD ==================
@@ -675,51 +664,40 @@ namespace Finly.Pages
                 return;
             }
 
-            var formTag = formItem.Tag as string ?? "";
+            var formTag = formItem.Tag as string ?? string.Empty;
             var date = IncomeDatePicker.SelectedDate ?? DateTime.Today;
-            var source = "Przychód";
-            var desc = string.IsNullOrWhiteSpace(IncomeDescBox.Text)
-                ? null
-                : IncomeDescBox.Text.Trim();
+            var desc = string.IsNullOrWhiteSpace(IncomeDescBox.Text) ? null : IncomeDescBox.Text.Trim();
 
             var catName = ResolveCategoryName(IncomeCategoryBox, IncomeNewCategoryBox);
-            int? categoryId = GetCategoryIdOrZero(catName);
-            if (categoryId == 0) categoryId = null;
+            int? categoryId = GetCategoryIdOrZero(catName); if (categoryId ==0) categoryId = null;
+
+            string sourceDisplay = string.Empty;
+            switch (formTag)
+            {
+                case "cash_free": sourceDisplay = "Wolna gotówka"; break;
+                case "cash_saved": sourceDisplay = "Odłożona gotówka"; break;
+                case "transfer":
+                    if (IncomeAccountCombo.SelectedItem is not BankAccountModel acc)
+                    {
+                        ToastService.Info("Wybierz konto bankowe, na które wpływa przelew.");
+                        return;
+                    }
+                    sourceDisplay = $"Konto: {acc.AccountName}"; break;
+                default: ToastService.Info("Wybierz poprawną formę przychodu."); return;
+            }
 
             try
             {
-                switch (formTag)
-                {
-                    case "cash_free":
-                        DatabaseService.AddIncomeToFreeCash(_uid, amount, date, categoryId, source, desc);
-                        break;
-
-                    case "cash_saved":
-                        DatabaseService.AddIncomeToSavedCash(_uid, amount, date, categoryId, source, desc);
-                        break;
-
-                    case "transfer":
-                        if (IncomeAccountCombo.SelectedItem is not BankAccountModel acc)
-                        {
-                            ToastService.Info("Wybierz konto bankowe, na które wpływa przelew.");
-                            return;
-                        }
-                        DatabaseService.AddIncomeToBankAccount(_uid, acc.Id, amount, date, categoryId, source, desc);
-                        break;
-
-                    default:
-                        ToastService.Info("Wybierz poprawną formę przychodu.");
-                        return;
-                }
+                if (formTag == "cash_free") DatabaseService.AddIncomeToFreeCash(_uid, amount, date, categoryId, sourceDisplay, desc);
+                else if (formTag == "cash_saved") DatabaseService.AddIncomeToSavedCash(_uid, amount, date, categoryId, sourceDisplay, desc);
+                else if (formTag == "transfer" && IncomeAccountCombo.SelectedItem is BankAccountModel acc)
+                    DatabaseService.AddIncomeToBankAccount(_uid, acc.Id, amount, date, categoryId, sourceDisplay, desc);
 
                 ToastService.Success("Dodano przychód.");
 
                 LoadCategories();
                 LoadIncomeAccounts();
-
-                // odśwież KPI
                 RefreshMoneySummary();
-
                 Cancel_Click(sender, e);
             }
             catch (Exception ex)
@@ -731,22 +709,17 @@ namespace Finly.Pages
         private void SaveIncomePlanned_Click(object sender, RoutedEventArgs e)
         {
             if (!TryParseAmount(IncomePlannedAmountBox.Text, out var amount) || amount <= 0m)
-            {
-                ToastService.Info("Podaj poprawną kwotę.");
-                return;
-            }
-
+            { ToastService.Info("Podaj poprawną kwotę."); return; }
             var date = IncomePlannedDatePicker.SelectedDate ?? DateTime.Today;
             var desc = string.IsNullOrWhiteSpace(IncomePlannedDescBox.Text) ? null : IncomePlannedDescBox.Text.Trim();
-
-            string source = "Przychód";
-            var sourceTag = (IncomePlannedSourceCombo.SelectedItem as ComboBoxItem)?.Tag as string ?? "";
-            if (IncomePlannedSourceCombo.SelectedItem is ComboBoxItem selItem && !string.IsNullOrWhiteSpace(selItem.Content as string))
-                source = selItem.Content as string ?? source;
-            if (string.Equals(sourceTag, "transfer", StringComparison.OrdinalIgnoreCase))
+            string sourceDisplay = string.Empty;
+            var sourceTag = (IncomePlannedSourceCombo.SelectedItem as ComboBoxItem)?.Tag as string ?? string.Empty;
+            if (sourceTag == "cash_free") sourceDisplay = "Wolna gotówka";
+            else if (sourceTag == "cash_saved") sourceDisplay = "Odłożona gotówka";
+            else if (sourceTag == "transfer")
             {
                 if (IncomePlannedAccountCombo.SelectedItem is string accName && !string.IsNullOrWhiteSpace(accName))
-                    source = $"Przelew -> {accName}";
+                    sourceDisplay = $"Konto: {accName}";
                 else
                 {
                     ToastService.Info("Wybierz konto docelowe dla planowanego przelewu.");
@@ -755,22 +728,11 @@ namespace Finly.Pages
             }
 
             var catName = IncomePlannedCategoryBox.SelectedItem as string;
-            if (string.IsNullOrWhiteSpace(catName) && !string.IsNullOrWhiteSpace(IncomePlannedNewCategoryBox.Text))
-                catName = IncomePlannedNewCategoryBox.Text.Trim();
-
-            int? catId = null;
-            try { var id = DatabaseService.GetOrCreateCategoryId(_uid, catName ?? ""); if (id > 0) catId = id; } catch { }
-
+            if (string.IsNullOrWhiteSpace(catName) && !string.IsNullOrWhiteSpace(IncomePlannedNewCategoryBox.Text)) catName = IncomePlannedNewCategoryBox.Text.Trim();
+            int? catId = null; try { var id = DatabaseService.GetOrCreateCategoryId(_uid, catName ?? string.Empty); if (id >0) catId = id; } catch { }
             try
-            {
-                DatabaseService.InsertIncome(_uid, amount, date, catId, source, desc, true);
-                ToastService.Success("Dodano zaplanowany przychód.");
-                Cancel_Click(sender, e);
-            }
-            catch (Exception ex)
-            {
-                ToastService.Error("Nie udało się dodać zaplanowanego przychodu.\n" + ex.Message);
-            }
+            { DatabaseService.InsertIncome(_uid, amount, date, catId, sourceDisplay, desc, true); ToastService.Success("Dodano zaplanowany przychód."); Cancel_Click(sender, e); }
+            catch (Exception ex) { ToastService.Error("Nie udało się dodać zaplanowanego przychodu.\n" + ex.Message); }
         }
 
         // ================== TRANSFER ==================

@@ -87,8 +87,11 @@ namespace Finly.Pages
             // TODO: tutaj podłącz odczyt z DB (jeśli masz DatabaseService.GetInvestments)
             _investments.Clear();
 
-            // sample / placeholder — usuń lub zastąp danymi z DB
-            _investments.Add(new InvestmentVm { Id = _nextId++, Name = "Fundusz emerytalny", TargetAmount = 50000m, CurrentAmount = 12000m, TargetDate = DateTime.Today.AddYears(5), Description = "Długoterminowa inwestycja" });
+            // Usunięto domyślne dodawanie przykładowej inwestycji "Fundusz emerytalny".
+            // Załaduj rzeczywiste dane z bazy lub pozostaw pustą listę.
+            // Example:
+            // var items = DatabaseService.GetInvestments();
+            // foreach (var i in items) _investments.Add(i);
 
             RebuildItems();
             RefreshKpis();

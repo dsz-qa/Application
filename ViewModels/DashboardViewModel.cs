@@ -25,11 +25,24 @@ namespace Finly.ViewModels
  public DateTime Date { get; set; }
  public string DateDisplay => Date.ToString("d");
  public string Category { get; set; } = string.Empty;
- public string Account { get; set; } = string.Empty;
+ public string Account { get; set; } = string.Empty; // sformatowane Ÿród³o
  public string Description { get; set; } = string.Empty;
  public string Kind { get; set; } = string.Empty; // Przychód/Wydatek/Transfer
  public decimal Amount { get; set; }
  public string AmountStr => Amount.ToString("N2", CultureInfo.CurrentCulture) + " z³";
+ public string RawSource { get; set; } = string.Empty; // oryginalny tekst Ÿród³a z DB
+ public void NormalizeAccount()
+ {
+ if (string.IsNullOrWhiteSpace(Account) && !string.IsNullOrWhiteSpace(RawSource))
+ {
+ var s = RawSource.Trim();
+ if (s.Equals("Wolna gotówka", StringComparison.OrdinalIgnoreCase)) Account = "Wolna gotówka";
+ else if (s.Equals("Od³o¿ona gotówka", StringComparison.OrdinalIgnoreCase)) Account = "Od³o¿ona gotówka";
+ else if (s.StartsWith("Konto", StringComparison.OrdinalIgnoreCase)) Account = s; // np. "Konto: mBank"
+ else if (s.StartsWith("Koperta", StringComparison.OrdinalIgnoreCase)) Account = s; // np. "Koperta: Jedzenie"
+ else Account = s; // fallback
+ }
+ }
  }
 
  public class DashboardViewModel : INotifyPropertyChanged
@@ -174,61 +187,76 @@ namespace Finly.ViewModels
 
  try
  {
+ // ===== PRZYCHODY =====
  var dtInc = DatabaseService.GetIncomes(_userId, start, end);
  foreach (var r in ToRows(dtInc))
  {
- Incomes.Add(new TransactionItem
- {
- Id = SafeInt(r, "Id"),
- Date = SafeDate(r, "Date"),
- Category = SafeString(r, "Source"),
- Account = string.Empty,
- Description = SafeString(r, "Description"),
- Kind = "Przychód",
- Amount = Math.Abs(SafeDecimal(r, "Amount"))
- });
- }
-
- var dtExp = DatabaseService.GetExpenses(_userId, start, end);
- foreach (var r in ToRows(dtExp))
- {
- Expenses.Add(new TransactionItem
+ var rawSrc = SafeString(r, "Source");
+ var item = new TransactionItem
  {
  Id = SafeInt(r, "Id"),
  Date = SafeDate(r, "Date"),
  Category = SafeString(r, "CategoryName"),
- Account = string.Empty,
+ RawSource = rawSrc,
+ Account = rawSrc,
+ Description = SafeString(r, "Description"),
+ Kind = "Przychód",
+ Amount = Math.Abs(SafeDecimal(r, "Amount"))
+ };
+ item.NormalizeAccount();
+ Incomes.Add(item);
+ }
+
+ // ===== WYDATKI =====
+ var dtExp = DatabaseService.GetExpenses(_userId, start, end);
+ foreach (var r in ToRows(dtExp))
+ {
+ var rawSrc = SafeString(r, "Source");
+ var item = new TransactionItem
+ {
+ Id = SafeInt(r, "Id"),
+ Date = SafeDate(r, "Date"),
+ Category = SafeString(r, "CategoryName"),
+ RawSource = rawSrc,
+ Account = rawSrc,
  Description = SafeString(r, "Description"),
  Kind = "Wydatek",
  Amount = Math.Abs(SafeDecimal(r, "Amount"))
- });
+ };
+ item.NormalizeAccount();
+ Expenses.Add(item);
  }
 
+ // ===== ZAPLANOWANE =====
  var plannedExp = DatabaseService.GetPlannedExpenses(_userId, start, end,500) ?? new System.Collections.Generic.List<DatabaseService.CategoryTransactionDto>();
  foreach (var p in plannedExp)
  {
- PlannedTransactions.Add(new TransactionItem
+ var item = new TransactionItem
  {
  Date = p.Date,
- Category = string.Empty,
- Account = string.Empty,
+ RawSource = p.Source ?? string.Empty,
+ Account = p.Source ?? string.Empty,
  Description = p.Description ?? string.Empty,
  Kind = "Wydatek",
  Amount = Math.Abs(p.Amount)
- });
+ };
+ item.NormalizeAccount();
+ PlannedTransactions.Add(item);
  }
  var plannedInc = DatabaseService.GetPlannedIncomes(_userId, start, end,500) ?? new System.Collections.Generic.List<DatabaseService.CategoryTransactionDto>();
  foreach (var p in plannedInc)
  {
- PlannedTransactions.Add(new TransactionItem
+ var item = new TransactionItem
  {
  Date = p.Date,
- Category = string.Empty,
- Account = string.Empty,
+ RawSource = p.Source ?? string.Empty,
+ Account = p.Source ?? string.Empty,
  Description = p.Description ?? string.Empty,
  Kind = "Przychód",
  Amount = Math.Abs(p.Amount)
- });
+ };
+ item.NormalizeAccount();
+ PlannedTransactions.Add(item);
  }
  }
  catch { }
