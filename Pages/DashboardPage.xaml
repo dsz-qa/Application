@@ -126,43 +126,39 @@
  </Border>
  </Grid>
 
- <!-- Main content: period bar +3 columns -->
+ <!-- Main content aligned grid: period bar + two columns x three equal rows + tables row -->
  <Border Grid.Row="2" Style="{StaticResource AccentCard}" Padding="16" HorizontalAlignment="Stretch">
- <StackPanel>
- <!-- Reuse the PeriodBarControl from Reports for identical look/behavior -->
- <controls:PeriodBarControl x:Name="PeriodBar" HorizontalAlignment="Center" Margin="0,0,0,8" RangeChanged="PeriodBar_RangeChanged" SearchClicked="PeriodBar_SearchClicked" ClearClicked="PeriodBar_ClearClicked" />
-
- <Grid Margin="0,8,0,0">
- <Grid.ColumnDefinitions>
- <ColumnDefinition Width="*" MinWidth="300"/>
- <ColumnDefinition Width="*" MinWidth="300"/>
- <ColumnDefinition Width="*" MinWidth="300"/>
- </Grid.ColumnDefinitions>
-
- <!-- Column1: two donuts + trend -->
- <Grid Grid.Column="0" Margin="0,0,8,0">
+ <Grid>
  <Grid.RowDefinitions>
  <RowDefinition Height="Auto"/>
- <RowDefinition Height="Auto"/>
+ <RowDefinition Height="*"/>
+ <RowDefinition Height="*"/>
+ <RowDefinition Height="*"/>
  <RowDefinition Height="Auto"/>
  </Grid.RowDefinitions>
- <Border Grid.Row="0" Style="{StaticResource Card}" MinHeight="260">
+ <Grid.ColumnDefinitions>
+ <ColumnDefinition Width="*"/>
+ <ColumnDefinition Width="*"/>
+ </Grid.ColumnDefinitions>
+
+ <!-- Period bar -->
+ <controls:PeriodBarControl Grid.Row="0" Grid.ColumnSpan="2" x:Name="PeriodBar" HorizontalAlignment="Center" Margin="0,0,0,8" RangeChanged="PeriodBar_RangeChanged" SearchClicked="PeriodBar_SearchClicked" ClearClicked="PeriodBar_ClearClicked" />
+
+ <!-- Row1: expenses donut / spacer (moved Top categories to Row3) -->
+ <Border Grid.Row="1" Grid.Column="0" Style="{StaticResource Card}" Margin="0,0,8,0">
  <StackPanel>
  <TextBlock Text="Wydatki wg kategorii — bieżący okres" Style="{StaticResource CardHeader}" Margin="0,0,0,8"/>
- <lvc:PieChart
- Series="{Binding DataContext.ExpensesByCategorySeries, ElementName=Root}"
- Height="220"
- LegendPosition="Right"
- Background="Transparent"
- Foreground="{DynamicResource App.Foreground}"
- DrawMargin="0">
- <lvc:PieChart.LegendTextPaint>
- <lvc:SolidColorPaint Color="#FFFFFFFF"/>
- </lvc:PieChart.LegendTextPaint>
+ <lvc:PieChart Series="{Binding DataContext.ExpensesByCategorySeries, ElementName=Root}" Height="220" LegendPosition="Right" Background="Transparent" Foreground="{DynamicResource App.Foreground}" DrawMargin="0">
+ <lvc:PieChart.LegendTextPaint><lvc:SolidColorPaint Color="#FFFFFFFF"/></lvc:PieChart.LegendTextPaint>
  </lvc:PieChart>
  </StackPanel>
  </Border>
- <Border Grid.Row="1" Style="{StaticResource Card}" Margin="0,12,0,0" MinHeight="260">
+ <Border Grid.Row="1" Grid.Column="1" Style="{StaticResource Card}" Margin="8,0,0,0" Background="Transparent">
+ <!-- Spacer to keep equal height with left expenses donut -->
+ </Border>
+
+ <!-- Row2: income donut / planned transactions -->
+ <Border Grid.Row="2" Grid.Column="0" Style="{StaticResource Card}" Margin="0,12,8,0">
  <StackPanel>
  <TextBlock Text="Źródła przychodu — bieżący okres" Style="{StaticResource CardHeader}" Margin="0,0,0,8"/>
  <lvc:PieChart
@@ -178,153 +174,7 @@
  </lvc:PieChart>
  </StackPanel>
  </Border>
- <Border Grid.Row="2" Style="{StaticResource Card}" Margin="0,12,0,0" MinHeight="140">
- <StackPanel>
- <TextBlock Text="Trend wydatków — bieżący okres" Style="{StaticResource CardHeader}" Margin="0,0,0,8"/>
- <Canvas x:Name="ExpenseTrendCanvas" Height="180" Margin="0,4,0,4" Background="Transparent"/>
- <ItemsControl x:Name="ExpenseTrendLabels" Margin="0,2,0,0" HorizontalAlignment="Stretch">
- <ItemsControl.ItemsPanel>
- <ItemsPanelTemplate><UniformGrid Rows="1"/></ItemsPanelTemplate>
- </ItemsControl.ItemsPanel>
- <ItemsControl.ItemTemplate>
- <DataTemplate><TextBlock Text="{Binding DateLabel}" FontSize="10" Foreground="{DynamicResource App.Foreground}" HorizontalAlignment="Center"/></DataTemplate>
- </ItemsControl.ItemTemplate>
- </ItemsControl>
- <TextBlock x:Name="ExpenseTrendEmptyText" Text="Brak danych w tym okresie" Foreground="{DynamicResource App.Foreground}" Visibility="Collapsed" HorizontalAlignment="Center" Margin="0,8,0,0" FontStyle="Italic"/>
- </StackPanel>
- </Border>
- </Grid>
-
- <!-- Column2: Tables -->
- <Grid Grid.Column="1" Margin="4,0,4,0">
- <Grid.RowDefinitions>
- <RowDefinition Height="*"/>
- <RowDefinition Height="*"/>
- </Grid.RowDefinitions>
- <Border Grid.Row="0" Style="{StaticResource Card}" MinHeight="120">
- <StackPanel>
- <TextBlock Text="Przychody — bieżący okres" Style="{StaticResource CardHeader}" Margin="0,0,0,8"/>
- <Border Margin="0,0,0,4" Background="{DynamicResource Surface.Background}" Padding="6,4,6,4">
- <Grid>
- <Grid.ColumnDefinitions>
- <ColumnDefinition Width="90"/>
- <ColumnDefinition Width="*"/>
- <ColumnDefinition Width="120"/>
- <ColumnDefinition Width="140"/>
- <ColumnDefinition Width="2*"/>
- <ColumnDefinition Width="90"/>
- </Grid.ColumnDefinitions>
- <TextBlock Grid.Column="0" Text="Kwota" FontSize="11" FontWeight="SemiBold" Foreground="{DynamicResource App.Foreground}" Opacity="0.8" HorizontalAlignment="Right"/>
- <TextBlock Grid.Column="1" Text="Kategoria" FontSize="11" FontWeight="SemiBold" Foreground="{DynamicResource App.Foreground}" Opacity="0.8"/>
- <TextBlock Grid.Column="2" Text="Data" FontSize="11" FontWeight="SemiBold" Foreground="{DynamicResource App.Foreground}" Opacity="0.8"/>
- <TextBlock Grid.Column="3" Text="Konto" FontSize="11" FontWeight="SemiBold" Foreground="{DynamicResource App.Foreground}" Opacity="0.8"/>
- <TextBlock Grid.Column="4" Text="Opis" FontSize="11" FontWeight="SemiBold" Foreground="{DynamicResource App.Foreground}" Opacity="0.8"/>
- <TextBlock Grid.Column="5" Text="Typ" FontSize="11" FontWeight="SemiBold" Foreground="{DynamicResource App.Foreground}" Opacity="0.8"/>
- </Grid>
- </Border>
- <ItemsControl x:Name="IncomeTable" ItemsSource="{Binding DataContext.Incomes, ElementName=Root}">
- <ItemsControl.ItemTemplate>
- <DataTemplate>
- <Grid Margin="0,2,0,2">
- <Grid.ColumnDefinitions>
- <ColumnDefinition Width="90"/>
- <ColumnDefinition Width="*"/>
- <ColumnDefinition Width="120"/>
- <ColumnDefinition Width="140"/>
- <ColumnDefinition Width="2*"/>
- <ColumnDefinition Width="90"/>
- </Grid.ColumnDefinitions>
- <TextBlock Grid.Column="0" Text="{Binding AmountStr}" HorizontalAlignment="Right" Foreground="{DynamicResource App.Foreground}"/>
- <TextBlock Grid.Column="1" Text="{Binding Category}" Foreground="{DynamicResource App.Foreground}" TextTrimming="CharacterEllipsis"/>
- <TextBlock Grid.Column="2" Text="{Binding DateDisplay}" Foreground="{DynamicResource App.Foreground}"/>
- <TextBlock Grid.Column="3" Text="{Binding Account}" Foreground="{DynamicResource App.Foreground}" TextTrimming="CharacterEllipsis"/>
- <TextBlock Grid.Column="4" Text="{Binding Description}" Foreground="{DynamicResource App.Foreground}" TextTrimming="CharacterEllipsis"/>
- <TextBlock Grid.Column="5" Text="{Binding Kind}" Foreground="{DynamicResource App.Foreground}"/>
- </Grid>
- </DataTemplate>
- </ItemsControl.ItemTemplate>
- </ItemsControl>
- <TextBlock x:Name="IncomeEmptyText" Text="Brak danych w tym okresie" Foreground="{DynamicResource App.Foreground}" Visibility="Collapsed" HorizontalAlignment="Center" Margin="0,8,0,0" FontStyle="Italic"/>
- </StackPanel>
- </Border>
- <Border Grid.Row="1" Style="{StaticResource Card}" Margin="0,12,0,0" MinHeight="120">
- <StackPanel>
- <TextBlock Text="Wydatki — bieżący okres" Style="{StaticResource CardHeader}" Margin="0,0,0,8"/>
- <Border Margin="0,0,0,4" Background="{DynamicResource Surface.Background}" Padding="6,4,6,4">
- <Grid>
- <Grid.ColumnDefinitions>
- <ColumnDefinition Width="90"/>
- <ColumnDefinition Width="*"/>
- <ColumnDefinition Width="120"/>
- <ColumnDefinition Width="140"/>
- <ColumnDefinition Width="2*"/>
- <ColumnDefinition Width="90"/>
- </Grid.ColumnDefinitions>
- <TextBlock Grid.Column="0" Text="Kwota" FontSize="11" FontWeight="SemiBold" Foreground="{DynamicResource App.Foreground}" Opacity="0.8" HorizontalAlignment="Right"/>
- <TextBlock Grid.Column="1" Text="Kategoria" FontSize="11" FontWeight="SemiBold" Foreground="{DynamicResource App.Foreground}" Opacity="0.8"/>
- <TextBlock Grid.Column="2" Text="Data" FontSize="11" FontWeight="SemiBold" Foreground="{DynamicResource App.Foreground}" Opacity="0.8"/>
- <TextBlock Grid.Column="3" Text="Konto" FontSize="11" FontWeight="SemiBold" Foreground="{DynamicResource App.Foreground}" Opacity="0.8"/>
- <TextBlock Grid.Column="4" Text="Opis" FontSize="11" FontWeight="SemiBold" Foreground="{DynamicResource App.Foreground}" Opacity="0.8"/>
- <TextBlock Grid.Column="5" Text="Typ" FontSize="11" FontWeight="SemiBold" Foreground="{DynamicResource App.Foreground}" Opacity="0.8"/>
- </Grid>
- </Border>
- <ItemsControl x:Name="ExpenseTable" ItemsSource="{Binding DataContext.Expenses, ElementName=Root}">
- <ItemsControl.ItemTemplate>
- <DataTemplate>
- <Grid Margin="0,2,0,2">
- <Grid.ColumnDefinitions>
- <ColumnDefinition Width="90"/>
- <ColumnDefinition Width="*"/>
- <ColumnDefinition Width="120"/>
- <ColumnDefinition Width="140"/>
- <ColumnDefinition Width="2*"/>
- <ColumnDefinition Width="90"/>
- </Grid.ColumnDefinitions>
- <TextBlock Grid.Column="0" Text="{Binding AmountStr}" HorizontalAlignment="Right" Foreground="{DynamicResource App.Foreground}"/>
- <TextBlock Grid.Column="1" Text="{Binding Category}" Foreground="{DynamicResource App.Foreground}" TextTrimming="CharacterEllipsis"/>
- <TextBlock Grid.Column="2" Text="{Binding DateDisplay}" Foreground="{DynamicResource App.Foreground}"/>
- <TextBlock Grid.Column="3" Text="{Binding Account}" Foreground="{DynamicResource App.Foreground}" TextTrimming="CharacterEllipsis"/>
- <TextBlock Grid.Column="4" Text="{Binding Description}" Foreground="{DynamicResource App.Foreground}" TextTrimming="CharacterEllipsis"/>
- <TextBlock Grid.Column="5" Text="{Binding Kind}" Foreground="{DynamicResource App.Foreground}"/>
- </Grid>
- </DataTemplate>
- </ItemsControl.ItemTemplate>
- </ItemsControl>
- <TextBlock x:Name="ExpenseEmptyText" Text="Brak danych w tym okresie" Foreground="{DynamicResource App.Foreground}" Visibility="Collapsed" HorizontalAlignment="Center" Margin="0,8,0,0" FontStyle="Italic"/>
- </StackPanel>
- </Border>
- </Grid>
-
- <!-- Column3: Top categories + Planned -->
- <Grid Grid.Column="2" Margin="8,0,0,0">
- <Grid.RowDefinitions>
- <RowDefinition Height="*"/>
- <RowDefinition Height="Auto"/>
- </Grid.RowDefinitions>
- <Border Grid.Row="0" Style="{StaticResource Card}" MinHeight="120">
- <StackPanel>
- <TextBlock Text="Najwyższe wydatki — kategorie" Style="{StaticResource CardHeader}" Margin="0,0,0,8"/>
- <ItemsControl x:Name="TopCategoryBars">
- <ItemsControl.ItemTemplate>
- <DataTemplate>
- <StackPanel Margin="0,4,0,6">
- <Grid>
- <Grid.ColumnDefinitions>
- <ColumnDefinition Width="*"/>
- <ColumnDefinition Width="Auto"/>
- </Grid.ColumnDefinitions>
- <TextBlock Text="{Binding Name}" Foreground="{DynamicResource App.Foreground}" Margin="0,0,8,2" TextTrimming="CharacterEllipsis"/>
- <TextBlock Grid.Column="1" Text="{Binding PercentStr}" Foreground="{DynamicResource App.Foreground}"/>
- </Grid>
- <ProgressBar Minimum="0" Maximum="100" Height="10" Value="{Binding Percent}"/>
- </StackPanel>
- </DataTemplate>
- </ItemsControl.ItemTemplate>
- </ItemsControl>
- <TextBlock x:Name="TopCategoryEmptyText" Text="Brak danych w tym okresie" Foreground="{DynamicResource App.Foreground}" Visibility="Collapsed" HorizontalAlignment="Center" Margin="4,8,4,0" FontStyle="Italic"/>
- </StackPanel>
- </Border>
- <Border Grid.Row="1" Style="{StaticResource Card}" Margin="0,12,0,0" MinHeight="100">
+ <Border Grid.Row="2" Grid.Column="1" Style="{StaticResource Card}" Margin="8,12,0,0">
  <StackPanel>
  <TextBlock Text="Zaplanowane transakcje" Style="{StaticResource CardHeader}" Margin="0,0,0,8"/>
  <Border Margin="0,0,0,4" Background="{DynamicResource Surface.Background}" Padding="6,4,6,4">
@@ -370,10 +220,143 @@
  <TextBlock x:Name="PlannedEmptyText" Text="Brak zaplanowanych transakcji" Foreground="{DynamicResource App.Foreground}" Visibility="Collapsed" HorizontalAlignment="Center" Margin="0,8,0,0" FontStyle="Italic"/>
  </StackPanel>
  </Border>
+
+ <!-- Row3: trend / Top categories (moved here) -->
+ <Border Grid.Row="3" Grid.Column="0" Style="{StaticResource Card}" Margin="0,12,8,0" MinHeight="220">
+ <StackPanel>
+ <TextBlock Text="Trend wydatków — bieżący okres" Style="{StaticResource CardHeader}" Margin="0,0,0,8"/>
+ <Canvas x:Name="ExpenseTrendCanvas" Height="180" Margin="0,4,0,4" Background="Transparent"/>
+ <ItemsControl x:Name="ExpenseTrendLabels" Margin="0,2,0,0" HorizontalAlignment="Stretch">
+ <ItemsControl.ItemsPanel>
+ <ItemsPanelTemplate><UniformGrid Rows="1"/></ItemsPanelTemplate>
+ </ItemsControl.ItemsPanel>
+ <ItemsControl.ItemTemplate>
+ <DataTemplate><TextBlock Text="{Binding DateLabel}" FontSize="10" Foreground="{DynamicResource App.Foreground}" HorizontalAlignment="Center"/></DataTemplate>
+ </ItemsControl.ItemTemplate>
+ </ItemsControl>
+ <TextBlock x:Name="ExpenseTrendEmptyText" Text="Brak danych w tym okresie" Foreground="{DynamicResource App.Foreground}" Visibility="Collapsed" HorizontalAlignment="Center" Margin="0,8,0,0" FontStyle="Italic"/>
+ </StackPanel>
+ </Border>
+ <Border Grid.Row="3" Grid.Column="1" Style="{StaticResource Card}" Margin="8,12,0,0">
+ <StackPanel>
+ <TextBlock Text="Najwyższe wydatki — kategorie" Style="{StaticResource CardHeader}" Margin="0,0,0,8"/>
+ <ItemsControl x:Name="TopCategoryBars">
+ <ItemsControl.ItemTemplate>
+ <DataTemplate>
+ <StackPanel Margin="0,4,0,6">
+ <Grid>
+ <Grid.ColumnDefinitions>
+ <ColumnDefinition Width="*"/>
+ <ColumnDefinition Width="Auto"/>
+ </Grid.ColumnDefinitions>
+ <TextBlock Text="{Binding Name}" Foreground="{DynamicResource App.Foreground}" Margin="0,0,8,2" TextTrimming="CharacterEllipsis"/>
+ <TextBlock Grid.Column="1" Text="{Binding PercentStr}" Foreground="{DynamicResource App.Foreground}"/>
  </Grid>
+ <ProgressBar Minimum="0" Maximum="100" Height="10" Value="{Binding Percent}"/>
+ </StackPanel>
+ </DataTemplate>
+ </ItemsControl.ItemTemplate>
+ </ItemsControl>
+ <TextBlock x:Name="TopCategoryEmptyText" Text="Brak danych w tym okresie" Foreground="{DynamicResource App.Foreground}" Visibility="Collapsed" HorizontalAlignment="Center" Margin="4,8,4,0" FontStyle="Italic"/>
+ </StackPanel>
+ </Border>
+
+ <!-- Row4: tables (unchanged) -->
+ <Border Grid.Row="4" Grid.Column="0" Style="{StaticResource Card}" Margin="0,12,8,0">
+ <StackPanel>
+ <TextBlock Text="Przychody — bieżący okres" Style="{StaticResource CardHeader}" Margin="0,0,0,8"/>
+ <Border Margin="0,0,0,4" Background="{DynamicResource Surface.Background}" Padding="6,4,6,4">
+ <Grid>
+ <Grid.ColumnDefinitions>
+ <ColumnDefinition Width="90"/>
+ <ColumnDefinition Width="*"/>
+ <ColumnDefinition Width="120"/>
+ <ColumnDefinition Width="140"/>
+ <ColumnDefinition Width="2*"/>
+ <ColumnDefinition Width="90"/>
+ </Grid.ColumnDefinitions>
+ <TextBlock Grid.Column="0" Text="Kwota" FontSize="11" FontWeight="SemiBold" Foreground="{DynamicResource App.Foreground}" Opacity="0.8" HorizontalAlignment="Right"/>
+ <TextBlock Grid.Column="1" Text="Kategoria" FontSize="11" FontWeight="SemiBold" Foreground="{DynamicResource App.Foreground}" Opacity="0.8"/>
+ <TextBlock Grid.Column="2" Text="Data" FontSize="11" FontWeight="SemiBold" Foreground="{DynamicResource App.Foreground}" Opacity="0.8"/>
+ <TextBlock Grid.Column="3" Text="Konto" FontSize="11" FontWeight="SemiBold" Foreground="{DynamicResource App.Foreground}" Opacity="0.8"/>
+ <TextBlock Grid.Column="4" Text="Opis" FontSize="11" FontWeight="SemiBold" Foreground="{DynamicResource App.Foreground}" Opacity="0.8"/>
+ <TextBlock Grid.Column="5" Text="Typ" FontSize="11" FontWeight="SemiBold" Foreground="{DynamicResource App.Foreground}" Opacity="0.8"/>
+ </Grid>
+ </Border>
+ <ItemsControl x:Name="IncomeTable" ItemsSource="{Binding DataContext.Incomes, ElementName=Root}">
+ <ItemsControl.ItemTemplate>
+ <DataTemplate>
+ <Grid Margin="0,2,0,2">
+ <Grid.ColumnDefinitions>
+ <ColumnDefinition Width="90"/>
+ <ColumnDefinition Width="*"/>
+ <ColumnDefinition Width="120"/>
+ <ColumnDefinition Width="140"/>
+ <ColumnDefinition Width="2*"/>
+ <ColumnDefinition Width="90"/>
+ </Grid.ColumnDefinitions>
+ <TextBlock Grid.Column="0" Text="{Binding AmountStr}" HorizontalAlignment="Right" Foreground="{DynamicResource App.Foreground}"/>
+ <TextBlock Grid.Column="1" Text="{Binding Category}" Foreground="{DynamicResource App.Foreground}" TextTrimming="CharacterEllipsis"/>
+ <TextBlock Grid.Column="2" Text="{Binding DateDisplay}" Foreground="{DynamicResource App.Foreground}"/>
+ <TextBlock Grid.Column="3" Text="{Binding Account}" Foreground="{DynamicResource App.Foreground}" TextTrimming="CharacterEllipsis"/>
+ <TextBlock Grid.Column="4" Text="{Binding Description}" Foreground="{DynamicResource App.Foreground}" TextTrimming="CharacterEllipsis"/>
+ <TextBlock Grid.Column="5" Text="{Binding Kind}" Foreground="{DynamicResource App.Foreground}"/>
+ </Grid>
+ </DataTemplate>
+ </ItemsControl.ItemTemplate>
+ </ItemsControl>
+ <TextBlock x:Name="IncomeEmptyText" Text="Brak danych w tym okresie" Foreground="{DynamicResource App.Foreground}" Visibility="Collapsed" HorizontalAlignment="Center" Margin="0,8,0,0" FontStyle="Italic"/>
+ </StackPanel>
+ </Border>
+
+ <Border Grid.Row="4" Grid.Column="1" Style="{StaticResource Card}" Margin="8,12,0,0">
+ <StackPanel>
+ <TextBlock Text="Wydatki — bieżący okres" Style="{StaticResource CardHeader}" Margin="0,0,0,8"/>
+ <Border Margin="0,0,0,4" Background="{DynamicResource Surface.Background}" Padding="6,4,6,4">
+ <Grid>
+ <Grid.ColumnDefinitions>
+ <ColumnDefinition Width="90"/>
+ <ColumnDefinition Width="*"/>
+ <ColumnDefinition Width="120"/>
+ <ColumnDefinition Width="140"/>
+ <ColumnDefinition Width="2*"/>
+ <ColumnDefinition Width="90"/>
+ </Grid.ColumnDefinitions>
+ <TextBlock Grid.Column="0" Text="Kwota" FontSize="11" FontWeight="SemiBold" Foreground="{DynamicResource App.Foreground}" Opacity="0.8" HorizontalAlignment="Right"/>
+ <TextBlock Grid.Column="1" Text="Kategoria" FontSize="11" FontWeight="SemiBold" Foreground="{DynamicResource App.Foreground}" Opacity="0.8"/>
+ <TextBlock Grid.Column="2" Text="Data" FontSize="11" FontWeight="SemiBold" Foreground="{DynamicResource App.Foreground}" Opacity="0.8"/>
+ <TextBlock Grid.Column="3" Text="Konto" FontSize="11" FontWeight="SemiBold" Foreground="{DynamicResource App.Foreground}" Opacity="0.8"/>
+ <TextBlock Grid.Column="4" Text="Opis" FontSize="11" FontWeight="SemiBold" Foreground="{DynamicResource App.Foreground}" Opacity="0.8"/>
+ <TextBlock Grid.Column="5" Text="Typ" FontSize="11" FontWeight="SemiBold" Foreground="{DynamicResource App.Foreground}" Opacity="0.8"/>
+ </Grid>
+ </Border>
+ <ItemsControl x:Name="ExpenseTable" ItemsSource="{Binding DataContext.Expenses, ElementName=Root}">
+ <ItemsControl.ItemTemplate>
+ <DataTemplate>
+ <Grid Margin="0,2,0,2">
+ <Grid.ColumnDefinitions>
+ <ColumnDefinition Width="90"/>
+ <ColumnDefinition Width="*"/>
+ <ColumnDefinition Width="120"/>
+ <ColumnDefinition Width="140"/>
+ <ColumnDefinition Width="2*"/>
+ <ColumnDefinition Width="90"/>
+ </Grid.ColumnDefinitions>
+ <TextBlock Grid.Column="0" Text="{Binding AmountStr}" HorizontalAlignment="Right" Foreground="{DynamicResource App.Foreground}"/>
+ <TextBlock Grid.Column="1" Text="{Binding Category}" Foreground="{DynamicResource App.Foreground}" TextTrimming="CharacterEllipsis"/>
+ <TextBlock Grid.Column="2" Text="{Binding DateDisplay}" Foreground="{DynamicResource App.Foreground}"/>
+ <TextBlock Grid.Column="3" Text="{Binding Account}" Foreground="{DynamicResource App.Foreground}" TextTrimming="CharacterEllipsis"/>
+ <TextBlock Grid.Column="4" Text="{Binding Description}" Foreground="{DynamicResource App.Foreground}" TextTrimming="CharacterEllipsis"/>
+ <TextBlock Grid.Column="5" Text="{Binding Kind}" Foreground="{DynamicResource App.Foreground}"/>
+ </Grid>
+ </DataTemplate>
+ </ItemsControl.ItemTemplate>
+ </ItemsControl>
+ <TextBlock x:Name="ExpenseEmptyText" Text="Brak danych w tym okresie" Foreground="{DynamicResource App.Foreground}" Visibility="Collapsed" HorizontalAlignment="Center" Margin="0,8,0,0" FontStyle="Italic"/>
+ </StackPanel>
+ </Border>
 
  </Grid>
- </StackPanel>
  </Border>
 
  </Grid>
