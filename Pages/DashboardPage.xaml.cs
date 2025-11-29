@@ -323,6 +323,18 @@ namespace Finly.Pages
             }), DispatcherPriority.Loaded);
         }
 
+        private sealed class PlannedTransactionRow
+        {
+            public DateTime Date { get; set; }
+            public string DateDisplay => Date.ToString("dd.MM.yyyy");
+            public decimal Amount { get; set; }
+            public string AmountStr => Amount.ToString("N2") + " zł";
+            public string Category { get; set; } = ""; // nazwa kategorii lub pusty
+            public string Account { get; set; } = ""; // konto bankowe lub pusty
+            public string Description { get; set; } = "";
+            public string Kind { get; set; } = ""; // Przychód / Wydatek / Transfer
+        }
+
         private void LoadPlannedTransactions()
         {
             try
@@ -335,24 +347,51 @@ namespace Finly.Pages
                 var expDict = plannedExpenses.GroupBy(e => Key(e.Date, e.Amount)).ToDictionary(g => g.Key, g => g.ToList());
                 var incDict = plannedIncomes.GroupBy(i => Key(i.Date, i.Amount)).ToDictionary(g => g.Key, g => g.ToList());
 
-                var combined = new List<object>();
+                var combined = new List<PlannedTransactionRow>();
+                // Najpierw pary transferów (wydatek + przychód tego samego dnia i kwoty)
                 foreach (var key in expDict.Keys.Intersect(incDict.Keys))
                 {
                     var e = expDict[key].First();
                     var i = incDict[key].First();
-                    var desc = string.IsNullOrWhiteSpace(e.Description) ? i.Description : e.Description;
-                    combined.Add(new { Date = e.Date, Description = desc, Amount = Math.Abs(e.Amount), Kind = "Transfer" });
+                    var desc = string.IsNullOrWhiteSpace(e.Description) ? (i.Description ?? "") : e.Description;
+                    combined.Add(new PlannedTransactionRow
+                    {
+                        Date = e.Date,
+                        Amount = Math.Abs(e.Amount),
+                        Category = e.CategoryName ?? i.CategoryName ?? "",
+                        Account = e.AccountName ?? i.AccountName ?? "",
+                        Description = desc,
+                        Kind = "Transfer"
+                    });
                     expDict[key].RemoveAt(0);
                     incDict[key].RemoveAt(0);
                 }
+                // Pozostałe wydatki
                 foreach (var list in expDict.Values)
                     foreach (var e in list)
-                        combined.Add(new { Date = e.Date, Description = e.Description, Amount = Math.Abs(e.Amount), Kind = "Wydatek" });
+                        combined.Add(new PlannedTransactionRow
+                        {
+                            Date = e.Date,
+                            Amount = Math.Abs(e.Amount),
+                            Category = e.CategoryName ?? "",
+                            Account = e.AccountName ?? "",
+                            Description = e.Description ?? "",
+                            Kind = "Wydatek"
+                        });
+                // Pozostałe przychody
                 foreach (var list in incDict.Values)
                     foreach (var i in list)
-                        combined.Add(new { Date = i.Date, Description = i.Description, Amount = Math.Abs(i.Amount), Kind = "Przychód" });
+                        combined.Add(new PlannedTransactionRow
+                        {
+                            Date = i.Date,
+                            Amount = Math.Abs(i.Amount),
+                            Category = i.CategoryName ?? "",
+                            Account = i.AccountName ?? "",
+                            Description = i.Description ?? (i.Source ?? ""),
+                            Kind = "Przychód"
+                        });
 
-                combined = combined.OrderBy(x => (DateTime)x.GetType().GetProperty("Date")!.GetValue(x)!).ToList();
+                combined = combined.OrderBy(x => x.Date).ToList();
                 if (FindName("PlannedTransactionsList") is ItemsControl pl) pl.ItemsSource = combined;
                 SetVisibility("PlannedEmptyText", combined.Count ==0);
                 SetVisibility("PlannedTransactionsList", combined.Count >0);
@@ -500,10 +539,11 @@ namespace Finly.Pages
 
         private void BindExpenseTable(IEnumerable<DatabaseService.CategoryAmountDto> data)
         {
-            var list = (data ?? Enumerable.Empty<DatabaseService.CategoryAmountDto>()).ToList();
-            var sum = list.Sum(x => x.Amount);
+            // data: zagregowane wydatki wg kategorii – potrzebne do TopCategoryBars i procentów
+            var aggregatedList = (data ?? Enumerable.Empty<DatabaseService.CategoryAmountDto>()).ToList();
+            var sum = aggregatedList.Sum(x => x.Amount);
 
-            var rows = list
+            var rows = aggregatedList
                 .OrderByDescending(x => x.Amount)
                 .Select(x => new TableRow
                 {
@@ -513,15 +553,16 @@ namespace Finly.Pages
                 })
                 .ToList();
 
-            if (FindName("ExpenseTable") is ItemsControl expTable)
-                expTable.ItemsSource = rows;
+            // NIE ustawiamy ExpenseTable.ItemsSource – XAML ma ItemsSource="{Binding DataContext.Expenses, ElementName=Root}"
+            // dzięki temu każdy wiersz korzysta z właściwości modelu: DateDisplay, AmountStr, Category, Account, Description.
 
             if (FindName("TopCategoryBars") is ItemsControl catBars)
                 catBars.ItemsSource = rows.Take(5).ToList();
 
-            // Toggle empty placeholder / content
-            SetVisibility("ExpenseEmptyText", rows.Count ==0);
-            SetVisibility("ExpenseTable", rows.Count >0);
+            // Widoczność oparta na szczegółowych transakcjach
+            var detailedCount = _vm?.Expenses?.Count ??0;
+            SetVisibility("ExpenseEmptyText", detailedCount ==0);
+            SetVisibility("ExpenseTable", detailedCount >0);
             SetVisibility("TopCategoryEmptyText", rows.Count ==0);
             SetVisibility("TopCategoryBars", rows.Count >0);
         }

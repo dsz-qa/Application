@@ -695,6 +695,11 @@ LIMIT 1;";
             public DateTime Date { get; set; }
             public decimal Amount { get; set; }
             public string Description { get; set; } = "";
+            public int? CategoryId { get; set; }
+            public int? AccountId { get; set; }
+            public string? CategoryName { get; set; }
+            public string? AccountName { get; set; }
+            public string? Source { get; set; }
         }
 
         public static DataTable GetCategories(int userId)
