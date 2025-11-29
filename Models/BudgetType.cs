@@ -1,6 +1,9 @@
 ﻿// Minimalne typy zastępcze, które rozwiązują błędy kompilacji.
 // Jeśli w projekcie masz własne implementacje, usuń poniższe deklaracje.
 
+using System;
+using System.Collections.Generic;
+
 namespace Finly.Models
 {
     internal enum BudgetType

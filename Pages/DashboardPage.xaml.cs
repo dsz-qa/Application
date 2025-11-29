@@ -25,6 +25,29 @@ namespace Finly.Pages
         public ObservableCollection<PieSlice> PieCurrent { get; } = new();
         public ObservableCollection<PieSlice> PieIncome { get; } = new();
 
+        // =====================================================================
+        // Podsumowanie okresu (nowa ramka)
+        // =====================================================================
+        private void RefreshPeriodSummary(decimal incomeSum, decimal expenseSum)
+        {
+            try
+            {
+                if (FindName("PeriodIncomeSummaryText") is TextBlock inc)
+                    inc.Text = $"Przychody: {incomeSum:N2} zł";
+                if (FindName("PeriodExpenseSummaryText") is TextBlock exp)
+                    exp.Text = $"Wydatki: {expenseSum:N2} zł";
+                if (FindName("PeriodBalanceSummaryText") is TextBlock bal)
+                {
+                    var balance = incomeSum - expenseSum;
+                    bal.Text = $"Bilans: {balance:N2} zł";
+                    bal.Foreground = balance >= 0
+                        ? (Brush)Application.Current.TryFindResource("Brand.Green") ?? Brushes.LightGreen
+                        : (Brush)Application.Current.TryFindResource("Brand.Red") ?? Brushes.IndianRed;
+                }
+            }
+            catch { }
+        }
+
         private static readonly DateRangeMode[] PresetOrder =
         {
             DateRangeMode.Day,
@@ -286,6 +309,11 @@ namespace Finly.Pages
 
             BuildExpensePie(expenses);
             BuildIncomePie(incomes);
+
+            // Compute sums for summary
+            decimal incomeSum = (incomes ?? Enumerable.Empty<DatabaseService.CategoryAmountDto>()).Sum(x => x.Amount);
+            decimal expenseSum = (expenses ?? Enumerable.Empty<DatabaseService.CategoryAmountDto>()).Sum(x => x.Amount);
+            RefreshPeriodSummary(incomeSum, expenseSum);
 
             Dispatcher.BeginInvoke(new Action(() =>
             {
