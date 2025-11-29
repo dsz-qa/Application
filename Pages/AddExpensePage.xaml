@@ -14,9 +14,9 @@
             <Setter Property="Margin" Value="0,8,0,0"/>
         </Style>
 
-        <!-- Prosta karta -->
+        <!-- Prosta karta (dopasowana do Dashboard: transparent, margin jak tam) -->
         <Style x:Key="Card" TargetType="Border">
-            <Setter Property="Background" Value="{DynamicResource Surface.Background}"/>
+            <Setter Property="Background" Value="Transparent"/>
             <Setter Property="BorderBrush" Value="{DynamicResource Surface.Border}"/>
             <Setter Property="BorderThickness" Value="1"/>
             <Setter Property="CornerRadius" Value="10"/>
@@ -24,28 +24,29 @@
             <Setter Property="Margin" Value="0,0,12,0"/>
         </Style>
 
-        <!-- Karta KPI z niebieską ramką – jak na DashboardPage -->
+        <!-- Karta KPI – identyczna z DashboardPage (niebieska ramka,2px, corner10, padding12) -->
         <Style x:Key="KpiCard" TargetType="Border" BasedOn="{StaticResource Card}">
-            <Setter Property="BorderBrush"     Value="{DynamicResource Brand.Blue}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource Brand.Blue}"/>
             <Setter Property="BorderThickness" Value="2"/>
-            <Setter Property="Padding"         Value="12"/>
-            <Setter Property="CornerRadius"    Value="14"/>
+            <Setter Property="Padding" Value="12"/>
+            <Setter Property="CornerRadius" Value="10"/>
+            <Setter Property="Margin" Value="0,0,16,0"/>
         </Style>
 
-        <!-- Nagłówek w kafelku KPI -->
-        <Style x:Key="CardHeader" TargetType="TextBlock">
-            <Setter Property="FontSize"   Value="13"/>
-            <Setter Property="FontWeight" Value="SemiBold"/>
-            <Setter Property="Foreground" Value="{DynamicResource App.Foreground}"/>
-            <Setter Property="Opacity"    Value="0.9"/>
+        <!-- Nagłówek w kafelku KPI – dopasowany do Dashboard (`KpiHeader`) -->
+        <Style x:Key="KpiHeader" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="20"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="Opacity" Value="1"/>
             <Setter Property="TextWrapping" Value="Wrap"/>
         </Style>
 
-        <!-- Wartość KPI -->
+        <!-- Wartość KPI – dopasowana do Dashboard (18pt) -->
         <Style x:Key="KpiValueStyle" TargetType="TextBlock">
-            <Setter Property="FontSize"   Value="24"/>
+            <Setter Property="FontSize" Value="18"/>
             <Setter Property="FontWeight" Value="Bold"/>
-            <Setter Property="Margin"     Value="0,4,0,0"/>
+            <Setter Property="Margin" Value="0,2,0,0"/>
             <Setter Property="Foreground" Value="{DynamicResource App.Foreground}"/>
         </Style>
 
@@ -87,66 +88,48 @@
             <!-- Cały majątek -->
             <Border Grid.Column="0" Style="{StaticResource KpiCard}">
                 <StackPanel>
-                    <TextBlock Text="Cały majątek"
-                               Style="{StaticResource CardHeader}"/>
-                    <TextBlock x:Name="TotalWealthText"
-                               Style="{StaticResource KpiValueStyle}"
-                               Text="0,00 zł"/>
+                    <TextBlock Text="Cały majątek" Style="{StaticResource KpiHeader}"/>
+                    <TextBlock x:Name="TotalWealthText" Style="{StaticResource KpiValueStyle}" Text="0,00 zł"/>
                 </StackPanel>
             </Border>
 
             <!-- Konta bankowe -->
             <Border Grid.Column="1" Style="{StaticResource KpiCard}">
                 <StackPanel>
-                    <TextBlock Text="Konta bankowe"
-                               Style="{StaticResource CardHeader}"/>
-                    <TextBlock x:Name="BanksText"
-                               Style="{StaticResource KpiValueStyle}"
-                               Text="0,00 zł"/>
+                    <TextBlock Text="Konta bankowe" Style="{StaticResource KpiHeader}"/>
+                    <TextBlock x:Name="BanksText" Style="{StaticResource KpiValueStyle}" Text="0,00 zł"/>
                 </StackPanel>
             </Border>
 
             <!-- Wolna gotówka -->
             <Border Grid.Column="2" Style="{StaticResource KpiCard}">
                 <StackPanel>
-                    <TextBlock Text="Wolna gotówka"
-                               Style="{StaticResource CardHeader}"/>
-                    <TextBlock x:Name="FreeCashDashboardText"
-                               Style="{StaticResource KpiValueStyle}"
-                               Text="0,00 zł"/>
+                    <TextBlock Text="Wolna gotówka" Style="{StaticResource KpiHeader}"/>
+                    <TextBlock x:Name="FreeCashDashboardText" Style="{StaticResource KpiValueStyle}" Text="0,00 zł"/>
                 </StackPanel>
             </Border>
 
             <!-- Odłożona gotówka -->
             <Border Grid.Column="3" Style="{StaticResource KpiCard}">
                 <StackPanel>
-                    <TextBlock Text="Odłożona gotówka (do rozdysponowania)"
-                               Style="{StaticResource CardHeader}"/>
-                    <TextBlock x:Name="SavedToAllocateText"
-                               Style="{StaticResource KpiValueStyle}"
-                               Text="0,00 zł"/>
+                    <TextBlock Text="Odłożona gotówka (do rozdysponowania)" Style="{StaticResource KpiHeader}"/>
+                    <TextBlock x:Name="SavedToAllocateText" Style="{StaticResource KpiValueStyle}" Text="0,00 zł"/>
                 </StackPanel>
             </Border>
 
             <!-- Gotówka w kopertach -->
             <Border Grid.Column="4" Style="{StaticResource KpiCard}">
                 <StackPanel>
-                    <TextBlock Text="Gotówka w kopertach"
-                               Style="{StaticResource CardHeader}"/>
-                    <TextBlock x:Name="EnvelopesDashboardText"
-                               Style="{StaticResource KpiValueStyle}"
-                               Text="0,00 zł"/>
+                    <TextBlock Text="Gotówka w kopertach" Style="{StaticResource KpiHeader}"/>
+                    <TextBlock x:Name="EnvelopesDashboardText" Style="{StaticResource KpiValueStyle}" Text="0,00 zł"/>
                 </StackPanel>
             </Border>
 
             <!-- Inwestycje -->
             <Border Grid.Column="5" Style="{StaticResource KpiCard}">
                 <StackPanel>
-                    <TextBlock Text="Inwestycje"
-                               Style="{StaticResource CardHeader}"/>
-                    <TextBlock x:Name="InvestmentsText"
-                               Style="{StaticResource KpiValueStyle}"
-                               Text="0,00 zł"/>
+                    <TextBlock Text="Inwestycje" Style="{StaticResource KpiHeader}"/>
+                    <TextBlock x:Name="InvestmentsText" Style="{StaticResource KpiValueStyle}" Text="0,00 zł"/>
                 </StackPanel>
             </Border>
         </Grid>

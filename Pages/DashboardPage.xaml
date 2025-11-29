@@ -18,11 +18,16 @@
  <Setter Property="BorderBrush" Value="{DynamicResource Brand.Blue}"/>
  <Setter Property="BorderThickness" Value="1.5"/>
  </Style>
+ <Style x:Key="AccentOrangeCard" TargetType="Border" BasedOn="{StaticResource Card}">
+ <Setter Property="BorderBrush" Value="{DynamicResource Brand.Orange}"/>
+ <Setter Property="BorderThickness" Value="1.5"/>
+ </Style>
+ <!-- Zmieniono wygląd głównych nagłówków kafelków: większe, pogrubione, biała czcionka -->
  <Style x:Key="CardHeader" TargetType="TextBlock">
- <Setter Property="FontSize" Value="13"/>
- <Setter Property="FontWeight" Value="SemiBold"/>
- <Setter Property="Opacity" Value="0.9"/>
- <Setter Property="Foreground" Value="{DynamicResource App.Foreground}"/>
+ <Setter Property="FontSize" Value="16"/>
+ <Setter Property="FontWeight" Value="Bold"/>
+ <Setter Property="Opacity" Value="1"/>
+ <Setter Property="Foreground" Value="White"/>
  </Style>
  <Style x:Key="KpiValueStyle" TargetType="TextBlock">
  <Setter Property="FontSize" Value="18"/>
@@ -44,6 +49,13 @@
  <Setter Property="BorderBrush" Value="{DynamicResource Brand.Blue}"/>
  <Setter Property="BorderThickness" Value="1.5"/>
  </Style>
+ <!-- Styl nagłówków KPI (większe niż kwoty, pogrubione, białe) -->
+ <Style x:Key="KpiHeader" TargetType="TextBlock">
+ <Setter Property="FontSize" Value="20"/>
+ <Setter Property="FontWeight" Value="Bold"/>
+ <Setter Property="Foreground" Value="White"/>
+ <Setter Property="Opacity" Value="1"/>
+ </Style>
  </UserControl.Resources>
 
  <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" PanningMode="VerticalOnly">
@@ -64,12 +76,12 @@
  <ColumnDefinition Width="*"/>
  <ColumnDefinition Width="*"/>
  </Grid.ColumnDefinitions>
- <Border Grid.Column="0" Style="{StaticResource KpiCard}"><StackPanel><TextBlock Text="Cały majątek" FontSize="13" Opacity="0.8"/><TextBlock x:Name="TotalWealthText" Style="{StaticResource KpiValueStyle}" Text="0,00 zł"/></StackPanel></Border>
- <Border Grid.Column="1" Style="{StaticResource KpiCard}"><StackPanel><TextBlock Text="Konta bankowe" FontSize="13" Opacity="0.8"/><TextBlock x:Name="BanksText" Style="{StaticResource KpiValueStyle}" Text="0,00 zł"/></StackPanel></Border>
- <Border Grid.Column="2" Style="{StaticResource KpiCard}"><StackPanel><TextBlock Text="Wolna gotówka" FontSize="13" Opacity="0.8"/><TextBlock x:Name="FreeCashDashboardText" Style="{StaticResource KpiValueStyle}" Text="0,00 zł"/></StackPanel></Border>
- <Border Grid.Column="3" Style="{StaticResource KpiCard}"><StackPanel><TextBlock Text="Odłożona gotówka (do rozdysponowania)" FontSize="13" Opacity="0.8" TextWrapping="Wrap"/><TextBlock x:Name="SavedToAllocateText" Style="{StaticResource KpiValueStyle}" Text="0,00 zł"/></StackPanel></Border>
- <Border Grid.Column="4" Style="{StaticResource KpiCard}"><StackPanel><TextBlock Text="Gotówka w kopertach" FontSize="13" Opacity="0.8"/><TextBlock x:Name="EnvelopesDashboardText" Style="{StaticResource KpiValueStyle}" Text="0,00 zł"/></StackPanel></Border>
- <Border Grid.Column="5" Style="{StaticResource KpiCard}"><StackPanel><TextBlock Text="Inwestycje" FontSize="13" Opacity="0.8"/><TextBlock x:Name="InvestmentsText" Style="{StaticResource KpiValueStyle}" Text="0,00 zł"/></StackPanel></Border>
+ <Border Grid.Column="0" Style="{StaticResource KpiCard}"><StackPanel><TextBlock Text="Cały majątek" Style="{StaticResource KpiHeader}"/><TextBlock x:Name="TotalWealthText" Style="{StaticResource KpiValueStyle}" Text="0,00 zł"/></StackPanel></Border>
+ <Border Grid.Column="1" Style="{StaticResource KpiCard}"><StackPanel><TextBlock Text="Konta bankowe" Style="{StaticResource KpiHeader}"/><TextBlock x:Name="BanksText" Style="{StaticResource KpiValueStyle}" Text="0,00 zł"/></StackPanel></Border>
+ <Border Grid.Column="2" Style="{StaticResource KpiCard}"><StackPanel><TextBlock Text="Wolna gotówka" Style="{StaticResource KpiHeader}"/><TextBlock x:Name="FreeCashDashboardText" Style="{StaticResource KpiValueStyle}" Text="0,00 zł"/></StackPanel></Border>
+ <Border Grid.Column="3" Style="{StaticResource KpiCard}"><StackPanel><TextBlock Text="Odłożona gotówka (do rozdysponowania)" Style="{StaticResource KpiHeader}" TextWrapping="Wrap"/><TextBlock x:Name="SavedToAllocateText" Style="{StaticResource KpiValueStyle}" Text="0,00 zł"/></StackPanel></Border>
+ <Border Grid.Column="4" Style="{StaticResource KpiCard}"><StackPanel><TextBlock Text="Gotówka w kopertach" Style="{StaticResource KpiHeader}"/><TextBlock x:Name="EnvelopesDashboardText" Style="{StaticResource KpiValueStyle}" Text="0,00 zł"/></StackPanel></Border>
+ <Border Grid.Column="5" Style="{StaticResource KpiCard}"><StackPanel><TextBlock Text="Inwestycje" Style="{StaticResource KpiHeader}"/><TextBlock x:Name="InvestmentsText" Style="{StaticResource KpiValueStyle}" Text="0,00 zł"/></StackPanel></Border>
  </Grid>
 
  <!-- Insights/Alerts/Forecast row -->
@@ -79,9 +91,9 @@
  <ColumnDefinition Width="*"/>
  <ColumnDefinition Width="*"/>
  </Grid.ColumnDefinitions>
- <Border Grid.Column="0" Style="{StaticResource Card}" Padding="12">
+ <Border Grid.Column="0" Style="{StaticResource AccentOrangeCard}" Padding="12">
  <StackPanel>
- <TextBlock Text="Insighty finansowe" Style="{StaticResource CardHeader}" Margin="0,0,0,8"/>
+ <TextBlock Text="Analizy finansowe" Style="{StaticResource CardHeader}" Margin="0,0,0,8"/>
  <ItemsControl ItemsSource="{Binding DataContext.Insights, ElementName=Root}">
  <ItemsControl.ItemTemplate>
  <DataTemplate><TextBlock Text="{Binding}" Foreground="{DynamicResource App.Foreground}" Margin="0,2,0,2" TextWrapping="Wrap"/></DataTemplate>
@@ -89,7 +101,7 @@
  </ItemsControl>
  </StackPanel>
  </Border>
- <Border Grid.Column="1" Style="{StaticResource Card}" Padding="12">
+ <Border Grid.Column="1" Style="{StaticResource AccentOrangeCard}" Padding="12">
  <StackPanel>
  <TextBlock Text="Alerty budżetowe" Style="{StaticResource CardHeader}" Margin="0,0,0,8"/>
  <ItemsControl ItemsSource="{Binding DataContext.Alerts, ElementName=Root}">
@@ -99,7 +111,7 @@
  </ItemsControl>
  </StackPanel>
  </Border>
- <Border Grid.Column="2" Style="{StaticResource Card}" Padding="12">
+ <Border Grid.Column="2" Style="{StaticResource AccentOrangeCard}" Padding="12">
  <StackPanel>
  <TextBlock Text="Prognoza końca miesiąca" Style="{StaticResource CardHeader}" Margin="0,0,0,8"/>
  <Grid>
