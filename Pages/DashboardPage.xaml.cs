@@ -528,35 +528,27 @@ namespace Finly.Pages
 
         private void BindIncomeTable(IEnumerable<DatabaseService.CategoryAmountDto> data)
         {
-            var list = (data ?? Enumerable.Empty<DatabaseService.CategoryAmountDto>()).ToList();
-            var sum = list.Sum(x => x.Amount);
+            // data: zagregowane przychody (np. wg źródła) – wykorzystujemy tylko do sumy i centrum donuta
+            var aggregatedList = (data ?? Enumerable.Empty<DatabaseService.CategoryAmountDto>()).ToList();
+            var sum = aggregatedList.Sum(x => x.Amount);
 
-            var rows = list
-                .OrderByDescending(x => x.Amount)
-                .Select(x => new TableRow
-                {
-                    Name = x.Name,
-                    Amount = x.Amount,
-                    Percent = sum >0 ? (double)(x.Amount / sum) *100.0 :0.0
-                })
-                .ToList();
+            // NIE nadpisujemy ItemsSource – XAML ma już ItemsSource="{Binding DataContext.Incomes, ElementName=Root}"
+            // Wyświetlane wiersze mają korzystać z kolekcji szczegółowych transakcji (_vm.Incomes) z właściwościami:
+            // DateDisplay, AmountStr, Category, Account, Description.
+            var detailed = _vm?.Incomes;
+            int detailedCount = detailed?.Count ??0;
 
-            if (FindName("IncomeTable") is ItemsControl incTable)
-                incTable.ItemsSource = rows;
-
-            // Środek donuta przychodów – całość
+            // Ustaw teksty w środku donuta (jak wcześniej – na podstawie zagregowanych wartości)
             if (FindName("IncomeCenterNameText") is TextBlock n)
-                n.Text = rows.Count ==0 ? "" : "Przychód";
-
+                n.Text = aggregatedList.Count ==0 ? "" : "Przychód";
             if (FindName("IncomeCenterValueText") is TextBlock v)
-                v.Text = rows.Count ==0 ? "" : sum.ToString("N2", CultureInfo.CurrentCulture) + " zł";
-
+                v.Text = aggregatedList.Count ==0 ? "" : sum.ToString("N2", CultureInfo.CurrentCulture) + " zł";
             if (FindName("IncomeCenterPercentText") is TextBlock p)
-                p.Text = rows.Count ==0 ? "" : "100,0% udziału";
+                p.Text = aggregatedList.Count ==0 ? "" : "100,0% udziału";
 
-            // Toggle empty placeholder / content
-            SetVisibility("IncomeEmptyText", rows.Count ==0);
-            SetVisibility("IncomeTable", rows.Count >0);
+            // Widoczność: oparta na szczegółowych danych, nie na agregacji
+            SetVisibility("IncomeEmptyText", detailedCount ==0);
+            SetVisibility("IncomeTable", detailedCount >0);
         }
 
         // =====================================================================

@@ -234,31 +234,27 @@
                                        Style="{StaticResource CardHeader}"
                                        Margin="0,0,0,8"/>
 
-                            <!-- nagłówki kolumn -->
+                            <!-- nagłówki kolumn: Data | Kwota | Kategoria | Z/Na konto | Opis -->
                             <Border Margin="0,0,0,4"
                                     Background="{DynamicResource Surface.Background}"
                                     Padding="6,4,6,4">
                                 <Grid>
                                     <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="90"/>
-                                        <ColumnDefinition Width="*"/>
-                                        <ColumnDefinition Width="120"/>
-                                        <ColumnDefinition Width="140"/>
-                                        <ColumnDefinition Width="2*"/>
-                                        <ColumnDefinition Width="90"/>
+                                        <ColumnDefinition Width="120"/> <!-- Data -->
+                                        <ColumnDefinition Width="90"/> <!-- Kwota -->
+                                        <ColumnDefinition Width="*"/> <!-- Kategoria -->
+                                        <ColumnDefinition Width="140"/> <!-- Z/Na konto -->
+                                        <ColumnDefinition Width="2*"/> <!-- Opis -->
                                     </Grid.ColumnDefinitions>
-
-                                    <TextBlock Grid.Column="0" Text="Kwota"   FontSize="11" FontWeight="SemiBold"
+                                    <TextBlock Grid.Column="0" Text="Data" FontSize="11" FontWeight="SemiBold"
+                                               Foreground="{DynamicResource App.Foreground}" Opacity="0.8"/>
+                                    <TextBlock Grid.Column="1" Text="Kwota" FontSize="11" FontWeight="SemiBold"
                                                Foreground="{DynamicResource App.Foreground}" Opacity="0.8" HorizontalAlignment="Right"/>
-                                    <TextBlock Grid.Column="1" Text="Kategoria" FontSize="11" FontWeight="SemiBold"
+                                    <TextBlock Grid.Column="2" Text="Kategoria" FontSize="11" FontWeight="SemiBold"
                                                Foreground="{DynamicResource App.Foreground}" Opacity="0.8"/>
-                                    <TextBlock Grid.Column="2" Text="Data"    FontSize="11" FontWeight="SemiBold"
+                                    <TextBlock Grid.Column="3" Text="Z/Na konto" FontSize="11" FontWeight="SemiBold"
                                                Foreground="{DynamicResource App.Foreground}" Opacity="0.8"/>
-                                    <TextBlock Grid.Column="3" Text="Konto"   FontSize="11" FontWeight="SemiBold"
-                                               Foreground="{DynamicResource App.Foreground}" Opacity="0.8"/>
-                                    <TextBlock Grid.Column="4" Text="Opis"    FontSize="11" FontWeight="SemiBold"
-                                               Foreground="{DynamicResource App.Foreground}" Opacity="0.8"/>
-                                    <TextBlock Grid.Column="5" Text="Typ"     FontSize="11" FontWeight="SemiBold"
+                                    <TextBlock Grid.Column="4" Text="Opis" FontSize="11" FontWeight="SemiBold"
                                                Foreground="{DynamicResource App.Foreground}" Opacity="0.8"/>
                                 </Grid>
                             </Border>
@@ -270,30 +266,18 @@
                                     <DataTemplate>
                                         <Grid Margin="0,2,0,2">
                                             <Grid.ColumnDefinitions>
-                                                <ColumnDefinition Width="90"/>
-                                                <ColumnDefinition Width="*"/>
-                                                <ColumnDefinition Width="120"/>
-                                                <ColumnDefinition Width="140"/>
-                                                <ColumnDefinition Width="2*"/>
-                                                <ColumnDefinition Width="90"/>
+                                                <ColumnDefinition Width="120"/> <!-- Data -->
+                                                <ColumnDefinition Width="90"/> <!-- Kwota -->
+                                                <ColumnDefinition Width="*"/> <!-- Kategoria -->
+                                                <ColumnDefinition Width="140"/> <!-- Z/Na konto -->
+                                                <ColumnDefinition Width="2*"/> <!-- Opis -->
                                             </Grid.ColumnDefinitions>
 
-                                            <TextBlock Grid.Column="0" Text="{Binding AmountStr}"
-                                                       HorizontalAlignment="Right"
-                                                       Foreground="{DynamicResource App.Foreground}"/>
-                                            <TextBlock Grid.Column="1" Text="{Binding Category}"
-                                                       Foreground="{DynamicResource App.Foreground}"
-                                                       TextTrimming="CharacterEllipsis"/>
-                                            <TextBlock Grid.Column="2" Text="{Binding DateDisplay}"
-                                                       Foreground="{DynamicResource App.Foreground}"/>
-                                            <TextBlock Grid.Column="3" Text="{Binding Account}"
-                                                       Foreground="{DynamicResource App.Foreground}"
-                                                       TextTrimming="CharacterEllipsis"/>
-                                            <TextBlock Grid.Column="4" Text="{Binding Description}"
-                                                       Foreground="{DynamicResource App.Foreground}"
-                                                       TextTrimming="CharacterEllipsis"/>
-                                            <TextBlock Grid.Column="5" Text="{Binding Kind}"
-                                                       Foreground="{DynamicResource App.Foreground}"/>
+                                            <TextBlock Grid.Column="0" Text="{Binding DateDisplay}" Foreground="{DynamicResource App.Foreground}"/>
+                                            <TextBlock Grid.Column="1" Text="{Binding AmountStr}" HorizontalAlignment="Right" Foreground="{DynamicResource App.Foreground}"/>
+                                            <TextBlock Grid.Column="2" Text="{Binding Category}" Foreground="{DynamicResource App.Foreground}" TextTrimming="CharacterEllipsis"/>
+                                            <TextBlock Grid.Column="3" Text="{Binding Account}" Foreground="{DynamicResource App.Foreground}" TextTrimming="CharacterEllipsis"/>
+                                            <TextBlock Grid.Column="4" Text="{Binding Description}" Foreground="{DynamicResource App.Foreground}" TextTrimming="CharacterEllipsis"/>
                                         </Grid>
                                     </DataTemplate>
                                 </ItemsControl.ItemTemplate>
@@ -321,26 +305,18 @@
                                     Padding="6,4,6,4">
                                 <Grid>
                                     <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="120"/>
                                         <ColumnDefinition Width="90"/>
                                         <ColumnDefinition Width="*"/>
-                                        <ColumnDefinition Width="120"/>
                                         <ColumnDefinition Width="140"/>
                                         <ColumnDefinition Width="2*"/>
-                                        <ColumnDefinition Width="90"/>
                                     </Grid.ColumnDefinitions>
 
-                                    <TextBlock Grid.Column="0" Text="Kwota"    FontSize="11" FontWeight="SemiBold"
-                                               Foreground="{DynamicResource App.Foreground}" Opacity="0.8" HorizontalAlignment="Right"/>
-                                    <TextBlock Grid.Column="1" Text="Kategoria" FontSize="11" FontWeight="SemiBold"
-                                               Foreground="{DynamicResource App.Foreground}" Opacity="0.8"/>
-                                    <TextBlock Grid.Column="2" Text="Data"     FontSize="11" FontWeight="SemiBold"
-                                               Foreground="{DynamicResource App.Foreground}" Opacity="0.8"/>
-                                    <TextBlock Grid.Column="3" Text="Konto"    FontSize="11" FontWeight="SemiBold"
-                                               Foreground="{DynamicResource App.Foreground}" Opacity="0.8"/>
-                                    <TextBlock Grid.Column="4" Text="Opis"     FontSize="11" FontWeight="SemiBold"
-                                               Foreground="{DynamicResource App.Foreground}" Opacity="0.8"/>
-                                    <TextBlock Grid.Column="5" Text="Typ"      FontSize="11" FontWeight="SemiBold"
-                                               Foreground="{DynamicResource App.Foreground}" Opacity="0.8"/>
+                                    <TextBlock Grid.Column="0" Text="Data" FontSize="11" FontWeight="SemiBold" Foreground="{DynamicResource App.Foreground}" Opacity="0.8"/>
+                                    <TextBlock Grid.Column="1" Text="Kwota" FontSize="11" FontWeight="SemiBold" Foreground="{DynamicResource App.Foreground}" Opacity="0.8" HorizontalAlignment="Right"/>
+                                    <TextBlock Grid.Column="2" Text="Kategoria" FontSize="11" FontWeight="SemiBold" Foreground="{DynamicResource App.Foreground}" Opacity="0.8"/>
+                                    <TextBlock Grid.Column="3" Text="Z/Na konto" FontSize="11" FontWeight="SemiBold" Foreground="{DynamicResource App.Foreground}" Opacity="0.8"/>
+                                    <TextBlock Grid.Column="4" Text="Opis" FontSize="11" FontWeight="SemiBold" Foreground="{DynamicResource App.Foreground}" Opacity="0.8"/>
                                 </Grid>
                             </Border>
 
@@ -350,30 +326,18 @@
                                     <DataTemplate>
                                         <Grid Margin="0,2,0,2">
                                             <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="120"/>
                                                 <ColumnDefinition Width="90"/>
                                                 <ColumnDefinition Width="*"/>
-                                                <ColumnDefinition Width="120"/>
                                                 <ColumnDefinition Width="140"/>
                                                 <ColumnDefinition Width="2*"/>
-                                                <ColumnDefinition Width="90"/>
                                             </Grid.ColumnDefinitions>
 
-                                            <TextBlock Grid.Column="0" Text="{Binding AmountStr}"
-                                                       HorizontalAlignment="Right"
-                                                       Foreground="{DynamicResource App.Foreground}"/>
-                                            <TextBlock Grid.Column="1" Text="{Binding Category}"
-                                                       Foreground="{DynamicResource App.Foreground}"
-                                                       TextTrimming="CharacterEllipsis"/>
-                                            <TextBlock Grid.Column="2" Text="{Binding DateDisplay}"
-                                                       Foreground="{DynamicResource App.Foreground}"/>
-                                            <TextBlock Grid.Column="3" Text="{Binding Account}"
-                                                       Foreground="{DynamicResource App.Foreground}"
-                                                       TextTrimming="CharacterEllipsis"/>
-                                            <TextBlock Grid.Column="4" Text="{Binding Description}"
-                                                       Foreground="{DynamicResource App.Foreground}"
-                                                       TextTrimming="CharacterEllipsis"/>
-                                            <TextBlock Grid.Column="5" Text="{Binding Kind}"
-                                                       Foreground="{DynamicResource App.Foreground}"/>
+                                            <TextBlock Grid.Column="0" Text="{Binding DateDisplay}" Foreground="{DynamicResource App.Foreground}"/>
+                                            <TextBlock Grid.Column="1" Text="{Binding AmountStr}" HorizontalAlignment="Right" Foreground="{DynamicResource App.Foreground}"/>
+                                            <TextBlock Grid.Column="2" Text="{Binding Category}" Foreground="{DynamicResource App.Foreground}" TextTrimming="CharacterEllipsis"/>
+                                            <TextBlock Grid.Column="3" Text="{Binding Account}" Foreground="{DynamicResource App.Foreground}" TextTrimming="CharacterEllipsis"/>
+                                            <TextBlock Grid.Column="4" Text="{Binding Description}" Foreground="{DynamicResource App.Foreground}" TextTrimming="CharacterEllipsis"/>
                                         </Grid>
                                     </DataTemplate>
                                 </ItemsControl.ItemTemplate>
@@ -457,7 +421,21 @@
                             <StackPanel>
                                 <TextBlock Text="Trend wydatków — bieżący okres" Style="{StaticResource CardHeader}" Margin="0,0,0,8"/>
                                 <Canvas x:Name="ExpenseTrendCanvas" Height="180" Margin="0,0,0,4"/>
-                                <ItemsControl x:Name="ExpenseTrendLabels" Visibility="Collapsed"/>
+                                <ItemsControl x:Name="ExpenseTrendLabels" Visibility="Collapsed" Margin="0,4,0,0">
+                                    <ItemsControl.ItemsPanel>
+                                        <ItemsPanelTemplate>
+                                            <UniformGrid Rows="1"/>
+                                        </ItemsPanelTemplate>
+                                    </ItemsControl.ItemsPanel>
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <TextBlock Text="{Binding DateLabel}"
+                                                       Foreground="{DynamicResource App.Foreground}"
+                                                       FontSize="10"
+                                                       HorizontalAlignment="Center"/>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
                                 <TextBlock x:Name="ExpenseTrendEmptyText" Text="Brak danych w tym okresie" Foreground="{DynamicResource App.Foreground}" Visibility="Collapsed" HorizontalAlignment="Center" FontStyle="Italic"/>
                             </StackPanel>
                         </Border>
@@ -521,18 +499,18 @@
                                 <Border Margin="0,0,0,4" Background="{DynamicResource Surface.Background}" Padding="6,4,6,4">
                                     <Grid>
                                         <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="120"/>
-                                            <ColumnDefinition Width="*"/>
-                                            <ColumnDefinition Width="120"/>
-                                            <ColumnDefinition Width="140"/>
-                                            <ColumnDefinition Width="2*"/>
-                                            <ColumnDefinition Width="90"/>
+                                            <ColumnDefinition Width="120"/><!-- Data -->
+                                            <ColumnDefinition Width="*"/><!-- Kategoria -->
+                                            <ColumnDefinition Width="120"/><!-- Typ transakcji -->
+                                            <ColumnDefinition Width="140"/><!-- Z/Na konto -->
+                                            <ColumnDefinition Width="2*"/><!-- Opis -->
+                                            <ColumnDefinition Width="90"/><!-- Kwota -->
                                         </Grid.ColumnDefinitions>
 
                                         <TextBlock Grid.Column="0" Text="Data" FontSize="11" FontWeight="SemiBold" Foreground="{DynamicResource App.Foreground}" Opacity="0.8"/>
                                         <TextBlock Grid.Column="1" Text="Kategoria" FontSize="11" FontWeight="SemiBold" Foreground="{DynamicResource App.Foreground}" Opacity="0.8"/>
-                                        <TextBlock Grid.Column="2" Text="Typ" FontSize="11" FontWeight="SemiBold" Foreground="{DynamicResource App.Foreground}" Opacity="0.8"/>
-                                        <TextBlock Grid.Column="3" Text="Konto" FontSize="11" FontWeight="SemiBold" Foreground="{DynamicResource App.Foreground}" Opacity="0.8"/>
+                                        <TextBlock Grid.Column="2" Text="Typ transakcji" FontSize="11" FontWeight="SemiBold" Foreground="{DynamicResource App.Foreground}" Opacity="0.8"/>
+                                        <TextBlock Grid.Column="3" Text="Z/Na konto" FontSize="11" FontWeight="SemiBold" Foreground="{DynamicResource App.Foreground}" Opacity="0.8"/>
                                         <TextBlock Grid.Column="4" Text="Opis" FontSize="11" FontWeight="SemiBold" Foreground="{DynamicResource App.Foreground}" Opacity="0.8"/>
                                         <TextBlock Grid.Column="5" Text="Kwota" FontSize="11" FontWeight="SemiBold" Foreground="{DynamicResource App.Foreground}" Opacity="0.8" HorizontalAlignment="Right"/>
                                     </Grid>
@@ -549,7 +527,6 @@
                                                     <ColumnDefinition Width="2*"/>
                                                     <ColumnDefinition Width="90"/>
                                                 </Grid.ColumnDefinitions>
-
                                                 <TextBlock Grid.Column="0" Text="{Binding DateDisplay}" Foreground="{DynamicResource App.Foreground}"/>
                                                 <TextBlock Grid.Column="1" Text="{Binding Category}" Foreground="{DynamicResource App.Foreground}" TextTrimming="CharacterEllipsis"/>
                                                 <TextBlock Grid.Column="2" Text="{Binding Kind}" Foreground="{DynamicResource App.Foreground}"/>
@@ -560,13 +537,7 @@
                                         </DataTemplate>
                                     </ItemsControl.ItemTemplate>
                                 </ItemsControl>
-                                <TextBlock x:Name="PlannedEmptyText"
-                                           Text="Brak zaplanowanych transakcji"
-                                           Foreground="{DynamicResource App.Foreground}"
-                                           Visibility="Collapsed"
-                                           HorizontalAlignment="Center"
-                                           Margin="0,8,0,0"
-                                           FontStyle="Italic"/>
+                                <TextBlock x:Name="PlannedEmptyText" Text="Brak zaplanowanych transakcji" Foreground="{DynamicResource App.Foreground}" Visibility="Collapsed" HorizontalAlignment="Center" Margin="0,8,0,0" FontStyle="Italic"/>
                             </StackPanel>
                         </Border>
                     </Grid>
