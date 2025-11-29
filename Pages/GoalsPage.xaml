@@ -105,6 +105,15 @@
                                Margin="0,2,0,6"
                                Foreground="{DynamicResource App.Foreground}"/>
 
+                    <!-- Termin osiągnięcia celu (jak w kopertach) -->
+                    <TextBlock Text="Termin osiągnięcia celu"
+                               FontWeight="Bold"
+                               Foreground="{DynamicResource App.Foreground}"
+                               Opacity="0.9"/>
+                    <TextBlock Margin="0,2,0,6"
+                               Foreground="{DynamicResource App.Foreground}"
+                               Text="{Binding DueDate, StringFormat={}{0:dd.MM.yyyy}, TargetNullValue=Brak terminu}"/>
+
                     <!-- Opis -->
                     <TextBlock Text="Opis"
                                FontWeight="Bold"

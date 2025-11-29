@@ -3,8 +3,8 @@ using System.Collections.ObjectModel;
 using System.Globalization;
 using System.Linq;
 using System.Data;
-using System.ComponentModel; // added
-using System.Runtime.CompilerServices; // for CallerMemberName
+using System.ComponentModel;
+using System.Runtime.CompilerServices;
 using Finly.Services;
 using LiveChartsCore;
 using LiveChartsCore.SkiaSharpView;
@@ -86,10 +86,12 @@ namespace Finly.ViewModels
  {
  Name = g.Key,
  Values = new[] { (double)g.Sum(x => x.Amount) },
- InnerRadius =60,
+ InnerRadius =0, // full pie, not donut
  DataLabelsPaint = new SolidColorPaint(SKColors.White),
  DataLabelsSize =11,
  DataLabelsPosition = LiveChartsCore.Measure.PolarLabelsPosition.Middle,
+ // label formatter with currency suffix
+ DataLabelsFormatter = point => string.Format(CultureInfo.CurrentCulture, "{0:N2} z³", point.Coordinate.PrimaryValue),
  Fill = new SolidColorPaint(PiePalette[i % PiePalette.Length]),
  Stroke = null
  }).Cast<ISeries>().ToArray();
@@ -102,10 +104,11 @@ namespace Finly.ViewModels
  {
  Name = string.IsNullOrWhiteSpace(x.Name) ? "(brak kategorii)" : x.Name,
  Values = new[] { (double)Math.Abs(x.Amount) },
- InnerRadius =60,
+ InnerRadius =0,
  DataLabelsPaint = new SolidColorPaint(SKColors.White),
  DataLabelsSize =11,
  DataLabelsPosition = LiveChartsCore.Measure.PolarLabelsPosition.Middle,
+ DataLabelsFormatter = point => string.Format(CultureInfo.CurrentCulture, "{0:N2} z³", point.Coordinate.PrimaryValue),
  Fill = new SolidColorPaint(PiePalette[i % PiePalette.Length]),
  Stroke = null
  }).Cast<ISeries>().ToArray();
@@ -125,10 +128,11 @@ namespace Finly.ViewModels
  {
  Name = g.Key,
  Values = new[] { (double)g.Sum(x => x.Amount) },
- InnerRadius =60,
+ InnerRadius =0,
  DataLabelsPaint = new SolidColorPaint(SKColors.White),
  DataLabelsSize =11,
  DataLabelsPosition = LiveChartsCore.Measure.PolarLabelsPosition.Middle,
+ DataLabelsFormatter = point => string.Format(CultureInfo.CurrentCulture, "{0:N2} z³", point.Coordinate.PrimaryValue),
  Fill = new SolidColorPaint(PiePalette[i % PiePalette.Length]),
  Stroke = null
  }).Cast<ISeries>().ToArray();
@@ -140,10 +144,11 @@ namespace Finly.ViewModels
  {
  Name = string.IsNullOrWhiteSpace(x.Name) ? "Przychody" : x.Name,
  Values = new[] { (double)Math.Abs(x.Amount) },
- InnerRadius =60,
+ InnerRadius =0,
  DataLabelsPaint = new SolidColorPaint(SKColors.White),
  DataLabelsSize =11,
  DataLabelsPosition = LiveChartsCore.Measure.PolarLabelsPosition.Middle,
+ DataLabelsFormatter = point => string.Format(CultureInfo.CurrentCulture, "{0:N2} z³", point.Coordinate.PrimaryValue),
  Fill = new SolidColorPaint(PiePalette[i % PiePalette.Length]),
  Stroke = null
  }).Cast<ISeries>().ToArray();
