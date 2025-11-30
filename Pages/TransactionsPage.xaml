@@ -205,28 +205,30 @@
  <Border Style="{StaticResource TransactionCardPlanned}">
  <Grid>
  <Grid.ColumnDefinitions>
- <ColumnDefinition Width="40"/>
  <ColumnDefinition Width="*"/>
  <ColumnDefinition Width="Auto"/>
  </Grid.ColumnDefinitions>
- <Border Grid.Column="0" Width="32" Height="32" CornerRadius="16"
- Background="{DynamicResource Brand.Orange}" HorizontalAlignment="Center" VerticalAlignment="Center">
- <TextBlock Text="{Binding CategoryIcon}" Foreground="Black" FontWeight="Bold" HorizontalAlignment="Center" VerticalAlignment="Center"/>
- </Border>
- <StackPanel Grid.Column="1" Margin="12,0,8,0">
+ <!-- Lewa część: treść karty -->
+ <StackPanel Grid.Column="0" Margin="4,0,8,0">
  <TextBlock Text="{Binding CategoryName}" FontWeight="SemiBold" Foreground="{DynamicResource App.Foreground}"/>
  <StackPanel Orientation="Horizontal">
  <TextBlock Text="{Binding Description}" Foreground="{DynamicResource App.Foreground}" Opacity="0.9" TextTrimming="CharacterEllipsis"/>
  <TextBlock Text="Zaplanowana" Margin="8,0,0,0" Visibility="{Binding IsPlanned, Converter={StaticResource BoolToVisibilityConverter}}" Style="{StaticResource PlannedLabelStyle}"/>
  </StackPanel>
+ <StackPanel Orientation="Horizontal" Margin="0,4,0,0">
+ <TextBlock Text="{Binding DateDisplay}" Foreground="{DynamicResource App.Foreground}"/>
+ <TextBlock Text=" • " Foreground="{DynamicResource App.Foreground}" Opacity="0.6" Margin="6,0"/>
+ <TextBlock Text="{Binding AmountStr}" Foreground="{DynamicResource App.Foreground}" FontWeight="Bold"/>
  </StackPanel>
- <StackPanel Grid.Column="2" HorizontalAlignment="Right" >
- <TextBlock Text="{Binding DateDisplay}" Foreground="{DynamicResource App.Foreground}" HorizontalAlignment="Right"/>
- <TextBlock Text="{Binding AmountStr}" Foreground="{DynamicResource App.Foreground}" FontWeight="Bold" HorizontalAlignment="Right"/>
- <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,4,0,0">
- <Button Content="Edytuj" Margin="0,0,6,0"/>
- <Button Content="Usuń"/>
  </StackPanel>
+ <!-- Prawa część: przyciski akcji w prawym górnym rogu -->
+ <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Top">
+ <Button Style="{StaticResource TitleBarIconButton}" Margin="0,0,6,0" ToolTip="Edytuj">
+ <Image Source="/Assets/Images/edit.png" Width="20" Height="20" Stretch="Uniform"/>
+ </Button>
+ <Button Style="{StaticResource TitleBarIconButton}" ToolTip="Usuń">
+ <Image Source="/Assets/Images/delete.png" Width="20" Height="20" Stretch="Uniform"/>
+ </Button>
  </StackPanel>
  </Grid>
  </Border>
