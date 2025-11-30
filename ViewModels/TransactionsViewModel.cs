@@ -19,12 +19,12 @@ namespace Finly.ViewModels
  private decimal _totalIncomes; public decimal TotalIncomes { get => _totalIncomes; private set { _totalIncomes = value; OnPropertyChanged(); OnPropertyChanged(nameof(Balance)); } }
  public decimal Balance => TotalIncomes - TotalExpenses;
  private string? _searchQuery; public string? SearchQuery { get => _searchQuery; set { _searchQuery = value; OnPropertyChanged(); ApplyFilters(); } }
- private bool _isToday; public bool IsToday { get => _isToday; set { _isToday = value; OnPropertyChanged(); ApplyFilters(); } }
- private bool _isYesterday; public bool IsYesterday { get => _isYesterday; set { _isYesterday = value; OnPropertyChanged(); ApplyFilters(); } }
- private bool _isThisWeek; public bool IsThisWeek { get => _isThisWeek; set { _isThisWeek = value; OnPropertyChanged(); ApplyFilters(); } }
- private bool _isThisMonth; public bool IsThisMonth { get => _isThisMonth; set { _isThisMonth = value; OnPropertyChanged(); ApplyFilters(); } }
- private bool _isPrevMonth; public bool IsPrevMonth { get => _isPrevMonth; set { _isPrevMonth = value; OnPropertyChanged(); ApplyFilters(); } }
- private bool _isThisYear; public bool IsThisYear { get => _isThisYear; set { _isThisYear = value; OnPropertyChanged(); ApplyFilters(); } }
+ private bool _isToday; public bool IsToday { get => _isToday; set { if (value) { if (!_isToday) { ClearPeriods(); _isToday = true; OnPropertyChanged(); ApplyFilters(); } } } }
+ private bool _isYesterday; public bool IsYesterday { get => _isYesterday; set { if (value) { if (!_isYesterday) { ClearPeriods(); _isYesterday = true; OnPropertyChanged(); ApplyFilters(); } } } }
+ private bool _isThisWeek; public bool IsThisWeek { get => _isThisWeek; set { if (value) { if (!_isThisWeek) { ClearPeriods(); _isThisWeek = true; OnPropertyChanged(); ApplyFilters(); } } } }
+ private bool _isThisMonth; public bool IsThisMonth { get => _isThisMonth; set { if (value) { if (!_isThisMonth) { ClearPeriods(); _isThisMonth = true; OnPropertyChanged(); ApplyFilters(); } } } }
+ private bool _isPrevMonth; public bool IsPrevMonth { get => _isPrevMonth; set { if (value) { if (!_isPrevMonth) { ClearPeriods(); _isPrevMonth = true; OnPropertyChanged(); ApplyFilters(); } } } }
+ private bool _isThisYear; public bool IsThisYear { get => _isThisYear; set { if (value) { if (!_isThisYear) { ClearPeriods(); _isThisYear = true; OnPropertyChanged(); ApplyFilters(); } } } }
  private bool _showExpenses = true; public bool ShowExpenses { get => _showExpenses; set { _showExpenses = value; OnPropertyChanged(); ApplyFilters(); } }
  private bool _showIncomes = true; public bool ShowIncomes { get => _showIncomes; set { _showIncomes = value; OnPropertyChanged(); ApplyFilters(); } }
  private bool _showTransfers = true; public bool ShowTransfers { get => _showTransfers; set { _showTransfers = value; OnPropertyChanged(); ApplyFilters(); } }
@@ -33,7 +33,17 @@ namespace Finly.ViewModels
  private bool _showScheduled; public bool ShowScheduled { get => _showScheduled; set { _showScheduled = value; OnPropertyChanged(); ApplyFilters(); } }
  public object? DateFrom { get; set; }
  public object? DateTo { get; set; }
- public void Initialize(int userId) { UserId = userId; LoadLookupData(); LoadFromDatabase(); DatabaseService.DataChanged += (_, __) => LoadFromDatabase(); }
+ public void Initialize(int userId)
+ {
+ UserId = userId;
+ LoadLookupData();
+ LoadFromDatabase();
+ if (!_isToday && !_isYesterday && !_isThisWeek && !_isThisMonth && !_isPrevMonth && !_isThisYear)
+ {
+ IsThisMonth = true; // domyœlny okres
+ }
+ DatabaseService.DataChanged += (_, __) => LoadFromDatabase();
+ }
  private void LoadLookupData()
  {
  Categories.Clear();
@@ -87,6 +97,10 @@ namespace Finly.ViewModels
  public void AddExpense(decimal amount, DateTime date, string description, string? categoryName, bool planned = false) { int catId =0; if (!string.IsNullOrWhiteSpace(categoryName)) { try { catId = DatabaseService.GetOrCreateCategoryId(UserId, categoryName); } catch { } } var exp = new Finly.Models.Expense { UserId = UserId, Amount = (double)amount, Date = date, Description = description, CategoryId = catId, IsPlanned = planned }; try { DatabaseService.InsertExpense(exp); } catch { } LoadFromDatabase(); }
  public void AddIncome(decimal amount, DateTime date, string description, string? source, string? categoryName, bool planned = false){ int? catId = null; if(!string.IsNullOrWhiteSpace(categoryName)) { try { var id = DatabaseService.GetOrCreateCategoryId(UserId, categoryName); if(id>0) catId = id; } catch { } } try { DatabaseService.InsertIncome(UserId, amount, date, description, source, catId, planned); } catch { } LoadFromDatabase(); }
  public void UpdateTransaction(TransactionCardVm vm, decimal? newAmount = null, string? newDescription = null, bool? planned = null) { if (vm.Kind == TransactionKind.Expense) { var exp = DatabaseService.GetExpenseById(vm.Id); if (exp != null) { if (newAmount.HasValue) exp.Amount = (double)newAmount.Value; if (newDescription != null) exp.Description = newDescription; if (planned.HasValue) exp.IsPlanned = planned.Value; try { DatabaseService.UpdateExpense(exp); } catch { } } } else if (vm.Kind == TransactionKind.Income) { try { DatabaseService.UpdateIncome(vm.Id, UserId, newAmount, newDescription, planned); } catch { } } LoadFromDatabase(); }
+ private void ClearPeriods()
+ {
+ _isToday = _isYesterday = _isThisWeek = _isThisMonth = _isPrevMonth = _isThisYear = false;
+ }
  private void ApplyFilters()
  {
  if (AllTransactions.Count ==0) return;

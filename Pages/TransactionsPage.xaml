@@ -86,6 +86,38 @@
  </Setter.Value>
  </Setter>
  </Style>
+
+ <Style x:Key="PeriodOptionStyle" TargetType="RadioButton">
+ <Setter Property="Foreground" Value="{DynamicResource App.Foreground}"/>
+ <Setter Property="FontSize" Value="13"/>
+ <Setter Property="FontWeight" Value="SemiBold"/>
+ <Setter Property="Margin" Value="0,0,12,0"/>
+ <Setter Property="Padding" Value="14,6"/>
+ <Setter Property="Cursor" Value="Hand"/>
+ <Setter Property="Template">
+ <Setter.Value>
+ <ControlTemplate TargetType="RadioButton">
+ <Border x:Name="Bd" CornerRadius="8" BorderThickness="1" BorderBrush="{DynamicResource Btn.Border}" Background="{DynamicResource Btn.Background}">
+ <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+ </Border>
+ <ControlTemplate.Triggers>
+ <Trigger Property="IsMouseOver" Value="True">
+ <Setter TargetName="Bd" Property="Background" Value="{DynamicResource Btn.Hover}"/>
+ </Trigger>
+ <Trigger Property="IsChecked" Value="True">
+ <Setter TargetName="Bd" Property="Background" Value="{DynamicResource Accent}"/>
+ <Setter TargetName="Bd" Property="BorderBrush" Value="{DynamicResource Accent}"/>
+ <Setter Property="Foreground" Value="{DynamicResource Accent.Foreground}"/>
+ <Setter Property="FontWeight" Value="Bold"/>
+ </Trigger>
+ <Trigger Property="IsEnabled" Value="False">
+ <Setter TargetName="Bd" Property="Opacity" Value="0.5"/>
+ </Trigger>
+ </ControlTemplate.Triggers>
+ </ControlTemplate>
+ </Setter.Value>
+ </Setter>
+ </Style>
  </UserControl.Resources>
 
  <!--3 poziomy: KPI / Filtry / Lista -->
@@ -126,6 +158,10 @@
  <!-- ROW2: Filtry w jednym poziomym rzędzie -->
  <ScrollViewer Grid.Row="1" Margin="16,0,16,0" HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Disabled">
  <Grid>
+ <Grid.RowDefinitions>
+ <RowDefinition Height="Auto"/>
+ <RowDefinition Height="Auto"/>
+ </Grid.RowDefinitions>
  <Grid.ColumnDefinitions>
  <ColumnDefinition Width="2*"/>
  <ColumnDefinition Width="*"/>
@@ -133,27 +169,27 @@
  <ColumnDefinition Width="*"/>
  <ColumnDefinition Width="*"/>
  </Grid.ColumnDefinitions>
- <!-- Zakres czasu -->
- <GroupBox Grid.Column="0" Header="Zakres czasu">
- <UniformGrid Columns="3" Rows="2" Margin="0">
- <RadioButton Content="Dzisiaj" IsChecked="{Binding IsToday, Mode=TwoWay}"/>
- <RadioButton Content="Wczoraj" IsChecked="{Binding IsYesterday, Mode=TwoWay}"/>
- <RadioButton Content="Ten tydzień" IsChecked="{Binding IsThisWeek, Mode=TwoWay}"/>
- <RadioButton Content="Ten miesiąc" IsChecked="{Binding IsThisMonth, Mode=TwoWay}"/>
- <RadioButton Content="Poprzedni miesiąc" IsChecked="{Binding IsPrevMonth, Mode=TwoWay}"/>
- <RadioButton Content="Rok bieżący" IsChecked="{Binding IsThisYear, Mode=TwoWay}"/>
- </UniformGrid>
- </GroupBox>
- <!-- Typ transakcji -->
- <GroupBox Grid.Column="1" Header="Typ transakcji">
+ <!-- Pasek okresu -->
+ <StackPanel Grid.Row="0" Grid.ColumnSpan="5" Margin="0,0,0,12">
+ <TextBlock Text="Wybierz okres, z którego chcesz zobaczyć dane" Foreground="{DynamicResource App.Foreground}" FontWeight="SemiBold" Margin="0,0,0,6"/>
+ <StackPanel Orientation="Horizontal">
+ <RadioButton Content="Dzisiaj" IsChecked="{Binding IsToday, Mode=TwoWay}" Style="{StaticResource PeriodOptionStyle}"/>
+ <RadioButton Content="Wczoraj" IsChecked="{Binding IsYesterday, Mode=TwoWay}" Style="{StaticResource PeriodOptionStyle}"/>
+ <RadioButton Content="Ten tydzień" IsChecked="{Binding IsThisWeek, Mode=TwoWay}" Style="{StaticResource PeriodOptionStyle}"/>
+ <RadioButton Content="Ten miesiąc" IsChecked="{Binding IsThisMonth, Mode=TwoWay}" Style="{StaticResource PeriodOptionStyle}"/>
+ <RadioButton Content="Poprzedni miesiąc" IsChecked="{Binding IsPrevMonth, Mode=TwoWay}" Style="{StaticResource PeriodOptionStyle}"/>
+ <RadioButton Content="Rok bieżący" IsChecked="{Binding IsThisYear, Mode=TwoWay}" Style="{StaticResource PeriodOptionStyle}" Margin="0"/>
+ </StackPanel>
+ </StackPanel>
+ <!-- Pozostałe grupy filtrów przeniesione do drugiego wiersza -->
+ <GroupBox Grid.Row="1" Grid.Column="1" Header="Typ transakcji">
  <StackPanel>
  <CheckBox Content="Wydatki" IsChecked="{Binding ShowExpenses, Mode=TwoWay}"/>
  <CheckBox Content="Przychody" IsChecked="{Binding ShowIncomes, Mode=TwoWay}"/>
  <CheckBox Content="Transfery" IsChecked="{Binding ShowTransfers, Mode=TwoWay}"/>
  </StackPanel>
  </GroupBox>
- <!-- Kategorie -->
- <GroupBox Grid.Column="2" Header="Kategorie">
+ <GroupBox Grid.Row="1" Grid.Column="2" Header="Kategorie">
  <ScrollViewer VerticalScrollBarVisibility="Auto" Height="140">
  <ItemsControl ItemsSource="{Binding Categories}">
  <ItemsControl.ItemTemplate>
@@ -164,8 +200,7 @@
  </ItemsControl>
  </ScrollViewer>
  </GroupBox>
- <!-- Konta -->
- <GroupBox Grid.Column="3" Header="Konta">
+ <GroupBox Grid.Row="1" Grid.Column="3" Header="Konta">
  <ScrollViewer VerticalScrollBarVisibility="Auto" Height="140">
  <ItemsControl ItemsSource="{Binding Accounts}">
  <ItemsControl.ItemTemplate>
@@ -176,12 +211,12 @@
  </ItemsControl>
  </ScrollViewer>
  </GroupBox>
- <!-- Ustawienia -->
- <GroupBox Grid.Column="4" Header="Ustawienia">
+ <GroupBox Grid.Row="1" Grid.Column="4" Header="Ustawienia">
  <StackPanel>
  <CheckBox Content="Pokaż zaplanowane" IsChecked="{Binding ShowScheduled, Mode=TwoWay}"/>
  </StackPanel>
  </GroupBox>
+ <!-- Zakres czasu kolumna0 w wierszu1 pusta - zajętą przestrzeń używa pasek w wierszu0 -->
  </Grid>
  </ScrollViewer>
 
@@ -239,6 +274,54 @@
  </Grid>
  </Grid>
 </UserControl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
