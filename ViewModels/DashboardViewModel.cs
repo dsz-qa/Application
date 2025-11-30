@@ -208,13 +208,11 @@ namespace Finly.ViewModels
  Incomes.Add(item);
  }
 
- // ===== WYDATKI ===== (surowe pobranie zamiast DatabaseService.GetExpenses)
+ // ===== WYDATKI =====
  var dtExp = LoadExpensesRaw(_userId, start, end);
  foreach (var r in ToRows(dtExp))
  {
- var accountText = string.Empty;
- var accId = SafeInt(r, "AccountId");
- if (accId >0) accountText = "Konto bankowe"; else accountText = "Gotówka"; // prosta heurystyka
+ var accountText = SafeInt(r, "AccountId") >0 ? "Konto bankowe" : "Gotówka";
  var item = new TransactionItem
  {
  Id = SafeInt(r, "Id"),
@@ -229,6 +227,117 @@ namespace Finly.ViewModels
  item.NormalizeAccount();
  Expenses.Add(item);
  }
+
+ // ===== ZAPLANOWANE (przychody + wydatki + wykrycie transferów) =====
+ LoadPlannedTransactions(start, end);
+ }
+ catch { }
+ }
+
+ private void LoadPlannedTransactions(DateTime start, DateTime end)
+ {
+ try
+ {
+ var plannedIncome = new List<TransactionItem>();
+ var plannedExpense = new List<TransactionItem>();
+
+ using (var con = DatabaseService.GetConnection())
+ using (var cmd = con.CreateCommand())
+ {
+ cmd.CommandText = @"SELECT i.Id, i.Date, i.Amount, i.Description, i.Source, i.CategoryId, c.Name AS CategoryName
+ FROM Incomes i
+ LEFT JOIN Categories c ON c.Id = i.CategoryId
+ WHERE i.UserId=@u AND i.IsPlanned=1 AND date(i.Date) >= date(@from) AND date(i.Date) <= date(@to);";
+ cmd.Parameters.AddWithValue("@u", _userId);
+ cmd.Parameters.AddWithValue("@from", start.Date.ToString("yyyy-MM-dd"));
+ cmd.Parameters.AddWithValue("@to", end.Date.ToString("yyyy-MM-dd"));
+ using var r = cmd.ExecuteReader();
+ var dt = new DataTable(); dt.Load(r);
+ foreach (DataRow row in dt.Rows)
+ {
+ var item = new TransactionItem
+ {
+ Id = SafeInt(row, "Id"),
+ Date = SafeDate(row, "Date"),
+ Category = SafeString(row, "CategoryName"),
+ RawSource = SafeString(row, "Source"),
+ Account = SafeString(row, "Source"),
+ Description = SafeString(row, "Description"),
+ Kind = "Przychód",
+ Amount = Math.Abs(SafeDecimal(row, "Amount"))
+ };
+ item.NormalizeAccount();
+ plannedIncome.Add(item);
+ }
+ }
+
+ using (var con = DatabaseService.GetConnection())
+ using (var cmd = con.CreateCommand())
+ {
+ cmd.CommandText = @"SELECT e.Id, e.Date, e.Amount, e.Description, e.CategoryId, e.AccountId, c.Name AS CategoryName
+ FROM Expenses e
+ LEFT JOIN Categories c ON c.Id = e.CategoryId
+ WHERE e.UserId=@u AND e.IsPlanned=1 AND date(e.Date) >= date(@from) AND date(e.Date) <= date(@to);";
+ cmd.Parameters.AddWithValue("@u", _userId);
+ cmd.Parameters.AddWithValue("@from", start.Date.ToString("yyyy-MM-dd"));
+ cmd.Parameters.AddWithValue("@to", end.Date.ToString("yyyy-MM-dd"));
+ using var r = cmd.ExecuteReader();
+ var dt = new DataTable(); dt.Load(r);
+ foreach (DataRow row in dt.Rows)
+ {
+ var accountText = SafeInt(row, "AccountId") >0 ? "Konto bankowe" : "Gotówka";
+ var item = new TransactionItem
+ {
+ Id = SafeInt(row, "Id"),
+ Date = SafeDate(row, "Date"),
+ Category = SafeString(row, "CategoryName"),
+ RawSource = accountText,
+ Account = accountText,
+ Description = SafeString(row, "Description"),
+ Kind = "Wydatek",
+ Amount = Math.Abs(SafeDecimal(row, "Amount"))
+ };
+ item.NormalizeAccount();
+ plannedExpense.Add(item);
+ }
+ }
+
+ // Wykryj potencjalne transfery: para (przychód Source='Przelew') + wydatek tego samego dnia i kwoty
+ var transfers = new List<(TransactionItem inc, TransactionItem exp)>();
+ foreach (var inc in plannedIncome.Where(i => i.Account.StartsWith("Przelew", StringComparison.OrdinalIgnoreCase)))
+ {
+ var match = plannedExpense.FirstOrDefault(e => e.Date.Date == inc.Date.Date && e.Amount == inc.Amount);
+ if (match != null)
+ {
+ transfers.Add((inc, match));
+ }
+ }
+ var usedExpenseIds = new HashSet<int>(transfers.Select(t => t.exp.Id));
+ var usedIncomeIds = new HashSet<int>(transfers.Select(t => t.inc.Id));
+
+ // Dodaj transfery jako pojedyncze wpisy
+ foreach (var (inc, exp) in transfers)
+ {
+ PlannedTransactions.Add(new TransactionItem
+ {
+ Id = inc.Id, // reprezentatywny
+ Date = inc.Date,
+ Category = string.IsNullOrWhiteSpace(exp.Category) ? inc.Category : exp.Category,
+ RawSource = "Transfer",
+ Account = "Transfer",
+ Description = string.IsNullOrWhiteSpace(inc.Description) ? exp.Description : inc.Description,
+ Kind = "Transfer",
+ Amount = inc.Amount
+ });
+ }
+
+ // Dodaj pozosta³e przychody
+ foreach (var inc in plannedIncome.Where(i => !usedIncomeIds.Contains(i.Id)))
+ PlannedTransactions.Add(inc);
+
+ // Dodaj pozosta³e wydatki
+ foreach (var exp in plannedExpense.Where(e => !usedExpenseIds.Contains(e.Id)))
+ PlannedTransactions.Add(exp);
  }
  catch { }
  }
