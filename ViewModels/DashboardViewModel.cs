@@ -184,11 +184,11 @@ namespace Finly.ViewModels
  {
  Incomes.Clear();
  Expenses.Clear();
- PlannedTransactions.Clear(); // pozostawione puste – brak implementacji zaplanowanych
+ PlannedTransactions.Clear();
 
  try
  {
- // ===== PRZYCHODY ===== (lokalny odczyt – nie u¿ywa nieistniej¹cego DatabaseService.GetIncomes)
+ // ===== PRZYCHODY =====
  var dtInc = LoadIncomesRaw(_userId, start, end);
  foreach (var r in ToRows(dtInc))
  {
@@ -208,18 +208,20 @@ namespace Finly.ViewModels
  Incomes.Add(item);
  }
 
- // ===== WYDATKI =====
- var dtExp = DatabaseService.GetExpenses(_userId, start, end);
+ // ===== WYDATKI ===== (surowe pobranie zamiast DatabaseService.GetExpenses)
+ var dtExp = LoadExpensesRaw(_userId, start, end);
  foreach (var r in ToRows(dtExp))
  {
- var rawSrc = SafeString(r, "Source");
+ var accountText = string.Empty;
+ var accId = SafeInt(r, "AccountId");
+ if (accId >0) accountText = "Konto bankowe"; else accountText = "Gotówka"; // prosta heurystyka
  var item = new TransactionItem
  {
  Id = SafeInt(r, "Id"),
  Date = SafeDate(r, "Date"),
  Category = SafeString(r, "CategoryName"),
- RawSource = rawSrc,
- Account = rawSrc,
+ RawSource = accountText,
+ Account = accountText,
  Description = SafeString(r, "Description"),
  Kind = "Wydatek",
  Amount = Math.Abs(SafeDecimal(r, "Amount"))
@@ -229,6 +231,28 @@ namespace Finly.ViewModels
  }
  }
  catch { }
+ }
+
+ private DataTable LoadExpensesRaw(int userId, DateTime start, DateTime end)
+ {
+ var dt = new DataTable();
+ try
+ {
+ using var con = DatabaseService.GetConnection();
+ using var cmd = con.CreateCommand();
+ cmd.CommandText = @"SELECT e.Id, e.Date, e.Amount, e.Description, e.CategoryId, e.AccountId, c.Name AS CategoryName
+ FROM Expenses e
+ LEFT JOIN Categories c ON c.Id = e.CategoryId
+ WHERE e.UserId = @u AND date(e.Date) >= date(@from) AND date(e.Date) <= date(@to)
+ ORDER BY date(e.Date) DESC, e.Id DESC;";
+ cmd.Parameters.AddWithValue("@u", userId);
+ cmd.Parameters.AddWithValue("@from", start.Date.ToString("yyyy-MM-dd"));
+ cmd.Parameters.AddWithValue("@to", end.Date.ToString("yyyy-MM-dd"));
+ using var r = cmd.ExecuteReader();
+ dt.Load(r);
+ }
+ catch { }
+ return dt;
  }
 
  private DataTable LoadIncomesRaw(int userId, DateTime start, DateTime end)
