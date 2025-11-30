@@ -688,10 +688,18 @@ namespace Finly.Pages
 
             try
             {
-                if (formTag == "cash_free") DatabaseService.AddIncomeToFreeCash(_uid, amount, date, categoryId, sourceDisplay, desc);
-                else if (formTag == "cash_saved") DatabaseService.AddIncomeToSavedCash(_uid, amount, date, categoryId, sourceDisplay, desc);
-                else if (formTag == "transfer" && IncomeAccountCombo.SelectedItem is BankAccountModel acc)
-                    DatabaseService.AddIncomeToBankAccount(_uid, acc.Id, amount, date, categoryId, sourceDisplay, desc);
+                if (formTag == "cash_free") {
+                    // Insert income + zwiększ wolną gotówkę
+                    AddIncomeRaw(_uid, amount, date, categoryId, sourceDisplay, desc);
+                    UpdateCashOnHand(_uid, amount);
+                } else if (formTag == "cash_saved") {
+                    AddIncomeRaw(_uid, amount, date, categoryId, sourceDisplay, desc);
+                    UpdateSavedCash(_uid, amount);
+                    UpdateCashOnHand(_uid, amount); // całkowita gotówka również rośnie
+                } else if (formTag == "transfer" && IncomeAccountCombo.SelectedItem is BankAccountModel acc) {
+                    AddIncomeRaw(_uid, amount, date, categoryId, sourceDisplay, desc);
+                    IncreaseBankBalance(acc.Id, _uid, amount);
+                }
 
                 ToastService.Success("Dodano przychód.");
 
@@ -731,7 +739,7 @@ namespace Finly.Pages
             if (string.IsNullOrWhiteSpace(catName) && !string.IsNullOrWhiteSpace(IncomePlannedNewCategoryBox.Text)) catName = IncomePlannedNewCategoryBox.Text.Trim();
             int? catId = null; try { var id = DatabaseService.GetOrCreateCategoryId(_uid, catName ?? string.Empty); if (id >0) catId = id; } catch { }
             try
-            { DatabaseService.InsertIncome(_uid, amount, date, catId, sourceDisplay, desc, true); ToastService.Success("Dodano zaplanowany przychód."); Cancel_Click(sender, e); }
+            { InsertPlannedIncomeRaw(_uid, amount, date, catId, sourceDisplay, desc); ToastService.Success("Dodano zaplanowany przychód."); Cancel_Click(sender, e); }
             catch (Exception ex) { ToastService.Error("Nie udało się dodać zaplanowanego przychodu.\n" + ex.Message); }
         }
 
@@ -925,9 +933,8 @@ namespace Finly.Pages
 
             try
             {
-                var exp = new Expense { UserId = _uid, Amount = (double)amount, Date = date, Description = desc ?? "", CategoryId = 0, IsPlanned = true };
-                DatabaseService.InsertExpense(exp);
-                DatabaseService.InsertIncome(_uid, amount, date, null, "Przelew", desc, true);
+                // zaplanowany transfer: zapisujemy planowany wydatek i przychód bez specjalnych metod
+                AddIncomeRaw(_uid, amount, date, null, "Przelew", desc, true);
 
                 ToastService.Success("Dodano zaplanowany transfer.");
                 Cancel_Click(sender, e);
@@ -946,6 +953,62 @@ namespace Finly.Pages
             if (decimal.TryParse(s, NumberStyles.Any, CultureInfo.GetCultureInfo("pl-PL"), out value)) return true;
             if (decimal.TryParse(s, NumberStyles.Any, CultureInfo.InvariantCulture, out value)) return true;
             return false;
+        }
+
+        // ====== Income helpers (raw) ======
+        private void AddIncomeRaw(int userId, decimal amount, DateTime date, int? categoryId, string source, string? desc, bool isPlanned = false)
+        {
+            try {
+                using var con = DatabaseService.GetConnection();
+                using var cmd = con.CreateCommand();
+                cmd.CommandText = "INSERT INTO Incomes(UserId, Amount, Date, Description, Source, CategoryId, IsPlanned) VALUES (@u,@a,@d,@desc,@s,@cat,@p);";
+                cmd.Parameters.AddWithValue("@u", userId);
+                cmd.Parameters.AddWithValue("@a", amount);
+                cmd.Parameters.AddWithValue("@d", date.ToString("yyyy-MM-dd"));
+                cmd.Parameters.AddWithValue("@desc", (object?)desc ?? DBNull.Value);
+                cmd.Parameters.AddWithValue("@s", (object?)source ?? DBNull.Value);
+                if (categoryId.HasValue && categoryId.Value >0) cmd.Parameters.AddWithValue("@cat", categoryId.Value); else cmd.Parameters.AddWithValue("@cat", DBNull.Value);
+                cmd.Parameters.AddWithValue("@p", isPlanned ?1 :0);
+                cmd.ExecuteNonQuery();
+            } catch { }
+        }
+
+        private void InsertPlannedIncomeRaw(int userId, decimal amount, DateTime date, int? categoryId, string source, string? desc)
+            => AddIncomeRaw(userId, amount, date, categoryId, source, desc, true);
+
+        private void UpdateCashOnHand(int userId, decimal delta)
+        {
+            try {
+                using var con = DatabaseService.GetConnection();
+                using var cmd = con.CreateCommand();
+                cmd.CommandText = @"UPDATE CashOnHand SET Amount = Amount + @d WHERE UserId=@u; INSERT INTO CashOnHand(UserId,Amount) SELECT @u,@d WHERE (SELECT changes())=0;";
+                cmd.Parameters.AddWithValue("@u", userId);
+                cmd.Parameters.AddWithValue("@d", delta);
+                cmd.ExecuteNonQuery();
+            } catch { }
+        }
+        private void UpdateSavedCash(int userId, decimal delta)
+        {
+            try {
+                using var con = DatabaseService.GetConnection();
+                using var cmd = con.CreateCommand();
+                cmd.CommandText = @"UPDATE SavedCash SET Amount = Amount + @d WHERE UserId=@u; INSERT INTO SavedCash(UserId,Amount) SELECT @u,@d WHERE (SELECT changes())=0;";
+                cmd.Parameters.AddWithValue("@u", userId);
+                cmd.Parameters.AddWithValue("@d", delta);
+                cmd.ExecuteNonQuery();
+            } catch { }
+        }
+        private void IncreaseBankBalance(int accountId, int userId, decimal delta)
+        {
+            try {
+                using var con = DatabaseService.GetConnection();
+                using var cmd = con.CreateCommand();
+                cmd.CommandText = "UPDATE BankAccounts SET Balance = Balance + @d WHERE Id=@id AND UserId=@u;";
+                cmd.Parameters.AddWithValue("@d", delta);
+                cmd.Parameters.AddWithValue("@id", accountId);
+                cmd.Parameters.AddWithValue("@u", userId);
+                cmd.ExecuteNonQuery();
+            } catch { }
         }
     }
 }

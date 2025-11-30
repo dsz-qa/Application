@@ -10,6 +10,7 @@ using LiveChartsCore;
 using LiveChartsCore.SkiaSharpView;
 using LiveChartsCore.SkiaSharpView.Painting;
 using SkiaSharp;
+using Microsoft.Data.Sqlite;
 
 namespace Finly.ViewModels
 {
@@ -183,12 +184,12 @@ namespace Finly.ViewModels
  {
  Incomes.Clear();
  Expenses.Clear();
- PlannedTransactions.Clear();
+ PlannedTransactions.Clear(); // pozostawione puste – brak implementacji zaplanowanych
 
  try
  {
- // ===== PRZYCHODY =====
- var dtInc = DatabaseService.GetIncomes(_userId, start, end);
+ // ===== PRZYCHODY ===== (lokalny odczyt – nie u¿ywa nieistniej¹cego DatabaseService.GetIncomes)
+ var dtInc = LoadIncomesRaw(_userId, start, end);
  foreach (var r in ToRows(dtInc))
  {
  var rawSrc = SafeString(r, "Source");
@@ -226,40 +227,30 @@ namespace Finly.ViewModels
  item.NormalizeAccount();
  Expenses.Add(item);
  }
-
- // ===== ZAPLANOWANE =====
- var plannedExp = DatabaseService.GetPlannedExpenses(_userId, start, end,500) ?? new System.Collections.Generic.List<DatabaseService.CategoryTransactionDto>();
- foreach (var p in plannedExp)
- {
- var item = new TransactionItem
- {
- Date = p.Date,
- RawSource = p.Source ?? string.Empty,
- Account = p.Source ?? string.Empty,
- Description = p.Description ?? string.Empty,
- Kind = "Wydatek",
- Amount = Math.Abs(p.Amount)
- };
- item.NormalizeAccount();
- PlannedTransactions.Add(item);
- }
- var plannedInc = DatabaseService.GetPlannedIncomes(_userId, start, end,500) ?? new System.Collections.Generic.List<DatabaseService.CategoryTransactionDto>();
- foreach (var p in plannedInc)
- {
- var item = new TransactionItem
- {
- Date = p.Date,
- RawSource = p.Source ?? string.Empty,
- Account = p.Source ?? string.Empty,
- Description = p.Description ?? string.Empty,
- Kind = "Przychód",
- Amount = Math.Abs(p.Amount)
- };
- item.NormalizeAccount();
- PlannedTransactions.Add(item);
- }
  }
  catch { }
+ }
+
+ private DataTable LoadIncomesRaw(int userId, DateTime start, DateTime end)
+ {
+ var dt = new DataTable();
+ try
+ {
+ using var con = DatabaseService.GetConnection();
+ using var cmd = con.CreateCommand();
+ cmd.CommandText = @"SELECT i.Id, i.Date, i.Amount, i.Description, i.Source, i.CategoryId, c.Name AS CategoryName
+ FROM Incomes i
+ LEFT JOIN Categories c ON c.Id = i.CategoryId
+ WHERE i.UserId = @u AND date(i.Date) >= date(@from) AND date(i.Date) <= date(@to)
+ ORDER BY date(i.Date) DESC, i.Id DESC;";
+ cmd.Parameters.AddWithValue("@u", userId);
+ cmd.Parameters.AddWithValue("@from", start.Date.ToString("yyyy-MM-dd"));
+ cmd.Parameters.AddWithValue("@to", end.Date.ToString("yyyy-MM-dd"));
+ using var r = cmd.ExecuteReader();
+ dt.Load(r);
+ }
+ catch { }
+ return dt;
  }
 
  public void GenerateInsights(DateTime start, DateTime end)
@@ -308,9 +299,7 @@ namespace Finly.ViewModels
  if (uncategorized >0)
  Alerts.Add($"{uncategorized} transakcji bez kategorii.");
 
- var plannedExp = DatabaseService.GetPlannedExpenses(_userId, DateTime.Today, DateTime.Today.AddDays(7),50) ?? new System.Collections.Generic.List<DatabaseService.CategoryTransactionDto>();
- if (plannedExp.Any()) Alerts.Add("Nadchodz¹ce zaplanowane wydatki w ci¹gu7 dni.");
-
+ // Usuniêto alert zaplanowanych wydatków – brak implementacji zaplanowanych w tej wersji
  if (!Alerts.Any()) Alerts.Add("Brak alertów.");
  }
  catch
