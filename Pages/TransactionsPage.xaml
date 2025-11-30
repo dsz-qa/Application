@@ -13,25 +13,21 @@
  <Setter Property="Margin" Value="0,2,0,0"/>
  <Setter Property="Foreground" Value="{DynamicResource App.Foreground}"/>
  </Style>
- <Style x:Key="KpiCard" TargetType="Border">
- <Setter Property="Background" Value="{DynamicResource Surface.Background}"/>
- <Setter Property="BorderBrush" Value="{DynamicResource Surface.Border}"/>
- <Setter Property="BorderThickness" Value="1"/>
- <Setter Property="CornerRadius" Value="10"/>
- <Setter Property="Padding" Value="12"/>
- <Setter Property="Margin" Value="0,0,16,0"/>
- <Setter Property="SnapsToDevicePixels" Value="True"/>
- <Setter Property="Effect">
- <Setter.Value>
- <DropShadowEffect BlurRadius="8" ShadowDepth="2" Opacity="0.18"/>
- </Setter.Value>
- </Setter>
- </Style>
  <Style x:Key="KpiHeader" TargetType="TextBlock">
  <Setter Property="FontSize" Value="20"/>
  <Setter Property="FontWeight" Value="Bold"/>
  <Setter Property="Foreground" Value="{DynamicResource App.Foreground}"/>
  <Setter Property="Opacity" Value="1"/>
+ </Style>
+
+ <!-- Lokalny styl AccentCard (jak na DashboardPage) -->
+ <Style x:Key="AccentCard" TargetType="Border">
+ <Setter Property="Background" Value="Transparent"/>
+ <Setter Property="BorderBrush" Value="{DynamicResource Brand.Blue}"/>
+ <Setter Property="BorderThickness" Value="2"/>
+ <Setter Property="CornerRadius" Value="10"/>
+ <Setter Property="Padding" Value="12"/>
+ <Setter Property="Margin" Value="0,0,16,0"/>
  </Style>
 
  <!-- Transaction Card styles (spójne z kartami na innych stronach) -->
@@ -55,7 +51,6 @@
  </Style.Triggers>
  </Style>
 
- <!-- Card style with planned dimming -->
  <Style x:Key="TransactionCardPlanned" TargetType="Border" BasedOn="{StaticResource TransactionCard}">
  <Style.Triggers>
  <DataTrigger Binding="{Binding IsPlanned}" Value="True">
@@ -64,7 +59,6 @@
  </Style.Triggers>
  </Style>
 
- <!-- Planned overlay style -->
  <Style x:Key="PlannedLabelStyle" TargetType="TextBlock">
  <Setter Property="Foreground" Value="{DynamicResource App.Foreground}"/>
  <Setter Property="Opacity" Value="0.7"/>
@@ -72,9 +66,8 @@
  <Setter Property="FontWeight" Value="SemiBold"/>
  </Style>
 
- <!-- GroupBox header spójny z CategoriesPage -->
  <Style TargetType="GroupBox">
- <Setter Property="Margin" Value="0,0,0,12"/>
+ <Setter Property="Margin" Value="0,0,16,0"/>
  <Setter Property="Padding" Value="8"/>
  <Setter Property="Foreground" Value="{DynamicResource App.Foreground}"/>
  <Setter Property="Background" Value="Transparent"/>
@@ -110,19 +103,19 @@
  <ColumnDefinition Width="*"/>
  <ColumnDefinition Width="*"/>
  </Grid.ColumnDefinitions>
- <Border Grid.Column="0" Style="{StaticResource KpiCard}">
+ <Border Grid.Column="0" Style="{StaticResource AccentCard}">
  <StackPanel>
  <TextBlock Text="Suma wydatków" Style="{StaticResource KpiHeader}"/>
  <TextBlock Text="{Binding TotalExpenses, StringFormat={}{0:N2} zł}" Style="{StaticResource KpiValueStyle}"/>
  </StackPanel>
  </Border>
- <Border Grid.Column="1" Style="{StaticResource KpiCard}">
+ <Border Grid.Column="1" Style="{StaticResource AccentCard}">
  <StackPanel>
  <TextBlock Text="Suma przychodów" Style="{StaticResource KpiHeader}"/>
  <TextBlock Text="{Binding TotalIncomes, StringFormat={}{0:N2} zł}" Style="{StaticResource KpiValueStyle}"/>
  </StackPanel>
  </Border>
- <Border Grid.Column="2" Style="{StaticResource KpiCard}">
+ <Border Grid.Column="2" Style="{StaticResource AccentCard}">
  <StackPanel>
  <TextBlock Text="Bilans" Style="{StaticResource KpiHeader}"/>
  <TextBlock Text="{Binding Balance, StringFormat={}{0:N2} zł}" Style="{StaticResource KpiValueStyle}"/>
@@ -244,6 +237,14 @@
  </Grid>
  </Grid>
 </UserControl>
+
+
+
+
+
+
+
+
 
 
 
