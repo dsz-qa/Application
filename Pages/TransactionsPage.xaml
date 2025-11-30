@@ -95,91 +95,33 @@
  </Style>
  </UserControl.Resources>
 
+ <!--3 poziomy: KPI / Filtry / Lista -->
  <Grid>
- <Grid.ColumnDefinitions>
- <ColumnDefinition Width="320" />
- <ColumnDefinition Width="*" />
- </Grid.ColumnDefinitions>
-
- <!-- Left column: filters panel -->
- <ScrollViewer Grid.Column="0" VerticalScrollBarVisibility="Auto">
- <StackPanel Margin="16" Orientation="Vertical">
- <!-- Search -->
- <GroupBox Header="Szukaj">
- <TextBox Text="{Binding SearchQuery, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
- </GroupBox>
-
- <!-- Quick time filters -->
- <GroupBox Header="Zakres czasu">
- <UniformGrid Columns="3" Rows="2" Margin="0" >
- <RadioButton Content="Dzisiaj" IsChecked="{Binding IsToday, Mode=TwoWay}"/>
- <RadioButton Content="Wczoraj" IsChecked="{Binding IsYesterday, Mode=TwoWay}"/>
- <RadioButton Content="Ten tydzień" IsChecked="{Binding IsThisWeek, Mode=TwoWay}"/>
- <RadioButton Content="Ten miesiąc" IsChecked="{Binding IsThisMonth, Mode=TwoWay}"/>
- <RadioButton Content="Poprzedni miesiąc" IsChecked="{Binding IsPrevMonth, Mode=TwoWay}"/>
- <RadioButton Content="Rok bieżący" IsChecked="{Binding IsThisYear, Mode=TwoWay}"/>
- </UniformGrid>
- </GroupBox>
-
- <!-- Transaction types -->
- <GroupBox Header="Typ transakcji">
- <StackPanel Margin="0">
- <CheckBox Content="Wydatki" IsChecked="{Binding ShowExpenses, Mode=TwoWay}"/>
- <CheckBox Content="Przychody" IsChecked="{Binding ShowIncomes, Mode=TwoWay}"/>
- <CheckBox Content="Transfery" IsChecked="{Binding ShowTransfers, Mode=TwoWay}"/>
- </StackPanel>
- </GroupBox>
-
- <!-- Categories placeholder -->
- <GroupBox Header="Kategorie">
- <ListBox ItemsSource="{Binding Categories}" SelectedItem="{Binding SelectedCategory, Mode=TwoWay}" Height="120"/>
- </GroupBox>
-
- <!-- Accounts placeholder -->
- <GroupBox Header="Konta">
- <ListBox ItemsSource="{Binding Accounts}" SelectedItem="{Binding SelectedAccount, Mode=TwoWay}" Height="120"/>
- </GroupBox>
-
- <!-- Scheduled toggle -->
- <GroupBox Header="Ustawienia">
- <CheckBox Content="Pokaż zaplanowane" IsChecked="{Binding ShowScheduled, Mode=TwoWay}" Margin="0"/>
- </GroupBox>
- </StackPanel>
- </ScrollViewer>
-
- <!-- Right column: header + KPI cards + transactions list -->
- <Grid Grid.Column="1" Margin="16">
  <Grid.RowDefinitions>
  <RowDefinition Height="Auto"/>
  <RowDefinition Height="Auto"/>
  <RowDefinition Height="*"/>
  </Grid.RowDefinitions>
 
- <!-- Header -->
- <TextBlock Grid.Row="0" Text="Transakcje" Style="{StaticResource KpiHeader}" Margin="0,0,0,12"/>
-
- <!-- KPI cards -->
- <Grid Grid.Row="1" Margin="0,0,0,12">
+ <!-- ROW1: KPI pełna szerokość -->
+ <Grid Grid.Row="0" Margin="16">
  <Grid.ColumnDefinitions>
  <ColumnDefinition Width="*"/>
  <ColumnDefinition Width="*"/>
  <ColumnDefinition Width="*"/>
  </Grid.ColumnDefinitions>
-
  <Border Grid.Column="0" Style="{StaticResource KpiCard}">
  <StackPanel>
  <TextBlock Text="Suma wydatków" Style="{StaticResource KpiHeader}"/>
  <TextBlock Text="{Binding TotalExpenses, StringFormat={}{0:N2} zł}" Style="{StaticResource KpiValueStyle}"/>
  </StackPanel>
  </Border>
-
  <Border Grid.Column="1" Style="{StaticResource KpiCard}">
  <StackPanel>
  <TextBlock Text="Suma przychodów" Style="{StaticResource KpiHeader}"/>
  <TextBlock Text="{Binding TotalIncomes, StringFormat={}{0:N2} zł}" Style="{StaticResource KpiValueStyle}"/>
  </StackPanel>
  </Border>
-
  <Border Grid.Column="2" Style="{StaticResource KpiCard}">
  <StackPanel>
  <TextBlock Text="Bilans" Style="{StaticResource KpiHeader}"/>
@@ -188,14 +130,83 @@
  </Border>
  </Grid>
 
- <!-- Transactions list -->
- <ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto">
+ <!-- ROW2: Filtry w jednym poziomym rzędzie -->
+ <ScrollViewer Grid.Row="1" Margin="16,0,16,0" HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Disabled">
+ <Grid>
+ <Grid.ColumnDefinitions>
+ <ColumnDefinition Width="2*"/>
+ <ColumnDefinition Width="*"/>
+ <ColumnDefinition Width="*"/>
+ <ColumnDefinition Width="*"/>
+ <ColumnDefinition Width="*"/>
+ </Grid.ColumnDefinitions>
+ <!-- Zakres czasu -->
+ <GroupBox Grid.Column="0" Header="Zakres czasu">
+ <UniformGrid Columns="3" Rows="2" Margin="0">
+ <RadioButton Content="Dzisiaj" IsChecked="{Binding IsToday, Mode=TwoWay}"/>
+ <RadioButton Content="Wczoraj" IsChecked="{Binding IsYesterday, Mode=TwoWay}"/>
+ <RadioButton Content="Ten tydzień" IsChecked="{Binding IsThisWeek, Mode=TwoWay}"/>
+ <RadioButton Content="Ten miesiąc" IsChecked="{Binding IsThisMonth, Mode=TwoWay}"/>
+ <RadioButton Content="Poprzedni miesiąc" IsChecked="{Binding IsPrevMonth, Mode=TwoWay}"/>
+ <RadioButton Content="Rok bieżący" IsChecked="{Binding IsThisYear, Mode=TwoWay}"/>
+ </UniformGrid>
+ </GroupBox>
+ <!-- Typ transakcji -->
+ <GroupBox Grid.Column="1" Header="Typ transakcji">
+ <StackPanel>
+ <CheckBox Content="Wydatki" IsChecked="{Binding ShowExpenses, Mode=TwoWay}"/>
+ <CheckBox Content="Przychody" IsChecked="{Binding ShowIncomes, Mode=TwoWay}"/>
+ <CheckBox Content="Transfery" IsChecked="{Binding ShowTransfers, Mode=TwoWay}"/>
+ </StackPanel>
+ </GroupBox>
+ <!-- Kategorie -->
+ <GroupBox Grid.Column="2" Header="Kategorie">
+ <ScrollViewer VerticalScrollBarVisibility="Auto" Height="140">
+ <ItemsControl ItemsSource="{Binding Categories}">
+ <ItemsControl.ItemTemplate>
+ <DataTemplate>
+ <CheckBox Content="{Binding Name}" IsChecked="{Binding IsSelected, Mode=TwoWay}"/>
+ </DataTemplate>
+ </ItemsControl.ItemTemplate>
+ </ItemsControl>
+ </ScrollViewer>
+ </GroupBox>
+ <!-- Konta -->
+ <GroupBox Grid.Column="3" Header="Konta">
+ <ScrollViewer VerticalScrollBarVisibility="Auto" Height="140">
+ <ItemsControl ItemsSource="{Binding Accounts}">
+ <ItemsControl.ItemTemplate>
+ <DataTemplate>
+ <CheckBox Content="{Binding Name}" IsChecked="{Binding IsSelected, Mode=TwoWay}"/>
+ </DataTemplate>
+ </ItemsControl.ItemTemplate>
+ </ItemsControl>
+ </ScrollViewer>
+ </GroupBox>
+ <!-- Ustawienia -->
+ <GroupBox Grid.Column="4" Header="Ustawienia">
+ <StackPanel>
+ <CheckBox Content="Pokaż zaplanowane" IsChecked="{Binding ShowScheduled, Mode=TwoWay}"/>
+ </StackPanel>
+ </GroupBox>
+ </Grid>
+ </ScrollViewer>
+
+ <!-- ROW3: Lista transakcji -->
+ <Grid Grid.Row="2" Margin="16">
+ <Grid.RowDefinitions>
+ <RowDefinition Height="Auto"/>
+ <RowDefinition Height="*"/>
+ </Grid.RowDefinitions>
+ <TextBlock Grid.Row="0" Text="Transakcje" Style="{StaticResource KpiHeader}" Margin="0,0,0,12"/>
+ <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
  <ItemsControl ItemsSource="{Binding FilteredTransactions}">
  <ItemsControl.ItemsPanel>
  <ItemsPanelTemplate>
  <StackPanel Orientation="Vertical"/>
  </ItemsPanelTemplate>
  </ItemsControl.ItemsPanel>
+ <!-- TRANSAKCJE: główny szablon -->
  <ItemsControl.ItemTemplate>
  <DataTemplate>
  <Border Style="{StaticResource TransactionCardPlanned}">
@@ -205,14 +216,10 @@
  <ColumnDefinition Width="*"/>
  <ColumnDefinition Width="Auto"/>
  </Grid.ColumnDefinitions>
-
- <!-- Icon / category circle -->
  <Border Grid.Column="0" Width="32" Height="32" CornerRadius="16"
  Background="{DynamicResource Brand.Orange}" HorizontalAlignment="Center" VerticalAlignment="Center">
  <TextBlock Text="{Binding CategoryIcon}" Foreground="Black" FontWeight="Bold" HorizontalAlignment="Center" VerticalAlignment="Center"/>
  </Border>
-
- <!-- Main text -->
  <StackPanel Grid.Column="1" Margin="12,0,8,0">
  <TextBlock Text="{Binding CategoryName}" FontWeight="SemiBold" Foreground="{DynamicResource App.Foreground}"/>
  <StackPanel Orientation="Horizontal">
@@ -220,8 +227,6 @@
  <TextBlock Text="Zaplanowana" Margin="8,0,0,0" Visibility="{Binding IsPlanned, Converter={StaticResource BoolToVisibilityConverter}}" Style="{StaticResource PlannedLabelStyle}"/>
  </StackPanel>
  </StackPanel>
-
- <!-- Right block: date + amount + actions -->
  <StackPanel Grid.Column="2" HorizontalAlignment="Right" >
  <TextBlock Text="{Binding DateDisplay}" Foreground="{DynamicResource App.Foreground}" HorizontalAlignment="Right"/>
  <TextBlock Text="{Binding AmountStr}" Foreground="{DynamicResource App.Foreground}" FontWeight="Bold" HorizontalAlignment="Right"/>
@@ -239,6 +244,9 @@
  </Grid>
  </Grid>
 </UserControl>
+
+
+
 
 
 
