@@ -104,7 +104,19 @@ namespace Finly.ViewModels
  private void ApplyFilters()
  {
  if (AllTransactions.Count ==0) return;
- DateTime? from = null, to = null; var today = DateTime.Today; if (IsToday) { from = today; to = today; } else if (IsYesterday) { var y = today.AddDays(-1); from = y; to = y; } else if (IsThisWeek) { int diff = ((int)today.DayOfWeek +6) %7; var start = today.AddDays(-diff).Date; from = start; to = start.AddDays(6); } else if (IsThisMonth) { var start = new DateTime(today.Year, today.Month,1); from = start; to = start.AddMonths(1).AddDays(-1); } else if (IsPrevMonth) { var start = new DateTime(today.Year, today.Month,1).AddMonths(-1); from = start; to = start.AddMonths(1).AddDays(-1); } else if (IsThisYear) { from = new DateTime(today.Year,1,1); to = new DateTime(today.Year,12,31); }
+ DateTime? from = null, to = null; var today = DateTime.Today;
+ if (IsToday) { from = today; to = today; }
+ else if (IsYesterday) { var y = today.AddDays(-1); from = y; to = y; }
+ else if (IsThisWeek) { int diff = ((int)today.DayOfWeek +6) %7; var start = today.AddDays(-diff).Date; from = start; to = start.AddDays(6); }
+ else if (IsThisMonth) { var start = new DateTime(today.Year, today.Month,1); from = start; to = start.AddMonths(1).AddDays(-1); }
+ else if (IsPrevMonth) { var start = new DateTime(today.Year, today.Month,1).AddMonths(-1); from = start; to = start.AddMonths(1).AddDays(-1); }
+ else if (IsThisYear) { from = new DateTime(today.Year,1,1); to = new DateTime(today.Year,12,31); }
+ // Nadpisanie przez custom zakres jeœli ustawiony
+ if (DateFrom is DateTime df && DateTo is DateTime dt)
+ {
+ from = df.Date;
+ to = dt.Date;
+ }
  var typeSelected = new[] { (TransactionKind.Expense, ShowExpenses), (TransactionKind.Income, ShowIncomes), (TransactionKind.Transfer, ShowTransfers) }
  .Where(t => t.Item2).Select(t => t.Item1).ToList();
  bool typeFilterActive = typeSelected.Count >0;
