@@ -1,205 +1,243 @@
 ﻿<UserControl x:Class="Finly.Pages.TransactionsPage"
-             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
-             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+ xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+ xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
 
-    <UserControl.Resources>
-        <!-- Built-in converter for planned visibility -->
-        <BooleanToVisibilityConverter x:Key="BoolToVisibilityConverter"/>
+ <UserControl.Resources>
+ <!-- Built-in converter for planned visibility -->
+ <BooleanToVisibilityConverter x:Key="BoolToVisibilityConverter"/>
 
-        <!-- KPI styles mirrored from DashboardPage -->
-        <Style x:Key="KpiValueStyle" TargetType="TextBlock">
-            <Setter Property="FontSize" Value="18"/>
-            <Setter Property="FontWeight" Value="Bold"/>
-            <Setter Property="Margin" Value="0,2,0,0"/>
-            <Setter Property="Foreground" Value="{DynamicResource App.Foreground}"/>
-        </Style>
-        <Style x:Key="KpiCard" TargetType="Border">
-            <Setter Property="Background" Value="Transparent"/>
-            <Setter Property="BorderBrush" Value="{DynamicResource Brand.Blue}"/>
-            <Setter Property="BorderThickness" Value="2"/>
-            <Setter Property="CornerRadius" Value="10"/>
-            <Setter Property="Padding" Value="12"/>
-            <Setter Property="Margin" Value="0,0,16,0"/>
-        </Style>
-        <Style x:Key="KpiHeader" TargetType="TextBlock">
-            <Setter Property="FontSize" Value="20"/>
-            <Setter Property="FontWeight" Value="Bold"/>
-            <Setter Property="Foreground" Value="White"/>
-            <Setter Property="Opacity" Value="1"/>
-        </Style>
+ <!-- KPI styles mirrored from DashboardPage -->
+ <Style x:Key="KpiValueStyle" TargetType="TextBlock">
+ <Setter Property="FontSize" Value="18"/>
+ <Setter Property="FontWeight" Value="Bold"/>
+ <Setter Property="Margin" Value="0,2,0,0"/>
+ <Setter Property="Foreground" Value="{DynamicResource App.Foreground}"/>
+ </Style>
+ <Style x:Key="KpiCard" TargetType="Border">
+ <Setter Property="Background" Value="{DynamicResource Surface.Background}"/>
+ <Setter Property="BorderBrush" Value="{DynamicResource Surface.Border}"/>
+ <Setter Property="BorderThickness" Value="1"/>
+ <Setter Property="CornerRadius" Value="10"/>
+ <Setter Property="Padding" Value="12"/>
+ <Setter Property="Margin" Value="0,0,16,0"/>
+ <Setter Property="SnapsToDevicePixels" Value="True"/>
+ <Setter Property="Effect">
+ <Setter.Value>
+ <DropShadowEffect BlurRadius="8" ShadowDepth="2" Opacity="0.18"/>
+ </Setter.Value>
+ </Setter>
+ </Style>
+ <Style x:Key="KpiHeader" TargetType="TextBlock">
+ <Setter Property="FontSize" Value="20"/>
+ <Setter Property="FontWeight" Value="Bold"/>
+ <Setter Property="Foreground" Value="{DynamicResource App.Foreground}"/>
+ <Setter Property="Opacity" Value="1"/>
+ </Style>
 
-        <!-- Transaction Card styles -->
-        <Style x:Key="TransactionCard" TargetType="Border">
-            <Setter Property="Background" Value="{DynamicResource Surface.Background}"/>
-            <Setter Property="BorderBrush" Value="{DynamicResource Surface.Border}"/>
-            <Setter Property="BorderThickness" Value="1"/>
-            <Setter Property="CornerRadius" Value="10"/>
-            <Setter Property="Padding" Value="10"/>
-            <Setter Property="Margin" Value="0,0,0,8"/>
-            <Setter Property="SnapsToDevicePixels" Value="True"/>
-            <Style.Triggers>
-                <Trigger Property="IsMouseOver" Value="True">
-                    <Setter Property="BorderBrush" Value="{DynamicResource Brand.Blue}"/>
-                </Trigger>
-            </Style.Triggers>
-        </Style>
+ <!-- Transaction Card styles (spójne z kartami na innych stronach) -->
+ <Style x:Key="TransactionCard" TargetType="Border">
+ <Setter Property="Background" Value="{DynamicResource Surface.Background}"/>
+ <Setter Property="BorderBrush" Value="{DynamicResource Surface.Border}"/>
+ <Setter Property="BorderThickness" Value="1"/>
+ <Setter Property="CornerRadius" Value="10"/>
+ <Setter Property="Padding" Value="12"/>
+ <Setter Property="Margin" Value="0,0,16,12"/>
+ <Setter Property="SnapsToDevicePixels" Value="True"/>
+ <Setter Property="Effect">
+ <Setter.Value>
+ <DropShadowEffect BlurRadius="8" ShadowDepth="2" Opacity="0.16"/>
+ </Setter.Value>
+ </Setter>
+ <Style.Triggers>
+ <Trigger Property="IsMouseOver" Value="True">
+ <Setter Property="BorderBrush" Value="{DynamicResource Brand.Blue}"/>
+ </Trigger>
+ </Style.Triggers>
+ </Style>
 
-        <!-- Card style with planned dimming -->
-        <Style x:Key="TransactionCardPlanned" TargetType="Border" BasedOn="{StaticResource TransactionCard}">
-            <Style.Triggers>
-                <DataTrigger Binding="{Binding IsPlanned}" Value="True">
-                    <Setter Property="Opacity" Value="0.7"/>
-                </DataTrigger>
-            </Style.Triggers>
-        </Style>
+ <!-- Card style with planned dimming -->
+ <Style x:Key="TransactionCardPlanned" TargetType="Border" BasedOn="{StaticResource TransactionCard}">
+ <Style.Triggers>
+ <DataTrigger Binding="{Binding IsPlanned}" Value="True">
+ <Setter Property="Opacity" Value="0.85"/>
+ </DataTrigger>
+ </Style.Triggers>
+ </Style>
 
-        <!-- Planned overlay style -->
-        <Style x:Key="PlannedLabelStyle" TargetType="TextBlock">
-            <Setter Property="Foreground" Value="{DynamicResource App.Foreground}"/>
-            <Setter Property="Opacity" Value="0.8"/>
-            <Setter Property="FontSize" Value="12"/>
-            <Setter Property="FontWeight" Value="SemiBold"/>
-        </Style>
-    </UserControl.Resources>
+ <!-- Planned overlay style -->
+ <Style x:Key="PlannedLabelStyle" TargetType="TextBlock">
+ <Setter Property="Foreground" Value="{DynamicResource App.Foreground}"/>
+ <Setter Property="Opacity" Value="0.7"/>
+ <Setter Property="FontSize" Value="12"/>
+ <Setter Property="FontWeight" Value="SemiBold"/>
+ </Style>
 
-    <Grid>
-        <Grid.ColumnDefinitions>
-            <ColumnDefinition Width="300" />
-            <ColumnDefinition Width="*" />
-        </Grid.ColumnDefinitions>
+ <!-- GroupBox header spójny z CategoriesPage -->
+ <Style TargetType="GroupBox">
+ <Setter Property="Margin" Value="0,0,0,12"/>
+ <Setter Property="Padding" Value="8"/>
+ <Setter Property="Foreground" Value="{DynamicResource App.Foreground}"/>
+ <Setter Property="Background" Value="Transparent"/>
+ <Setter Property="BorderBrush" Value="{DynamicResource Surface.Border}"/>
+ <Setter Property="BorderThickness" Value="1"/>
+ <Setter Property="Template">
+ <Setter.Value>
+ <ControlTemplate TargetType="GroupBox">
+ <StackPanel>
+ <TextBlock Text="{TemplateBinding Header}" FontWeight="Bold" Foreground="{DynamicResource App.Foreground}" Margin="0,0,0,6"/>
+ <Border Background="{DynamicResource Surface.Background}" BorderBrush="{DynamicResource Surface.Border}" BorderThickness="1" CornerRadius="8" Padding="8">
+ <ContentPresenter/>
+ </Border>
+ </StackPanel>
+ </ControlTemplate>
+ </Setter.Value>
+ </Setter>
+ </Style>
+ </UserControl.Resources>
 
-        <!-- Left column: filters panel -->
-        <ScrollViewer Grid.Column="0" VerticalScrollBarVisibility="Auto">
-            <StackPanel Margin="12" Orientation="Vertical">
-                <!-- Search -->
-                <GroupBox Header="Szukaj" Margin="0,0,0,12">
-                    <TextBox Text="{Binding SearchQuery, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
-                </GroupBox>
+ <Grid>
+ <Grid.ColumnDefinitions>
+ <ColumnDefinition Width="320" />
+ <ColumnDefinition Width="*" />
+ </Grid.ColumnDefinitions>
 
-                <!-- Quick time filters -->
-                <GroupBox Header="Zakres czasu" Margin="0,0,0,12">
-                    <UniformGrid Columns="3" Rows="2" Margin="6" >
-                        <RadioButton Content="Dzisiaj" IsChecked="{Binding IsToday, Mode=TwoWay}"/>
-                        <RadioButton Content="Wczoraj" IsChecked="{Binding IsYesterday, Mode=TwoWay}"/>
-                        <RadioButton Content="Ten tydzień" IsChecked="{Binding IsThisWeek, Mode=TwoWay}"/>
-                        <RadioButton Content="Ten miesiąc" IsChecked="{Binding IsThisMonth, Mode=TwoWay}"/>
-                        <RadioButton Content="Poprzedni miesiąc" IsChecked="{Binding IsPrevMonth, Mode=TwoWay}"/>
-                        <RadioButton Content="Rok bieżący" IsChecked="{Binding IsThisYear, Mode=TwoWay}"/>
-                    </UniformGrid>
-                </GroupBox>
+ <!-- Left column: filters panel -->
+ <ScrollViewer Grid.Column="0" VerticalScrollBarVisibility="Auto">
+ <StackPanel Margin="16" Orientation="Vertical">
+ <!-- Search -->
+ <GroupBox Header="Szukaj">
+ <TextBox Text="{Binding SearchQuery, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
+ </GroupBox>
 
-                <!-- Transaction types -->
-                <GroupBox Header="Typ transakcji" Margin="0,0,0,12">
-                    <StackPanel Margin="6">
-                        <CheckBox Content="Wydatki" IsChecked="{Binding ShowExpenses, Mode=TwoWay}"/>
-                        <CheckBox Content="Przychody" IsChecked="{Binding ShowIncomes, Mode=TwoWay}"/>
-                        <CheckBox Content="Transfery" IsChecked="{Binding ShowTransfers, Mode=TwoWay}"/>
-                    </StackPanel>
-                </GroupBox>
+ <!-- Quick time filters -->
+ <GroupBox Header="Zakres czasu">
+ <UniformGrid Columns="3" Rows="2" Margin="0" >
+ <RadioButton Content="Dzisiaj" IsChecked="{Binding IsToday, Mode=TwoWay}"/>
+ <RadioButton Content="Wczoraj" IsChecked="{Binding IsYesterday, Mode=TwoWay}"/>
+ <RadioButton Content="Ten tydzień" IsChecked="{Binding IsThisWeek, Mode=TwoWay}"/>
+ <RadioButton Content="Ten miesiąc" IsChecked="{Binding IsThisMonth, Mode=TwoWay}"/>
+ <RadioButton Content="Poprzedni miesiąc" IsChecked="{Binding IsPrevMonth, Mode=TwoWay}"/>
+ <RadioButton Content="Rok bieżący" IsChecked="{Binding IsThisYear, Mode=TwoWay}"/>
+ </UniformGrid>
+ </GroupBox>
 
-                <!-- Categories placeholder -->
-                <GroupBox Header="Kategorie" Margin="0,0,0,12">
-                    <ListBox ItemsSource="{Binding Categories}" SelectedItem="{Binding SelectedCategory, Mode=TwoWay}" Height="120"/>
-                </GroupBox>
+ <!-- Transaction types -->
+ <GroupBox Header="Typ transakcji">
+ <StackPanel Margin="0">
+ <CheckBox Content="Wydatki" IsChecked="{Binding ShowExpenses, Mode=TwoWay}"/>
+ <CheckBox Content="Przychody" IsChecked="{Binding ShowIncomes, Mode=TwoWay}"/>
+ <CheckBox Content="Transfery" IsChecked="{Binding ShowTransfers, Mode=TwoWay}"/>
+ </StackPanel>
+ </GroupBox>
 
-                <!-- Accounts placeholder -->
-                <GroupBox Header="Konta" Margin="0,0,0,12">
-                    <ListBox ItemsSource="{Binding Accounts}" SelectedItem="{Binding SelectedAccount, Mode=TwoWay}" Height="120"/>
-                </GroupBox>
+ <!-- Categories placeholder -->
+ <GroupBox Header="Kategorie">
+ <ListBox ItemsSource="{Binding Categories}" SelectedItem="{Binding SelectedCategory, Mode=TwoWay}" Height="120"/>
+ </GroupBox>
 
-                <!-- Scheduled toggle -->
-                <GroupBox Header="Ustawienia">
-                    <CheckBox Content="Pokaż zaplanowane" IsChecked="{Binding ShowScheduled, Mode=TwoWay}" Margin="6"/>
-                </GroupBox>
-            </StackPanel>
-        </ScrollViewer>
+ <!-- Accounts placeholder -->
+ <GroupBox Header="Konta">
+ <ListBox ItemsSource="{Binding Accounts}" SelectedItem="{Binding SelectedAccount, Mode=TwoWay}" Height="120"/>
+ </GroupBox>
 
-        <!-- Right column: header + KPI cards + transactions list -->
-        <Grid Grid.Column="1" Margin="16">
-            <Grid.RowDefinitions>
-                <RowDefinition Height="Auto"/>
-                <RowDefinition Height="Auto"/>
-                <RowDefinition Height="*"/>
-            </Grid.RowDefinitions>
+ <!-- Scheduled toggle -->
+ <GroupBox Header="Ustawienia">
+ <CheckBox Content="Pokaż zaplanowane" IsChecked="{Binding ShowScheduled, Mode=TwoWay}" Margin="0"/>
+ </GroupBox>
+ </StackPanel>
+ </ScrollViewer>
 
-            <!-- Header -->
-            <TextBlock Grid.Row="0" Text="Transakcje" Style="{StaticResource KpiHeader}" Margin="0,0,0,12"/>
+ <!-- Right column: header + KPI cards + transactions list -->
+ <Grid Grid.Column="1" Margin="16">
+ <Grid.RowDefinitions>
+ <RowDefinition Height="Auto"/>
+ <RowDefinition Height="Auto"/>
+ <RowDefinition Height="*"/>
+ </Grid.RowDefinitions>
 
-            <!-- KPI cards -->
-            <Grid Grid.Row="1" Margin="0,0,0,12">
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="*"/>
-                    <ColumnDefinition Width="*"/>
-                    <ColumnDefinition Width="*"/>
-                </Grid.ColumnDefinitions>
+ <!-- Header -->
+ <TextBlock Grid.Row="0" Text="Transakcje" Style="{StaticResource KpiHeader}" Margin="0,0,0,12"/>
 
-                <Border Grid.Column="0" Style="{StaticResource KpiCard}">
-                    <StackPanel>
-                        <TextBlock Text="Suma wydatków" Style="{StaticResource KpiHeader}"/>
-                        <TextBlock Text="{Binding TotalExpenses, StringFormat={}{0:N2} zł}" Style="{StaticResource KpiValueStyle}"/>
-                    </StackPanel>
-                </Border>
+ <!-- KPI cards -->
+ <Grid Grid.Row="1" Margin="0,0,0,12">
+ <Grid.ColumnDefinitions>
+ <ColumnDefinition Width="*"/>
+ <ColumnDefinition Width="*"/>
+ <ColumnDefinition Width="*"/>
+ </Grid.ColumnDefinitions>
 
-                <Border Grid.Column="1" Style="{StaticResource KpiCard}">
-                    <StackPanel>
-                        <TextBlock Text="Suma przychodów" Style="{StaticResource KpiHeader}"/>
-                        <TextBlock Text="{Binding TotalIncomes, StringFormat={}{0:N2} zł}" Style="{StaticResource KpiValueStyle}"/>
-                    </StackPanel>
-                </Border>
+ <Border Grid.Column="0" Style="{StaticResource KpiCard}">
+ <StackPanel>
+ <TextBlock Text="Suma wydatków" Style="{StaticResource KpiHeader}"/>
+ <TextBlock Text="{Binding TotalExpenses, StringFormat={}{0:N2} zł}" Style="{StaticResource KpiValueStyle}"/>
+ </StackPanel>
+ </Border>
 
-                <Border Grid.Column="2" Style="{StaticResource KpiCard}">
-                    <StackPanel>
-                        <TextBlock Text="Bilans" Style="{StaticResource KpiHeader}"/>
-                        <TextBlock Text="{Binding Balance, StringFormat={}{0:N2} zł}" Style="{StaticResource KpiValueStyle}"/>
-                    </StackPanel>
-                </Border>
-            </Grid>
+ <Border Grid.Column="1" Style="{StaticResource KpiCard}">
+ <StackPanel>
+ <TextBlock Text="Suma przychodów" Style="{StaticResource KpiHeader}"/>
+ <TextBlock Text="{Binding TotalIncomes, StringFormat={}{0:N2} zł}" Style="{StaticResource KpiValueStyle}"/>
+ </StackPanel>
+ </Border>
 
-            <!-- Transactions list -->
-            <ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto">
-                <ItemsControl ItemsSource="{Binding FilteredTransactions}">
-                    <ItemsControl.ItemTemplate>
-                        <DataTemplate>
-                            <Border Style="{StaticResource TransactionCardPlanned}">
-                                <Grid>
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="40"/> <!-- icon -->
-                                        <ColumnDefinition Width="*"/> <!-- text -->
-                                        <ColumnDefinition Width="160"/> <!-- right block -->
-                                    </Grid.ColumnDefinitions>
+ <Border Grid.Column="2" Style="{StaticResource KpiCard}">
+ <StackPanel>
+ <TextBlock Text="Bilans" Style="{StaticResource KpiHeader}"/>
+ <TextBlock Text="{Binding Balance, StringFormat={}{0:N2} zł}" Style="{StaticResource KpiValueStyle}"/>
+ </StackPanel>
+ </Border>
+ </Grid>
 
-                                    <!-- Icon / category circle -->
-                                    <Border Grid.Column="0" Width="32" Height="32" CornerRadius="16"
-                                            Background="{DynamicResource Brand.Orange}" HorizontalAlignment="Center" VerticalAlignment="Center">
-                                        <TextBlock Text="{Binding CategoryIcon}" Foreground="Black" FontWeight="Bold" HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                                    </Border>
+ <!-- Transactions list -->
+ <ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto">
+ <ItemsControl ItemsSource="{Binding FilteredTransactions}">
+ <ItemsControl.ItemsPanel>
+ <ItemsPanelTemplate>
+ <StackPanel Orientation="Vertical"/>
+ </ItemsPanelTemplate>
+ </ItemsControl.ItemsPanel>
+ <ItemsControl.ItemTemplate>
+ <DataTemplate>
+ <Border Style="{StaticResource TransactionCardPlanned}">
+ <Grid>
+ <Grid.ColumnDefinitions>
+ <ColumnDefinition Width="40"/>
+ <ColumnDefinition Width="*"/>
+ <ColumnDefinition Width="Auto"/>
+ </Grid.ColumnDefinitions>
 
-                                    <!-- Main text -->
-                                    <StackPanel Grid.Column="1" Margin="8,0,0,0">
-                                        <TextBlock Text="{Binding CategoryName}" FontWeight="SemiBold" Foreground="{DynamicResource App.Foreground}"/>
-                                        <StackPanel Orientation="Horizontal">
-                                            <TextBlock Text="{Binding Description}" Foreground="{DynamicResource App.Foreground}" Opacity="0.9" TextTrimming="CharacterEllipsis"/>
-                                            <TextBlock Text="Zaplanowana" Margin="8,0,0,0" Visibility="{Binding IsPlanned, Converter={StaticResource BoolToVisibilityConverter}}" Style="{StaticResource PlannedLabelStyle}"/>
-                                        </StackPanel>
-                                    </StackPanel>
+ <!-- Icon / category circle -->
+ <Border Grid.Column="0" Width="32" Height="32" CornerRadius="16"
+ Background="{DynamicResource Brand.Orange}" HorizontalAlignment="Center" VerticalAlignment="Center">
+ <TextBlock Text="{Binding CategoryIcon}" Foreground="Black" FontWeight="Bold" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+ </Border>
 
-                                    <!-- Right block: date + amount + actions -->
-                                    <StackPanel Grid.Column="2" HorizontalAlignment="Right" >
-                                        <TextBlock Text="{Binding DateDisplay}" Foreground="{DynamicResource App.Foreground}" HorizontalAlignment="Right"/>
-                                        <TextBlock Text="{Binding AmountStr}" Foreground="{DynamicResource App.Foreground}" FontWeight="Bold" HorizontalAlignment="Right"/>
-                                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,4,0,0">
-                                            <Button Content="Edytuj" Margin="0,0,6,0"/>
-                                            <Button Content="Usuń"/>
-                                        </StackPanel>
-                                    </StackPanel>
-                                </Grid>
-                            </Border>
-                        </DataTemplate>
-                    </ItemsControl.ItemTemplate>
-                </ItemsControl>
-            </ScrollViewer>
-        </Grid>
-    </Grid>
+ <!-- Main text -->
+ <StackPanel Grid.Column="1" Margin="12,0,8,0">
+ <TextBlock Text="{Binding CategoryName}" FontWeight="SemiBold" Foreground="{DynamicResource App.Foreground}"/>
+ <StackPanel Orientation="Horizontal">
+ <TextBlock Text="{Binding Description}" Foreground="{DynamicResource App.Foreground}" Opacity="0.9" TextTrimming="CharacterEllipsis"/>
+ <TextBlock Text="Zaplanowana" Margin="8,0,0,0" Visibility="{Binding IsPlanned, Converter={StaticResource BoolToVisibilityConverter}}" Style="{StaticResource PlannedLabelStyle}"/>
+ </StackPanel>
+ </StackPanel>
+
+ <!-- Right block: date + amount + actions -->
+ <StackPanel Grid.Column="2" HorizontalAlignment="Right" >
+ <TextBlock Text="{Binding DateDisplay}" Foreground="{DynamicResource App.Foreground}" HorizontalAlignment="Right"/>
+ <TextBlock Text="{Binding AmountStr}" Foreground="{DynamicResource App.Foreground}" FontWeight="Bold" HorizontalAlignment="Right"/>
+ <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,4,0,0">
+ <Button Content="Edytuj" Margin="0,0,6,0"/>
+ <Button Content="Usuń"/>
+ </StackPanel>
+ </StackPanel>
+ </Grid>
+ </Border>
+ </DataTemplate>
+ </ItemsControl.ItemTemplate>
+ </ItemsControl>
+ </ScrollViewer>
+ </Grid>
+ </Grid>
 </UserControl>
 
 

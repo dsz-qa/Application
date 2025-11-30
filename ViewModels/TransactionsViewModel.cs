@@ -37,7 +37,11 @@ namespace Finly.ViewModels
  public object? DateFrom { get; set; }
  public object? DateTo { get; set; }
  public void Initialize(int userId) { UserId = userId; LoadLookupData(); LoadFromDatabase(); DatabaseService.DataChanged += (_, __) => LoadFromDatabase(); }
- private void LoadLookupData() { Categories.Clear(); try { foreach (var c in DatabaseService.GetCategoriesByUser(UserId) ?? new System.Collections.Generic.List<string>()) Categories.Add(c); } catch { } Accounts.Clear(); try { foreach (var a in DatabaseService.GetAccounts(UserId) ?? new System.Collections.Generic.List<Finly.Models.BankAccountModel>()) Accounts.Add(a.AccountName); } catch { } }
+ private void LoadLookupData() { Categories.Clear(); try { foreach (var c in DatabaseService.GetCategoriesByUser(UserId) ?? new System.Collections.Generic.List<string>()) Categories.Add(c); } catch { } Accounts.Clear(); try { foreach (var a in DatabaseService.GetAccounts(UserId) ?? new System.Collections.Generic.List<Finly.Models.BankAccountModel>()) Accounts.Add(a.AccountName); } catch { } 
+ // append virtual/static items for filtering
+ Accounts.Add("Koperty");
+ Accounts.Add("Wolna gotówka");
+ Accounts.Add("Od³o¿ona gotówka"); }
  public void LoadFromDatabase() { if (UserId <=0) return; AllTransactions.Clear();
  // Expenses
  DataTable expDt = null; try { expDt = DatabaseService.GetExpenses(UserId); } catch { }
