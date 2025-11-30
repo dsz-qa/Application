@@ -71,12 +71,27 @@ namespace Finly.ViewModels
  {
  Categories.Clear();
  try { foreach (var c in DatabaseService.GetCategoriesByUser(UserId) ?? new System.Collections.Generic.List<string>()) Categories.Add(new CategoryFilterItem { Name = c }); } catch { }
+ Categories.CollectionChanged += (s, e) =>
+ {
+ if (e.NewItems != null) foreach (CategoryFilterItem ci in e.NewItems) ci.PropertyChanged += (_, __) => ApplyFilters();
+ if (e.OldItems != null) foreach (CategoryFilterItem ci in e.OldItems) ci.PropertyChanged -= (_, __) => ApplyFilters();
+ ApplyFilters();
+ };
+ foreach (var ci in Categories) ci.PropertyChanged += (_, __) => ApplyFilters();
 
  Accounts.Clear();
  try { foreach (var a in DatabaseService.GetAccounts(UserId) ?? new System.Collections.Generic.List<Finly.Models.BankAccountModel>()) Accounts.Add(new AccountFilterItem { Name = a.AccountName }); } catch { }
  try { foreach (var env in DatabaseService.GetEnvelopesNames(UserId) ?? new System.Collections.Generic.List<string>()) Accounts.Add(new AccountFilterItem { Name = $"Koperta: {env}" }); } catch { }
  Accounts.Add(new AccountFilterItem { Name = "Wolna gotówka" });
  Accounts.Add(new AccountFilterItem { Name = "Od³o¿ona gotówka" });
+ // subscribe to account selection changes
+ Accounts.CollectionChanged += (s, e) =>
+ {
+ if (e.NewItems != null) foreach (AccountFilterItem ai in e.NewItems) ai.PropertyChanged += (_, __) => ApplyFilters();
+ if (e.OldItems != null) foreach (AccountFilterItem ai in e.OldItems) ai.PropertyChanged -= (_, __) => ApplyFilters();
+ ApplyFilters();
+ };
+ foreach (var ai in Accounts) ai.PropertyChanged += (_, __) => ApplyFilters();
  }
 
  public void LoadFromDatabase()
@@ -160,6 +175,25 @@ namespace Finly.ViewModels
  _isToday = _isYesterday = _isThisWeek = _isThisMonth = _isPrevMonth = _isThisYear = false;
  }
 
+ private bool MatchesSelectedAccounts(TransactionCardVm t, System.Collections.Generic.List<string> selectedAccounts)
+ {
+ if (selectedAccounts.Count ==0) return true;
+ string Normalize(string s) => (s ?? string.Empty).Trim();
+ var set = selectedAccounts.Select(Normalize).ToHashSet(StringComparer.CurrentCultureIgnoreCase);
+ if (t.Kind == TransactionKind.Transfer)
+ {
+ var raw = Normalize(t.AccountName);
+ var parts = raw.Split('?');
+ var from = parts.Length >0 ? Normalize(parts[0]) : string.Empty;
+ var to = parts.Length >1 ? Normalize(parts[1]) : string.Empty;
+ return set.Contains(from) || set.Contains(to);
+ }
+ else
+ {
+ return set.Contains(Normalize(t.AccountName));
+ }
+ }
+
  private void ApplyFilters()
  {
  if (AllTransactions.Count ==0) return;
@@ -183,30 +217,30 @@ namespace Finly.ViewModels
  .Where(t => t.Item2).Select(t => t.Item1).ToList();
  bool typeFilterActive = typeSelected.Count >0;
 
- var selectedAccounts = Accounts.Where(a => a.IsSelected).Select(a => a.Name).ToList(); bool accountFilterActive = selectedAccounts.Count >0;
- var selectedCategories = Categories.Where(c => c.IsSelected).Select(c => c.Name).ToList(); bool categoryFilterActive = selectedCategories.Count >0;
+ var selectedAccounts = Accounts.Where(a => a.IsSelected).Select(a => a.Name).ToList();
+ var selectedCategories = Categories.Where(c => c.IsSelected).Select(c => c.Name).ToList();
 
  var q = (SearchQuery ?? string.Empty).Trim();
 
- // Lewa lista: tylko zwyk³e (nieplanowane i nieprzysz³e)
- var left = AllTransactions.Where(t =>
+ bool PassCommonFilters(TransactionCardVm t)
  {
  bool dateOk = true; if (from.HasValue && to.HasValue && DateTime.TryParse(t.DateDisplay, out var d)) dateOk = d.Date >= from.Value.Date && d.Date <= to.Value.Date;
  bool typeOk = !typeFilterActive || typeSelected.Contains(t.Kind);
- bool accOk = !accountFilterActive || selectedAccounts.Any(x => string.Equals(t.AccountName, x, StringComparison.CurrentCultureIgnoreCase));
- bool catOk = !categoryFilterActive || selectedCategories.Any(x => string.Equals(t.CategoryName, x, StringComparison.CurrentCultureIgnoreCase));
+ bool accOk = MatchesSelectedAccounts(t, selectedAccounts);
+ bool catOk = selectedCategories.Count ==0 || selectedCategories.Any(x => string.Equals(t.CategoryName, x, StringComparison.CurrentCultureIgnoreCase));
  bool textOk = string.IsNullOrEmpty(q) || (t.CategoryName?.IndexOf(q, StringComparison.CurrentCultureIgnoreCase) >=0) || (t.Description?.IndexOf(q, StringComparison.CurrentCultureIgnoreCase) >=0) || (t.AccountName?.IndexOf(q, StringComparison.CurrentCultureIgnoreCase) >=0);
- bool isPlannedOrFuture = t.IsPlanned || t.IsFuture;
- return dateOk && typeOk && accOk && catOk && textOk && !isPlannedOrFuture;
- }).ToList();
+ return dateOk && typeOk && accOk && catOk && textOk;
+ }
 
+ // Left: non-planned/future
+ var left = AllTransactions.Where(t => PassCommonFilters(t) && !(t.IsPlanned || t.IsFuture)).ToList();
  TransactionsList.Clear(); foreach (var i in left) TransactionsList.Add(i);
 
- // Prawa lista: zaplanowane (IsPlanned || IsFuture) – NIE podlega filtrom typu/konta/kategorii/dat
- var right = AllTransactions.Where(t => t.IsPlanned || t.IsFuture).OrderBy(t => t.DateDisplay).ToList();
+ // Right: planned/future with the same filters applied
+ var right = AllTransactions.Where(t => PassCommonFilters(t) && (t.IsPlanned || t.IsFuture)).OrderBy(t => t.DateDisplay).ToList();
  PlannedTransactionsList.Clear(); foreach (var r in right) PlannedTransactionsList.Add(r);
 
- // Suma KPI liczona z lewej listy (zwyk³e)
+ // KPI from left
  TotalExpenses = left.Where(t => t.Kind == TransactionKind.Expense).Select(x => ParseAmountInternal(x.AmountStr)).Sum();
  TotalIncomes = left.Where(t => t.Kind == TransactionKind.Income).Select(x => ParseAmountInternal(x.AmountStr)).Sum();
  }
