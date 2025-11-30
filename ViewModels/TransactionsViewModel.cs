@@ -5,6 +5,7 @@ using System.Linq;
 using System.Runtime.CompilerServices;
 using Finly.Services;
 using System.Data;
+using Finly.Models;
 
 namespace Finly.ViewModels
 {
@@ -136,6 +137,36 @@ namespace Finly.ViewModels
  FilteredTransactions.Clear(); foreach (var item in result) FilteredTransactions.Add(item);
  TotalExpenses = result.Where(t => t.Kind == TransactionKind.Expense).Select(x => ParseAmountInternal(x.AmountStr)).Sum();
  TotalIncomes = result.Where(t => t.Kind == TransactionKind.Income).Select(x => ParseAmountInternal(x.AmountStr)).Sum();
+ }
+ public void SetPeriod(DateRangeMode mode, DateTime start, DateTime end)
+ {
+ // Reset preset flags
+ ClearPeriods();
+ // Custom vs preset
+ switch (mode)
+ {
+ case DateRangeMode.Day:
+ _isToday = true; DateFrom = null; DateTo = null; break;
+ case DateRangeMode.Week:
+ _isThisWeek = true; DateFrom = null; DateTo = null; break;
+ case DateRangeMode.Month:
+ _isThisMonth = true; DateFrom = null; DateTo = null; break;
+ case DateRangeMode.Year:
+ _isThisYear = true; DateFrom = null; DateTo = null; break;
+ case DateRangeMode.Quarter:
+ // traktujemy kwarta³ jak custom (brak dedykowanych flag w UI)
+ DateFrom = start; DateTo = end; break;
+ case DateRangeMode.Custom:
+ DateFrom = start; DateTo = end; break;
+ default:
+ DateFrom = start; DateTo = end; break;
+ }
+ OnPropertyChanged(nameof(IsToday));
+ OnPropertyChanged(nameof(IsThisWeek));
+ OnPropertyChanged(nameof(IsThisMonth));
+ OnPropertyChanged(nameof(IsPrevMonth));
+ OnPropertyChanged(nameof(IsThisYear));
+ ApplyFilters();
  }
  }
  public enum TransactionKind { Expense, Income, Transfer }
