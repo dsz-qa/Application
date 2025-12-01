@@ -222,31 +222,38 @@
  </ItemsControl>
  </ScrollViewer>
 
- <!-- Panel edycji -->
- <Border Grid.Row="4" x:Name="EditPanel" Background="{DynamicResource Surface.Background}" BorderBrush="{DynamicResource Surface.Border}" BorderThickness="1" CornerRadius="6" Padding="8" Margin="0,8,0,0" Visibility="Collapsed">
+ <!-- Panel edycji (połączony: nazwa + opis + kolor) -->
+ <Border Grid.Row="4" x:Name="EditPanel" Background="{DynamicResource Surface.Background}" BorderBrush="{DynamicResource Surface.Border}" BorderThickness="1" CornerRadius="6" Padding="12" Margin="0,8,0,0" Visibility="Collapsed">
  <StackPanel>
- <TextBlock Text="Edytuj kategorię" FontWeight="Bold" Foreground="{DynamicResource App.Foreground}"/>
- <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
- <TextBox x:Name="EditNameBox" Width="320" Height="28" />
- <Button Content="Zapisz" Width="80" Margin="8,0,0,0" Click="SaveEdit_Click"/>
- <Button Content="Anuluj" Width="80" Margin="8,0,0,0" Click="CancelEdit_Click"/>
- </StackPanel>
- <TextBlock x:Name="EditPanelMessage" Foreground="OrangeRed" Margin="0,6,0,0"/>
+ <TextBlock Text="{Binding Name, StringFormat=Edytujesz kategorię: {0}}" FontWeight="Bold" Foreground="{DynamicResource App.Foreground}" FontSize="16"/>
 
- <!-- Panel edycji: dodaj wybór ikony -->
- <StackPanel Orientation="Vertical" Margin="0,8,0,0">
- <TextBlock Text="Ikona" FontWeight="SemiBold"/>
- <ComboBox x:Name="IconCombo" Width="200">
- <ComboBoxItem Content="🍽️"/>
- <ComboBoxItem Content="🚌"/>
- <ComboBoxItem Content="🏠"/>
- <ComboBoxItem Content="🧾"/>
- <ComboBoxItem Content="🎉"/>
- <ComboBoxItem Content="💊"/>
- <ComboBoxItem Content="👕"/>
- <ComboBoxItem Content="🎁"/>
- </ComboBox>
+ <!-- Nazwa -->
+ <TextBlock Text="Nazwa" Margin="0,10,0,4" Foreground="{DynamicResource App.Foreground}"/>
+ <TextBox x:Name="EditNameBox" Width="360" Height="28"/>
+
+ <!-- Opis -->
+ <TextBlock Text="Opis kategorii" Margin="0,10,0,4" Foreground="{DynamicResource App.Foreground}"/>
+ <TextBox x:Name="EditDescriptionBox" Height="80" TextWrapping="Wrap" AcceptsReturn="True"/>
+
+ <!-- Kolor -->
+ <TextBlock Text="Kolor kategorii" Margin="0,12,0,6" Foreground="{DynamicResource App.Foreground}"/>
+ <WrapPanel x:Name="EditColorPickerPanel" ItemWidth="32" ItemHeight="32">
+ <Button Width="32" Height="32" Margin="0,0,6,6" Background="#FFED7A1A" Tag="#FFED7A1A" Click="ColorPick_Click"/>
+ <Button Width="32" Height="32" Margin="0,0,6,6" Background="#FF3FA7D6" Tag="#FF3FA7D6" Click="ColorPick_Click"/>
+ <Button Width="32" Height="32" Margin="0,0,6,6" Background="#FF7BC96F" Tag="#FF7BC96F" Click="ColorPick_Click"/>
+ <Button Width="32" Height="32" Margin="0,0,6,6" Background="#FFAF7AC5" Tag="#FFAF7AC5" Click="ColorPick_Click"/>
+ <Button Width="32" Height="32" Margin="0,0,6,6" Background="#FFF6BF26" Tag="#FFF6BF26" Click="ColorPick_Click"/>
+ <Button Width="32" Height="32" Margin="0,0,6,6" Background="#FF56C1A7" Tag="#FF56C1A7" Click="ColorPick_Click"/>
+ <Button Width="32" Height="32" Margin="0,0,6,6" Background="#FFCE6A6B" Tag="#FFCE6A6B" Click="ColorPick_Click"/>
+ <Button Width="32" Height="32" Margin="0,0,6,6" Background="#FF9AA0A6" Tag="#FF9AA0A6" Click="ColorPick_Click"/>
+ </WrapPanel>
+
+ <!-- Akcje -->
+ <StackPanel Orientation="Horizontal" Margin="0,12,0,0" HorizontalAlignment="Right">
+ <Button Content="Zapisz" Width="100" Margin="0,0,8,0" Click="SaveEdit_Click"/>
+ <Button Content="Anuluj" Width="100" Click="CancelEdit_Click"/>
  </StackPanel>
+ <TextBlock x:Name="EditPanelMessage" Foreground="OrangeRed" Margin="0,8,0,0"/>
  </StackPanel>
  </Border>
  </Grid>
@@ -403,28 +410,7 @@
  </StackPanel>
  </Border>
 
- <!-- Ustawienia kategorii -->
- <Border x:Name="SettingsPanel" Grid.Column="2" Padding="12" Background="{DynamicResource Surface.Background}" BorderBrush="{DynamicResource Surface.Border}" BorderThickness="1" CornerRadius="8" Visibility="Collapsed">
- <StackPanel>
- <TextBlock Text="Ustawienia kategorii" FontWeight="Bold" Foreground="{DynamicResource App.Foreground}" FontSize="16"/>
- <TextBlock Text="Opis kategorii" Margin="0,12,0,4" FontWeight="SemiBold" Foreground="{DynamicResource App.Foreground}"/>
- <TextBox x:Name="CategoryDescriptionBox" Height="80" TextWrapping="Wrap" AcceptsReturn="True"/>
- <TextBlock Text="Kolor kategorii" Margin="0,12,0,6" FontWeight="SemiBold" Foreground="{DynamicResource App.Foreground}"/>
- <WrapPanel x:Name="ColorPickerPanel" ItemWidth="32" ItemHeight="32">
- <Button Width="32" Height="32" Margin="0,0,6,6" Background="#FFED7A1A" Tag="#FFED7A1A" Click="ColorPick_Click"/>
- <Button Width="32" Height="32" Margin="0,0,6,6" Background="#FF3FA7D6" Tag="#FF3FA7D6" Click="ColorPick_Click"/>
- <Button Width="32" Height="32" Margin="0,0,6,6" Background="#FF7BC96F" Tag="#FF7BC96F" Click="ColorPick_Click"/>
- <Button Width="32" Height="32" Margin="0,0,6,6" Background="#FFAF7AC5" Tag="#FFAF7AC5" Click="ColorPick_Click"/>
- <Button Width="32" Height="32" Margin="0,0,6,6" Background="#FFF6BF26" Tag="#FFF6BF26" Click="ColorPick_Click"/>
- <Button Width="32" Height="32" Margin="0,0,6,6" Background="#FF56C1A7" Tag="#FF56C1A7" Click="ColorPick_Click"/>
- <Button Width="32" Height="32" Margin="0,0,6,6" Background="#FFCE6A6B" Tag="#FFCE6A6B" Click="ColorPick_Click"/>
- <Button Width="32" Height="32" Margin="0,0,6,6" Background="#FF9AA0A6" Tag="#FF9AA0A6" Click="ColorPick_Click"/>
- </WrapPanel>
- <StackPanel Orientation="Horizontal" Margin="0,16,0,0" HorizontalAlignment="Right">
- <Button Content="Zapisz ustawienia kategorii" Style="{StaticResource PrimaryButton}" Click="SaveCategorySettings_Click"/>
- </StackPanel>
- </StackPanel>
- </Border>
+ <!-- Ustawienia kategorii (USUNIĘTO GLOBALNY PANEL USTAWIEŃ) -->
  </Grid>
  </Grid>
  </Grid>

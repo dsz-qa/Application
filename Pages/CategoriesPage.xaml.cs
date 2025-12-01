@@ -274,15 +274,18 @@ namespace Finly.Pages
             if ((sender as FrameworkElement)?.Tag is CategoryVm vm)
             {
                 _editingVm = vm;
-                EditNameBox.Text = vm.Name;
+                _selectedCategory = vm; // set SelectedCategory-like state
 
-                // open side edit panel
+                // header is bound to DataContext of EditPanel; set locally via Name Text update
+                EditNameBox.Text = vm.Name;
+                EditDescriptionBox.Text = _categoryDescriptionDraft ?? string.Empty;
+
+                // open unified edit panel
                 EditPanel.Visibility = Visibility.Visible;
                 EditPanelMessage.Text = string.Empty;
 
-                // preselect current color in color picker by focusing matching button
+                // select current color
                 _selectedColorHex = (vm.ColorBrush as SolidColorBrush)?.Color.ToString() ?? string.Empty;
-                CategoryDescriptionBox.Text = _categoryDescriptionDraft ?? string.Empty;
             }
         }
 
@@ -382,23 +385,36 @@ namespace Finly.Pages
 
             try
             {
-                // Persist changes: name + color + icon
+                // Persist changes: name + color + description (description via categories table Description column if available)
                 string? colorToSave = null;
                 if (!string.IsNullOrWhiteSpace(_selectedColorHex))
                     colorToSave = _selectedColorHex;
 
-                // read icon from ComboBox if set
-                string? iconToSave = _selectedIcon;
-                var iconCombo = this.FindName("IconCombo") as ComboBox;
-                if (iconCombo?.SelectedItem is ComboBoxItem ci)
-                    iconToSave = ci.Content as string ?? (ci.Content as TextBlock)?.Text;
+                // description capture
+                _categoryDescriptionDraft = EditDescriptionBox.Text;
 
-                DatabaseService.UpdateCategoryFull(_editingVm.Id, _uid, newName, colorToSave, iconToSave ?? _editingVm.Icon);
+                // Update core fields we know exist (name/color/icon)
+                DatabaseService.UpdateCategoryFull(_editingVm.Id, _uid, newName, colorToSave, _editingVm.Icon);
+
+                // Try save description if DB has such column (best-effort)
+                try
+                {
+                    using var con = DatabaseService.GetConnection();
+                    using var cmd = con.CreateCommand();
+                    cmd.CommandText = "UPDATE Categories SET Description=@d WHERE Id=@id;";
+                    cmd.Parameters.AddWithValue("@d", (object?)_categoryDescriptionDraft ?? DBNull.Value);
+                    cmd.Parameters.AddWithValue("@id", _editingVm.Id);
+                    cmd.ExecuteNonQuery();
+                }
+                catch { }
 
                 // local update
                 _editingVm.Name = newName;
-                if (!string.IsNullOrWhiteSpace(iconToSave))
-                    _editingVm.Icon = iconToSave;
+                if (!string.IsNullOrWhiteSpace(_selectedColorHex))
+                {
+                    var brush = (Brush)(new BrushConverter().ConvertFromString(_selectedColorHex)!);
+                    _editingVm.ColorBrush = brush;
+                }
 
                 EditPanelMessage.Text = "Zapisano.";
                 EditPanel.Visibility = Visibility.Collapsed;
