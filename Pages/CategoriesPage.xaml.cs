@@ -8,9 +8,8 @@ using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Data;
-using System.Windows.Input;
 using System.Windows.Media;
-using Finly.Views.Controls;
+using System.Windows.Shapes;
 
 namespace Finly.Pages
 {
@@ -23,6 +22,26 @@ namespace Finly.Pages
 
         // editing state
         private CategoryVm? _editingVm;
+
+        // selected category state
+        private CategoryVm? _selectedCategory;
+        private readonly ObservableCollection<CategoryTransactionRow> _lastTransactions = new();
+        private string _selectedColorHex = string.Empty;
+        private string? _categoryDescriptionDraft;
+
+        // KPI element refs (resolved via FindName to avoid generated field dependency)
+        private TextBlock? _mostUsedName;
+        private TextBlock? _mostUsedCount;
+        private Rectangle? _mostUsedColor;
+
+        private TextBlock? _mostExpName;
+        private TextBlock? _mostExpAmount;
+        private ProgressBar? _mostExpPercentBar;
+        private TextBlock? _mostExpPercentText;
+
+        private TextBlock? _totalCats;
+        private TextBlock? _activeCats;
+        private TextBlock? _inactiveCats;
 
         public CategoriesPage() : this(UserService.GetCurrentUserId()) { }
 
@@ -40,18 +59,36 @@ namespace Finly.Pages
             // PeriodBar from XAML
             PeriodBar.RangeChanged += PeriodBar_RangeChanged;
 
-            // subscribe to donut clicks
-            SpendingChart.SliceClicked += SpendingChart_SliceClicked;
-            IncomeChart.SliceClicked += IncomeChart_SliceClicked;
+            // assign breakdown lists
+            LastTransactionsList.ItemsSource = _lastTransactions; // if exists (may be hidden now)
+
+            CategoriesList.AddHandler(Button.ClickEvent, new RoutedEventHandler(CategoryItem_Click));
+        }
+
+        private void EnsureKpiRefs()
+        {
+            _mostUsedName ??= FindName("MostUsedCategoryNameText") as TextBlock;
+            _mostUsedCount ??= FindName("MostUsedCountText") as TextBlock;
+            _mostUsedColor ??= FindName("MostUsedColorRect") as Rectangle;
+
+            _mostExpName ??= FindName("MostExpensiveNameText") as TextBlock;
+            _mostExpAmount ??= FindName("MostExpensiveAmountText") as TextBlock;
+            _mostExpPercentBar ??= FindName("MostExpensivePercentBar") as ProgressBar;
+            _mostExpPercentText ??= FindName("MostExpensivePercentText") as TextBlock;
+
+            _totalCats ??= FindName("TotalCategoriesText") as TextBlock;
+            _activeCats ??= FindName("ActiveCategoriesText") as TextBlock;
+            _inactiveCats ??= FindName("InactiveCategoriesText") as TextBlock;
         }
 
         private void CategoriesPage_Loaded(object sender, RoutedEventArgs e)
         {
             try
             {
+                EnsureKpiRefs();
                 EnsureDefaultCategories();
                 LoadCategories();
-                LoadCharts();
+                UpdateCategoryKpis();
             }
             catch (Exception ex)
             {
@@ -61,7 +98,112 @@ namespace Finly.Pages
 
         private void PeriodBar_RangeChanged(object? sender, EventArgs e)
         {
-            LoadCharts();
+            EnsureKpiRefs();
+            UpdateCategoryKpis();
+            if (_selectedCategory != null) LoadSelectedCategoryDetails();
+        }
+
+        // === KPI (nad szczegółami) ===
+        private void UpdateCategoryKpis()
+        {
+            EnsureKpiRefs();
+            try
+            {
+                DateTime from = PeriodBar.StartDate;
+                DateTime to = PeriodBar.EndDate;
+                if (from > to) (from, to) = (to, from);
+
+                //1) Wydatki w okresie
+                var dt = DatabaseService.GetExpenses(_uid, from, to, null, null, null);
+
+                // mapy
+                var counts = new Dictionary<string, int>(StringComparer.CurrentCultureIgnoreCase);
+                var sums = new Dictionary<string, decimal>(StringComparer.CurrentCultureIgnoreCase);
+                decimal totalSum = 0m;
+
+                foreach (System.Data.DataRow row in dt.Rows)
+                {
+                    try
+                    {
+                        var name = (row[6]?.ToString() ?? "").Trim();
+                        if (string.IsNullOrWhiteSpace(name) || name == "(brak)") continue;
+                        decimal amount = 0m;
+                        var val = row[3];
+                        if (val is decimal dec) amount = dec; else if (val is double d) amount = (decimal)d; else amount = Convert.ToDecimal(val);
+                        amount = Math.Abs(amount);
+
+                        counts[name] = counts.TryGetValue(name, out var c) ? c + 1 : 1;
+                        sums[name] = sums.TryGetValue(name, out var s) ? s + amount : amount;
+                        totalSum += amount;
+                    }
+                    catch { }
+                }
+
+                //2) Najczęściej używana
+                if (counts.Count > 0)
+                {
+                    var mostUsed = counts.OrderByDescending(kv => kv.Value).First();
+                    if (_mostUsedName != null) _mostUsedName.Text = mostUsed.Key;
+                    if (_mostUsedCount != null) _mostUsedCount.Text = $"Liczba transakcji: {mostUsed.Value}";
+                    try
+                    {
+                        var brush = GetBrushForName(mostUsed.Key);
+                        if (_mostUsedColor != null) _mostUsedColor.Fill = brush;
+                    }
+                    catch { }
+                }
+                else
+                {
+                    if (_mostUsedName != null) _mostUsedName.Text = "Brak danych dla wybranego okresu";
+                    if (_mostUsedCount != null) _mostUsedCount.Text = string.Empty;
+                    if (_mostUsedColor != null) _mostUsedColor.Fill = Brushes.Transparent;
+                }
+
+                //3) Najdroższa kategoria
+                if (sums.Count > 0)
+                {
+                    var mostExp = sums.OrderByDescending(kv => kv.Value).First();
+                    if (_mostExpName != null) _mostExpName.Text = mostExp.Key;
+                    if (_mostExpAmount != null) _mostExpAmount.Text = mostExp.Value.ToString("N2") + " zł";
+                    var pct = totalSum > 0m ? (double)(mostExp.Value / totalSum * 100m) : 0.0;
+                    if (_mostExpPercentBar != null) _mostExpPercentBar.Value = pct;
+                    if (_mostExpPercentText != null) _mostExpPercentText.Text = Math.Round(pct, 0) + "% wszystkich wydatków";
+                }
+                else
+                {
+                    if (_mostExpName != null) _mostExpName.Text = "Brak danych dla wybranego okresu";
+                    if (_mostExpAmount != null) _mostExpAmount.Text = string.Empty;
+                    if (_mostExpPercentBar != null) _mostExpPercentBar.Value = 0;
+                    if (_mostExpPercentText != null) _mostExpPercentText.Text = string.Empty;
+                }
+
+                //4) Twoje kategorie (łącznie, aktywne, nieużywane)
+                var allCats = DatabaseService.GetCategoriesByUser(_uid) ?? new List<string>();
+                int total = allCats.Count;
+                var activeSet = new HashSet<string>(sums.Where(kv => kv.Value > 0).Select(kv => kv.Key), StringComparer.CurrentCultureIgnoreCase);
+                int active = allCats.Count(c => activeSet.Contains(c));
+                int inactive = Math.Max(0, total - active);
+
+                if (_totalCats != null) _totalCats.Text = total.ToString(CultureInfo.CurrentCulture);
+                if (_activeCats != null) _activeCats.Text = active.ToString(CultureInfo.CurrentCulture);
+                if (_inactiveCats != null) _inactiveCats.Text = inactive.ToString(CultureInfo.CurrentCulture);
+            }
+            catch
+            {
+                // fallback bez wywalania wyjątków do UI
+                if (_mostUsedName != null) _mostUsedName.Text = "Brak danych dla wybranego okresu";
+                if (_mostUsedCount != null) _mostUsedCount.Text = string.Empty;
+                if (_mostUsedColor != null) _mostUsedColor.Fill = Brushes.Transparent;
+
+                if (_mostExpName != null) _mostExpName.Text = "Brak danych dla wybranego okresu";
+                if (_mostExpAmount != null) _mostExpAmount.Text = string.Empty;
+                if (_mostExpPercentBar != null) _mostExpPercentBar.Value = 0;
+                if (_mostExpPercentText != null) _mostExpPercentText.Text = string.Empty;
+
+                if (_totalCats != null) _totalCats.Text = "0";
+                if (_activeCats != null) _activeCats.Text = "0";
+                if (_inactiveCats != null) _inactiveCats.Text = "0";
+            }
         }
 
         // === Lista kategorii ===
@@ -117,7 +259,7 @@ namespace Finly.Pages
                 NewCategoryBox.Text = "";
                 MessageText.Text = "Kategoria dodana.";
                 LoadCategories();
-                LoadCharts();
+                UpdateCategoryKpis();
             }
             catch (Exception ex)
             {
@@ -204,7 +346,8 @@ namespace Finly.Pages
 
                 MessageText.Text = "Kategoria usunięta.";
                 LoadCategories();
-                LoadCharts();
+                HideCategoryPanels();
+                UpdateCategoryKpis();
             }
             catch (Exception ex)
             {
@@ -231,7 +374,7 @@ namespace Finly.Pages
                 EditPanel.Visibility = Visibility.Collapsed;
                 _editingVm = null;
                 LoadCategories();
-                LoadCharts();
+                UpdateCategoryKpis();
             }
             catch (Exception ex)
             {
@@ -246,136 +389,114 @@ namespace Finly.Pages
             EditPanelMessage.Text = string.Empty;
         }
 
-        private void DeleteCategory_Click(object sender, RoutedEventArgs e)
+        // === Selection of category from list ===
+        private void CategoryItem_Click(object sender, RoutedEventArgs e)
         {
-            if ((sender as FrameworkElement)?.Tag is CategoryVm vm)
+            if (e.OriginalSource is FrameworkElement fe && fe.DataContext is CategoryVm vm)
             {
-                var yes = MessageBox.Show($"Czy na pewno usunąć kategorię \"{vm.Name}\"? (operacja może wpłynąć na dane)", "Usuń kategorię", MessageBoxButton.YesNo, MessageBoxImage.Warning);
-                if (yes != MessageBoxResult.Yes) return;
-
-                TryDeleteCategory(vm);
+                _selectedCategory = vm;
+                ShowCategoryPanels();
+                LoadSelectedCategoryDetails();
             }
         }
 
-        // === Wykresy ===
-
-        private void LoadCharts()
+        private void ShowCategoryPanels()
         {
-            LoadSpendingChart();
-            LoadIncomeChart();
+            SummaryPanel.Visibility = Visibility.Visible;
+            TransactionsPanel.Visibility = Visibility.Visible;
+            SettingsPanel.Visibility = Visibility.Visible;
         }
 
-        private void LoadSpendingChart()
+        private void HideCategoryPanels()
         {
-            // prepare donut using Dashboard's PieSlice helper
-            // SpendingDonut.ItemsSource = null;
+            SummaryPanel.Visibility = Visibility.Collapsed;
+            TransactionsPanel.Visibility = Visibility.Collapsed;
+            SettingsPanel.Visibility = Visibility.Collapsed;
+        }
+
+        private void LoadSelectedCategoryDetails()
+        {
+            if (_selectedCategory == null) return;
+
+            int? catId = DatabaseService.GetCategoryIdByName(_uid, _selectedCategory.Name);
+            if (!catId.HasValue)
+            {
+                HideCategoryPanels();
+                return;
+            }
+
+            SummaryCategoryNameText.Text = _selectedCategory.Name;
 
             DateTime from = PeriodBar.StartDate;
             DateTime to = PeriodBar.EndDate;
             if (from > to) (from, to) = (to, from);
 
-            var data = DatabaseService.GetSpendingByCategorySafe(_uid, from, to) ?? new List<DatabaseService.CategoryAmountDto>();
-            if (!data.Any())
+            // sum + count in period
+            var expensesDt = DatabaseService.GetExpenses(_uid, from, to, catId, null, null);
+            decimal sum = 0m;
+            int count = 0;
+            foreach (System.Data.DataRow row in expensesDt.Rows)
             {
-                PieCenterNameText.Text = "Brak danych";
-                PieCenterValueText.Text = "0,00 zł";
-                PieCenterPercentText.Text = string.Empty;
-                // clear charts
-                SpendingChart.Draw(new Dictionary<string, decimal>(), 0, new Brush[0]);
-                return;
+                try
+                {
+                    sum += Convert.ToDecimal(row[3]);
+                    count++;
+                }
+                catch { }
+            }
+            SummaryTotalText.Text = "Suma wydatków w tym okresie: " + sum.ToString("N2") + " zł";
+
+            // monthly avg (based on months span)
+            double monthsSpan = Math.Max(1.0, (to - from).TotalDays / 30.0);
+            decimal monthlyAvg = monthsSpan <= 0 ? 0 : sum / (decimal)monthsSpan;
+            SummaryMonthlyAvgText.Text = "Średni wydatek w tej kategorii (miesięcznie): " + monthlyAvg.ToString("N2") + " zł";
+
+            SummaryTxnCountText.Text = count + (count == 1 ? " transakcja" : " transakcji");
+
+            // last transactions
+            _lastTransactions.Clear();
+            var txList = DatabaseService.GetLastTransactionsForCategory(_uid, catId.Value, 12);
+            foreach (var t in txList)
+            {
+                _lastTransactions.Add(new CategoryTransactionRow { Date = t.Date, Amount = t.Amount, Description = t.Description });
             }
 
-            var list = data.Where(x => x.Amount > 0).OrderByDescending(x => x.Amount).ToList();
-            var sum = list.Sum(x => x.Amount);
-            if (sum <= 0)
-            {
-                PieCenterNameText.Text = "Brak danych";
-                PieCenterValueText.Text = "0,00 zł";
-                PieCenterPercentText.Text = string.Empty;
-                SpendingChart.Draw(new Dictionary<string, decimal>(), 0, new Brush[0]);
-                return;
-            }
+            // load description draft (placeholder - no persistence column now)
+            CategoryDescriptionBox.Text = _categoryDescriptionDraft ?? string.Empty;
 
-            var palette = new[] { "#FFED7A1A", "#FF3FA7D6", "#FF7BC96F", "#FFAF7AC5", "#FFF6BF26", "#FF56C1A7", "#FFCE6A6B", "#FF9AA0A6" };
-            var used = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-            int idx = 0;
-
-            var totals = new Dictionary<string, decimal>();
-            foreach (var item in list)
-            {
-                totals[item.Name] = item.Amount;
-            }
-
-            var brushes = totals.Keys.Select((k, i) => (Brush)(new BrushConverter().ConvertFromString(palette[i % palette.Length])!)).ToArray();
-
-            SpendingChart.Draw(totals, sum, brushes);
-
-            PieCenterNameText.Text = "Wszystko";
-            PieCenterValueText.Text = sum.ToString("N2") + " zł";
-            PieCenterPercentText.Text = string.Empty;
+            // color selection default
+            _selectedColorHex = (_selectedCategory.ColorBrush as SolidColorBrush)?.Color.ToString() ?? string.Empty;
         }
 
-        private void LoadIncomeChart()
+        private void ColorPick_Click(object sender, RoutedEventArgs e)
         {
-            // IncomeDonut.ItemsSource = null;
-
-            DateTime from = PeriodBar.StartDate;
-            DateTime to = PeriodBar.EndDate;
-            if (from > to) (from, to) = (to, from);
-
-            var data = DatabaseService.GetIncomeBySourceSafe(_uid, from, to) ?? new List<DatabaseService.CategoryAmountDto>();
-            var list = data.Where(x => x.Amount > 0).OrderByDescending(x => x.Amount).ToList();
-            var sum = list.Sum(x => x.Amount);
-
-            if (sum <= 0)
+            if (sender is Button b && b.Tag is string hex)
             {
-                IncomeCenterNameText.Text = "Brak danych";
-                IncomeCenterValueText.Text = "0,00 zł";
-                IncomeCenterPercentText.Text = string.Empty;
-                IncomeChart.Draw(new Dictionary<string, decimal>(), 0, new Brush[0]);
-                return;
+                _selectedColorHex = hex;
+                b.Focus();
             }
-
-            var palette = new[] { "#FFED7A1A", "#FF3FA7D6", "#FF7BC96F", "#FFAF7AC5", "#FFF6BF26", "#FF56C1A7", "#FFCE6A6B", "#FF9AA0A6" };
-            var used = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-            int idx = 0;
-            var totals = new Dictionary<string, decimal>();
-            foreach (var item in list)
-            {
-                totals[item.Name] = item.Amount;
-            }
-            var brushes = totals.Keys.Select((k, i) => (Brush)(new BrushConverter().ConvertFromString(palette[i % palette.Length])!)).ToArray();
-
-            IncomeChart.Draw(totals, sum, brushes);
-
-            IncomeCenterNameText.Text = "Wszystko";
-            IncomeCenterValueText.Text = sum.ToString("N2") + " zł";
-            IncomeCenterPercentText.Text = string.Empty;
         }
 
-        private void SpendingChart_SliceClicked(object? sender, SliceClickedEventArgs e)
+        private void SaveCategorySettings_Click(object sender, RoutedEventArgs e)
         {
-            if (e == null) return;
-            var total = DatabaseService.GetSpendingByCategorySafe(_uid, PeriodBar.StartDate, PeriodBar.EndDate)?.Sum(x => x.Amount) ?? 0m;
-            if (total <= 0) return;
-            var share = e.Amount / total * 100m;
-            PieCenterNameText.Text = e.Name;
-            PieCenterValueText.Text = e.Amount.ToString("N2") + " zł";
-            PieCenterPercentText.Text = $"{share:N1}% udziału";
+            if (_selectedCategory == null) return;
 
-            // filter left list to this category
-            _categoriesView.Filter = obj => (obj as CategoryVm)?.Name == e.Name;
-        }
+            _categoryDescriptionDraft = CategoryDescriptionBox.Text;
 
-        private void IncomeChart_SliceClicked(object? sender, SliceClickedEventArgs e)
-        {
-            if (e == null) return;
-            var total = DatabaseService.GetIncomeBySourceSafe(_uid, PeriodBar.StartDate, PeriodBar.EndDate)?.Sum(x => x.Amount) ?? 0m;
-            if (total <= 0) return;
-            var share = e.Amount / total * 100m;
-            IncomeCenterNameText.Text = e.Name;
-            IncomeCenterValueText.Text = e.Amount.ToString("N2") + " zł";
-            IncomeCenterPercentText.Text = $"{share:N1}% udziału";
+            // apply color to VM only (no DB persistence yet)
+            try
+            {
+                if (!string.IsNullOrWhiteSpace(_selectedColorHex))
+                {
+                    var brush = (Brush)(new BrushConverter().ConvertFromString(_selectedColorHex)!);
+                    _selectedCategory.ColorBrush = brush;
+                }
+                MessageText.Text = "Zapisano ustawienia kategorii (lokalnie).";
+            }
+            catch (Exception ex)
+            {
+                MessageText.Text = "Błąd zapisu ustawień: " + ex.Message;
+            }
         }
 
         // === Domyślne kategorie ===
@@ -442,18 +563,20 @@ namespace Finly.Pages
             return (Brush)(new BrushConverter().ConvertFromString(palette[idx])!);
         }
 
-        private class CategoryVm
+        private class CategoryVm : INotifyPropertyChanged
         {
-            public string Name { get; set; } = "";
-            public Brush ColorBrush { get; set; } = Brushes.Gray;
+            private Brush _colorBrush = Brushes.Gray;
+            public string Name { get; set; } = string.Empty;
+            public Brush ColorBrush { get => _colorBrush; set { _colorBrush = value; OnPropertyChanged(nameof(ColorBrush)); } }
+            public event PropertyChangedEventHandler? PropertyChanged;
+            private void OnPropertyChanged(string prop) => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(prop));
         }
 
-        private class PieSliceModel
+        private class CategoryTransactionRow
         {
-            public string Name { get; set; } = "";
+            public DateTime Date { get; set; }
             public decimal Amount { get; set; }
-            public Brush Brush { get; set; } = Brushes.Gray;
-            public Geometry Geometry { get; set; } = Geometry.Empty;
+            public string Description { get; set; } = string.Empty;
         }
     }
 }

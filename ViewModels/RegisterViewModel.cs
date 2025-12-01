@@ -18,7 +18,7 @@ namespace Finly.ViewModels
 
         public RegisterViewModel()
         {
-            RegisterCommand = new RelayCommand(Register);
+            RegisterCommand = new RelayCommand(_ => Register()); // poprawka: lambda z parametrem
         }
 
         private void Register()

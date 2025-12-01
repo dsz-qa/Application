@@ -4,9 +4,9 @@ using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Windows;
 using System.Windows.Input;
-using Finly.Helpers;   // RelayCommand
-using Finly.Services;  // UserService
-using Finly.Views;     // DashboardView, LoginView
+using Finly.Helpers; // RelayCommand
+using Finly.Services; // UserService
+using Finly.Views; // DashboardView, LoginView
 
 
 namespace Finly.ViewModels
@@ -45,7 +45,7 @@ namespace Finly.ViewModels
         public LoginViewModel()
         {
             // CanExecute blokuje przycisk gdy pola s¹ puste
-            LoginCommand = new RelayCommand(Login, CanLogin);
+            LoginCommand = new RelayCommand(_ => Login(), _ => CanLogin()); // poprawka: lambdy z parametrem
         }
 
         private bool CanLogin()

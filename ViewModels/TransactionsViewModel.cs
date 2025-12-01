@@ -6,6 +6,7 @@ using System.Runtime.CompilerServices;
 using Finly.Services;
 using System.Data;
 using Finly.Models;
+using System.Collections.Generic;
 
 namespace Finly.ViewModels
 {
@@ -50,10 +51,14 @@ namespace Finly.ViewModels
  public ObservableCollection<CategoryFilterItem> Categories { get; } = new();
  public ObservableCollection<AccountFilterItem> Accounts { get; } = new();
 
- private bool _showScheduled = true; public bool ShowScheduled { get => _showScheduled; set { _showScheduled = value; OnPropertyChanged(); /* nie filtrujemy PlannedTransactionsList, tylko UI ukrywa kolumnê */ } }
+ private bool _showScheduled = true; public bool ShowScheduled { get => _showScheduled; set { _showScheduled = value; OnPropertyChanged(); /* UI ukrywa kolumnê */ } }
 
  public object? DateFrom { get; set; }
  public object? DateTo { get; set; }
+
+ // lokalne s³owniki nazw kont/kopert do budowania nazw transferów i wydatków
+ private Dictionary<int, string> _accountNameById = new();
+ private Dictionary<int, string> _envelopeNameById = new();
 
  public void Initialize(int userId)
  {
@@ -70,7 +75,16 @@ namespace Finly.ViewModels
  private void LoadLookupData()
  {
  Categories.Clear();
- try { foreach (var c in DatabaseService.GetCategoriesByUser(UserId) ?? new System.Collections.Generic.List<string>()) Categories.Add(new CategoryFilterItem { Name = c }); } catch { }
+ try { foreach (var c in DatabaseService.GetCategoriesByUser(UserId) ?? new System.Collections.Generic.List<string>()) Categories.Add(new CategoryFilterItem { Name = c, IsSelected = true }); } catch { }
+ // ensure special categories exist
+ void EnsureCat(string name)
+ {
+ if (!Categories.Any(x => string.Equals(x.Name, name, StringComparison.CurrentCultureIgnoreCase)))
+ Categories.Add(new CategoryFilterItem { Name = name, IsSelected = true });
+ }
+ EnsureCat("(brak)"); // expenses without category
+ EnsureCat("Przychód"); // incomes without category
+ EnsureCat("Transfer"); // transfers pseudo-category
  Categories.CollectionChanged += (s, e) =>
  {
  if (e.NewItems != null) foreach (CategoryFilterItem ci in e.NewItems) ci.PropertyChanged += (_, __) => ApplyFilters();
@@ -80,10 +94,10 @@ namespace Finly.ViewModels
  foreach (var ci in Categories) ci.PropertyChanged += (_, __) => ApplyFilters();
 
  Accounts.Clear();
- try { foreach (var a in DatabaseService.GetAccounts(UserId) ?? new System.Collections.Generic.List<Finly.Models.BankAccountModel>()) Accounts.Add(new AccountFilterItem { Name = a.AccountName }); } catch { }
- try { foreach (var env in DatabaseService.GetEnvelopesNames(UserId) ?? new System.Collections.Generic.List<string>()) Accounts.Add(new AccountFilterItem { Name = $"Koperta: {env}" }); } catch { }
- Accounts.Add(new AccountFilterItem { Name = "Wolna gotówka" });
- Accounts.Add(new AccountFilterItem { Name = "Od³o¿ona gotówka" });
+ try { foreach (var a in DatabaseService.GetAccounts(UserId) ?? new System.Collections.Generic.List<Finly.Models.BankAccountModel>()) Accounts.Add(new AccountFilterItem { Name = a.AccountName, IsSelected = true }); } catch { }
+ try { foreach (var env in DatabaseService.GetEnvelopesNames(UserId) ?? new System.Collections.Generic.List<string>()) Accounts.Add(new AccountFilterItem { Name = $"Koperta: {env}", IsSelected = true }); } catch { }
+ Accounts.Add(new AccountFilterItem { Name = "Wolna gotówka", IsSelected = true });
+ Accounts.Add(new AccountFilterItem { Name = "Od³o¿ona gotówka", IsSelected = true });
  // subscribe to account selection changes
  Accounts.CollectionChanged += (s, e) =>
  {
@@ -98,6 +112,10 @@ namespace Finly.ViewModels
  {
  if (UserId <=0) return;
  AllTransactions.Clear();
+
+ // zbuduj s³owniki pomocnicze
+ try { _accountNameById = DatabaseService.GetAccounts(UserId).ToDictionary(a => a.Id, a => a.AccountName); } catch { _accountNameById = new(); }
+ try { var envDt = DatabaseService.GetEnvelopesTable(UserId); _envelopeNameById = new(); if (envDt != null) foreach (DataRow rr in envDt.Rows) { try { var id = Convert.ToInt32(rr["Id"]); var nm = rr["Name"]?.ToString() ?? ""; if (id>0) _envelopeNameById[id] = nm; } catch { } } } catch { _envelopeNameById = new(); }
 
  DataTable expDt = null; try { expDt = DatabaseService.GetExpenses(UserId); } catch { }
  if (expDt != null) foreach (DataRow r in expDt.Rows) AddExpenseRow(r);
@@ -133,8 +151,8 @@ namespace Finly.ViewModels
  DateTime date = ParseDate(r["Date"]); string desc = r["Description"]?.ToString() ?? string.Empty;
  string catName = r["CategoryName"]?.ToString() ?? string.Empty; bool planned = r.Table.Columns.Contains("IsPlanned") && r["IsPlanned"] != DBNull.Value && Convert.ToInt32(r["IsPlanned"]) ==1;
  int? accountId = r.Table.Columns.Contains("AccountId") && r["AccountId"] != DBNull.Value ? (int?)Convert.ToInt32(r["AccountId"]) : null;
- string accountName = string.Empty; if (accountId.HasValue) { try { var acc = DatabaseService.GetAccounts(UserId).FirstOrDefault(a => a.Id == accountId.Value); accountName = acc?.AccountName ?? string.Empty; } catch { } }
- if (string.IsNullOrWhiteSpace(accountName)) accountName = "Gotówka";
+ string accountName = string.Empty;
+ if (accountId.HasValue && _accountNameById.TryGetValue(accountId.Value, out var accn)) accountName = accn; else accountName = "Wolna gotówka"; // domyœlnie gotówka wolna
  AllTransactions.Add(new TransactionCardVm { Id = id, Kind = TransactionKind.Expense, CategoryName = catName, Description = desc, DateDisplay = date.ToString("yyyy-MM-dd"), AmountStr = amt.ToString("N2") + " z³", IsPlanned = planned, IsFuture = date.Date > DateTime.Today, CategoryIcon = "?", AccountName = accountName });
  }
  private void AddIncomeRow(DataRow r)
@@ -143,14 +161,40 @@ namespace Finly.ViewModels
  DateTime date = ParseDate(r["Date"]); string desc = r["Description"]?.ToString() ?? string.Empty;
  string source = r["Source"]?.ToString() ?? string.Empty; string catName = r.Table.Columns.Contains("CategoryName") ? (r["CategoryName"]?.ToString() ?? "") : "";
  bool planned = r.Table.Columns.Contains("IsPlanned") && r["IsPlanned"] != DBNull.Value && Convert.ToInt32(r["IsPlanned"]) ==1;
- AllTransactions.Add(new TransactionCardVm { Id = id, Kind = TransactionKind.Income, CategoryName = string.IsNullOrEmpty(catName) ? "Przychód" : catName, Description = desc, DateDisplay = date.ToString("yyyy-MM-dd"), AmountStr = amt.ToString("N2") + " z³", IsPlanned = planned, IsFuture = date.Date > DateTime.Today, CategoryIcon = "+", AccountName = source });
+ // Na konto: jeœli pusta nazwa, za³ó¿my wolna gotówka
+ var dest = string.IsNullOrWhiteSpace(source) ? "Wolna gotówka" : source;
+ AllTransactions.Add(new TransactionCardVm { Id = id, Kind = TransactionKind.Income, CategoryName = string.IsNullOrEmpty(catName) ? "Przychód" : catName, Description = desc, DateDisplay = date.ToString("yyyy-MM-dd"), AmountStr = amt.ToString("N2") + " z³", IsPlanned = planned, IsFuture = date.Date > DateTime.Today, CategoryIcon = "+", AccountName = dest });
  }
  private void AddTransferRow(DataRow r)
  {
  int id = Convert.ToInt32(r["Id"]); decimal amt = Convert.ToDecimal(r["Amount"]);
  DateTime date = ParseDate(r["Date"]); string desc = r["Description"]?.ToString() ?? "Transfer"; bool planned = r.Table.Columns.Contains("IsPlanned") && r["IsPlanned"] != DBNull.Value && Convert.ToInt32(r["IsPlanned"]) ==1;
- string fromKind = r.Table.Columns.Contains("FromKind") ? r["FromKind"]?.ToString() ?? "" : ""; string toKind = r.Table.Columns.Contains("ToKind") ? r["ToKind"]?.ToString() ?? "" : ""; string accountDisplay = fromKind + "?" + toKind;
+ string fromKind = r.Table.Columns.Contains("FromKind") ? r["FromKind"]?.ToString() ?? "" : ""; string toKind = r.Table.Columns.Contains("ToKind") ? r["ToKind"]?.ToString() ?? "" : "";
+ int? fromRef = null; try { if (r.Table.Columns.Contains("FromRefId") && r["FromRefId"] != DBNull.Value) fromRef = Convert.ToInt32(r["FromRefId"]); } catch { }
+ int? toRef = null; try { if (r.Table.Columns.Contains("ToRefId") && r["ToRefId"] != DBNull.Value) toRef = Convert.ToInt32(r["ToRefId"]); } catch { }
+ string fromName = ResolveAccountDisplay(fromKind, fromRef);
+ string toName = ResolveAccountDisplay(toKind, toRef);
+ string accountDisplay = fromName + " ? " + toName;
  AllTransactions.Add(new TransactionCardVm { Id = id, Kind = TransactionKind.Transfer, CategoryName = "Transfer", Description = desc, DateDisplay = date.ToString("yyyy-MM-dd"), AmountStr = amt.ToString("N2") + " z³", IsPlanned = planned, IsFuture = date.Date > DateTime.Today, CategoryIcon = "?", AccountName = accountDisplay });
+ }
+
+ private string ResolveAccountDisplay(string kind, int? id)
+ {
+ switch ((kind ?? string.Empty).Trim().ToLowerInvariant())
+ {
+ case "bank":
+ if (id.HasValue && _accountNameById.TryGetValue(id.Value, out var acc)) return acc;
+ return "Konto bankowe";
+ case "cash":
+ return "Wolna gotówka";
+ case "saved":
+ return "Od³o¿ona gotówka";
+ case "envelope":
+ if (id.HasValue && _envelopeNameById.TryGetValue(id.Value, out var env)) return $"Koperta: {env}";
+ return "Koperta";
+ default:
+ return string.Empty;
+ }
  }
 
  private DateTime ParseDate(object? raw) { if (raw is DateTime dt) return dt; if (DateTime.TryParse(raw?.ToString(), out var p)) return p; return DateTime.MinValue; }
@@ -180,17 +224,20 @@ namespace Finly.ViewModels
  if (selectedAccounts.Count ==0) return true;
  string Normalize(string s) => (s ?? string.Empty).Trim();
  var set = selectedAccounts.Select(Normalize).ToHashSet(StringComparer.CurrentCultureIgnoreCase);
+ // cash synonyms
+ bool MatchesCash(string name) => name.IndexOf("gotówka", StringComparison.CurrentCultureIgnoreCase) >=0 && (set.Contains("Wolna gotówka") || set.Contains("Od³o¿ona gotówka"));
  if (t.Kind == TransactionKind.Transfer)
  {
  var raw = Normalize(t.AccountName);
  var parts = raw.Split('?');
  var from = parts.Length >0 ? Normalize(parts[0]) : string.Empty;
  var to = parts.Length >1 ? Normalize(parts[1]) : string.Empty;
- return set.Contains(from) || set.Contains(to);
+ return set.Contains(from) || set.Contains(to) || MatchesCash(from) || MatchesCash(to);
  }
  else
  {
- return set.Contains(Normalize(t.AccountName));
+ var n = Normalize(t.AccountName);
+ return set.Contains(n) || MatchesCash(n);
  }
  }
 
@@ -209,8 +256,7 @@ namespace Finly.ViewModels
  // Custom override
  if (DateFrom is DateTime df && DateTo is DateTime dt)
  {
- from = df.Date;
- to = dt.Date;
+ from = df.Date; to = dt.Date;
  }
 
  var typeSelected = new[] { (TransactionKind.Expense, ShowExpenses), (TransactionKind.Income, ShowIncomes), (TransactionKind.Transfer, ShowTransfers) }

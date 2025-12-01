@@ -4,13 +4,13 @@
              xmlns:views="clr-namespace:Finly.Views.Controls">
     <Grid Margin="16">
         <Grid.RowDefinitions>
-            <RowDefinition Height="Auto"/>    <!-- Header -->
-            <RowDefinition Height="Auto"/>    <!-- New container placeholder -->
-            <RowDefinition Height="Auto"/>    <!-- Controls (add budget etc.) -->
-            <RowDefinition Height="*"/>    <!-- Budgets list -->
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
         </Grid.RowDefinitions>
 
         <Grid.Resources>
+            <BooleanToVisibilityConverter x:Key="BoolToVisibility"/>
             <!-- Budget card template -->
             <DataTemplate x:Key="BudgetItemTemplate">
                 <Border BorderBrush="{DynamicResource Brand.Blue}" BorderThickness="2" CornerRadius="10" Padding="12" Margin="0,0,0,12" Background="{DynamicResource Surface.Background}">
@@ -53,107 +53,96 @@
                     </Grid>
                 </Border>
             </DataTemplate>
-
-            <Style x:Key="PeriodSelectorRadioStyle" TargetType="RadioButton">
-                <Setter Property="Foreground" Value="{DynamicResource App.Foreground}"/>
-                <Setter Property="FontWeight" Value="SemiBold"/>
-                <Setter Property="Margin" Value="0,0,12,0"/>
-                <Setter Property="Cursor" Value="Hand"/>
-                <Setter Property="Template">
-                    <Setter.Value>
-                        <ControlTemplate TargetType="RadioButton">
-                            <Border x:Name="Outer" Padding="10,6" CornerRadius="20" BorderThickness="2" BorderBrush="{DynamicResource Surface.Border}" Background="{DynamicResource Surface.Background}">
-                                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                                    <Ellipse x:Name="Dot" Width="14" Height="14" StrokeThickness="2" Stroke="{DynamicResource Surface.Border}" Fill="Transparent"/>
-                                    <TextBlock Text="{TemplateBinding Content}" Margin="8,0,0,0" FontSize="13" Foreground="{DynamicResource App.Foreground}"/>
-                                </StackPanel>
-                            </Border>
-                            <ControlTemplate.Triggers>
-                                <Trigger Property="IsChecked" Value="True">
-                                    <Setter TargetName="Outer" Property="BorderBrush" Value="{DynamicResource Brand.Blue}"/>
-                                    <Setter TargetName="Outer" Property="Background" Value="{DynamicResource Brand.Blue}"/>
-                                    <Setter TargetName="Dot" Property="Fill" Value="{DynamicResource Accent.Foreground}"/>
-                                    <Setter TargetName="Dot" Property="Stroke" Value="{DynamicResource Accent.Foreground}"/>
-                                    <Setter Property="Foreground" Value="{DynamicResource Accent.Foreground}"/>
-                                </Trigger>
-                                <Trigger Property="IsMouseOver" Value="True">
-                                    <Setter TargetName="Outer" Property="Background" Value="{DynamicResource Btn.Hover}"/>
-                                </Trigger>
-                            </ControlTemplate.Triggers>
-                        </ControlTemplate>
-                    </Setter.Value>
-                </Setter>
-                <Style.Triggers>
-                    <DataTrigger Binding="{Binding SelectedPeriod}" Value="Week">
-                        <Setter Property="IsChecked" Value="True"/>
-                        <Setter Property="Tag" Value="Week"/>
-                    </DataTrigger>
-                    <DataTrigger Binding="{Binding SelectedPeriod}" Value="Month">
-                        <Setter Property="IsChecked" Value="True"/>
-                        <Setter Property="Tag" Value="Month"/>
-                    </DataTrigger>
-                    <DataTrigger Binding="{Binding SelectedPeriod}" Value="Quarter">
-                        <Setter Property="IsChecked" Value="True"/>
-                        <Setter Property="Tag" Value="Quarter"/>
-                    </DataTrigger>
-                    <DataTrigger Binding="{Binding SelectedPeriod}" Value="Year">
-                        <Setter Property="IsChecked" Value="True"/>
-                        <Setter Property="Tag" Value="Year"/>
-                    </DataTrigger>
-                </Style.Triggers>
-            </Style>
         </Grid.Resources>
 
         <!-- Header -->
         <TextBlock Text="Budżety" FontSize="18" FontWeight="Bold"/>
 
-        <!-- New empty container for future period selector, navigation arrows, summary tile, and budgets list header -->
-        <Grid Grid.Row="1" Margin="0,12,0,12" x:Name="TopFiltersContainer">
-            <Grid.RowDefinitions>
-                <RowDefinition Height="Auto"/> <!-- Period selector -->
-                <RowDefinition Height="Auto"/> <!-- Navigation row -->
-            </Grid.RowDefinitions>
-            <StackPanel Orientation="Horizontal" x:Name="PeriodSelector" HorizontalAlignment="Left">
-                <RadioButton Content="Tydzień" Tag="Week" Style="{StaticResource PeriodSelectorRadioStyle}"/>
-                <RadioButton Content="Miesiąc" Tag="Month" Style="{StaticResource PeriodSelectorRadioStyle}"/>
-                <RadioButton Content="Kwartał" Tag="Quarter" Style="{StaticResource PeriodSelectorRadioStyle}"/>
-                <RadioButton Content="Rok" Tag="Year" Style="{StaticResource PeriodSelectorRadioStyle}"/>
-            </StackPanel>
-            <StackPanel Grid.Row="1" Orientation="Horizontal" HorizontalAlignment="Left" Margin="0,8,0,0">
-                <Button Content="&lt;&lt;" Style="{StaticResource PrimaryButton}" Width="56" Padding="10,6"/>
-                <TextBlock Text="{Binding CurrentPeriodName}" FontSize="16" FontWeight="Bold" Foreground="{DynamicResource App.Foreground}" Margin="12,0,12,0" VerticalAlignment="Center"/>
-                <Button Content="&gt;&gt;" Style="{StaticResource PrimaryButton}" Width="56" Padding="10,6"/>
-            </StackPanel>
-        </Grid>
+        <!-- Top add tile -->
+        <Border Grid.Row="1" BorderBrush="{DynamicResource Brand.Blue}" BorderThickness="2" CornerRadius="10" Padding="16" Background="Transparent" Margin="0,12,0,12">
+            <Button Content="Dodaj budżet" Style="{StaticResource PrimaryButton}" HorizontalAlignment="Stretch" Padding="16" Command="{Binding ToggleAddPanelCommand}"/>
+        </Border>
 
-        <!-- Existing add budget controls -->
-        <StackPanel Orientation="Horizontal" Grid.Row="2" Margin="0,0,0,12" VerticalAlignment="Center" >
-            <TextBox x:Name="NameBox" Width="160" />
-            <ComboBox x:Name="TypeBox" Width="140" Margin="8,0,0,0">
-                <ComboBoxItem Content="Miesięczny" Tag="Monthly" />
-                <ComboBoxItem Content="Tygodniowy" Tag="Weekly" />
-                <ComboBoxItem Content="Roll-over" Tag="Rollover" />
-                <ComboBoxItem Content="Jednorazowy" Tag="OneTime" />
-            </ComboBox>
-            <ComboBox x:Name="CategoryBox" Width="160" IsEditable="True" Margin="8,0,0,0"/>
-            <TextBox x:Name="AmountBox" Width="100" Margin="8,0,0,0"/>
-            <Button x:Name="AddBtn" Content="Dodaj budżet" Click="AddBtn_Click" Margin="8,0,0,0"/>
-            <Button x:Name="RefreshBtn" Content="Odśwież" Click="RefreshBtn_Click" Margin="8,0,0,0"/>
-            <StackPanel Orientation="Vertical" Margin="12,0,0,0">
-                <TextBlock Text="Bezpieczeństwo:" FontWeight="SemiBold"/>
-                <TextBlock x:Name="SafetyText" Text="—" />
-            </StackPanel>
-        </StackPanel>
+        <!-- Main content: add panel + sections -->
+        <ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto">
+            <StackPanel Orientation="Vertical">
+                <!-- Collapsible add panel -->
+                <Border BorderBrush="{DynamicResource Surface.Border}" BorderThickness="1" CornerRadius="8" Padding="12" Background="{DynamicResource Surface.Background}" Margin="0,0,0,12" Visibility="{Binding IsAddPanelVisible, Converter={StaticResource BoolToVisibility}}">
+                    <StackPanel Orientation="Vertical">
+                        <TextBlock Text="Dodaj nowy budżet" FontSize="16" FontWeight="Bold" Foreground="{DynamicResource App.Foreground}"/>
 
-        <!-- Budgets list -->
-        <ScrollViewer Grid.Row="3">
-            <ItemsControl x:Name="BudgetsItems" ItemTemplate="{StaticResource BudgetItemTemplate}" ItemsSource="{Binding Budgets}">
-                <ItemsControl.ItemsPanel>
-                    <ItemsPanelTemplate>
-                        <WrapPanel Orientation="Horizontal" ItemWidth="350" MinWidth="200" />
-                    </ItemsPanelTemplate>
-                </ItemsControl.ItemsPanel>
-            </ItemsControl>
+                        <!-- Sekcja1: wybór rodzaju budżetu -->
+                        <StackPanel Orientation="Vertical" Margin="0,8,0,0">
+                            <TextBlock Text="Rodzaj budżetu" FontWeight="SemiBold"/>
+                            <StackPanel Orientation="Horizontal" Margin="0,6,0,0">
+                                <RadioButton x:Name="TypeMonthlyRadio" Content="Miesięczny" GroupName="BudgetType" Margin="0,0,8,0"/>
+                                <RadioButton x:Name="TypeWeeklyRadio" Content="Tygodniowy" GroupName="BudgetType" Margin="0,0,8,0"/>
+                                <RadioButton x:Name="TypeQuarterlyRadio" Content="Kwartalny" GroupName="BudgetType" Margin="0,0,8,0"/>
+                                <RadioButton x:Name="TypeYearlyRadio" Content="Roczny" GroupName="BudgetType"/>
+                            </StackPanel>
+                        </StackPanel>
+
+                        <!-- Sekcja2: wybór kategorii -->
+                        <StackPanel Orientation="Vertical" Margin="0,12,0,0">
+                            <TextBlock Text="Kategoria" FontWeight="SemiBold"/>
+                            <ComboBox x:Name="FormCategoryBox" Width="240" IsEditable="True" Margin="0,6,0,0"/>
+                        </StackPanel>
+
+                        <!-- Sekcja3: szczegóły -->
+                        <StackPanel Orientation="Vertical" Margin="0,12,0,0">
+                            <TextBlock Text="Szczegóły" FontWeight="SemiBold"/>
+                            <StackPanel Orientation="Horizontal" Margin="0,6,0,0">
+                                <TextBox x:Name="FormAmountBox" Width="120"/>
+                                <CheckBox x:Name="RepeatCheck" Content="Powtarzaj w kolejnych okresach" Margin="12,0,0,0"/>
+                                <CheckBox x:Name="RolloverCheck" Content="Przenoś niewykorzystane środki" Margin="12,0,0,0"/>
+                            </StackPanel>
+                        </StackPanel>
+
+                        <!-- Przyciski na dole -->
+                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,16,0,0">
+                            <Button x:Name="CancelFormBtn" Content="Anuluj" Margin="0,0,8,0" Click="CancelFormBtn_Click"/>
+                            <Button x:Name="SaveBudgetBtn" Content="Zapisz budżet" Style="{StaticResource PrimaryButton}" Click="SaveBudgetBtn_Click"/>
+                        </StackPanel>
+                    </StackPanel>
+                </Border>
+
+                <!-- Sections -->
+                <TextBlock Text="Budżety miesięczne" FontSize="16" FontWeight="Bold" Foreground="{DynamicResource App.Foreground}" Margin="0,0,0,8"/>
+                <ItemsControl ItemTemplate="{StaticResource BudgetItemTemplate}" ItemsSource="{Binding BudgetsMonthly}">
+                    <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate>
+                            <WrapPanel Orientation="Horizontal" ItemWidth="360"/>
+                        </ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                </ItemsControl>
+
+                <TextBlock Text="Budżety tygodniowe" FontSize="16" FontWeight="Bold" Foreground="{DynamicResource App.Foreground}" Margin="0,16,0,8"/>
+                <ItemsControl ItemTemplate="{StaticResource BudgetItemTemplate}" ItemsSource="{Binding BudgetsWeekly}">
+                    <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate>
+                            <WrapPanel Orientation="Horizontal" ItemWidth="360"/>
+                        </ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                </ItemsControl>
+
+                <TextBlock Text="Budżety kwartalne" FontSize="16" FontWeight="Bold" Foreground="{DynamicResource App.Foreground}" Margin="0,16,0,8"/>
+                <ItemsControl ItemTemplate="{StaticResource BudgetItemTemplate}" ItemsSource="{Binding BudgetsQuarterly}">
+                    <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate>
+                            <WrapPanel Orientation="Horizontal" ItemWidth="360"/>
+                        </ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                </ItemsControl>
+
+                <TextBlock Text="Budżety roczne" FontSize="16" FontWeight="Bold" Foreground="{DynamicResource App.Foreground}" Margin="0,16,0,8"/>
+                <ItemsControl ItemTemplate="{StaticResource BudgetItemTemplate}" ItemsSource="{Binding BudgetsYearly}">
+                    <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate>
+                            <WrapPanel Orientation="Horizontal" ItemWidth="360"/>
+                        </ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                </ItemsControl>
+            </StackPanel>
         </ScrollViewer>
     </Grid>
 </UserControl>

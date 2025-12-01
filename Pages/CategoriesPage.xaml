@@ -6,98 +6,189 @@
  xmlns:ctrls="clr-namespace:Finly.Views.Controls"
  mc:Ignorable="d">
 
+ <UserControl.Resources>
+ <!-- Watermark / placeholder dla TextBox -->
+ <Style x:Key="WatermarkTextBoxStyle" TargetType="TextBox">
+ <Setter Property="Foreground" Value="White"/>
+ <Setter Property="Template">
+ <Setter.Value>
+ <ControlTemplate TargetType="TextBox">
+ <Grid>
+ <ScrollViewer x:Name="PART_ContentHost"/>
+ <TextBlock x:Name="Watermark"
+ Text="{TemplateBinding Tag}"
+ Foreground="#666"
+ Margin="6,0,0,0"
+ VerticalAlignment="Center"
+ IsHitTestVisible="False"
+ Visibility="Collapsed"/>
+ </Grid>
+ <ControlTemplate.Triggers>
+ <Trigger Property="Text" Value="">
+ <Setter TargetName="Watermark" Property="Visibility" Value="Visible"/>
+ </Trigger>
+ <Trigger Property="IsFocused" Value="True">
+ <Setter TargetName="Watermark" Property="Visibility" Value="Collapsed"/>
+ </Trigger>
+ </ControlTemplate.Triggers>
+ </ControlTemplate>
+ </Setter.Value>
+ </Setter>
+ </Style>
+
+ <!-- Style KPI spójne z Dashboard -->
+ <Style x:Key="KpiCard" TargetType="Border">
+ <Setter Property="Background" Value="Transparent"/>
+ <Setter Property="BorderBrush" Value="{DynamicResource Brand.Blue}"/>
+ <Setter Property="BorderThickness" Value="2"/>
+ <Setter Property="CornerRadius" Value="10"/>
+ <Setter Property="Padding" Value="12"/>
+ <Setter Property="Margin" Value="0,0,16,0"/>
+ </Style>
+ <Style x:Key="KpiHeader" TargetType="TextBlock">
+ <Setter Property="FontSize" Value="16"/>
+ <Setter Property="FontWeight" Value="Bold"/>
+ <Setter Property="Foreground" Value="White"/>
+ </Style>
+ <Style x:Key="KpiValueStyle" TargetType="TextBlock">
+ <Setter Property="FontSize" Value="18"/>
+ <Setter Property="FontWeight" Value="Bold"/>
+ <Setter Property="Foreground" Value="{DynamicResource App.Foreground}"/>
+ </Style>
+ </UserControl.Resources>
+
  <Grid Margin="16">
+ <Grid.RowDefinitions>
+ <RowDefinition Height="Auto"/>
+ <RowDefinition Height="Auto"/>
+ <RowDefinition Height="*"/> <!-- Categories take available space -->
+ <RowDefinition Height="Auto"/> <!-- Details below -->
+ </Grid.RowDefinitions>
+
+ <!--1) KPI: pełna szerokość, trzy kolumny -->
+ <Grid Grid.Row="0" Margin="0,0,0,12">
  <Grid.ColumnDefinitions>
- <ColumnDefinition Width="340"/>
- <ColumnDefinition Width="16"/>
  <ColumnDefinition Width="*"/>
- <ColumnDefinition Width="2*" />
- <ColumnDefinition Width="16" />
- <ColumnDefinition Width="3*" />
+ <ColumnDefinition Width="*"/>
+ <ColumnDefinition Width="*"/>
  </Grid.ColumnDefinitions>
 
- <!-- LEWY PANEL: Kategorie -->
- <!-- LEFT: Categories -->
- <Border Grid.Column="0"
+ <!-- Najczęściej używana -->
+ <Border Grid.Column="0" Style="{StaticResource KpiCard}">
+ <StackPanel>
+ <TextBlock Text="Najczęściej używana kategoria w tym okresie" Style="{StaticResource KpiHeader}" TextWrapping="Wrap"/>
+ <StackPanel Orientation="Horizontal" Margin="0,6,0,0" VerticalAlignment="Center">
+ <Rectangle x:Name="MostUsedColorRect" Width="14" Height="14" RadiusX="3" RadiusY="3" Margin="0,0,6,0"/>
+ <TextBlock x:Name="MostUsedCategoryNameText" Style="{StaticResource KpiValueStyle}" Text="Brak danych dla wybranego okresu"/>
+ </StackPanel>
+ <TextBlock x:Name="MostUsedCountText" Foreground="{DynamicResource App.Foreground}" Opacity="0.85"/>
+ </StackPanel>
+ </Border>
+
+ <!-- Najdroższa -->
+ <Border Grid.Column="1" Style="{StaticResource KpiCard}">
+ <StackPanel>
+ <TextBlock Text="Najdroższa kategoria w tym okresie" Style="{StaticResource KpiHeader}" TextWrapping="Wrap"/>
+ <TextBlock x:Name="MostExpensiveNameText" Style="{StaticResource KpiValueStyle}" Text="Brak danych dla wybranego okresu"/>
+ <TextBlock x:Name="MostExpensiveAmountText" Foreground="{DynamicResource App.Foreground}" Margin="0,2,0,0"/>
+ <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,6,0,0">
+ <ProgressBar x:Name="MostExpensivePercentBar" Minimum="0" Maximum="100" Height="10" Width="140"/>
+ <TextBlock x:Name="MostExpensivePercentText" Margin="8,0,0,0" Foreground="{DynamicResource App.Foreground}"/>
+ </StackPanel>
+ </StackPanel>
+ </Border>
+
+ <!-- Twoje kategorie -->
+ <Border Grid.Column="2" Style="{StaticResource KpiCard}">
+ <StackPanel>
+ <TextBlock Text="Twoje kategorie" Style="{StaticResource KpiHeader}"/>
+ <StackPanel Orientation="Horizontal" Margin="0,6,0,0">
+ <StackPanel>
+ <TextBlock Text="Łącznie" Foreground="{DynamicResource App.Foreground}"/>
+ <TextBlock x:Name="TotalCategoriesText" Style="{StaticResource KpiValueStyle}" Text="0"/>
+ </StackPanel>
+ <StackPanel Margin="16,0,0,0">
+ <TextBlock Text="Aktywne (w okresie)" Foreground="{DynamicResource App.Foreground}"/>
+ <TextBlock x:Name="ActiveCategoriesText" Style="{StaticResource KpiValueStyle}" Text="0"/>
+ </StackPanel>
+ <StackPanel Margin="16,0,0,0">
+ <TextBlock Text="Nieużywane" Foreground="{DynamicResource App.Foreground}"/>
+ <TextBlock x:Name="InactiveCategoriesText" Style="{StaticResource KpiValueStyle}" Text="0"/>
+ </StackPanel>
+ </StackPanel>
+ </StackPanel>
+ </Border>
+ </Grid>
+
+ <!--2) Pasek wyboru okresu – na środku -->
+ <ctrls:PeriodBarControl x:Name="PeriodBar" Grid.Row="1" HorizontalAlignment="Center" Margin="0,0,0,12" />
+
+ <!--3) Ramka kategorii – poziomo pod paskiem -->
+ <Border Grid.Row="2"
  Padding="12"
  Background="{DynamicResource Surface.Background}"
  BorderBrush="{DynamicResource Surface.Border}"
  BorderThickness="1"
  CornerRadius="8"
- VerticalAlignment="Stretch">
-
+ Margin="0,0,0,12">
  <Grid>
  <Grid.RowDefinitions>
  <RowDefinition Height="Auto"/> <!-- header -->
  <RowDefinition Height="Auto"/> <!-- search -->
- <RowDefinition Height="*"/> <!-- list -->
- <RowDefinition Height="Auto"/> <!-- add area -->
+ <RowDefinition Height="Auto"/> <!-- add area under search -->
+ <RowDefinition Height="*"/> <!-- list gets space -->
+ <RowDefinition Height="Auto"/> <!-- structure + details side-by-side -->
  <RowDefinition Height="Auto"/> <!-- edit panel -->
  </Grid.RowDefinitions>
 
- <TextBlock Text="Kategorie"
- FontSize="22"
- FontWeight="Bold"
- Foreground="{DynamicResource App.Foreground}"
- Margin="0,0,0,12"/>
+ <TextBlock Text="Kategorie" FontSize="22" FontWeight="Bold" Foreground="{DynamicResource App.Foreground}" Margin="0,0,0,12"/>
 
- <!-- Wyszukiwarka (nad listą) -->
- <DockPanel Grid.Row="1" Margin="0,0,0,10" LastChildFill="True">
+ <!-- Wyszukiwarka: ikona przed polem -->
+ <DockPanel Grid.Row="1" Margin="0,0,0,8" LastChildFill="True">
+ <Image Source="pack://application:,,,/Assets/Icons/search.png" Width="16" Height="16" VerticalAlignment="Center" Margin="0,0,6,0"/>
  <TextBox x:Name="SearchBox"
  Height="28"
  VerticalAlignment="Top"
  TextChanged="SearchBox_TextChanged"
- MinWidth="220" />
-
- <Button Width="34" Height="28" Margin="8,0,0,0" DockPanel.Dock="Right" ToolTip="Szukaj">
- <Image Source="pack://application:,,,/Assets/Icons/search.png" Width="16" Height="16" />
- </Button>
+ MinWidth="220"
+ Tag="Szukaj"
+ Style="{StaticResource WatermarkTextBoxStyle}"/>
  </DockPanel>
 
- <ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto">
+ <!-- Dodawanie kategorii: etykieta, pole, przycisk pod polem -->
+ <StackPanel Grid.Row="2" Orientation="Vertical" Margin="0,0,0,8">
+ <TextBlock Text="Dodaj kategorię" FontWeight="SemiBold" Foreground="{DynamicResource App.Foreground}"/>
+ <TextBox x:Name="NewCategoryBox" Height="28" Width="320"/>
+ <Button Content="Dodaj" Width="120" Margin="0,6,0,0" Click="AddCategory_Click"/>
+ <TextBlock x:Name="MessageText" Margin="0,8,0,0" Foreground="OrangeRed" TextWrapping="Wrap"/>
+ </StackPanel>
+
+ <!-- Lista kategorii -->
+ <ScrollViewer Grid.Row="3" VerticalScrollBarVisibility="Auto">
  <ItemsControl x:Name="CategoriesList">
  <ItemsControl.ItemTemplate>
  <DataTemplate>
-
- <Border Margin="0,4,0,4"
- Padding="8"
- Background="{DynamicResource Surface.Background}"
- BorderBrush="{DynamicResource Surface.Border}"
- BorderThickness="1"
- CornerRadius="6">
+ <Border Margin="0,4,0,4" Padding="8" Background="{DynamicResource Surface.Background}" BorderBrush="{DynamicResource Surface.Border}" BorderThickness="1" CornerRadius="6">
  <StackPanel>
  <Grid>
  <Grid.ColumnDefinitions>
  <ColumnDefinition Width="*"/>
  <ColumnDefinition Width="Auto"/>
  </Grid.ColumnDefinitions>
-
  <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
- <Rectangle Width="12" Height="12"
- Fill="{Binding ColorBrush}"
- RadiusX="3" RadiusY="3"
- Margin="0,0,8,0"/>
- <TextBlock Text="{Binding Name}"
- VerticalAlignment="Center"
- Foreground="{DynamicResource App.Foreground}"/>
+ <Rectangle Width="12" Height="12" Fill="{Binding ColorBrush}" RadiusX="3" RadiusY="3" Margin="0,0,8,0"/>
+ <TextBlock Text="{Binding Name}" VerticalAlignment="Center" Foreground="{DynamicResource App.Foreground}"/>
  </StackPanel>
-
- <StackPanel Grid.Column="1"
- Orientation="Horizontal"
- HorizontalAlignment="Right"
- VerticalAlignment="Center">
- <!-- Edit icon (Segoe MDL2 Assets pencil) -->
+ <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
  <Button Tag="{Binding}" Click="EditCategory_Click" ToolTip="Edytuj" Padding="6" Margin="0,0,8,0">
  <TextBlock FontFamily="Segoe MDL2 Assets" Text="&#xE70F;" FontSize="14" Foreground="{DynamicResource App.Foreground}"/>
  </Button>
- <!-- Delete icon (Segoe MDL2 Assets delete) -->
  <Button Tag="{Binding}" Click="ShowDeleteConfirm_Click" ToolTip="Usuń" Padding="6">
  <TextBlock FontFamily="Segoe MDL2 Assets" Text="&#xE74D;" FontSize="14" Foreground="Tomato"/>
  </Button>
  </StackPanel>
  </Grid>
-
- <!-- inline confirmation (hidden by default) -->
+ <!-- inline delete confirm -->
  <Border x:Name="DeleteConfirmPanel" Background="{DynamicResource Surface.Background}" BorderBrush="{DynamicResource Surface.Border}" BorderThickness="1" CornerRadius="6" Padding="8" Margin="0,8,0,0" Visibility="Collapsed">
  <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
  <TextBlock Text="Czy na pewno usunąć kategorię?" VerticalAlignment="Center" Margin="0,0,12,0"/>
@@ -107,102 +198,203 @@
  </Border>
  </StackPanel>
  </Border>
-
  </DataTemplate>
  </ItemsControl.ItemTemplate>
  </ItemsControl>
  </ScrollViewer>
 
- <!-- Dodawanie kategorii -->
- <StackPanel Grid.Row="3" Orientation="Vertical" Margin="0,10,0,0">
- <TextBlock Text="Dodaj kategorię" FontWeight="SemiBold" Foreground="{DynamicResource App.Foreground}"/>
- <DockPanel Margin="0,6,0,0">
- <TextBox x:Name="NewCategoryBox" Height="28" DockPanel.Dock="Left" Width="260"/>
- <Button Content="Dodaj" Width="80" Margin="8,0,0,0" Click="AddCategory_Click"/>
- </DockPanel>
- <TextBlock x:Name="MessageText" Margin="0,8,0,0" Foreground="OrangeRed" TextWrapping="Wrap"/>
- </StackPanel>
+ <!-- Struktura + Szczegóły + Porównanie obok siebie -->
+ <Grid Grid.Row="4">
+ <Grid.ColumnDefinitions>
+ <ColumnDefinition Width="2*"/>
+ <ColumnDefinition Width="16"/>
+ <ColumnDefinition Width="*"/>
+ <ColumnDefinition Width="16"/>
+ <ColumnDefinition Width="*"/>
+ </Grid.ColumnDefinitions>
 
- <!-- Edit panel (na dole) -->
- <Border Grid.Row="4" x:Name="EditPanel" Background="{DynamicResource Surface.Background}" BorderBrush="{DynamicResource Surface.Border}" BorderThickness="1" CornerRadius="6" Padding="8" Margin="0,12,0,0" Visibility="Collapsed">
+ <!-- Struktura wydatków -->
+ <Border Grid.Column="0" Padding="12" Background="{DynamicResource Surface.Background}" BorderBrush="{DynamicResource Surface.Border}" BorderThickness="1" CornerRadius="8">
+ <StackPanel>
+ <TextBlock Text="Struktura wydatków według kategorii" FontWeight="Bold" Foreground="{DynamicResource App.Foreground}"/>
+ <TextBlock Margin="0,8,0,8" Foreground="{DynamicResource App.Foreground}" Text="{Binding ActiveCategoriesSummary}"/>
+ <ItemsControl ItemsSource="{Binding CategoryShares}">
+ <ItemsControl.ItemTemplate>
+ <DataTemplate>
+ <DockPanel Margin="0,2,0,2">
+ <TextBlock DockPanel.Dock="Left" Foreground="{DynamicResource App.Foreground}" Text="{Binding Name}"/>
+ <TextBlock DockPanel.Dock="Right" Foreground="{DynamicResource App.Foreground}" Text="{Binding Percent, StringFormat={}{0:N0}%}"/>
+ </DockPanel>
+ </DataTemplate>
+ </ItemsControl.ItemTemplate>
+ </ItemsControl>
+ <TextBlock Margin="0,10,0,4" FontWeight="SemiBold" Foreground="{DynamicResource App.Foreground}" Text="TOP3 kategorie"/>
+ <ItemsControl ItemsSource="{Binding TopCategories}">
+ <ItemsControl.ItemTemplate>
+ <DataTemplate>
+ <DockPanel>
+ <TextBlock DockPanel.Dock="Left" Foreground="{DynamicResource App.Foreground}" Text="{Binding Name}"/>
+ <TextBlock DockPanel.Dock="Right" Foreground="{DynamicResource App.Foreground}" Text="{Binding Percent, StringFormat={}{0:N0}%}"/>
+ </DockPanel>
+ </DataTemplate>
+ </ItemsControl.ItemTemplate>
+ </ItemsControl>
+ <TextBlock Margin="0,10,0,4" FontWeight="SemiBold" Foreground="{DynamicResource App.Foreground}" Text="BOTTOM3"/>
+ <ItemsControl ItemsSource="{Binding BottomCategories}">
+ <ItemsControl.ItemTemplate>
+ <DataTemplate>
+ <DockPanel>
+ <TextBlock DockPanel.Dock="Left" Foreground="{DynamicResource App.Foreground}" Text="{Binding Name}"/>
+ <TextBlock DockPanel.Dock="Right" Foreground="{DynamicResource App.Foreground}" Text="{Binding Percent, StringFormat={}{0:N0}%}"/>
+ </DockPanel>
+ </DataTemplate>
+ </ItemsControl.ItemTemplate>
+ </ItemsControl>
+ </StackPanel>
+ </Border>
+
+ <!-- Szczegóły kategorii -->
+ <Border Grid.Column="2" Padding="12" Background="{DynamicResource Surface.Background}" BorderBrush="{DynamicResource Surface.Border}" BorderThickness="1" CornerRadius="8">
+ <StackPanel>
+ <TextBlock Text="Szczegóły kategorii" FontWeight="Bold" Foreground="{DynamicResource App.Foreground}"/>
+ <StackPanel Margin="0,8,0,0">
+ <TextBlock Foreground="{DynamicResource App.Foreground}" Text="Suma wydatków w tym okresie:"/>
+ <TextBlock Foreground="{DynamicResource App.Foreground}" Text="{Binding SelectedCategoryTotalAmount, StringFormat={}{0:N2} zł}"/>
+ <TextBlock Foreground="{DynamicResource App.Foreground}" Margin="0,8,0,0" Text="Średni miesięczny wydatek:"/>
+ <TextBlock Foreground="{DynamicResource App.Foreground}" Text="{Binding SelectedCategoryAverageMonthly, StringFormat={}{0:N2} zł}"/>
+ <TextBlock Foreground="{DynamicResource App.Foreground}" Margin="0,8,0,0" Text="Liczba transakcji w okresie:"/>
+ <TextBlock Foreground="{DynamicResource App.Foreground}" Text="{Binding SelectedCategoryTransactionCount}"/>
+ <TextBlock Foreground="{DynamicResource App.Foreground}" Margin="0,12,0,4" Text="Ostatnie transakcje:"/>
+ <ItemsControl ItemsSource="{Binding SelectedCategoryRecentTransactions}">
+ <ItemsControl.ItemTemplate>
+ <DataTemplate>
+ <Grid Margin="0,2,0,2">
+ <Grid.ColumnDefinitions>
+ <ColumnDefinition Width="100"/>
+ <ColumnDefinition Width="*"/>
+ <ColumnDefinition Width="120"/>
+ </Grid.ColumnDefinitions>
+ <TextBlock Grid.Column="0" Foreground="{DynamicResource App.Foreground}" Text="{Binding Date, StringFormat={}{0:yyyy-MM-dd}}"/>
+ <TextBlock Grid.Column="1" Foreground="{DynamicResource App.Foreground}" Text="{Binding Description}" TextTrimming="CharacterEllipsis"/>
+ <TextBlock Grid.Column="2" Foreground="{DynamicResource App.Foreground}" TextAlignment="Right" Text="{Binding Amount, StringFormat={}{0:N2} zł}"/>
+ </Grid>
+ </DataTemplate>
+ </ItemsControl.ItemTemplate>
+ </ItemsControl>
+ </StackPanel>
+ </StackPanel>
+ </Border>
+
+ <!-- Porównanie z poprzednim okresem -->
+ <Border Grid.Column="4" Padding="12" Background="{DynamicResource Surface.Background}" BorderBrush="{DynamicResource Surface.Border}" BorderThickness="1" CornerRadius="8">
+ <StackPanel>
+ <TextBlock Text="Porównanie z poprzednim okresem" FontWeight="Bold" Foreground="{DynamicResource App.Foreground}"/>
+ <StackPanel Margin="0,8,0,0">
+ <TextBlock Foreground="{DynamicResource App.Foreground}" Text="Ten okres:"/>
+ <TextBlock Foreground="{DynamicResource App.Foreground}" Text="{Binding CurrentPeriodAmount, StringFormat={}{0:N2} zł}"/>
+ <TextBlock Foreground="{DynamicResource App.Foreground}" Margin="0,8,0,0" Text="Poprzedni okres:"/>
+ <TextBlock Foreground="{DynamicResource App.Foreground}" Text="{Binding PreviousPeriodAmount, StringFormat={}{0:N2} zł}"/>
+ <TextBlock Foreground="{DynamicResource App.Foreground}" Margin="0,8,0,0" Text="Różnica:"/>
+ <TextBlock Foreground="{DynamicResource App.Foreground}" Text="{Binding AmountDifference, StringFormat={}{0:N2} zł}"/>
+ <TextBlock Foreground="{DynamicResource App.Foreground}" Margin="0,4,0,0" Text="{Binding PercentageDifference, StringFormat={}{0:N0}%}"/>
+ </StackPanel>
+ </StackPanel>
+ </Border>
+ </Grid>
+
+ <!-- Panel edycji -->
+ <Border Grid.Row="5" x:Name="EditPanel" Background="{DynamicResource Surface.Background}" BorderBrush="{DynamicResource Surface.Border}" BorderThickness="1" CornerRadius="6" Padding="8" Margin="0,8,0,0" Visibility="Collapsed">
  <StackPanel>
  <TextBlock Text="Edytuj kategorię" FontWeight="Bold" Foreground="{DynamicResource App.Foreground}"/>
  <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
- <TextBox x:Name="EditNameBox" Width="260" Height="28" />
+ <TextBox x:Name="EditNameBox" Width="320" Height="28" />
  <Button Content="Zapisz" Width="80" Margin="8,0,0,0" Click="SaveEdit_Click"/>
  <Button Content="Anuluj" Width="80" Margin="8,0,0,0" Click="CancelEdit_Click"/>
  </StackPanel>
  <TextBlock x:Name="EditPanelMessage" Foreground="OrangeRed" Margin="0,6,0,0"/>
  </StackPanel>
  </Border>
-
  </Grid>
-
  </Border>
 
- <!-- PRAWY PANEL: Wykresy -->
- <Grid Grid.Column="2">
+ <!--4) Szczegóły (pod ramką kategorii) -->
+ <Grid Grid.Row="3">
  <Grid.RowDefinitions>
  <RowDefinition Height="Auto"/>
  <RowDefinition Height="*"/>
  </Grid.RowDefinitions>
 
- <ctrls:PeriodBarControl x:Name="PeriodBar" Grid.Row="0" Margin="0,0,0,12" />
+ <!-- Podsumowanie wybranej kategorii -->
+ <Border x:Name="SummaryPanel" Grid.Row="0" Padding="12" Margin="0,0,0,12" Background="{DynamicResource Surface.Background}" BorderBrush="{DynamicResource Surface.Border}" BorderThickness="1" CornerRadius="8" Visibility="Collapsed">
+ <StackPanel>
+ <TextBlock x:Name="SummaryCategoryNameText" FontSize="18" FontWeight="Bold" Foreground="{DynamicResource App.Foreground}" Text="(Kategoria)"/>
+ <TextBlock x:Name="SummaryTotalText" Margin="0,6,0,0" Foreground="{DynamicResource App.Foreground}" Text="Suma wydatków w tym okresie:0,00 zł"/>
+ <TextBlock x:Name="SummaryMonthlyAvgText" Margin="0,2,0,0" Foreground="{DynamicResource App.Foreground}" Text="Średni wydatek w tej kategorii (miesięcznie):0,00 zł"/>
+ <Border Background="#2255AAFF" CornerRadius="4" Padding="6" Margin="0,8,0,0" HorizontalAlignment="Left">
+ <TextBlock x:Name="SummaryTxnCountText" Foreground="White" FontSize="12"/>
+ </Border>
+ </StackPanel>
+ </Border>
 
+ <!-- Dół: dwie kolumny -->
  <Grid Grid.Row="1">
  <Grid.ColumnDefinitions>
- <ColumnDefinition Width="*"/>
+ <ColumnDefinition Width="2*"/>
+ <ColumnDefinition Width="16"/>
  <ColumnDefinition Width="*"/>
  </Grid.ColumnDefinitions>
 
- <Border Grid.Column="0" Padding="12" Background="{DynamicResource Surface.Background}" BorderBrush="{DynamicResource Surface.Border}" BorderThickness="1" CornerRadius="8">
+ <!-- Ostatnie transakcje -->
+ <Border x:Name="TransactionsPanel" Grid.Column="0" Padding="12" Background="{DynamicResource Surface.Background}" BorderBrush="{DynamicResource Surface.Border}" BorderThickness="1" CornerRadius="8" Visibility="Collapsed">
  <StackPanel>
- <TextBlock Text="Wydatki wg kategorii (30 dni)" FontWeight="Bold" Foreground="{DynamicResource App.Foreground}" Margin="0,0,0,10"/>
- <TextBlock Text="Wydatki wg kategorii" FontWeight="Bold" Foreground="{DynamicResource App.Foreground}" Margin="0,0,0,10"/>
-
- <Viewbox Height="220" HorizontalAlignment="Center" VerticalAlignment="Center" Stretch="Uniform">
- <Grid Width="220" Height="220">
- <Ellipse Width="220" Height="220" Fill="#11000000" Stroke="{DynamicResource Surface.Border}" StrokeThickness="1"/>
-
- <ctrls:DonutChartControl x:Name="SpendingChart" />
-
- <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" MaxWidth="170">
- <TextBlock x:Name="PieCenterNameText" FontSize="14" FontWeight="SemiBold" Foreground="White" TextAlignment="Center" TextWrapping="Wrap" Margin="0,0,0,4"/>
- <TextBlock x:Name="PieCenterValueText" FontSize="18" FontWeight="Bold" Foreground="White" TextAlignment="Center" Margin="0,0,0,2"/>
- <TextBlock x:Name="PieCenterPercentText" FontSize="11" Foreground="White" Opacity="0.8" TextAlignment="Center" TextWrapping="Wrap"/>
- </StackPanel>
- </Grid>
- </Viewbox>
- </StackPanel>
-
- </Border>
-
- <Border Grid.Column="1" Padding="12" Background="{DynamicResource Surface.Background}" BorderBrush="{DynamicResource Surface.Border}" BorderThickness="1" CornerRadius="8" Margin="12,0,0,0">
- <StackPanel>
- <TextBlock Text="Przychody wg kategorii (30 dni)"
- FontWeight="Bold"
- Foreground="{DynamicResource App.Foreground}"
- Margin="0,0,0,10"/>
- <TextBlock Text="Przychody wg kategorii" FontWeight="Bold" Foreground="{DynamicResource App.Foreground}" Margin="0,0,0,10"/>
-
- <Viewbox Height="220" HorizontalAlignment="Center" VerticalAlignment="Center" Stretch="Uniform">
- <Grid Width="220" Height="220">
- <Ellipse Width="220" Height="220" Fill="#11000000" Stroke="{DynamicResource Surface.Border}" StrokeThickness="1"/>
-
- <ctrls:DonutChartControl x:Name="IncomeChart" />
-
- <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" MaxWidth="170">
- <TextBlock x:Name="IncomeCenterNameText" FontSize="14" FontWeight="SemiBold" Foreground="White" TextAlignment="Center" TextWrapping="Wrap" Margin="0,0,0,4">Przychód</TextBlock>
- <TextBlock x:Name="IncomeCenterValueText" FontSize="18" FontWeight="Bold" Foreground="White" TextAlignment="Center" Margin="0,0,0,2"/>
- <TextBlock x:Name="IncomeCenterPercentText" FontSize="11" Foreground="White" Opacity="0.8" TextAlignment="Center" TextWrapping="Wrap"/>
- </StackPanel>
- </Grid>
- </Viewbox>
+ <TextBlock Text="Ostatnie transakcje w tej kategorii" FontWeight="Bold" Foreground="{DynamicResource App.Foreground}" FontSize="16" Margin="0,0,0,8"/>
+ <ListView x:Name="LastTransactionsList" Height="320" BorderThickness="0" Background="Transparent">
+ <ListView.View>
+ <GridView>
+ <GridViewColumn Header="Data" Width="100">
+ <GridViewColumn.CellTemplate>
+ <DataTemplate>
+ <TextBlock Text="{Binding Date, StringFormat={}{0:yyyy-MM-dd}}"/>
+ </DataTemplate>
+ </GridViewColumn.CellTemplate>
+ </GridViewColumn>
+ <GridViewColumn Header="Opis" Width="220" DisplayMemberBinding="{Binding Description}"/>
+ <GridViewColumn Header="Kwota" Width="100">
+ <GridViewColumn.CellTemplate>
+ <DataTemplate>
+ <TextBlock Text="{Binding Amount, StringFormat={}{0:N2} zł}"/>
+ </DataTemplate>
+ </GridViewColumn.CellTemplate>
+ </GridViewColumn>
+ </GridView>
+ </ListView.View>
+ </ListView>
  </StackPanel>
  </Border>
 
+ <!-- Ustawienia kategorii -->
+ <Border x:Name="SettingsPanel" Grid.Column="2" Padding="12" Background="{DynamicResource Surface.Background}" BorderBrush="{DynamicResource Surface.Border}" BorderThickness="1" CornerRadius="8" Visibility="Collapsed">
+ <StackPanel>
+ <TextBlock Text="Ustawienia kategorii" FontWeight="Bold" Foreground="{DynamicResource App.Foreground}" FontSize="16"/>
+ <TextBlock Text="Opis kategorii" Margin="0,12,0,4" FontWeight="SemiBold" Foreground="{DynamicResource App.Foreground}"/>
+ <TextBox x:Name="CategoryDescriptionBox" Height="80" TextWrapping="Wrap" AcceptsReturn="True"/>
+ <TextBlock Text="Kolor kategorii" Margin="0,12,0,6" FontWeight="SemiBold" Foreground="{DynamicResource App.Foreground}"/>
+ <WrapPanel x:Name="ColorPickerPanel" ItemWidth="32" ItemHeight="32">
+ <Button Width="32" Height="32" Margin="0,0,6,6" Background="#FFED7A1A" Tag="#FFED7A1A" Click="ColorPick_Click"/>
+ <Button Width="32" Height="32" Margin="0,0,6,6" Background="#FF3FA7D6" Tag="#FF3FA7D6" Click="ColorPick_Click"/>
+ <Button Width="32" Height="32" Margin="0,0,6,6" Background="#FF7BC96F" Tag="#FF7BC96F" Click="ColorPick_Click"/>
+ <Button Width="32" Height="32" Margin="0,0,6,6" Background="#FFAF7AC5" Tag="#FFAF7AC5" Click="ColorPick_Click"/>
+ <Button Width="32" Height="32" Margin="0,0,6,6" Background="#FFF6BF26" Tag="#FFF6BF26" Click="ColorPick_Click"/>
+ <Button Width="32" Height="32" Margin="0,0,6,6" Background="#FF56C1A7" Tag="#FF56C1A7" Click="ColorPick_Click"/>
+ <Button Width="32" Height="32" Margin="0,0,6,6" Background="#FFCE6A6B" Tag="#FFCE6A6B" Click="ColorPick_Click"/>
+ <Button Width="32" Height="32" Margin="0,0,6,6" Background="#FF9AA0A6" Tag="#FF9AA0A6" Click="ColorPick_Click"/>
+ </WrapPanel>
+ <StackPanel Orientation="Horizontal" Margin="0,16,0,0" HorizontalAlignment="Right">
+ <Button Content="Zapisz ustawienia kategorii" Style="{StaticResource PrimaryButton}" Click="SaveCategorySettings_Click"/>
+ </StackPanel>
+ </StackPanel>
+ </Border>
  </Grid>
  </Grid>
-
  </Grid>
 </UserControl>

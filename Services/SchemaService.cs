@@ -203,6 +203,7 @@ CREATE TABLE IF NOT EXISTS SavedCash(
                 AddColumnIfMissing(con, tx, "Categories", "Color", "TEXT");
                 AddColumnIfMissing(con, tx, "Categories", "Icon", "TEXT");
                 AddColumnIfMissing(con, tx, "Categories", "IsArchived", "INTEGER", "NOT NULL DEFAULT 0");
+                AddColumnIfMissing(con, tx, "Categories", "Description", "TEXT");
 
                 // Expenses – spójne z zapytaniami w UI / DatabaseService
                 AddColumnIfMissing(con, tx, "Expenses", "Title", "TEXT");

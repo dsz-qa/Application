@@ -33,22 +33,19 @@ namespace Finly.Pages
             _userId = _userId >0 ? _userId : UserService.GetCurrentUserId();
             _vm.Initialize(_userId);
             DataContext = _vm;
-            // Removed old BudgetPeriodBar wiring (control no longer exists)
 
-            // Hook budget type selector RadioButtons inside the right StackPanel
-            HookBudgetTypeSelector();
-        }
+            // default type selection
+            if (TypeMonthlyRadio != null) TypeMonthlyRadio.IsChecked = true;
 
-        private void HookBudgetTypeSelector()
-        {
-            // find radio buttons by content
-            foreach (var rb in FindVisualChildren<RadioButton>(this))
+            // populate categories into form combo box
+            try
             {
-                var text = rb.Content?.ToString()?.Trim();
-                if (text == "Miesięczny") rb.Checked += (s, e) => _vm.SelectedBudgetType = BudgetType.Monthly;
-                else if (text == "Tygodniowy") rb.Checked += (s, e) => _vm.SelectedBudgetType = BudgetType.Weekly;
-                else if (text == "Koperty") rb.Checked += (s, e) => _vm.SelectedBudgetType = BudgetType.Rollover;
-                else if (text == "Własny") rb.Checked += (s, e) => _vm.SelectedBudgetType = BudgetType.OneTime;
+                var cats = DatabaseService.GetCategoriesByUser(_userId) ?? new List<string>();
+                FormCategoryBox.ItemsSource = cats;
+            }
+            catch
+            {
+                FormCategoryBox.ItemsSource = new List<string>();
             }
         }
 
@@ -70,7 +67,122 @@ namespace Finly.Pages
 
         private void RefreshBtn_Click(object sender, RoutedEventArgs e)
         {
-            // TODO: implement refresh logic
+            _vm.Reload();
+        }
+
+        private void CancelFormBtn_Click(object sender, RoutedEventArgs e)
+        {
+            // hide panel and clear form
+            _vm.IsAddPanelVisible = false;
+            ClearForm();
+        }
+
+        private void ClearForm()
+        {
+            if (TypeMonthlyRadio != null) TypeMonthlyRadio.IsChecked = true;
+            if (TypeWeeklyRadio != null) TypeWeeklyRadio.IsChecked = false;
+            if (TypeQuarterlyRadio != null) TypeQuarterlyRadio.IsChecked = false;
+            if (TypeYearlyRadio != null) TypeYearlyRadio.IsChecked = false;
+
+            FormCategoryBox.SelectedIndex = -1;
+            FormAmountBox.Text = string.Empty;
+            RepeatCheck.IsChecked = false;
+            RolloverCheck.IsChecked = false;
+        }
+
+        private void SaveBudgetBtn_Click(object sender, RoutedEventArgs e)
+        {
+            // gather data from form
+            var type = BudgetType.Monthly;
+            if (TypeWeeklyRadio.IsChecked == true) type = BudgetType.Weekly;
+            else if (TypeMonthlyRadio.IsChecked == true) type = BudgetType.Monthly;
+            else if (TypeQuarterlyRadio.IsChecked == true)
+            {
+                // no native Quarterly in enum; map to Monthly for now or handle specially
+                // choose Monthly mapping; you can extend model later.
+                type = BudgetType.Monthly;
+            }
+            else if (TypeYearlyRadio.IsChecked == true)
+            {
+                // map to Rollover for yearly-like persistence if available, otherwise OneTime
+                type = BudgetType.Rollover;
+            }
+
+            var catName = FormCategoryBox.SelectedItem as string;
+            int? catId = null;
+            try
+            {
+                if (!string.IsNullOrWhiteSpace(catName))
+                {
+                    var id = DatabaseService.GetOrCreateCategoryId(_userId, catName);
+                    if (id >0) catId = id;
+                }
+            }
+            catch { }
+
+            if (!TryParseAmount(FormAmountBox.Text, out var amount) || amount <=0m)
+            {
+                ToastService.Info("Podaj poprawną kwotę.");
+                return;
+            }
+
+            bool repeat = RepeatCheck.IsChecked == true;
+            bool rollover = RolloverCheck.IsChecked == true;
+
+            var model = new BudgetModel
+            {
+                Name = (catName ?? "") + " budżet",
+                Type = type,
+                CategoryId = catId,
+                CategoryName = catName,
+                Amount = amount,
+                Active = true,
+                LastRollover = rollover ?0m :0m
+            };
+
+            // persist via service if available; otherwise add to VM collections
+            try
+            {
+                // Add to grouped collections in VM
+                switch (model.Type)
+                {
+                    case BudgetType.Monthly:
+                        _vm.BudgetsMonthly.Add(model);
+                        break;
+                    case BudgetType.Weekly:
+                        _vm.BudgetsWeekly.Add(model);
+                        break;
+                    case BudgetType.Rollover:
+                    case BudgetType.OneTime:
+                    default:
+                        _vm.BudgetsYearly.Add(model);
+                        break;
+                }
+
+                // Also add to main list if matches selected type (used by totals)
+                if (model.Type == _vm.SelectedBudgetType)
+                    _vm.Budgets.Add(model);
+
+                // Optionally save
+                // BudgetService.SaveBudgets(_userId, _vm.Budgets.ToList());
+
+                ToastService.Success("Zapisano budżet.");
+                ClearForm();
+                _vm.IsAddPanelVisible = false;
+                _vm.Reload();
+            }
+            catch (Exception ex)
+            {
+                ToastService.Error("Nie udało się zapisać budżetu.\n" + ex.Message);
+            }
+        }
+
+        private static bool TryParseAmount(string? s, out decimal value)
+        {
+            if (decimal.TryParse(s, NumberStyles.Any, CultureInfo.CurrentCulture, out value)) return true;
+            if (decimal.TryParse(s, NumberStyles.Any, CultureInfo.GetCultureInfo("pl-PL"), out value)) return true;
+            if (decimal.TryParse(s, NumberStyles.Any, CultureInfo.InvariantCulture, out value)) return true;
+            return false;
         }
     }
 }

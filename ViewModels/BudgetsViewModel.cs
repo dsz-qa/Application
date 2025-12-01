@@ -3,6 +3,7 @@ using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Linq;
 using System.Runtime.CompilerServices;
+using System.Windows.Input;
 using Finly.Models;
 using Finly.Services;
 
@@ -16,6 +17,15 @@ namespace Finly.ViewModels
  internal int UserId { get; private set; }
 
  internal ObservableCollection<BudgetModel> Budgets { get; } = new();
+ // New: grouped collections per period
+ public ObservableCollection<BudgetModel> BudgetsMonthly { get; } = new();
+ public ObservableCollection<BudgetModel> BudgetsWeekly { get; } = new();
+ public ObservableCollection<BudgetModel> BudgetsYearly { get; } = new();
+
+ // New: add panel visibility and toggle command
+ private bool _isAddPanelVisible;
+ public bool IsAddPanelVisible { get => _isAddPanelVisible; set { _isAddPanelVisible = value; OnPropertyChanged(); } }
+ public ICommand ToggleAddPanelCommand => new RelayCommand(_ => IsAddPanelVisible = !IsAddPanelVisible);
 
  private DateTime _from = DateTime.Today, _to = DateTime.Today;
  internal DateTime From { get => _from; private set { _from = value; OnPropertyChanged(); } }
@@ -54,11 +64,24 @@ namespace Finly.ViewModels
  // load all budgets then filter by SelectedBudgetType (if specific) and active range
  var all = BudgetService.LoadBudgets(UserId) ?? new System.Collections.Generic.List<BudgetModel>();
  Budgets.Clear();
+ BudgetsMonthly.Clear();
+ BudgetsWeekly.Clear();
+ BudgetsYearly.Clear();
  foreach (var b in all)
  {
  if (!b.Active) continue;
- if (b.Type != SelectedBudgetType) continue;
- Budgets.Add(b);
+ // Fill master list by selected type (kept for backwards bindings)
+ if (b.Type == SelectedBudgetType) Budgets.Add(b);
+ // Fill grouped lists by period
+ switch (b.Type)
+ {
+ case BudgetType.Monthly: BudgetsMonthly.Add(b); break;
+ case BudgetType.Weekly: BudgetsWeekly.Add(b); break;
+ case BudgetType.Rollover: BudgetsYearly.Add(b); break;
+ case BudgetType.OneTime: BudgetsYearly.Add(b); break;
+ default:
+ BudgetsYearly.Add(b); break;
+ }
  }
  RecalculateTotals();
  }
@@ -122,4 +145,19 @@ namespace Finly.ViewModels
  }
 
  public enum BudgetPeriodKind { Week, Month, Quarter, Year }
+
+ // Simple RelayCommand for commands
+ public class RelayCommand : ICommand
+ {
+ private readonly Action<object?> _execute;
+ private readonly Func<object?, bool>? _canExecute;
+ public RelayCommand(Action<object?> execute, Func<object?, bool>? canExecute = null)
+ {
+ _execute = execute; _canExecute = canExecute;
+ }
+ public bool CanExecute(object? parameter) => _canExecute?.Invoke(parameter) ?? true;
+ public void Execute(object? parameter) => _execute(parameter);
+ public event EventHandler? CanExecuteChanged;
+ public void RaiseCanExecuteChanged() => CanExecuteChanged?.Invoke(this, EventArgs.Empty);
+ }
 }

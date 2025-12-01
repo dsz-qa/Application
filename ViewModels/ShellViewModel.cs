@@ -47,8 +47,8 @@ namespace Finly.ViewModels
             };
 
             NavigateToCommand = new RelayCommand(p => NavigateTo(p?.ToString()));
-            OpenSettingsCommand = new RelayCommand(() => NavigateTo("settings"));
-            LogoutCommand = new RelayCommand(() => OnLogoutRequested());
+            OpenSettingsCommand = new RelayCommand(_ => NavigateTo("settings")); // poprawka: delegat z parametrem
+            LogoutCommand = new RelayCommand(_ => OnLogoutRequested()); // poprawka: delegat z parametrem
 
             // Ekran startowy – wybierz, co wolisz:
             NavigateTo("add");          // od razu formularz Dodaj
