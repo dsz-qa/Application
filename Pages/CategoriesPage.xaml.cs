@@ -28,6 +28,7 @@ namespace Finly.Pages
         private readonly ObservableCollection<CategoryTransactionRow> _lastTransactions = new();
         private string _selectedColorHex = string.Empty;
         private string? _categoryDescriptionDraft;
+        private string? _selectedIcon;
 
         // KPI element refs (resolved via FindName to avoid generated field dependency)
         private TextBlock? _mostUsedName;
@@ -212,10 +213,11 @@ namespace Finly.Pages
         {
             _categories.Clear();
 
-            var list = DatabaseService.GetCategoriesByUser(_uid) ?? new List<string>();
-            foreach (var name in list)
+            var tuples = DatabaseService.GetCategoriesExtended(_uid);
+            foreach (var (id, name, color, icon) in tuples)
             {
-                _categories.Add(new CategoryVm { Name = name, ColorBrush = GetBrushForName(name) });
+                Brush brush = string.IsNullOrWhiteSpace(color) ? GetBrushForName(name) : (Brush)(new BrushConverter().ConvertFromString(color)!);
+                _categories.Add(new CategoryVm { Id=id, Name = name, ColorBrush = brush, Icon = icon });
             }
         }
 
@@ -273,8 +275,14 @@ namespace Finly.Pages
             {
                 _editingVm = vm;
                 EditNameBox.Text = vm.Name;
+
+                // open side edit panel
                 EditPanel.Visibility = Visibility.Visible;
                 EditPanelMessage.Text = string.Empty;
+
+                // preselect current color in color picker by focusing matching button
+                _selectedColorHex = (vm.ColorBrush as SolidColorBrush)?.Color.ToString() ?? string.Empty;
+                CategoryDescriptionBox.Text = _categoryDescriptionDraft ?? string.Empty;
             }
         }
 
@@ -283,16 +291,22 @@ namespace Finly.Pages
         {
             if (sender is FrameworkElement fe && fe.Tag is CategoryVm vm)
             {
-                // find the DeleteConfirmPanel within the visual tree of this item
-                var container = FindAncestor<ContentPresenter>(fe);
-                if (container == null) return;
-
-                var panel = FindDescendantByName<FrameworkElement>(container, "DeleteConfirmPanel");
-                if (panel != null)
+                // delete directly rather than inline panel for tiles
+                var result = MessageBox.Show($"Usunąć kategorię '{vm.Name}'?", "Potwierdź", MessageBoxButton.YesNo, MessageBoxImage.Warning);
+                if (result == MessageBoxResult.Yes)
                 {
-                    panel.Visibility = Visibility.Visible;
-                    // store vm reference in Tag for confirm button to use
-                    panel.Tag = vm;
+                    try
+                    {
+                        var id = DatabaseService.GetCategoryIdByName(_uid, vm.Name);
+                        if (id.HasValue)
+                            DatabaseService.ArchiveCategory(id.Value);
+                        _ = _categories.Remove(vm);
+                        UpdateCategoryKpis();
+                    }
+                    catch (Exception ex)
+                    {
+                        MessageText.Text = "Błąd usuwania: " + ex.Message;
+                    }
                 }
             }
         }
@@ -368,11 +382,28 @@ namespace Finly.Pages
 
             try
             {
-                // create or get id for new name
-                DatabaseService.GetOrCreateCategoryId(_uid, newName);
+                // Persist changes: name + color + icon
+                string? colorToSave = null;
+                if (!string.IsNullOrWhiteSpace(_selectedColorHex))
+                    colorToSave = _selectedColorHex;
+
+                // read icon from ComboBox if set
+                string? iconToSave = _selectedIcon;
+                var iconCombo = this.FindName("IconCombo") as ComboBox;
+                if (iconCombo?.SelectedItem is ComboBoxItem ci)
+                    iconToSave = ci.Content as string ?? (ci.Content as TextBlock)?.Text;
+
+                DatabaseService.UpdateCategoryFull(_editingVm.Id, _uid, newName, colorToSave, iconToSave ?? _editingVm.Icon);
+
+                // local update
+                _editingVm.Name = newName;
+                if (!string.IsNullOrWhiteSpace(iconToSave))
+                    _editingVm.Icon = iconToSave;
+
                 EditPanelMessage.Text = "Zapisano.";
                 EditPanel.Visibility = Visibility.Collapsed;
                 _editingVm = null;
+
                 LoadCategories();
                 UpdateCategoryKpis();
             }
@@ -449,7 +480,7 @@ namespace Finly.Pages
             // monthly avg (based on months span)
             double monthsSpan = Math.Max(1.0, (to - from).TotalDays / 30.0);
             decimal monthlyAvg = monthsSpan <= 0 ? 0 : sum / (decimal)monthsSpan;
-            SummaryMonthlyAvgText.Text = "Średni wydatek w tej kategorii (miesięcznie): " + monthlyAvg.ToString("N2") + " zł";
+            SummaryMonthlyAvgText.Text = "Średni wydatek w tej kategorii (miesiące)): " + monthlyAvg.ToString("N2") + " zł";
 
             SummaryTxnCountText.Text = count + (count == 1 ? " transakcja" : " transakcji");
 
@@ -473,6 +504,16 @@ namespace Finly.Pages
             if (sender is Button b && b.Tag is string hex)
             {
                 _selectedColorHex = hex;
+                b.Focus();
+            }
+        }
+
+        public void PickIcon_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is Button b)
+            {
+                // Content may be a string (emoji) or a TextBlock; support both
+                _selectedIcon = b.Content as string ?? (b.Content as TextBlock)?.Text;
                 b.Focus();
             }
         }
@@ -566,8 +607,10 @@ namespace Finly.Pages
         private class CategoryVm : INotifyPropertyChanged
         {
             private Brush _colorBrush = Brushes.Gray;
+            public int Id { get; set; }
             public string Name { get; set; } = string.Empty;
             public Brush ColorBrush { get => _colorBrush; set { _colorBrush = value; OnPropertyChanged(nameof(ColorBrush)); } }
+            public string? Icon { get; set; }
             public event PropertyChangedEventHandler? PropertyChanged;
             private void OnPropertyChanged(string prop) => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(prop));
         }

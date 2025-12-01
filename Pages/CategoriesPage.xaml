@@ -61,8 +61,8 @@
  <Grid.RowDefinitions>
  <RowDefinition Height="Auto"/>
  <RowDefinition Height="Auto"/>
- <RowDefinition Height="*"/> <!-- Categories take available space -->
- <RowDefinition Height="Auto"/> <!-- Details below -->
+ <RowDefinition Height="*"/> <!-- wspólna niebieska rama: Wszystkie Kategorie +3 panele -->
+ <RowDefinition Height="Auto"/> <!-- szczegóły pod ramką -->
  </Grid.RowDefinitions>
 
  <!--1) KPI: pełna szerokość, trzy kolumny -->
@@ -123,8 +123,22 @@
  <!--2) Pasek wyboru okresu – na środku -->
  <ctrls:PeriodBarControl x:Name="PeriodBar" Grid.Row="1" HorizontalAlignment="Center" Margin="0,0,0,12" />
 
- <!--3) Ramka kategorii – poziomo pod paskiem -->
+ <!--3) Wspólna ramka: Wszystkie Kategorie + trzy dolne panele -->
  <Border Grid.Row="2"
+ Background="Transparent"
+ BorderBrush="{DynamicResource Brand.Blue}"
+ BorderThickness="2"
+ CornerRadius="10"
+ Padding="12"
+ Margin="0,0,0,12">
+ <Grid>
+ <Grid.RowDefinitions>
+ <RowDefinition Height="Auto"/>
+ <RowDefinition Height="Auto"/>
+ </Grid.RowDefinitions>
+
+ <!-- Sekcja: Wszystkie Kategorie -->
+ <Border Grid.Row="0"
  Padding="12"
  Background="{DynamicResource Surface.Background}"
  BorderBrush="{DynamicResource Surface.Border}"
@@ -133,15 +147,14 @@
  Margin="0,0,0,12">
  <Grid>
  <Grid.RowDefinitions>
- <RowDefinition Height="Auto"/> <!-- header -->
- <RowDefinition Height="Auto"/> <!-- search -->
- <RowDefinition Height="Auto"/> <!-- add area under search -->
- <RowDefinition Height="*"/> <!-- list gets space -->
- <RowDefinition Height="Auto"/> <!-- structure + details side-by-side -->
+ <RowDefinition Height="Auto"/>
+ <RowDefinition Height="Auto"/>
+ <RowDefinition Height="Auto"/>
+ <RowDefinition Height="*"/>
  <RowDefinition Height="Auto"/> <!-- edit panel -->
  </Grid.RowDefinitions>
 
- <TextBlock Text="Kategorie" FontSize="22" FontWeight="Bold" Foreground="{DynamicResource App.Foreground}" Margin="0,0,0,12"/>
+ <TextBlock Text="Wszystkie Kategorie" FontSize="22" FontWeight="Bold" Foreground="{DynamicResource App.Foreground}" Margin="0,0,0,12"/>
 
  <!-- Wyszukiwarka: ikona przed polem -->
  <DockPanel Grid.Row="1" Margin="0,0,0,8" LastChildFill="True">
@@ -163,48 +176,84 @@
  <TextBlock x:Name="MessageText" Margin="0,8,0,0" Foreground="OrangeRed" TextWrapping="Wrap"/>
  </StackPanel>
 
- <!-- Lista kategorii -->
+ <!-- Lista kategorii jako kafelki -->
  <ScrollViewer Grid.Row="3" VerticalScrollBarVisibility="Auto">
  <ItemsControl x:Name="CategoriesList">
+ <ItemsControl.ItemsPanel>
+ <ItemsPanelTemplate>
+ <WrapPanel ItemWidth="180" ItemHeight="120" IsItemsHost="True" />
+ </ItemsPanelTemplate>
+ </ItemsControl.ItemsPanel>
  <ItemsControl.ItemTemplate>
  <DataTemplate>
- <Border Margin="0,4,0,4" Padding="8" Background="{DynamicResource Surface.Background}" BorderBrush="{DynamicResource Surface.Border}" BorderThickness="1" CornerRadius="6">
- <StackPanel>
+ <Border Width="180" Height="120" Margin="8" Padding="8"
+ Background="{DynamicResource Surface.Background}"
+ BorderBrush="{DynamicResource Surface.Border}" BorderThickness="1" CornerRadius="10">
  <Grid>
- <Grid.ColumnDefinitions>
- <ColumnDefinition Width="*"/>
- <ColumnDefinition Width="Auto"/>
- </Grid.ColumnDefinitions>
- <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
- <Rectangle Width="12" Height="12" Fill="{Binding ColorBrush}" RadiusX="3" RadiusY="3" Margin="0,0,8,0"/>
- <TextBlock Text="{Binding Name}" VerticalAlignment="Center" Foreground="{DynamicResource App.Foreground}"/>
+ <Grid.RowDefinitions>
+ <RowDefinition Height="Auto"/>
+ <RowDefinition Height="*"/>
+ <RowDefinition Height="Auto"/>
+ </Grid.RowDefinitions>
+
+ <!-- Header: color square + icon + name -->
+ <StackPanel Orientation="Horizontal">
+ <Rectangle Width="14" Height="14" RadiusX="3" RadiusY="3" Fill="{Binding ColorBrush}" Margin="0,0,6,0"/>
+ <TextBlock Text="{Binding Icon}" FontSize="16" Margin="0,0,6,0"/>
+ <TextBlock Text="{Binding Name}" FontSize="16" FontWeight="SemiBold" Foreground="{DynamicResource App.Foreground}"/>
  </StackPanel>
- <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
- <Button Tag="{Binding}" Click="EditCategory_Click" ToolTip="Edytuj" Padding="6" Margin="0,0,8,0">
- <TextBlock FontFamily="Segoe MDL2 Assets" Text="&#xE70F;" FontSize="14" Foreground="{DynamicResource App.Foreground}"/>
+
+ <!-- spacer -->
+ <Grid Grid.Row="1"/>
+
+ <!-- Footer: actions -->
+ <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Right">
+ <Button Tag="{Binding}" Click="EditCategory_Click" Width="28" Height="28" Padding="0" Margin="0,0,6,0" ToolTip="Edytuj">
+ <TextBlock FontFamily="Segoe MDL2 Assets" Text="&#xE70F;" FontSize="14"/>
  </Button>
- <Button Tag="{Binding}" Click="ShowDeleteConfirm_Click" ToolTip="Usuń" Padding="6">
- <TextBlock FontFamily="Segoe MDL2 Assets" Text="&#xE74D;" FontSize="14" Foreground="Tomato"/>
+ <Button Tag="{Binding}" Click="ShowDeleteConfirm_Click" Width="28" Height="28" Padding="0" ToolTip="Usuń">
+ <TextBlock FontFamily="Segoe MDL2 Assets" Text="&#xE74D;" FontSize="14"/>
  </Button>
  </StackPanel>
  </Grid>
- <!-- inline delete confirm -->
- <Border x:Name="DeleteConfirmPanel" Background="{DynamicResource Surface.Background}" BorderBrush="{DynamicResource Surface.Border}" BorderThickness="1" CornerRadius="6" Padding="8" Margin="0,8,0,0" Visibility="Collapsed">
- <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
- <TextBlock Text="Czy na pewno usunąć kategorię?" VerticalAlignment="Center" Margin="0,0,12,0"/>
- <Button Tag="{Binding}" Click="DeleteConfirm_Click" Content="Tak" Width="60" Margin="0,0,8,0"/>
- <Button Click="DeleteCancel_Click" Content="Nie" Width="60"/>
- </StackPanel>
- </Border>
- </StackPanel>
  </Border>
  </DataTemplate>
  </ItemsControl.ItemTemplate>
  </ItemsControl>
  </ScrollViewer>
 
- <!-- Struktura + Szczegóły + Porównanie obok siebie -->
- <Grid Grid.Row="4">
+ <!-- Panel edycji -->
+ <Border Grid.Row="4" x:Name="EditPanel" Background="{DynamicResource Surface.Background}" BorderBrush="{DynamicResource Surface.Border}" BorderThickness="1" CornerRadius="6" Padding="8" Margin="0,8,0,0" Visibility="Collapsed">
+ <StackPanel>
+ <TextBlock Text="Edytuj kategorię" FontWeight="Bold" Foreground="{DynamicResource App.Foreground}"/>
+ <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
+ <TextBox x:Name="EditNameBox" Width="320" Height="28" />
+ <Button Content="Zapisz" Width="80" Margin="8,0,0,0" Click="SaveEdit_Click"/>
+ <Button Content="Anuluj" Width="80" Margin="8,0,0,0" Click="CancelEdit_Click"/>
+ </StackPanel>
+ <TextBlock x:Name="EditPanelMessage" Foreground="OrangeRed" Margin="0,6,0,0"/>
+
+ <!-- Panel edycji: dodaj wybór ikony -->
+ <StackPanel Orientation="Vertical" Margin="0,8,0,0">
+ <TextBlock Text="Ikona" FontWeight="SemiBold"/>
+ <ComboBox x:Name="IconCombo" Width="200">
+ <ComboBoxItem Content="🍽️"/>
+ <ComboBoxItem Content="🚌"/>
+ <ComboBoxItem Content="🏠"/>
+ <ComboBoxItem Content="🧾"/>
+ <ComboBoxItem Content="🎉"/>
+ <ComboBoxItem Content="💊"/>
+ <ComboBoxItem Content="👕"/>
+ <ComboBoxItem Content="🎁"/>
+ </ComboBox>
+ </StackPanel>
+ </StackPanel>
+ </Border>
+ </Grid>
+ </Border>
+
+ <!-- Wewnątrz ramki: trzy panele poniżej listy -->
+ <Grid Grid.Row="1" Margin="0,12,0,0">
  <Grid.ColumnDefinitions>
  <ColumnDefinition Width="2*"/>
  <ColumnDefinition Width="16"/>
@@ -285,7 +334,7 @@
  </StackPanel>
  </Border>
 
- <!-- Porównanie z poprzednim okresem -->
+ <!-- Porównanie z poprzednim okresie -->
  <Border Grid.Column="4" Padding="12" Background="{DynamicResource Surface.Background}" BorderBrush="{DynamicResource Surface.Border}" BorderThickness="1" CornerRadius="8">
  <StackPanel>
  <TextBlock Text="Porównanie z poprzednim okresem" FontWeight="Bold" Foreground="{DynamicResource App.Foreground}"/>
@@ -301,19 +350,6 @@
  </StackPanel>
  </Border>
  </Grid>
-
- <!-- Panel edycji -->
- <Border Grid.Row="5" x:Name="EditPanel" Background="{DynamicResource Surface.Background}" BorderBrush="{DynamicResource Surface.Border}" BorderThickness="1" CornerRadius="6" Padding="8" Margin="0,8,0,0" Visibility="Collapsed">
- <StackPanel>
- <TextBlock Text="Edytuj kategorię" FontWeight="Bold" Foreground="{DynamicResource App.Foreground}"/>
- <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
- <TextBox x:Name="EditNameBox" Width="320" Height="28" />
- <Button Content="Zapisz" Width="80" Margin="8,0,0,0" Click="SaveEdit_Click"/>
- <Button Content="Anuluj" Width="80" Margin="8,0,0,0" Click="CancelEdit_Click"/>
- </StackPanel>
- <TextBlock x:Name="EditPanelMessage" Foreground="OrangeRed" Margin="0,6,0,0"/>
- </StackPanel>
- </Border>
  </Grid>
  </Border>
 
@@ -348,27 +384,22 @@
  <Border x:Name="TransactionsPanel" Grid.Column="0" Padding="12" Background="{DynamicResource Surface.Background}" BorderBrush="{DynamicResource Surface.Border}" BorderThickness="1" CornerRadius="8" Visibility="Collapsed">
  <StackPanel>
  <TextBlock Text="Ostatnie transakcje w tej kategorii" FontWeight="Bold" Foreground="{DynamicResource App.Foreground}" FontSize="16" Margin="0,0,0,8"/>
- <ListView x:Name="LastTransactionsList" Height="320" BorderThickness="0" Background="Transparent">
- <ListView.View>
- <GridView>
- <GridViewColumn Header="Data" Width="100">
- <GridViewColumn.CellTemplate>
+ <ItemsControl x:Name="LastTransactionsList">
+ <ItemsControl.ItemTemplate>
  <DataTemplate>
- <TextBlock Text="{Binding Date, StringFormat={}{0:yyyy-MM-dd}}"/>
+ <Grid Margin="0,2,0,2">
+ <Grid.ColumnDefinitions>
+ <ColumnDefinition Width="100"/>
+ <ColumnDefinition Width="*"/>
+ <ColumnDefinition Width="120"/>
+ </Grid.ColumnDefinitions>
+ <TextBlock Grid.Column="0" Text="{Binding Date, StringFormat={}{0:yyyy-MM-dd}}"/>
+ <TextBlock Grid.Column="1" Text="{Binding Description}" TextTrimming="CharacterEllipsis"/>
+ <TextBlock Grid.Column="2" Text="{Binding Amount, StringFormat={}{0:N2} zł}" TextAlignment="Right"/>
+ </Grid>
  </DataTemplate>
- </GridViewColumn.CellTemplate>
- </GridViewColumn>
- <GridViewColumn Header="Opis" Width="220" DisplayMemberBinding="{Binding Description}"/>
- <GridViewColumn Header="Kwota" Width="100">
- <GridViewColumn.CellTemplate>
- <DataTemplate>
- <TextBlock Text="{Binding Amount, StringFormat={}{0:N2} zł}"/>
- </DataTemplate>
- </GridViewColumn.CellTemplate>
- </GridViewColumn>
- </GridView>
- </ListView.View>
- </ListView>
+ </ItemsControl.ItemTemplate>
+ </ItemsControl>
  </StackPanel>
  </Border>
 

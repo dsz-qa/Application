@@ -2326,5 +2326,46 @@ GROUP BY i.Source;";
             catch { }
             return list;
         }
+
+        public static List<(int Id, string Name, string? Color, string? Icon)> GetCategoriesExtended(int userId)
+        {
+            var list = new List<(int, string, string?, string?)>();
+            using var c = OpenAndEnsureSchema();
+            using var cmd = c.CreateCommand();
+            if (ColumnExists(c, "Categories", "IsArchived"))
+                cmd.CommandText = "SELECT Id, Name, Color, Icon FROM Categories WHERE UserId=@u AND IsArchived=0 ORDER BY Name;";
+            else
+                cmd.CommandText = "SELECT Id, Name, Color, Icon FROM Categories WHERE UserId=@u ORDER BY Name;";
+            cmd.Parameters.AddWithValue("@u", userId);
+            using var r = cmd.ExecuteReader();
+            while (r.Read())
+            {
+                var id = r.IsDBNull(0) ? 0 : r.GetInt32(0);
+                var name = r.IsDBNull(1) ? string.Empty : r.GetString(1);
+                var color = r.IsDBNull(2) ? null : r.GetString(2);
+                var icon = r.IsDBNull(3) ? null : r.GetString(3);
+                list.Add((id, name, color, icon));
+            }
+            return list;
+        }
+
+        public static void UpdateCategoryFull(int id, int userId, string? name = null, string? color = null, string? icon = null)
+        {
+            using var c = OpenAndEnsureSchema();
+            using var cmd = c.CreateCommand();
+            var setParts = new List<string>();
+            if (name != null) setParts.Add("Name=@n");
+            if (color != null) setParts.Add("Color=@c");
+            if (icon != null) setParts.Add("Icon=@i");
+            if (setParts.Count ==0) return;
+            cmd.CommandText = $"UPDATE Categories SET {string.Join(", ", setParts)} WHERE Id=@id AND UserId=@u;";
+            cmd.Parameters.AddWithValue("@id", id);
+            cmd.Parameters.AddWithValue("@u", userId);
+            if (name != null) cmd.Parameters.AddWithValue("@n", name.Trim());
+            if (color != null) cmd.Parameters.AddWithValue("@c", (object?)color ?? DBNull.Value);
+            if (icon != null) cmd.Parameters.AddWithValue("@i", (object?)icon ?? DBNull.Value);
+            cmd.ExecuteNonQuery();
+            RaiseDataChanged();
+        }
     }
 }
