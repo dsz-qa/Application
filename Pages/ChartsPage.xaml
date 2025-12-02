@@ -87,7 +87,7 @@
                                              Height="260"
                                              LegendPosition="Right"
                                              Background="Transparent"
-                                             Foreground="{DynamicResource App.Foreground}"/>
+                                             Foreground="White"/>
                         </StackPanel>
                     </Border>
 
@@ -98,7 +98,7 @@
                                                    XAxes="{Binding AccountsXAxes}"
                                                    Height="260"
                                                    Background="Transparent"
-                                                   Foreground="{DynamicResource App.Foreground}"/>
+                                                   Foreground="White"/>
                         </StackPanel>
                     </Border>
                 </StackPanel>
@@ -112,7 +112,7 @@
                                                    XAxes="{Binding TrendXAxes}"
                                                    Height="260"
                                                    Background="Transparent"
-                                                   Foreground="{DynamicResource App.Foreground}"/>
+                                                   Foreground="White"/>
                         </StackPanel>
                     </Border>
 
@@ -123,7 +123,7 @@
                                                    XAxes="{Binding WeekdayXAxes}"
                                                    Height="260"
                                                    Background="Transparent"
-                                                   Foreground="{DynamicResource App.Foreground}"/>
+                                                   Foreground="White"/>
                         </StackPanel>
                     </Border>
                 </StackPanel>
