@@ -1,298 +1,108 @@
-﻿using Finly.Models;
-using Finly.Services;
-
-using LiveChartsCore;
-using LiveChartsCore.SkiaSharpView;
-using LiveChartsCore.SkiaSharpView.Painting;
-using LiveChartsCore.SkiaSharpView.WPF;
-
-using QuestPDF.Fluent;
-using QuestPDF.Helpers;
-
-using SkiaSharp;
-using System;
-using System.Collections.Generic;
-using System.IO;
-using System.Linq;
+﻿using System;
 using System.Windows;
 using System.Windows.Controls;
-using System.Windows.Media;
-using System.Windows.Media.Imaging;
+using Finly.ViewModels;
 
 namespace Finly.Pages
 {
     public partial class ChartsPage : UserControl
     {
-        private readonly int _userId;
-        private List<Expense> _expenses = new();
-
-        public ChartsPage() : this(SafeGetUserId()) { }
-
-        public ChartsPage(int userId)
+        public ChartsPage()
         {
             InitializeComponent();
-            _userId = userId;
-            LoadChartData();
+
+            DataContext = new ChartsViewModel();
+
+            // domyślny tryb: wydatki
+            if (ModeExpensesBtn != null)
+                ApplyPrimary(ModeExpensesBtn);
+
+            HookPeriodBar();
         }
 
-        private static int SafeGetUserId()
+        private void HookPeriodBar()
         {
-            try { return UserService.GetCurrentUserId(); }
-            catch { return 0; }
-        }
+            if (PeriodBar == null) return;
 
-        private void FilterButton_Click(object sender, RoutedEventArgs e)
-        {
-            LoadChartData(FromDatePicker.SelectedDate, ToDatePicker.SelectedDate);
-        }
-
-        private void LoadChartData(DateTime? start = null, DateTime? end = null)
-        {
-            var all = DatabaseService.GetExpensesWithCategory()
-                                     .Where(e => e.UserId == _userId)
-                                     .ToList();
-
-            var filtered = all.Where(e =>
-                                (!start.HasValue || e.Date >= start.Value) &&
-                                (!end.HasValue || e.Date <= end.Value))
-                              .ToList();
-
-            LoadPieChart(filtered);
-            LoadLineChart(filtered);
-
-            _expenses = filtered.Select(e => new Expense
+            PeriodBar.RangeChanged += (_, __) =>
             {
-                Id = e.Id,
-                Amount = e.Amount,
-                Category = e.CategoryName,
-                Date = e.Date,
-                Description = e.Description ?? string.Empty
-            }).ToList();
-        }
-
-        // === PIE ===
-        private void LoadPieChart(List<ExpenseDisplayModel> data)
-        {
-            var grouped = data
-                .GroupBy(e => string.IsNullOrWhiteSpace(e.CategoryName) ? "Brak kategorii" : e.CategoryName)
-                .Select(g =>
-                {
-                    var sum = g.Sum(x => x.Amount);
-                    return new PieSeries<double>
-                    {
-                        Name = g.Key,
-                        Values = new[] { sum },
-                        DataLabelsSize = 12,
-                        DataLabelsPaint = new SolidColorPaint(SKColors.White),
-                        DataLabelsPosition = LiveChartsCore.Measure.PolarLabelsPosition.Middle
-                    };
-                })
-                .ToArray();
-
-            pieChart.Series = grouped;
-        }
-
-        // === LINE ===
-        private void LoadLineChart(List<ExpenseDisplayModel> data)
-        {
-            var points = data
-                .GroupBy(e => e.Date.Date)
-                .OrderBy(g => g.Key)
-                .Select(g => new { Date = g.Key, Amount = g.Sum(e => e.Amount) })
-                .ToList();
-
-            lineChart.Series = new ISeries[]
-            {
-                new LineSeries<double>
-                {
-                    Values = points.Select(p => p.Amount).ToArray(),
-                    Fill = null,
-                    GeometrySize = 8
-                }
+                if (DataContext is ChartsViewModel vm)
+                    vm.SetCustomRange(PeriodBar.StartDate, PeriodBar.EndDate);
             };
 
-            lineChart.XAxes = new Axis[]
+            PeriodBar.SearchClicked += (_, __) =>
             {
-                new Axis
-                {
-                    Labels = points.Select(p => p.Date.ToString("dd.MM.yyyy")).ToArray(),
-                    LabelsRotation = 45,
-                    Name = "Data",
-                    LabelsPaint = new SolidColorPaint(SKColors.Gray)
-                }
-            };
-
-            lineChart.YAxes = new Axis[]
-            {
-                new Axis
-                {
-                    Name = "Kwota [zł]",
-                    LabelsPaint = new SolidColorPaint(SKColors.Gray),
-                    Labeler = value => value >= 1000 ? $"{value/1000:0.#} tys." : $"{value:0}"
-                }
+                if (DataContext is ChartsViewModel vm)
+                    vm.SetCustomRange(PeriodBar.StartDate, PeriodBar.EndDate);
             };
         }
 
-        // === EXPORT PNG ===
-        private void ExportChartsToPng_Click(object sender, RoutedEventArgs e)
+        // ===== Tryb (wydatki / przychody / transfer / cashflow) =====
+
+        private void Mode_Click(object sender, RoutedEventArgs e)
         {
-            try
+            if (sender is not Button btn) return;
+            if (DataContext is not ChartsViewModel vm) return;
+
+            SetActiveMode(btn);
+
+            switch (btn.Content?.ToString())
             {
-                var dlgPie = new Microsoft.Win32.SaveFileDialog { Filter = "PNG Image|*.png", FileName = "WykresKolowy" };
-                if (dlgPie.ShowDialog() != true) return;
-
-                var dlgLine = new Microsoft.Win32.SaveFileDialog { Filter = "PNG Image|*.png", FileName = "WykresLiniowy" };
-                if (dlgLine.ShowDialog() != true) return;
-
-                SaveVisualAsPng(pieChart, dlgPie.FileName);
-                SaveVisualAsPng(lineChart, dlgLine.FileName);
-
-                ToastService.Success("Wykresy zapisano jako PNG.");
-            }
-            catch (Exception ex)
-            {
-                ToastService.Error("Nie udało się zapisać PNG: " + ex.Message);
+                case "Wydatki":
+                    vm.SetMode("Expenses");
+                    break;
+                case "Przychody":
+                    vm.SetMode("Incomes");
+                    break;
+                case "Transfer":
+                    vm.SetMode("Transfer");
+                    break;
+                case "Cashflow":
+                    vm.SetMode("Cashflow");
+                    break;
             }
         }
 
-        private static void SaveVisualAsPng(FrameworkElement visual, string path)
+        private void SetActiveMode(Button? active)
         {
-            // jeśli kontrolka nie jest zmierzona/rozmieszczona – zrób to lokalnie
-            if (double.IsNaN(visual.ActualWidth) || visual.ActualWidth == 0 ||
-                double.IsNaN(visual.ActualHeight) || visual.ActualHeight == 0)
-            {
-                visual.Measure(new System.Windows.Size(double.PositiveInfinity, double.PositiveInfinity));
-                visual.Arrange(new System.Windows.Rect(visual.DesiredSize));
-                visual.UpdateLayout();
-            }
+            if (active == null) return;
 
-            var bmp = new RenderTargetBitmap(
-                Math.Max(1, (int)visual.ActualWidth),
-                Math.Max(1, (int)visual.ActualHeight),
-                96, 96, PixelFormats.Pbgra32);
-
-            bmp.Render(visual);
-
-            var encoder = new PngBitmapEncoder();
-            encoder.Frames.Add(BitmapFrame.Create(bmp));
-            using var fs = File.Create(path);
-            encoder.Save(fs);
+            ResetModeButtons();
+            ApplyPrimary(active);
         }
 
-        private void ExportChartToPdf_Click(object sender, RoutedEventArgs e)
+        private void ResetModeButtons()
         {
-            var pieTemp = Path.Combine(Path.GetTempPath(), $"finly_pie_{Guid.NewGuid():N}.png");
-            var lineTemp = Path.Combine(Path.GetTempPath(), $"finly_line_{Guid.NewGuid():N}.png");
-
-            SaveVisualAsPng(pieChart, pieTemp);
-            SaveVisualAsPng(lineChart, lineTemp);
-
-            try
-            {
-                var sfd = new Microsoft.Win32.SaveFileDialog
-                {
-                    Filter = "PDF (*.pdf)|*.pdf",
-                    FileName = "wykresy_wydatkow"
-                };
-                if (sfd.ShowDialog() != true) return;
-
-                var pieBytes = File.ReadAllBytes(pieTemp);
-                var lineBytes = File.ReadAllBytes(lineTemp);
-
-                var doc = Document.Create(container =>
-                {
-                    container.Page(page =>
-                    {
-                        page.Size(PageSizes.A4);
-                        page.Margin(20);
-                        page.DefaultTextStyle(ts => ts.FontSize(12));
-
-                        page.Content().Column(col =>
-                        {
-                            col.Spacing(10);
-                            col.Item().Text("Wykresy wydatków").FontSize(16).SemiBold().AlignCenter();
-                            col.Item().Image(pieBytes);
-                            col.Item().Image(lineBytes);
-                        });
-                    });
-                });
-
-                doc.GeneratePdf(sfd.FileName);
-                ToastService.Success("Wykresy zapisano do PDF.");
-            }
-            catch (Exception ex)
-            {
-                ToastService.Error("Nie udało się zapisać PDF: " + ex.Message);
-            }
-            finally
-            {
-                try { File.Delete(pieTemp); } catch { }
-                try { File.Delete(lineTemp); } catch { }
-            }
+            if (ModeExpensesBtn != null) ClearPrimary(ModeExpensesBtn);
+            if (ModeIncomesBtn != null) ClearPrimary(ModeIncomesBtn);
+            if (ModeTransferBtn != null) ClearPrimary(ModeTransferBtn);
+            if (ModeCashflowBtn != null) ClearPrimary(ModeCashflowBtn);
         }
 
-
-        // ===== Sortowanie (na toastach zamiast MessageBox) =====
-        private void SortComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        private static void ApplyPrimary(Button btn)
         {
-            var selected = (SortComboBox.SelectedItem as ComboBoxItem)?.Content?.ToString();
-            if (_expenses == null || _expenses.Count == 0)
-            {
-                ToastService.Info("Brak danych do sortowania.");
-                return;
-            }
-
-            var sorted = _expenses;
-
-            switch (selected)
-            {
-                case "Kategoria A-Z": sorted = _expenses.OrderBy(x => x.Category).ToList(); break;
-                case "Kategoria Z-A": sorted = _expenses.OrderByDescending(x => x.Category).ToList(); break;
-                case "Suma rosnąco": sorted = _expenses.OrderBy(x => x.Amount).ToList(); break;
-                case "Suma malejąco": sorted = _expenses.OrderByDescending(x => x.Amount).ToList(); break;
-            }
-
-            var mapped = sorted.Select(x => new ExpenseDisplayModel
-            {
-                Id = x.Id,
-                Amount = x.Amount,
-                CategoryName = x.Category,
-                Date = x.Date,
-                Description = x.Description
-            }).ToList();
-
-            LoadPieChart(mapped);
+            // korzystamy ze stylu PrimaryButton, który masz już w zasobach
+            if (Application.Current.Resources["PrimaryButton"] is Style s)
+                btn.Style = s;
         }
 
-        private void DateSortComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        private static void ClearPrimary(Button btn)
         {
-            var selected = (DateSortComboBox.SelectedItem as ComboBoxItem)?.Content?.ToString();
-            if (_expenses == null || _expenses.Count == 0)
-            {
-                ToastService.Info("Brak danych do sortowania.");
-                return;
-            }
+            btn.ClearValue(StyleProperty);
+        }
 
-            var sorted = _expenses;
+        // ===== Eksport =====
 
-            switch (selected)
-            {
-                case "Data rosnąco": sorted = _expenses.OrderBy(x => x.Date).ToList(); break;
-                case "Data malejąco": sorted = _expenses.OrderByDescending(x => x.Date).ToList(); break;
-            }
+        private async void ExportPdf_Click(object sender, RoutedEventArgs e)
+        {
+            if (DataContext is ChartsViewModel vm)
+                await vm.ExportToPdfAsync();
+        }
 
-            var mapped = sorted.Select(x => new ExpenseDisplayModel
-            {
-                Amount = x.Amount,
-                Date = x.Date,
-                CategoryName = x.Category,
-                Description = x.Description
-            }).ToList();
-
-            LoadLineChart(mapped);
+        private void ExportCsv_Click(object sender, RoutedEventArgs e)
+        {
+            if (DataContext is ChartsViewModel vm)
+                vm.ExportToCsv();
         }
     }
 }
-
-
-

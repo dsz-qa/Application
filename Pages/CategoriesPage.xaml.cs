@@ -17,9 +17,27 @@ namespace Finly.Pages
     {
         private readonly int _uid;
         private readonly ObservableCollection<CategoryVm> _categories = new();
-        public IEnumerable<CategoryVm> Categories => _categories;
+        public ObservableCollection<CategoryVm> Categories => _categories;
 
         private CollectionView _categoriesView;
+
+        // filtering state
+        private string _searchText = string.Empty;
+        public string SearchText
+        {
+            get => _searchText;
+            set
+            {
+                if (_searchText != value)
+                {
+                    _searchText = value ?? string.Empty;
+                    RaisePropertyChanged(nameof(SearchText));
+                    // hide any open delete confirmations when user types
+                    ClearAllDeleteConfirmPanels();
+                    ApplyCategoriesFilter();
+                }
+            }
+        }
 
         // editing state
         private CategoryVm? _editingVm;
@@ -60,12 +78,25 @@ namespace Finly.Pages
             Loaded += CategoriesPage_Loaded;
 
             _categoriesView = (CollectionView)CollectionViewSource.GetDefaultView(_categories);
+            _categoriesView.Filter = CategoryFilter;
 
             PeriodBar.RangeChanged += PeriodBar_RangeChanged;
 
             LastTransactionsList.ItemsSource = _lastTransactions;
+        }
 
-            CategoriesList.AddHandler(Button.ClickEvent, new RoutedEventHandler(CategoryItem_Click));
+        private bool CategoryFilter(object obj)
+        {
+            if (obj is not CategoryVm vm) return false;
+            var q = (SearchText ?? string.Empty).Trim();
+            if (string.IsNullOrEmpty(q)) return true;
+            var cmp = StringComparison.CurrentCultureIgnoreCase;
+            return (vm.Name?.IndexOf(q, cmp) >= 0) || (vm.Description?.IndexOf(q, cmp) >= 0);
+        }
+
+        private void ApplyCategoriesFilter()
+        {
+            try { _categoriesView.Refresh(); } catch { }
         }
 
         private void EnsureKpiRefs()
@@ -92,6 +123,8 @@ namespace Finly.Pages
                 EnsureDefaultCategories();
                 LoadCategories();
                 UpdateCategoryKpis();
+                // ensure no delete confirmation is visible on load
+                ClearAllDeleteConfirmPanels();
             }
             catch (Exception ex)
             {
@@ -194,41 +227,43 @@ namespace Finly.Pages
                 _categories.Add(new CategoryVm { Id = id, Name = name, ColorBrush = brush, Icon = icon });
             }
 
-            RaisePropertyChanged(nameof(Categories));
-        }
-
-        private void SearchBox_TextChanged(object sender, TextChangedEventArgs e)
-        {
-            if (_categoriesView == null) return;
-
-            var txt = (SearchBox.Text ?? string.Empty).Trim();
-            if (string.IsNullOrEmpty(txt))
+            // Load descriptions for all categories (in one query)
+            try
             {
-                _categoriesView.Filter = null;
-            }
-            else
-            {
-                _categoriesView.Filter = obj =>
+                using var con = DatabaseService.GetConnection();
+                using var cmd = con.CreateCommand();
+                cmd.CommandText = "SELECT Id, Description FROM Categories WHERE UserId=@u;";
+                cmd.Parameters.AddWithValue("@u", _uid);
+                using var reader = cmd.ExecuteReader();
+                var map = new Dictionary<int, string?>(256);
+                while (reader.Read())
                 {
-                    if (obj is CategoryVm vm)
-                    {
-                        var name = vm.Name ?? string.Empty;
-                        return name.IndexOf(txt, StringComparison.CurrentCultureIgnoreCase) >= 0;
-                    }
-                    return false;
-                };
+                    var id = reader.GetInt32(0);
+                    string? desc = reader.IsDBNull(1) ? null : reader.GetString(1);
+                    map[id] = desc;
+                }
+                foreach (var vm in _categories)
+                {
+                    if (map.TryGetValue(vm.Id, out var d)) vm.Description = d;
+                }
             }
+            catch { }
+
+            ApplyCategoriesFilter();
+            // ensure no stale confirm panel stays visible
+            ClearAllDeleteConfirmPanels();
+            RaisePropertyChanged(nameof(Categories));
         }
 
         private void AddCategoryTile_Click(object sender, RoutedEventArgs e)
         {
-            try
-            {
-                AddPanel.Visibility = Visibility.Visible;
-                AddPanel.BringIntoView();
-                AddNameBox.Focus();
-            }
-            catch { }
+            // show add panel and reset fields
+            AddPanelMessage.Text = string.Empty;
+            AddNameBox.Text = string.Empty;
+            AddDescriptionBox.Text = string.Empty;
+            _selectedColorHex = string.Empty;
+            AddPanel.Visibility = Visibility.Visible;
+            try { AddPanel.UpdateLayout(); AddPanel.BringIntoView(); } catch { }
         }
 
         private void AddCategory_Click(object sender, RoutedEventArgs e)
@@ -300,23 +335,21 @@ namespace Finly.Pages
         {
             if (sender is FrameworkElement fe && fe.Tag is CategoryVm vm)
             {
-                var result = MessageBox.Show($"Usunąć kategorię '{vm.Name}'?", "Potwierdź", MessageBoxButton.YesNo, MessageBoxImage.Warning);
-                if (result == MessageBoxResult.Yes)
-                {
-                    try
-                    {
-                        var id = DatabaseService.GetCategoryIdByName(_uid, vm.Name);
-                        if (id.HasValue)
-                            DatabaseService.ArchiveCategory(id.Value);
-                        _ = _categories.Remove(vm);
-                        RaisePropertyChanged(nameof(Categories));
-                        UpdateCategoryKpis();
-                    }
-                    catch (Exception ex)
-                    {
-                        MessageBox.Show("Błąd usuwania: " + ex.Message, "Błąd", MessageBoxButton.OK, MessageBoxImage.Error);
-                    }
-                }
+                // show inline confirm panel only for this item
+                ClearAllDeleteConfirmPanels();
+                vm.IsDeleteConfirmVisible = true;
+            }
+        }
+
+        private void HideDeleteConfirm_Click(object sender, RoutedEventArgs e)
+        {
+            if ((sender as FrameworkElement)?.Tag is CategoryVm vm)
+            {
+                vm.IsDeleteConfirmVisible = false;
+            }
+            else
+            {
+                ClearAllDeleteConfirmPanels();
             }
         }
 
@@ -324,6 +357,7 @@ namespace Finly.Pages
         {
             if ((sender as FrameworkElement)?.Tag is CategoryVm vm)
             {
+                vm.IsDeleteConfirmVisible = false;
                 TryDeleteCategory(vm);
             }
         }
@@ -546,13 +580,39 @@ namespace Finly.Pages
             }
         }
 
+        private void ClearAllDeleteConfirmPanels()
+        {
+            foreach (var c in _categories)
+            {
+                if (c.IsDeleteConfirmVisible)
+                    c.IsDeleteConfirmVisible = false;
+            }
+        }
+
         public class CategoryVm : INotifyPropertyChanged
         {
             private Brush _colorBrush = Brushes.Gray;
+            private bool _isDeleteConfirmVisible;
+            private string? _description;
             public int Id { get; set; }
             public string Name { get; set; } = string.Empty;
-            public Brush ColorBrush { get => _colorBrush; set { _colorBrush = value; OnPropertyChanged(nameof(ColorBrush)); } }
+            public Brush ColorBrush { get => _colorBrush; set { _colorBrush = value; OnPropertyChanged(nameof(ColorBrush)); OnPropertyChanged(nameof(Color)); } }
+            // For XAML bindings that expect Color property
+            public Brush Color { get => _colorBrush; set { _colorBrush = value; OnPropertyChanged(nameof(Color)); OnPropertyChanged(nameof(ColorBrush)); } }
             public string? Icon { get; set; }
+
+            public string? Description
+            {
+                get => _description;
+                set { _description = value; OnPropertyChanged(nameof(Description)); }
+            }
+
+            public bool IsDeleteConfirmVisible
+            {
+                get => _isDeleteConfirmVisible;
+                set { _isDeleteConfirmVisible = value; OnPropertyChanged(nameof(IsDeleteConfirmVisible)); }
+            }
+
             public event PropertyChangedEventHandler? PropertyChanged;
             private void OnPropertyChanged(string prop) => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(prop));
         }

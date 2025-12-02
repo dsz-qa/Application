@@ -2,7 +2,9 @@
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:lvc="http://livecharts.com"
-             xmlns:lvcwpf="clr-namespace:LiveChartsCore.SkiaSharpView.WPF;assembly=LiveChartsCore.SkiaSharpView.WPF">
+             xmlns:lvcwpf="clr-namespace:LiveChartsCore.SkiaSharpView.WPF;assembly=LiveChartsCore.SkiaSharpView.WPF"
+             xmlns:lvcsk="clr-namespace:LiveChartsCore.SkiaSharpView;assembly=LiveChartsCore.SkiaSharpView"
+             xmlns:vc="clr-namespace:Finly.Views.Controls">
 
     <UserControl.Resources>
         <!-- Ten sam styl kart co na Dashboardzie -->
@@ -15,114 +17,95 @@
         </Style>
 
         <Style x:Key="CardHeader" TargetType="TextBlock">
-            <Setter Property="FontSize"   Value="14"/>
-            <Setter Property="FontWeight" Value="SemiBold"/>
-            <Setter Property="Opacity"    Value="0.9"/>
+            <Setter Property="FontSize"   Value="16"/>
+            <Setter Property="FontWeight" Value="Bold"/>
             <Setter Property="Foreground" Value="{DynamicResource App.Foreground}"/>
         </Style>
     </UserControl.Resources>
 
     <ScrollViewer VerticalScrollBarVisibility="Auto"
-                  HorizontalScrollBarVisibility="Auto">
+                  HorizontalScrollBarVisibility="Disabled">
         <Grid Margin="16">
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto"/>
-                <!-- Filtry -->
                 <RowDefinition Height="*"/>
-                <!-- Wykresy -->
             </Grid.RowDefinitions>
 
-            <!-- ========= FILTRY U GÓRY ========= -->
-            <Border Grid.Row="0"
-                    Style="{StaticResource Card}"
-                    Margin="0,0,0,12">
-                <StackPanel Orientation="Horizontal"
-                            VerticalAlignment="Center">
-                    <TextBlock Text="Sortuj:"
-                               VerticalAlignment="Center"
-                               Margin="0,0,5,0"/>
-                    <ComboBox x:Name="SortComboBox"
-                              Width="150"
-                              Margin="0,0,10,0"
-                              SelectionChanged="SortComboBox_SelectionChanged">
-                        <ComboBoxItem Content="Kategoria A-Z" />
-                        <ComboBoxItem Content="Kategoria Z-A" />
-                        <ComboBoxItem Content="Suma rosnąco" />
-                        <ComboBoxItem Content="Suma malejąco" />
-                    </ComboBox>
+            <!-- Pasek okresu + tryb -->
+            <Border Grid.Row="0" Style="{StaticResource Card}" Margin="0,0,0,12">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
 
-                    <TextBlock Text="Sortowanie wg daty:"
-                               VerticalAlignment="Center"
-                               Margin="0,0,5,0"/>
-                    <ComboBox x:Name="DateSortComboBox"
-                              Width="140"
-                              Margin="0,0,10,0"
-                              SelectionChanged="DateSortComboBox_SelectionChanged">
-                        <ComboBoxItem Content="Data rosnąco" />
-                        <ComboBoxItem Content="Data malejąco" />
-                    </ComboBox>
+                    <!-- Własny pasek okresu -->
+                    <vc:PeriodBarControl Grid.Column="0" x:Name="PeriodBar"/>
 
-                    <TextBlock Text="Od:"
-                               VerticalAlignment="Center"
-                               Margin="0,0,5,0"/>
-                    <DatePicker x:Name="FromDatePicker"
-                                Width="120"
-                                Margin="0,0,10,0"/>
-
-                    <TextBlock Text="Do:"
-                               VerticalAlignment="Center"
-                               Margin="0,0,5,0"/>
-                    <DatePicker x:Name="ToDatePicker"
-                                Width="120"
-                                Margin="0,0,10,0"/>
-
-                    <Button Content="Filtruj"
-                            Width="80"
-                            Margin="0,0,10,0"
-                            Click="FilterButton_Click"/>
-
-                    <Button Content="Eksportuj oba wykresy do PNG"
-                            Margin="5,0"
-                            Click="ExportChartsToPng_Click"/>
-
-                    <Button Content="Eksportuj do PDF"
-                            Margin="5,0"
-                            Click="ExportChartToPdf_Click"/>
-                </StackPanel>
+                    <!-- Tryb -->
+                    <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                        <TextBlock Text="Tryb:" VerticalAlignment="Center" Margin="0,0,8,0" Foreground="{DynamicResource App.Foreground}"/>
+                        <StackPanel Orientation="Horizontal">
+                            <Button x:Name="ModeExpensesBtn" Content="Wydatki"  Click="Mode_Click"/>
+                            <Button x:Name="ModeIncomesBtn"  Content="Przychody" Click="Mode_Click" Margin="8,0,0,0"/>
+                            <Button x:Name="ModeTransferBtn" Content="Transfer" Click="Mode_Click" Margin="8,0,0,0"/>
+                            <Button x:Name="ModeCashflowBtn" Content="Cashflow" Click="Mode_Click" Margin="8,0,0,0"/>
+                        </StackPanel>
+                    </StackPanel>
+                </Grid>
             </Border>
 
-            <!-- ========= WYKRESY ========= -->
-            <Grid Grid.Row="1">
-                <Grid.RowDefinitions>
-                    <RowDefinition Height="*"/>
-                    <RowDefinition Height="*"/>
-                </Grid.RowDefinitions>
+            <!-- Karty statystik -->
+            <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                <StackPanel>
+                    <!-- Karta 1: Pie -->
+                    <Border Style="{StaticResource Card}" Margin="0,0,0,12">
+                        <StackPanel>
+                            <TextBlock Text="Podział wg kategorii" Style="{StaticResource CardHeader}"/>
+                            <lvcwpf:PieChart Series="{Binding CategoriesSeries}"
+                                             Background="{DynamicResource Surface.Background}"/>
+                        </StackPanel>
+                    </Border>
 
-                <!-- Wydatki wg kategorii -->
-                <Border Grid.Row="0"
-                        Style="{StaticResource Card}"
-                        Margin="0,0,0,8">
-                    <StackPanel>
-                        <TextBlock Text="Wydatki wg kategorii"
-                                   Style="{StaticResource CardHeader}"
-                                   Margin="0,0,0,8"/>
-                        <lvcwpf:PieChart x:Name="pieChart"
-                                         Background="{DynamicResource Surface.Background}"/>
-                    </StackPanel>
-                </Border>
+                    <!-- Karta 2: Line -->
+                    <Border Style="{StaticResource Card}" Margin="0,0,0,12">
+                        <StackPanel>
+                            <TextBlock Text="Trend w czasie" Style="{StaticResource CardHeader}"/>
+                            <lvcwpf:CartesianChart Series="{Binding TrendSeries}"
+                                                   XAxes="{Binding TrendXAxes}"
+                                                   Background="{DynamicResource Surface.Background}"/>
+                        </StackPanel>
+                    </Border>
 
-                <!-- Wydatki wg daty -->
-                <Border Grid.Row="1"
-                        Style="{StaticResource Card}">
-                    <StackPanel>
-                        <TextBlock Text="Wydatki wg daty"
-                                   Style="{StaticResource CardHeader}"
-                                   Margin="0,0,0,8"/>
-                        <lvcwpf:CartesianChart x:Name="lineChart"
-                                               Background="{DynamicResource Surface.Background}"/>
-                    </StackPanel>
-                </Border>
-            </Grid>
+                    <!-- Karta 3: Column (konta/koperty) -->
+                    <Border Style="{StaticResource Card}" Margin="0,0,0,12">
+                        <StackPanel>
+                            <TextBlock Text="Wg kont / kopert" Style="{StaticResource CardHeader}"/>
+                            <lvcwpf:CartesianChart Series="{Binding AccountsSeries}"
+                                                   XAxes="{Binding AccountsXAxes}"
+                                                   Background="{DynamicResource Surface.Background}"/>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- Karta 4: Column (dni tygodnia) -->
+                    <Border Style="{StaticResource Card}" Margin="0,0,12,0">
+                        <StackPanel>
+                            <TextBlock Text="Wg dnia tygodnia" Style="{StaticResource CardHeader}"/>
+                            <lvcwpf:CartesianChart Series="{Binding WeekdaySeries}"
+                                                   XAxes="{Binding WeekdayXAxes}"
+                                                   Background="{DynamicResource Surface.Background}"/>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- Sekcja eksportu -->
+                    <Border Style="{StaticResource Card}" Margin="0,12,0,0">
+                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                            <Button Content="Eksport do PDF" Click="ExportPdf_Click"/>
+                            <Button Content="Eksport do CSV" Click="ExportCsv_Click" Margin="8,0,0,0"/>
+                        </StackPanel>
+                    </Border>
+                </StackPanel>
+            </ScrollViewer>
         </Grid>
     </ScrollViewer>
 </UserControl>

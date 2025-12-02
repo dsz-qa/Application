@@ -199,7 +199,7 @@ namespace Finly.Views
                 "budget" or "budgets" => new BudgetsPage(),
                 "categories" => new CategoriesPage(),
                 "goals" => new GoalsPage(),
-                "charts" => new ChartsPage(uid),
+                "charts" => new ChartsPage(),
                 "reports" => new ReportsPage(),
                 "settings" => new SettingsPage(),
                 "banks" => new BanksPage(),
@@ -241,7 +241,7 @@ namespace Finly.Views
 
         private void Nav_Charts_Click(object s, RoutedEventArgs e)
         {
-            RightHost.Content = new ChartsPage(UserService.CurrentUserId);
+            RightHost.Content = new ChartsPage();
             SetActiveNav(NavCharts);
             SetActiveFooter(null);
         }
