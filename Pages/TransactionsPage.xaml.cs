@@ -144,13 +144,17 @@ namespace Finly.Pages
         {
             if (sender is FrameworkElement fe && fe.DataContext is TransactionCardVm vm)
             {
-                vm.IsEditing = !vm.IsEditing;
+                _vm.StartEdit(vm);
             }
         }
 
         private void EditAmount_GotFocus(object sender, RoutedEventArgs e)
         {
-            if (sender is TextBox tb) tb.SelectAll();
+            if (sender is TextBox tb)
+            {
+                // wyczyść, aby ułatwić wpisanie nowej kwoty
+                tb.Clear();
+            }
         }
 
         private void EditDescription_GotFocus(object sender, RoutedEventArgs e)
@@ -159,6 +163,139 @@ namespace Finly.Pages
         }
     }
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 

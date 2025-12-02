@@ -265,6 +265,97 @@ namespace Finly.ViewModels
  public void AddIncome(decimal amount, DateTime date, string description, string? source, string? categoryName, bool planned = false){ int? catId = null; if(!string.IsNullOrWhiteSpace(categoryName)) { try { var id = DatabaseService.GetOrCreateCategoryId(UserId, categoryName); if(id>0) catId = id; } catch { } } try { DatabaseService.InsertIncome(UserId, amount, date, description, source, catId, planned); } catch { } LoadFromDatabase(); }
  public void UpdateTransaction(TransactionCardVm vm, decimal? newAmount = null, string? newDescription = null, bool? planned = null) { if (vm.Kind == TransactionKind.Expense) { var exp = DatabaseService.GetExpenseById(vm.Id); if (exp != null) { if (newAmount.HasValue) exp.Amount = (double)newAmount.Value; if (newDescription != null) exp.Description = newDescription; if (planned.HasValue) exp.IsPlanned = planned.Value; try { DatabaseService.UpdateExpense(exp); } catch { } } } else if (vm.Kind == TransactionKind.Income) { try { DatabaseService.UpdateIncome(vm.Id, UserId, newAmount, newDescription, planned); } catch { } } LoadFromDatabase(); }
 
+ // ===== Inline edit API =====
+ public void StartEdit(TransactionCardVm vm)
+ {
+ if (vm == null) return;
+ // kopiuj aktualne dane do pól edycyjnych i w³¹cz tryb edycji
+ vm.EditDescription = vm.Description ?? string.Empty;
+ vm.EditAmountText = ParseAmountInternal(vm.AmountStr).ToString("N2");
+ if (DateTime.TryParse(vm.DateDisplay, out var d)) vm.EditDate = d; else vm.EditDate = DateTime.Today;
+ vm.SelectedCategory = string.IsNullOrWhiteSpace(vm.CategoryName) ? (vm.Kind == TransactionKind.Income ? "Przychód" : vm.Kind == TransactionKind.Transfer ? "Transfer" : "(brak)") : vm.CategoryName;
+ vm.SelectedAccount = vm.AccountName ?? string.Empty;
+ vm.IsEditing = true;
+ }
+
+ public void SaveEdit(TransactionCardVm vm)
+ {
+ if (vm == null) return;
+ try
+ {
+ // 1) parsowanie kwoty
+ var amount = ParseAmountInternal(vm.EditAmountText ?? string.Empty);
+ var date = vm.EditDate == default ? DateTime.Today : vm.EditDate;
+ var desc = vm.EditDescription ?? string.Empty;
+ var selectedCat = vm.SelectedCategory?.Trim();
+ var selectedAcc = vm.SelectedAccount?.Trim();
+
+ switch (vm.Kind)
+ {
+ case TransactionKind.Expense:
+ {
+ var exp = DatabaseService.GetExpenseById(vm.Id);
+ if (exp != null)
+ {
+ exp.UserId = UserId;
+ exp.Amount = (double)amount;
+ exp.Date = date;
+ exp.Description = desc;
+ // kategoria: (brak) => null
+ int? cid = null;
+ if (!string.IsNullOrWhiteSpace(selectedCat) && !string.Equals(selectedCat, "(brak)", StringComparison.CurrentCultureIgnoreCase))
+ {
+ try { var id = DatabaseService.GetOrCreateCategoryId(UserId, selectedCat!); if (id > 0) cid = id; } catch { cid = null; }
+ }
+ exp.CategoryId = cid ?? 0;
+ DatabaseService.UpdateExpense(exp);
+ }
+ // odœwie¿ widok elementu
+ vm.AmountStr = amount.ToString("N2") + " z³";
+ vm.DateDisplay = date.ToString("yyyy-MM-dd");
+ vm.Description = desc;
+ vm.CategoryName = string.IsNullOrWhiteSpace(selectedCat) ? "(brak)" : selectedCat!;
+ // konto na razie tylko lokalnie (brak kolumny do aktualizacji)
+ if (!string.IsNullOrWhiteSpace(selectedAcc)) vm.AccountName = selectedAcc!;
+ break;
+ }
+ case TransactionKind.Income:
+ {
+ int? cid = null;
+ if (!string.IsNullOrWhiteSpace(selectedCat) && !string.Equals(selectedCat, "Przychód", StringComparison.CurrentCultureIgnoreCase))
+ {
+ try { var id = DatabaseService.GetOrCreateCategoryId(UserId, selectedCat!); if (id > 0) cid = id; } catch { cid = null; }
+ }
+ string? source = string.IsNullOrWhiteSpace(selectedAcc) ? null : selectedAcc;
+ DatabaseService.UpdateIncome(vm.Id, UserId, amount, desc, null, date, cid, source);
+ // odœwie¿ widok elementu
+ vm.AmountStr = amount.ToString("N2") + " z³";
+ vm.DateDisplay = date.ToString("yyyy-MM-dd");
+ vm.Description = desc;
+ vm.CategoryName = string.IsNullOrWhiteSpace(selectedCat) ? "Przychód" : selectedCat!;
+ vm.AccountName = source ?? vm.AccountName;
+ break;
+ }
+ case TransactionKind.Transfer:
+ {
+ // Brak wsparcia DB na edycjê transferów – aktualizujemy tylko lokalne pola
+ vm.AmountStr = amount.ToString("N2") + " z³"; // je¿eli UI pozwala edytowaæ kwotê
+ vm.DateDisplay = date.ToString("yyyy-MM-dd");
+ vm.Description = desc;
+ // AccountName budowane z 2 stron – zostawiamy bez zmian
+ break;
+ }
+ }
+ }
+ catch { /* zignoruj jednostkowe b³êdy aby nie blokowaæ interfejsu */ }
+ finally
+ {
+ vm.IsEditing = false;
+ // Odswie¿ KPI i listy – wykonaj lokalnie bez pe³nego prze³adowania DB
+ ApplyFilters();
+ }
+ }
+
  private void ClearPeriods()
  {
  _isToday = _isYesterday = _isThisWeek = _isThisMonth = _isPrevMonth = _isThisYear = false;
@@ -373,7 +464,17 @@ namespace Finly.ViewModels
  }
 
  public enum TransactionKind { Expense, Income, Transfer }
- public class TransactionCardVm : INotifyPropertyChanged { public int Id { get; set; } public string CategoryName { get; set; } = ""; public string Description { get; set; } = ""; public string DateDisplay { get; set; } = ""; public string AmountStr { get; set; } = ""; public bool IsPlanned { get; set; } public bool IsFuture { get; set; } public string CategoryIcon { get; set; } = ""; public string AccountName { get; set; } = ""; public TransactionKind Kind { get; set; } = TransactionKind.Expense; 
+ public class TransactionCardVm : INotifyPropertyChanged { 
+ public int Id { get; set; }
+ private string _categoryName = ""; public string CategoryName { get => _categoryName; set { _categoryName = value; PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(CategoryName))); } }
+ private string _description = ""; public string Description { get => _description; set { _description = value; PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(Description))); } }
+ private string _dateDisplay = ""; public string DateDisplay { get => _dateDisplay; set { _dateDisplay = value; PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(DateDisplay))); } }
+ private string _amountStr = ""; public string AmountStr { get => _amountStr; set { _amountStr = value; PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(AmountStr))); } }
+ public bool IsPlanned { get; set; }
+ public bool IsFuture { get; set; }
+ public string CategoryIcon { get; set; } = "";
+ private string _accountName = ""; public string AccountName { get => _accountName; set { _accountName = value; PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(AccountName))); } }
+ public TransactionKind Kind { get; set; } = TransactionKind.Expense; 
  // inline edit
  private bool _isEditing; public bool IsEditing { get=>_isEditing; set { _isEditing=value; PropertyChanged?.Invoke(this,new PropertyChangedEventArgs(nameof(IsEditing))); } }
  public string EditAmountText { get; set; } = ""; public string EditDescription { get; set; } = ""; public DateTime EditDate { get; set; } = DateTime.Today; public string SelectedCategory { get; set; } = ""; public string SelectedAccount { get; set; } = ""; public event PropertyChangedEventHandler? PropertyChanged; }

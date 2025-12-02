@@ -11,7 +11,7 @@
     <UserControl.Resources>
         <BooleanToVisibilityConverter x:Key="BoolToVisibilityConverter"/>
 
-        <!-- Small icon button (always visible) -->
+        <!-- Mały przycisk ikonowy -->
         <Style x:Key="IconButtonSmall" TargetType="Button">
             <Setter Property="Width" Value="28"/>
             <Setter Property="Height" Value="28"/>
@@ -36,7 +36,9 @@
                         </Border>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="Bd" Property="Background" Value="{DynamicResource Btn.Hover}"/>
+                                <Setter TargetName="Bd"
+                                        Property="Background"
+                                        Value="{DynamicResource Btn.Hover}"/>
                             </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
@@ -44,7 +46,7 @@
             </Setter>
         </Style>
 
-        <!-- KPI styles -->
+        <!-- KPI -->
         <Style x:Key="KpiValueStyle" TargetType="TextBlock">
             <Setter Property="FontSize" Value="18"/>
             <Setter Property="FontWeight" Value="Bold"/>
@@ -59,7 +61,7 @@
             <Setter Property="Opacity" Value="1"/>
         </Style>
 
-        <!-- Accent card -->
+        <!-- Karta akcentowa KPI -->
         <Style x:Key="AccentCard" TargetType="Border">
             <Setter Property="Background" Value="Transparent"/>
             <Setter Property="BorderBrush" Value="{DynamicResource Brand.Blue}"/>
@@ -69,7 +71,7 @@
             <Setter Property="Margin" Value="0,0,16,0"/>
         </Style>
 
-        <!-- Transaction cards -->
+        <!-- Karty transakcji -->
         <Style x:Key="TransactionCard" TargetType="Border">
             <Setter Property="Background" Value="{DynamicResource Surface.Background}"/>
             <Setter Property="BorderBrush" Value="{DynamicResource Surface.Border}"/>
@@ -80,18 +82,21 @@
             <Setter Property="SnapsToDevicePixels" Value="True"/>
             <Setter Property="Effect">
                 <Setter.Value>
-                    <DropShadowEffect BlurRadius="8" ShadowDepth="2" Opacity="0.16"/>
+                    <DropShadowEffect BlurRadius="8"
+                                      ShadowDepth="2"
+                                      Opacity="0.16"/>
                 </Setter.Value>
             </Setter>
             <Style.Triggers>
                 <Trigger Property="IsMouseOver" Value="True">
-                    <!-- neutral hover -->
                     <Setter Property="BorderBrush" Value="{DynamicResource Surface.Border}"/>
                 </Trigger>
             </Style.Triggers>
         </Style>
 
-        <Style x:Key="TransactionCardPlanned" TargetType="Border" BasedOn="{StaticResource TransactionCard}">
+        <Style x:Key="TransactionCardPlanned"
+               TargetType="Border"
+               BasedOn="{StaticResource TransactionCard}">
             <Style.Triggers>
                 <DataTrigger Binding="{Binding IsPlanned}" Value="True">
                     <Setter Property="Opacity" Value="0.95"/>
@@ -106,17 +111,7 @@
             <Setter Property="FontWeight" Value="SemiBold"/>
         </Style>
 
-        <!-- Period option -->
-        <Style x:Key="PeriodOptionStyle" TargetType="RadioButton">
-            <Setter Property="Foreground" Value="{DynamicResource App.Foreground}"/>
-            <Setter Property="FontSize" Value="13"/>
-            <Setter Property="FontWeight" Value="SemiBold"/>
-            <Setter Property="Margin" Value="0,0,12,0"/>
-            <Setter Property="Padding" Value="14,6"/>
-            <Setter Property="Cursor" Value="Hand"/>
-        </Style>
-
-        <!-- Filter checkbox style -->
+        <!-- checkbox filtrów -->
         <Style x:Key="FilterCheckBoxStyle" TargetType="CheckBox">
             <Setter Property="FontSize" Value="15"/>
             <Setter Property="FontWeight" Value="SemiBold"/>
@@ -136,7 +131,8 @@
                                 <ColumnDefinition Width="*"/>
                             </Grid.ColumnDefinitions>
                             <Border x:Name="Box"
-                                    Width="18" Height="18"
+                                    Width="18"
+                                    Height="18"
                                     CornerRadius="3"
                                     Background="{DynamicResource Surface.Background}"
                                     BorderBrush="{DynamicResource Surface.Border}"
@@ -161,17 +157,30 @@
                         </Grid>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsChecked" Value="True">
-                                <Setter TargetName="CheckGlyph" Property="Visibility" Value="Visible"/>
-                                <Setter TargetName="Box" Property="Background" Value="{DynamicResource Accent}"/>
-                                <Setter TargetName="Box" Property="BorderBrush" Value="{DynamicResource Accent}"/>
+                                <Setter TargetName="CheckGlyph"
+                                        Property="Visibility"
+                                        Value="Visible"/>
+                                <Setter TargetName="Box"
+                                        Property="Background"
+                                        Value="{DynamicResource Accent}"/>
+                                <Setter TargetName="Box"
+                                        Property="BorderBrush"
+                                        Value="{DynamicResource Accent}"/>
                             </Trigger>
                             <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="Box" Property="Background" Value="{DynamicResource Btn.Hover}"/>
-                                <Setter TargetName="Box" Property="BorderBrush" Value="{DynamicResource Btn.Border}"/>
+                                <Setter TargetName="Box"
+                                        Property="Background"
+                                        Value="{DynamicResource Btn.Hover}"/>
+                                <Setter TargetName="Box"
+                                        Property="BorderBrush"
+                                        Value="{DynamicResource Btn.Border}"/>
                             </Trigger>
                             <Trigger Property="IsEnabled" Value="False">
-                                <Setter TargetName="Box" Property="Opacity" Value="0.5"/>
-                                <Setter Property="Foreground" Value="{DynamicResource App.Foreground}"/>
+                                <Setter TargetName="Box"
+                                        Property="Opacity"
+                                        Value="0.5"/>
+                                <Setter Property="Foreground"
+                                        Value="{DynamicResource App.Foreground}"/>
                             </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
@@ -179,7 +188,7 @@
             </Setter>
         </Style>
 
-        <!-- Filter panel -->
+        <!-- Panel filtrów -->
         <Style x:Key="FilterPanelStyle" TargetType="GroupBox">
             <Setter Property="Height" Value="220"/>
             <Setter Property="MinHeight" Value="220"/>
@@ -191,7 +200,8 @@
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="GroupBox">
-                        <Grid Height="{TemplateBinding Height}" ClipToBounds="True">
+                        <Grid Height="{TemplateBinding Height}"
+                              ClipToBounds="True">
                             <Grid.RowDefinitions>
                                 <RowDefinition Height="Auto"/>
                                 <RowDefinition Height="*"/>
@@ -218,12 +228,12 @@
             </Setter>
         </Style>
 
-        <!-- arrays for edit (możesz je dalej używać w dialogach edycji) -->
+        <!-- listy do edycji -->
         <x:Array x:Key="CategoriesForEditRes" Type="{x:Type sys:String}"/>
         <x:Array x:Key="AccountsForEditRes" Type="{x:Type sys:String}"/>
     </UserControl.Resources>
 
-    <!-- Page scroll -->
+    <!-- Główny scroll -->
     <ScrollViewer VerticalScrollBarVisibility="Auto"
                   HorizontalScrollBarVisibility="Disabled"
                   PanningMode="VerticalOnly">
@@ -234,7 +244,7 @@
                 <RowDefinition Height="*"/>
             </Grid.RowDefinitions>
 
-            <!-- KPI row -->
+            <!-- KPI -->
             <Grid Grid.Row="0" Margin="16">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*"/>
@@ -244,7 +254,8 @@
 
                 <Border Grid.Column="0" Style="{StaticResource AccentCard}">
                     <StackPanel>
-                        <TextBlock Text="Suma wydatków" Style="{StaticResource KpiHeader}"/>
+                        <TextBlock Text="Suma wydatków"
+                                   Style="{StaticResource KpiHeader}"/>
                         <TextBlock Text="{Binding TotalExpenses, StringFormat={}{0:N2} zł}"
                                    Style="{StaticResource KpiValueStyle}"/>
                     </StackPanel>
@@ -252,7 +263,8 @@
 
                 <Border Grid.Column="1" Style="{StaticResource AccentCard}">
                     <StackPanel>
-                        <TextBlock Text="Suma przychodów" Style="{StaticResource KpiHeader}"/>
+                        <TextBlock Text="Suma przychodów"
+                                   Style="{StaticResource KpiHeader}"/>
                         <TextBlock Text="{Binding TotalIncomes, StringFormat={}{0:N2} zł}"
                                    Style="{StaticResource KpiValueStyle}"/>
                     </StackPanel>
@@ -260,15 +272,18 @@
 
                 <Border Grid.Column="2" Style="{StaticResource AccentCard}">
                     <StackPanel>
-                        <TextBlock Text="Bilans" Style="{StaticResource KpiHeader}"/>
+                        <TextBlock Text="Bilans"
+                                   Style="{StaticResource KpiHeader}"/>
                         <TextBlock Text="{Binding Balance, StringFormat={}{0:N2} zł}"
                                    Style="{StaticResource KpiValueStyle}"/>
                     </StackPanel>
                 </Border>
             </Grid>
 
-            <!-- Filters above period bar -->
-            <StackPanel Grid.Row="1" Margin="16,0,16,12" Orientation="Vertical">
+            <!-- FILTRY -->
+            <StackPanel Grid.Row="1"
+                        Margin="16,0,16,12"
+                        Orientation="Vertical">
                 <Grid>
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*"/>
@@ -276,8 +291,8 @@
                         <ColumnDefinition Width="*"/>
                     </Grid.ColumnDefinitions>
 
-                    <GroupBox Style="{StaticResource FilterPanelStyle}"
-                              Grid.Column="0"
+                    <GroupBox Grid.Column="0"
+                              Style="{StaticResource FilterPanelStyle}"
                               Header="Typ transakcji">
                         <ScrollViewer VerticalScrollBarVisibility="Auto">
                             <StackPanel>
@@ -294,8 +309,8 @@
                         </ScrollViewer>
                     </GroupBox>
 
-                    <GroupBox Style="{StaticResource FilterPanelStyle}"
-                              Grid.Column="1"
+                    <GroupBox Grid.Column="1"
+                              Style="{StaticResource FilterPanelStyle}"
                               Header="Kategorie">
                         <ScrollViewer VerticalScrollBarVisibility="Auto">
                             <ItemsControl ItemsSource="{Binding Categories}">
@@ -310,8 +325,8 @@
                         </ScrollViewer>
                     </GroupBox>
 
-                    <GroupBox Style="{StaticResource FilterPanelStyle}"
-                              Grid.Column="2"
+                    <GroupBox Grid.Column="2"
+                              Style="{StaticResource FilterPanelStyle}"
                               Header="Konta">
                         <ScrollViewer VerticalScrollBarVisibility="Auto">
                             <ItemsControl ItemsSource="{Binding Accounts}">
@@ -333,7 +348,7 @@
                         Margin="0,8,0,0"/>
             </StackPanel>
 
-            <!-- Main content wrapper -->
+            <!-- GŁÓWNY CONTENT -->
             <Border Grid.Row="2"
                     Margin="16"
                     BorderBrush="{DynamicResource Surface.Border}"
@@ -350,8 +365,10 @@
                         <ColumnDefinition Width="*"/>
                     </Grid.ColumnDefinitions>
 
-                    <!-- Period bar -->
-                    <StackPanel Grid.Row="0" Grid.ColumnSpan="2" Margin="0,0,0,12">
+                    <!-- Pasek okresu -->
+                    <StackPanel Grid.Row="0"
+                                Grid.ColumnSpan="2"
+                                Margin="0,0,0,12">
                         <ctrls:PeriodBarControl x:Name="PeriodBar"
                                                 RangeChanged="PeriodBar_RangeChanged"/>
                         <Border Height="3"
@@ -360,7 +377,7 @@
                                 Margin="0,6,0,0"/>
                     </StackPanel>
 
-                    <!-- Realized Transactions -->
+                    <!-- TRANS. ZREALIZOWANE (lewa) -->
                     <Border Grid.Row="1"
                             Grid.Column="0"
                             Style="{StaticResource TransactionCard}"
@@ -387,15 +404,17 @@
                                         <Style TargetType="TextBlock">
                                             <Setter Property="Visibility" Value="Collapsed"/>
                                             <Style.Triggers>
-                                                <DataTrigger Binding="{Binding ElementName=RealizedItems, Path=HasItems}" Value="False">
-                                                    <Setter Property="Visibility" Value="Visible"/>
+                                                <DataTrigger Binding="{Binding ElementName=RealizedItems, Path=HasItems}"
+                                                             Value="False">
+                                                    <Setter Property="Visibility"
+                                                            Value="Visible"/>
                                                 </DataTrigger>
                                             </Style.Triggers>
                                         </Style>
                                     </TextBlock.Style>
                                 </TextBlock>
 
-                                <!-- Items -->
+                                <!-- Lista -->
                                 <ItemsControl x:Name="RealizedItems"
                                               ItemsSource="{Binding FilteredTransactions}">
                                     <ItemsControl.ItemTemplate>
@@ -408,41 +427,122 @@
                                                         <ColumnDefinition Width="Auto"/>
                                                     </Grid.ColumnDefinitions>
 
-                                                    <!-- Left details -->
+                                                    <!-- LEWA: dane + edycja -->
                                                     <StackPanel Grid.Column="0"
                                                                 Margin="4,0,8,0"
                                                                 Orientation="Vertical">
-                                                        <!-- Data -->
+
+                                                        <!-- DATA -->
                                                         <StackPanel Orientation="Horizontal">
                                                             <TextBlock Text="Data:"
                                                                        FontWeight="SemiBold"
                                                                        Foreground="{DynamicResource App.Foreground}"
                                                                        Margin="0,0,6,0"/>
-                                                            <TextBlock Text="{Binding DateDisplay}"
-                                                                       Foreground="{DynamicResource App.Foreground}"/>
+                                                            <TextBlock x:Name="DateText"
+                                                                       Text="{Binding DateDisplay}"
+                                                                       Foreground="{DynamicResource App.Foreground}">
+                                                                <TextBlock.Style>
+                                                                    <Style TargetType="TextBlock">
+                                                                        <Setter Property="Visibility" Value="Visible"/>
+                                                                        <Style.Triggers>
+                                                                            <DataTrigger Binding="{Binding IsEditing}" Value="True">
+                                                                                <Setter Property="Visibility" Value="Collapsed"/>
+                                                                            </DataTrigger>
+                                                                        </Style.Triggers>
+                                                                    </Style>
+                                                                </TextBlock.Style>
+                                                            </TextBlock>
+                                                            <DatePicker x:Name="DateEditor"
+                                                                        Width="130"
+                                                                        SelectedDate="{Binding EditDate, Mode=TwoWay}">
+                                                                <DatePicker.Style>
+                                                                    <Style TargetType="DatePicker">
+                                                                        <Setter Property="Visibility" Value="Collapsed"/>
+                                                                        <Style.Triggers>
+                                                                            <DataTrigger Binding="{Binding IsEditing}" Value="True">
+                                                                                <Setter Property="Visibility" Value="Visible"/>
+                                                                            </DataTrigger>
+                                                                        </Style.Triggers>
+                                                                    </Style>
+                                                                </DatePicker.Style>
+                                                            </DatePicker>
                                                         </StackPanel>
 
-                                                        <!-- Kwota -->
+                                                        <!-- KWOTA -->
                                                         <StackPanel Orientation="Horizontal">
                                                             <TextBlock Text="Kwota:"
-                                                                       FontWeight="SemiBold"
-                                                                       Foreground="{DynamicResource App.Foreground}"
-                                                                       Margin="0,0,6,0"/>
-                                                            <TextBlock Text="{Binding AmountStr}"
-                                                                       Foreground="{DynamicResource App.Foreground}"/>
+                                                                      FontWeight="SemiBold"
+                                                                      Foreground="{DynamicResource App.Foreground}"
+                                                                      Margin="0,0,6,0"/>
+                                                            <TextBlock x:Name="AmountText"
+                                                                      Text="{Binding AmountStr}"
+                                                                      Foreground="{DynamicResource App.Foreground}">
+                                                                <TextBlock.Style>
+                                                                    <Style TargetType="TextBlock">
+                                                                        <Setter Property="Visibility" Value="Visible"/>
+                                                                        <Style.Triggers>
+                                                                            <DataTrigger Binding="{Binding IsEditing}" Value="True">
+                                                                                <Setter Property="Visibility" Value="Collapsed"/>
+                                                                            </DataTrigger>
+                                                                        </Style.Triggers>
+                                                                    </Style>
+                                                                </TextBlock.Style>
+                                                            </TextBlock>
+                                                            <TextBox x:Name="AmountBox"
+                                                                    Width="120"
+                                                                    Text="{Binding EditAmountText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                                                    GotFocus="EditAmount_GotFocus">
+                                                                <TextBox.Style>
+                                                                    <Style TargetType="TextBox">
+                                                                        <Setter Property="Visibility" Value="Collapsed"/>
+                                                                        <Style.Triggers>
+                                                                            <DataTrigger Binding="{Binding IsEditing}" Value="True">
+                                                                                <Setter Property="Visibility" Value="Visible"/>
+                                                                            </DataTrigger>
+                                                                        </Style.Triggers>
+                                                                    </Style>
+                                                                </TextBox.Style>
+                                                            </TextBox>
                                                         </StackPanel>
 
-                                                        <!-- Kategoria -->
+                                                        <!-- KATEGORIA -->
                                                         <StackPanel Orientation="Horizontal">
                                                             <TextBlock Text="Kategoria:"
                                                                        FontWeight="SemiBold"
                                                                        Foreground="{DynamicResource App.Foreground}"
                                                                        Margin="0,0,6,0"/>
-                                                            <TextBlock Text="{Binding CategoryName, TargetNullValue=Brak kategorii, FallbackValue=Brak kategorii}"
-                                                                       Foreground="{DynamicResource App.Foreground}"/>
+                                                            <TextBlock x:Name="CategoryText"
+                                                                       Text="{Binding CategoryName, TargetNullValue=Brak kategorii, FallbackValue=Brak kategorii}"
+                                                                       Foreground="{DynamicResource App.Foreground}">
+                                                                <TextBlock.Style>
+                                                                    <Style TargetType="TextBlock">
+                                                                        <Setter Property="Visibility" Value="Visible"/>
+                                                                        <Style.Triggers>
+                                                                            <DataTrigger Binding="{Binding IsEditing}" Value="True">
+                                                                                <Setter Property="Visibility" Value="Collapsed"/>
+                                                                            </DataTrigger>
+                                                                        </Style.Triggers>
+                                                                    </Style>
+                                                                </TextBlock.Style>
+                                                            </TextBlock>
+                                                            <ComboBox x:Name="CategoryCombo"
+                                                                      Width="180"
+                                                                      ItemsSource="{Binding Source={StaticResource CategoriesForEditRes}}"
+                                                                      SelectedItem="{Binding SelectedCategory, Mode=TwoWay}">
+                                                                <ComboBox.Style>
+                                                                    <Style TargetType="ComboBox">
+                                                                        <Setter Property="Visibility" Value="Collapsed"/>
+                                                                        <Style.Triggers>
+                                                                            <DataTrigger Binding="{Binding IsEditing}" Value="True">
+                                                                                <Setter Property="Visibility" Value="Visible"/>
+                                                                            </DataTrigger>
+                                                                        </Style.Triggers>
+                                                                    </Style>
+                                                                </ComboBox.Style>
+                                                            </ComboBox>
                                                         </StackPanel>
 
-                                                        <!-- From / To (dla transferów) -->
+                                                        <!-- Z KONTA -->
                                                         <StackPanel Orientation="Horizontal"
                                                                     Visibility="Collapsed"
                                                                     x:Name="FromLine">
@@ -450,9 +550,38 @@
                                                                        FontWeight="SemiBold"
                                                                        Foreground="{DynamicResource App.Foreground}"
                                                                        Margin="0,0,6,0"/>
-                                                            <TextBlock Text="{Binding AccountName, TargetNullValue=Nie dotyczy, FallbackValue=Nie dotyczy}"/>
+                                                            <TextBlock x:Name="FromAccountText"
+                                                                       Text="{Binding AccountName, TargetNullValue=Nie dotyczy, FallbackValue=Nie dotyczy}"
+                                                                       Foreground="{DynamicResource App.Foreground}">
+                                                                <TextBlock.Style>
+                                                                    <Style TargetType="TextBlock">
+                                                                        <Setter Property="Visibility" Value="Visible"/>
+                                                                        <Style.Triggers>
+                                                                            <DataTrigger Binding="{Binding IsEditing}" Value="True">
+                                                                                <Setter Property="Visibility" Value="Collapsed"/>
+                                                                            </DataTrigger>
+                                                                        </Style.Triggers>
+                                                                    </Style>
+                                                                </TextBlock.Style>
+                                                            </TextBlock>
+                                                            <ComboBox x:Name="FromAccountCombo"
+                                                                      Width="220"
+                                                                      ItemsSource="{Binding Source={StaticResource AccountsForEditRes}}"
+                                                                      SelectedItem="{Binding SelectedAccount, Mode=TwoWay}">
+                                                                <ComboBox.Style>
+                                                                    <Style TargetType="ComboBox">
+                                                                        <Setter Property="Visibility" Value="Collapsed"/>
+                                                                        <Style.Triggers>
+                                                                            <DataTrigger Binding="{Binding IsEditing}" Value="True">
+                                                                                <Setter Property="Visibility" Value="Visible"/>
+                                                                            </DataTrigger>
+                                                                        </Style.Triggers>
+                                                                    </Style>
+                                                                </ComboBox.Style>
+                                                            </ComboBox>
                                                         </StackPanel>
 
+                                                        <!-- NA KONTO -->
                                                         <StackPanel Orientation="Horizontal"
                                                                     Visibility="Collapsed"
                                                                     x:Name="ToLine">
@@ -460,19 +589,73 @@
                                                                        FontWeight="SemiBold"
                                                                        Foreground="{DynamicResource App.Foreground}"
                                                                        Margin="0,0,6,0"/>
-                                                            <TextBlock Text="{Binding AccountName, TargetNullValue=Nie dotyczy, FallbackValue=Nie dotyczy}"
-                                                                       Foreground="{DynamicResource App.Foreground}"/>
+                                                            <TextBlock x:Name="ToAccountText"
+                                                                       Text="{Binding AccountName, TargetNullValue=Nie dotyczy, FallbackValue=Nie dotyczy}"
+                                                                       Foreground="{DynamicResource App.Foreground}">
+                                                                <TextBlock.Style>
+                                                                    <Style TargetType="TextBlock">
+                                                                        <Setter Property="Visibility" Value="Visible"/>
+                                                                        <Style.Triggers>
+                                                                            <DataTrigger Binding="{Binding IsEditing}" Value="True">
+                                                                                <Setter Property="Visibility" Value="Collapsed"/>
+                                                                            </DataTrigger>
+                                                                        </Style.Triggers>
+                                                                    </Style>
+                                                                </TextBlock.Style>
+                                                            </TextBlock>
+                                                            <ComboBox x:Name="ToAccountCombo"
+                                                                      Width="220"
+                                                                      ItemsSource="{Binding Source={StaticResource AccountsForEditRes}}"
+                                                                      SelectedItem="{Binding SelectedAccount, Mode=TwoWay}">
+                                                                <ComboBox.Style>
+                                                                    <Style TargetType="ComboBox">
+                                                                        <Setter Property="Visibility" Value="Collapsed"/>
+                                                                        <Style.Triggers>
+                                                                            <DataTrigger Binding="{Binding IsEditing}" Value="True">
+                                                                                <Setter Property="Visibility" Value="Visible"/>
+                                                                            </DataTrigger>
+                                                                        </Style.Triggers>
+                                                                    </Style>
+                                                                </ComboBox.Style>
+                                                            </ComboBox>
                                                         </StackPanel>
 
-                                                        <!-- Opis + znacznik Zaplanowana -->
+                                                        <!-- OPIS + znacznik zaplanowana -->
                                                         <StackPanel Orientation="Horizontal">
                                                             <TextBlock Text="Opis:"
                                                                        FontWeight="SemiBold"
                                                                        Foreground="{DynamicResource App.Foreground}"
                                                                        Margin="0,0,6,0"/>
-                                                            <TextBlock Text="{Binding Description, TargetNullValue=Brak danych, FallbackValue=Brak danych}"
+                                                            <TextBlock x:Name="DescriptionText"
+                                                                       Text="{Binding Description, TargetNullValue=Brak danych, FallbackValue=Brak danych}"
                                                                        Foreground="{DynamicResource App.Foreground}"
-                                                                       TextTrimming="CharacterEllipsis"/>
+                                                                       TextTrimming="CharacterEllipsis">
+                                                                <TextBlock.Style>
+                                                                    <Style TargetType="TextBlock">
+                                                                        <Setter Property="Visibility" Value="Visible"/>
+                                                                        <Style.Triggers>
+                                                                            <DataTrigger Binding="{Binding IsEditing}" Value="True">
+                                                                                <Setter Property="Visibility" Value="Collapsed"/>
+                                                                            </DataTrigger>
+                                                                        </Style.Triggers>
+                                                                    </Style>
+                                                                </TextBlock.Style>
+                                                            </TextBlock>
+                                                            <TextBox x:Name="DescriptionBox"
+                                                                     Width="260"
+                                                                     Text="{Binding EditDescription, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                                                     GotFocus="EditDescription_GotFocus">
+                                                                <TextBox.Style>
+                                                                    <Style TargetType="TextBox">
+                                                                        <Setter Property="Visibility" Value="Collapsed"/>
+                                                                        <Style.Triggers>
+                                                                            <DataTrigger Binding="{Binding IsEditing}" Value="True">
+                                                                                <Setter Property="Visibility" Value="Visible"/>
+                                                                            </DataTrigger>
+                                                                        </Style.Triggers>
+                                                                    </Style>
+                                                                </TextBox.Style>
+                                                            </TextBox>
                                                             <TextBlock Text="Zaplanowana"
                                                                        Margin="8,0,0,0"
                                                                        Visibility="{Binding IsPlanned, Converter={StaticResource BoolToVisibilityConverter}}"
@@ -480,7 +663,7 @@
                                                         </StackPanel>
                                                     </StackPanel>
 
-                                                    <!-- Right actions -->
+                                                    <!-- PRAWA: akcje -->
                                                     <StackPanel Grid.Column="1"
                                                                 Orientation="Vertical"
                                                                 HorizontalAlignment="Right"
@@ -491,7 +674,7 @@
                                                                     ToolTip="Edytuj"
                                                                     Click="StartEdit_Click">
                                                                 <Path Data="M3,17 L7,21 L21,7 L17,3 Z M2,22 L8,22 L2,16 Z"
-                                                                      Fill="{DynamicResource App.Foreground}"
+                                                                      Fill="{DynamicResource Brand.Blue}"
                                                                       Stretch="Uniform"
                                                                       Width="14"
                                                                       Height="14"/>
@@ -533,7 +716,9 @@
                                                 </Grid>
                                             </Border>
 
+                                            <!-- TRIGGERS -->
                                             <DataTemplate.Triggers>
+                                                <!-- widoczność From/To w zależności od typu -->
                                                 <DataTrigger Binding="{Binding Kind}" Value="Expense">
                                                     <Setter TargetName="FromLine"
                                                             Property="Visibility"
@@ -553,7 +738,7 @@
                                                             Value="Visible"/>
                                                 </DataTrigger>
 
-                                                <!-- Ukryj zrealizowane gdy to przyszłość / plan -->
+                                                <!-- ukryj zrealizowane gdy zaplanowane/przyszłość -->
                                                 <DataTrigger Binding="{Binding IsPlanned}" Value="True">
                                                     <Setter TargetName="RealizedCard"
                                                             Property="Visibility"
@@ -572,7 +757,7 @@
                         </Grid>
                     </Border>
 
-                    <!-- Scheduled Transactions -->
+                    <!-- ZAPLANOWANE (prawa) -->
                     <Border Grid.Row="1"
                             Grid.Column="1"
                             Style="{StaticResource TransactionCard}"
@@ -590,7 +775,6 @@
                                        Margin="0,0,0,8"/>
 
                             <Grid Grid.Row="1">
-                                <!-- Placeholder -->
                                 <TextBlock Text="Brak danych w tym okresie"
                                            Foreground="{DynamicResource App.Foreground}"
                                            FontStyle="Italic"
@@ -600,15 +784,16 @@
                                         <Style TargetType="TextBlock">
                                             <Setter Property="Visibility" Value="Collapsed"/>
                                             <Style.Triggers>
-                                                <DataTrigger Binding="{Binding ElementName=PlannedItems, Path=HasItems}" Value="False">
-                                                    <Setter Property="Visibility" Value="Visible"/>
+                                                <DataTrigger Binding="{Binding ElementName=PlannedItems, Path=HasItems}"
+                                                             Value="False">
+                                                    <Setter Property="Visibility"
+                                                            Value="Visible"/>
                                                 </DataTrigger>
                                             </Style.Triggers>
                                         </Style>
                                     </TextBlock.Style>
                                 </TextBlock>
 
-                                <!-- Items -->
                                 <ItemsControl x:Name="PlannedItems"
                                               ItemsSource="{Binding PlannedTransactions}">
                                     <ItemsControl.ItemTemplate>
@@ -632,7 +817,6 @@
                                                             <TextBlock Text="{Binding DateDisplay}"
                                                                        Foreground="{DynamicResource App.Foreground}"/>
                                                         </StackPanel>
-
                                                         <StackPanel Orientation="Horizontal">
                                                             <TextBlock Text="Kwota:"
                                                                        FontWeight="SemiBold"
@@ -641,7 +825,6 @@
                                                             <TextBlock Text="{Binding AmountStr}"
                                                                        Foreground="{DynamicResource App.Foreground}"/>
                                                         </StackPanel>
-
                                                         <StackPanel Orientation="Horizontal">
                                                             <TextBlock Text="Kategoria:"
                                                                        FontWeight="SemiBold"
@@ -650,7 +833,6 @@
                                                             <TextBlock Text="{Binding CategoryName, TargetNullValue=Brak kategorii, FallbackValue=Brak kategorii}"
                                                                        Foreground="{DynamicResource App.Foreground}"/>
                                                         </StackPanel>
-
                                                         <StackPanel Orientation="Horizontal"
                                                                     Visibility="Collapsed"
                                                                     x:Name="SchedFromLine">
@@ -660,7 +842,6 @@
                                                                        Margin="0,0,6,0"/>
                                                             <TextBlock Text="{Binding AccountName, TargetNullValue=Nie dotyczy, FallbackValue=Nie dotyczy}"/>
                                                         </StackPanel>
-
                                                         <StackPanel Orientation="Horizontal"
                                                                     Visibility="Collapsed"
                                                                     x:Name="SchedToLine">
@@ -668,10 +849,8 @@
                                                                        FontWeight="SemiBold"
                                                                        Foreground="{DynamicResource App.Foreground}"
                                                                        Margin="0,0,6,0"/>
-                                                            <TextBlock Text="{Binding AccountName, TargetNullValue=Nie dotyczy, FallbackValue=Nie dotyczy}"
-                                                                       Foreground="{DynamicResource App.Foreground}"/>
+                                                            <TextBlock Text="{Binding AccountName, TargetNullValue=Nie dotyczy, FallbackValue=Nie dotyczy}"/>
                                                         </StackPanel>
-
                                                         <StackPanel Orientation="Horizontal">
                                                             <TextBlock Text="Opis:"
                                                                        FontWeight="SemiBold"
@@ -693,7 +872,7 @@
                                                                     ToolTip="Edytuj"
                                                                     Click="StartEdit_Click">
                                                                 <Path Data="M3,17 L7,21 L21,7 L17,3 Z M2,22 L8,22 L2,16 Z"
-                                                                      Fill="{DynamicResource App.Foreground}"
+                                                                      Fill="{DynamicResource Brand.Blue}"
                                                                       Stretch="Uniform"
                                                                       Width="14"
                                                                       Height="14"/>
@@ -755,7 +934,6 @@
                                                             Value="Visible"/>
                                                 </DataTrigger>
 
-                                                <!-- Ukryj zaplanowane, jeśli to już przeszłość i nie jest IsPlanned -->
                                                 <MultiDataTrigger>
                                                     <MultiDataTrigger.Conditions>
                                                         <Condition Binding="{Binding IsPlanned}" Value="False"/>
