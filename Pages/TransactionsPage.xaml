@@ -270,24 +270,6 @@
  <Border Height="3" Background="{DynamicResource Brand.Blue}" CornerRadius="0,0,8,8" Margin="0,6,0,0"/>
  </StackPanel>
 
- <!-- Empty state message (visible only when both collections empty) -->
- <TextBlock Grid.Row="1" Grid.ColumnSpan="2" Text="Brak danych w tym okresie" Foreground="{DynamicResource App.Foreground}" FontStyle="Italic" HorizontalAlignment="Center" Margin="0,0,0,12">
- <TextBlock.Style>
- <Style TargetType="TextBlock">
- <Setter Property="Visibility" Value="Collapsed"/>
- <Style.Triggers>
- <MultiDataTrigger>
- <MultiDataTrigger.Conditions>
- <Condition Binding="{Binding FilteredTransactions.Count}" Value="0"/>
- <Condition Binding="{Binding PlannedTransactions.Count}" Value="0"/>
- </MultiDataTrigger.Conditions>
- <Setter Property="Visibility" Value="Visible"/>
- </MultiDataTrigger>
- </Style.Triggers>
- </Style>
- </TextBlock.Style>
- </TextBlock>
-
  <!-- Realized Transactions -->
  <Border Grid.Row="2" Grid.Column="0" BorderBrush="{DynamicResource Surface.Border}" BorderThickness="1" CornerRadius="10" Padding="12" Margin="0,0,8,0">
  <Grid>
@@ -296,10 +278,26 @@
  <RowDefinition Height="Auto"/>
  </Grid.RowDefinitions>
  <TextBlock Grid.Row="0" Text="Transakcje" Style="{StaticResource KpiHeader}" Margin="0,0,0,8"/>
- <ItemsControl Grid.Row="1" ItemsSource="{Binding FilteredTransactions}">
+
+ <Grid Grid.Row="1">
+ <!-- Placeholder for empty "Transakcje" -->
+ <TextBlock Text="Brak danych w tym okresie" Foreground="{DynamicResource App.Foreground}" FontStyle="Italic" HorizontalAlignment="Center" Margin="0,8,0,8">
+ <TextBlock.Style>
+ <Style TargetType="TextBlock">
+ <Setter Property="Visibility" Value="Collapsed"/>
+ <Style.Triggers>
+ <DataTrigger Binding="{Binding ElementName=RealizedItems, Path=HasItems}" Value="False">
+ <Setter Property="Visibility" Value="Visible"/>
+ </DataTrigger>
+ </Style.Triggers>
+ </Style>
+ </TextBlock.Style>
+ </TextBlock>
+
+ <!-- Items list -->
+ <ItemsControl x:Name="RealizedItems" ItemsSource="{Binding FilteredTransactions}">
  <ItemsControl.ItemTemplate>
  <DataTemplate>
- <!-- existing transaction card -->
  <Border x:Name="RealizedCard" Style="{StaticResource TransactionCardPlanned}">
  <Grid>
  <Grid.ColumnDefinitions>
@@ -382,9 +380,10 @@
  </ItemsControl.ItemTemplate>
  </ItemsControl>
  </Grid>
+ </Grid>
  </Border>
 
- <!-- Scheduled Transactions (no inner ScrollViewer, grows) -->
+ <!-- Scheduled Transactions -->
  <Border Grid.Row="2" Grid.Column="1" BorderBrush="{DynamicResource Surface.Border}" BorderThickness="1" CornerRadius="10" Padding="12" Margin="8,0,0,0" Visibility="{Binding ShowScheduled, Converter={StaticResource BoolToVisibilityConverter}}">
  <Grid>
  <Grid.RowDefinitions>
@@ -392,7 +391,24 @@
  <RowDefinition Height="Auto"/>
  </Grid.RowDefinitions>
  <TextBlock Grid.Row="0" Text="Zaplanowane transakcje" Style="{StaticResource KpiHeader}" Margin="0,0,0,8"/>
- <ItemsControl Grid.Row="1" ItemsSource="{Binding PlannedTransactions}">
+
+ <Grid Grid.Row="1">
+ <!-- Placeholder for empty "Zaplanowane transakcje" -->
+ <TextBlock Text="Brak danych w tym okresie" Foreground="{DynamicResource App.Foreground}" FontStyle="Italic" HorizontalAlignment="Center" Margin="0,8,0,8">
+ <TextBlock.Style>
+ <Style TargetType="TextBlock">
+ <Setter Property="Visibility" Value="Collapsed"/>
+ <Style.Triggers>
+ <DataTrigger Binding="{Binding ElementName=PlannedItems, Path=HasItems}" Value="False">
+ <Setter Property="Visibility" Value="Visible"/>
+ </DataTrigger>
+ </Style.Triggers>
+ </Style>
+ </TextBlock.Style>
+ </TextBlock>
+
+ <!-- Items list -->
+ <ItemsControl x:Name="PlannedItems" ItemsSource="{Binding PlannedTransactions}">
  <ItemsControl.ItemTemplate>
  <DataTemplate>
  <Border x:Name="ScheduledCard" Style="{StaticResource TransactionCardPlanned}">
@@ -476,12 +492,224 @@
  </ItemsControl.ItemTemplate>
  </ItemsControl>
  </Grid>
+ </Grid>
  </Border>
  </Grid>
  </Border>
  </Grid>
  </ScrollViewer>
 </UserControl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
