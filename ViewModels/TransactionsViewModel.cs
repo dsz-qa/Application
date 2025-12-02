@@ -153,7 +153,25 @@ namespace Finly.ViewModels
  int? accountId = r.Table.Columns.Contains("AccountId") && r["AccountId"] != DBNull.Value ? (int?)Convert.ToInt32(r["AccountId"]) : null;
  string accountName = string.Empty;
  if (accountId.HasValue && _accountNameById.TryGetValue(accountId.Value, out var accn)) accountName = accn; else accountName = "Wolna gotówka"; // domyœlnie gotówka wolna
- AllTransactions.Add(new TransactionCardVm { Id = id, Kind = TransactionKind.Expense, CategoryName = catName, Description = desc, DateDisplay = date.ToString("yyyy-MM-dd"), AmountStr = amt.ToString("N2") + " z³", IsPlanned = planned, IsFuture = date.Date > DateTime.Today, CategoryIcon = "?", AccountName = accountName });
+ AllTransactions.Add(new TransactionCardVm {
+ Id = id,
+ Kind = TransactionKind.Expense,
+ CategoryName = catName,
+ Description = desc,
+ DateDisplay = date.ToString("yyyy-MM-dd"),
+ AmountStr = amt.ToString("N2") + " z³",
+ IsPlanned = planned,
+ IsFuture = date.Date > DateTime.Today,
+ CategoryIcon = "?",
+
+ AccountName = accountName,
+ // inline edit defaults
+ SelectedCategory = string.IsNullOrWhiteSpace(catName) ? "(brak)" : catName,
+ SelectedAccount = accountName,
+ EditAmountText = amt.ToString("N2"),
+ EditDescription = desc,
+ EditDate = date
+ });
  }
  private void AddIncomeRow(DataRow r)
  {
@@ -163,7 +181,23 @@ namespace Finly.ViewModels
  bool planned = r.Table.Columns.Contains("IsPlanned") && r["IsPlanned"] != DBNull.Value && Convert.ToInt32(r["IsPlanned"]) ==1;
  // Na konto: jeœli pusta nazwa, za³ó¿my wolna gotówka
  var dest = string.IsNullOrWhiteSpace(source) ? "Wolna gotówka" : source;
- AllTransactions.Add(new TransactionCardVm { Id = id, Kind = TransactionKind.Income, CategoryName = string.IsNullOrEmpty(catName) ? "Przychód" : catName, Description = desc, DateDisplay = date.ToString("yyyy-MM-dd"), AmountStr = amt.ToString("N2") + " z³", IsPlanned = planned, IsFuture = date.Date > DateTime.Today, CategoryIcon = "+", AccountName = dest });
+ AllTransactions.Add(new TransactionCardVm {
+ Id = id,
+ Kind = TransactionKind.Income,
+ CategoryName = string.IsNullOrEmpty(catName) ? "Przychód" : catName,
+ Description = desc,
+ DateDisplay = date.ToString("yyyy-MM-dd"),
+ AmountStr = amt.ToString("N2") + " z³",
+ IsPlanned = planned,
+ IsFuture = date.Date > DateTime.Today,
+ CategoryIcon = "+",
+ AccountName = dest,
+ SelectedCategory = string.IsNullOrWhiteSpace(catName) ? "Przychód" : catName,
+ SelectedAccount = dest,
+ EditAmountText = amt.ToString("N2"),
+ EditDescription = desc,
+ EditDate = date
+ });
  }
  private void AddTransferRow(DataRow r)
  {
@@ -175,7 +209,24 @@ namespace Finly.ViewModels
  string fromName = ResolveAccountDisplay(fromKind, fromRef);
  string toName = ResolveAccountDisplay(toKind, toRef);
  string accountDisplay = fromName + " ? " + toName;
- AllTransactions.Add(new TransactionCardVm { Id = id, Kind = TransactionKind.Transfer, CategoryName = "Transfer", Description = desc, DateDisplay = date.ToString("yyyy-MM-dd"), AmountStr = amt.ToString("N2") + " z³", IsPlanned = planned, IsFuture = date.Date > DateTime.Today, CategoryIcon = "?", AccountName = accountDisplay });
+ AllTransactions.Add(new TransactionCardVm {
+ Id = id,
+ Kind = TransactionKind.Transfer,
+ CategoryName = "Transfer",
+ Description = desc,
+ DateDisplay = date.ToString("yyyy-MM-dd"),
+ AmountStr = amt.ToString("N2") + " z³",
+ IsPlanned = planned,
+ IsFuture = date.Date > DateTime.Today,
+ CategoryIcon = "?",
+
+ AccountName = accountDisplay,
+ SelectedCategory = "Transfer",
+ SelectedAccount = accountDisplay,
+ EditAmountText = amt.ToString("N2"),
+ EditDescription = desc,
+ EditDate = date
+ });
  }
 
  private string ResolveAccountDisplay(string kind, int? id)
@@ -322,7 +373,10 @@ namespace Finly.ViewModels
  }
 
  public enum TransactionKind { Expense, Income, Transfer }
- public class TransactionCardVm { public int Id { get; set; } public string CategoryName { get; set; } = ""; public string Description { get; set; } = ""; public string DateDisplay { get; set; } = ""; public string AmountStr { get; set; } = ""; public bool IsPlanned { get; set; } public bool IsFuture { get; set; } public string CategoryIcon { get; set; } = ""; public string AccountName { get; set; } = ""; public TransactionKind Kind { get; set; } = TransactionKind.Expense; }
+ public class TransactionCardVm : INotifyPropertyChanged { public int Id { get; set; } public string CategoryName { get; set; } = ""; public string Description { get; set; } = ""; public string DateDisplay { get; set; } = ""; public string AmountStr { get; set; } = ""; public bool IsPlanned { get; set; } public bool IsFuture { get; set; } public string CategoryIcon { get; set; } = ""; public string AccountName { get; set; } = ""; public TransactionKind Kind { get; set; } = TransactionKind.Expense; 
+ // inline edit
+ private bool _isEditing; public bool IsEditing { get=>_isEditing; set { _isEditing=value; PropertyChanged?.Invoke(this,new PropertyChangedEventArgs(nameof(IsEditing))); } }
+ public string EditAmountText { get; set; } = ""; public string EditDescription { get; set; } = ""; public DateTime EditDate { get; set; } = DateTime.Today; public string SelectedCategory { get; set; } = ""; public string SelectedAccount { get; set; } = ""; public event PropertyChangedEventHandler? PropertyChanged; }
  public sealed class AccountFilterItem : INotifyPropertyChanged { private bool _sel; public string Name { get; set; } = ""; public bool IsSelected { get => _sel; set { _sel = value; PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(IsSelected))); } } public event PropertyChangedEventHandler? PropertyChanged; }
  public sealed class CategoryFilterItem : INotifyPropertyChanged { private bool _sel; public string Name { get; set; } = ""; public bool IsSelected { get => _sel; set { _sel = value; PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(IsSelected))); } } public event PropertyChangedEventHandler? PropertyChanged; }
 }

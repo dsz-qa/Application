@@ -6,6 +6,7 @@ using Finly.Models;
 using Finly.Views.Controls;
 using System.Windows;
 using System.Windows.Media;
+using System.Linq;
 
 namespace Finly.Pages
 {
@@ -25,13 +26,28 @@ namespace Finly.Pages
         {
             int uid = UserService.GetCurrentUserId();
             _vm.Initialize(uid);
-            // odszukaj kontrolkę po nazwie nadanej w XAML
             _periodBar = this.FindName("PeriodBar") as PeriodBarControl;
             if (_periodBar != null)
             {
                 _vm.SetPeriod(_periodBar.Mode, _periodBar.StartDate, _periodBar.EndDate);
                 _periodBar.RangeChanged += PeriodBar_RangeChanged;
             }
+            // fill combo sources
+            try
+            {
+                var cats = DatabaseService.GetCategoriesByUser(uid) ?? new System.Collections.Generic.List<string>();
+                this.Resources["CategoriesForEditRes"] = cats.ToArray();
+            }
+            catch { this.Resources["CategoriesForEditRes"] = Array.Empty<string>(); }
+
+            try
+            {
+                var accs = DatabaseService.GetAccounts(uid)?.Select(a => a.AccountName).ToList() ?? new System.Collections.Generic.List<string>();
+                accs.Add("Wolna gotówka");
+                accs.Add("Odłożona gotówka");
+                this.Resources["AccountsForEditRes"] = accs.ToArray();
+            }
+            catch { this.Resources["AccountsForEditRes"] = new string[] { "Wolna gotówka", "Odłożona gotówka" }; }
         }
 
         private void PeriodBar_RangeChanged(object? sender, EventArgs e)
@@ -42,17 +58,6 @@ namespace Finly.Pages
             }
         }
 
-        // ===================== Inline delete confirm (like Dashboard) =====================
-        private static T? FindVisualParent<T>(DependencyObject? child) where T : DependencyObject
-        {
-            while (child != null)
-            {
-                var parent = VisualTreeHelper.GetParent(child);
-                if (parent is T typed) return typed;
-                child = parent;
-            }
-            return null;
-        }
         private static T? FindDescendantByName<T>(DependencyObject? start, string name) where T : FrameworkElement
         {
             if (start == null) return null;
@@ -90,35 +95,19 @@ namespace Finly.Pages
         private void ShowDeleteConfirm_Click(object sender, RoutedEventArgs e)
         {
             if (sender is not FrameworkElement fe) return;
-
-            // hide other panels first
             HideAllDeletePanels();
-
-            // find the container for this item
             FrameworkElement? container = fe;
             while (container != null && container is not ContentPresenter && container is not Border)
-            {
                 container = VisualTreeHelper.GetParent(container) as FrameworkElement;
-            }
             if (container == null) return;
-
             var panel = FindDescendantByName<FrameworkElement>(container, "DeleteConfirmPanel");
-            if (panel != null)
-            {
-                panel.Visibility = panel.Visibility == Visibility.Visible
-                    ? Visibility.Collapsed
-                    : Visibility.Visible;
-            }
+            if (panel != null) panel.Visibility = Visibility.Visible;
         }
 
-        private void DeleteConfirmNo_Click(object sender, RoutedEventArgs e)
-        {
-            HideAllDeletePanels();
-        }
+        private void DeleteConfirmNo_Click(object sender, RoutedEventArgs e) => HideAllDeletePanels();
 
         private void DeleteConfirmYes_Click(object sender, RoutedEventArgs e)
         {
-            // get bound item from any element within DataTemplate
             if (sender is not FrameworkElement fe) { HideAllDeletePanels(); return; }
             if (fe.DataContext is not TransactionCardVm vmItem) { HideAllDeletePanels(); return; }
 
@@ -146,11 +135,27 @@ namespace Finly.Pages
             finally
             {
                 HideAllDeletePanels();
-                // reload preserving current period
-                if (_periodBar != null)
-                    _vm.SetPeriod(_periodBar.Mode, _periodBar.StartDate, _periodBar.EndDate);
+                if (_periodBar != null) _vm.SetPeriod(_periodBar.Mode, _periodBar.StartDate, _periodBar.EndDate);
                 _vm.LoadFromDatabase();
             }
+        }
+
+        private void StartEdit_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is FrameworkElement fe && fe.DataContext is TransactionCardVm vm)
+            {
+                vm.IsEditing = !vm.IsEditing;
+            }
+        }
+
+        private void EditAmount_GotFocus(object sender, RoutedEventArgs e)
+        {
+            if (sender is TextBox tb) tb.SelectAll();
+        }
+
+        private void EditDescription_GotFocus(object sender, RoutedEventArgs e)
+        {
+            if (sender is TextBox tb) tb.SelectAll();
         }
     }
 }
