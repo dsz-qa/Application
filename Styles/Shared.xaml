@@ -4,6 +4,7 @@
     <!-- BRAND / ACCENT -->
     <SolidColorBrush x:Key="Brand.Orange"       Color="#FF8A00"/>
     <SolidColorBrush x:Key="Brand.Blue"         Color="#3B82F6"/>
+    <SolidColorBrush x:Key="Brand.Red"          Color="#E74C3C"/>
     <SolidColorBrush x:Key="Accent"             Color="#3B82F6"/>
     <SolidColorBrush x:Key="Accent.Hover"       Color="#2563EB"/>
     <SolidColorBrush x:Key="Accent.Foreground"  Color="#FFFFFF"/>

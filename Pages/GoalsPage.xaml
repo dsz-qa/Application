@@ -137,7 +137,8 @@
                                 <Image Source="/Assets/Icons/edit.png"
                                        Width="16" Height="16"
                                        Margin="0,0,6,0"
-                                       VerticalAlignment="Center"/>
+                                       VerticalAlignment="Center"
+                                       OpacityMask="{DynamicResource Brand.Orange}"/>
                                 <TextBlock Text="Edytuj" VerticalAlignment="Center"/>
                             </StackPanel>
                         </Button>
@@ -149,7 +150,8 @@
                                 <Image Source="/Assets/Icons/delete.png"
                                        Width="16" Height="16"
                                        Margin="0,0,6,0"
-                                       VerticalAlignment="Center"/>
+                                       VerticalAlignment="Center"
+                                       OpacityMask="{DynamicResource Brand.Orange}"/>
                                 <TextBlock Text="Usuń" VerticalAlignment="Center"/>
                             </StackPanel>
                         </Button>

@@ -105,13 +105,15 @@
         <Grid Margin="16">
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto"/>
+                <!-- KPI -->
                 <RowDefinition Height="Auto"/>
+                <!-- odstęp / przyszłość -->
                 <RowDefinition Height="Auto"/>
-                <!-- Add row -->
+                <!-- Add panel -->
                 <RowDefinition Height="Auto"/>
-                <!-- Period row -->
+                <!-- Period bar + główne panele -->
                 <RowDefinition Height="*"/>
-                <!-- Details -->
+                <!-- dół (opcjonalny) -->
             </Grid.RowDefinitions>
 
             <!-- 1) KPI -->
@@ -207,7 +209,7 @@
                 </Border>
             </Grid>
 
-            <!-- 3) Panel dodawania (górny) -->
+            <!-- 3) Panel dodawania (góra strony) -->
             <StackPanel Grid.Row="2"
                         Orientation="Vertical"
                         Margin="0,0,0,12">
@@ -298,7 +300,7 @@
                 </Border>
             </StackPanel>
 
-            <!-- 4) Pasek okresu + panele -->
+            <!-- 4) Pasek okresu + główne panele -->
             <StackPanel Grid.Row="3"
                         Orientation="Vertical">
                 <ctrls:PeriodBarControl x:Name="PeriodBar"
@@ -308,15 +310,17 @@
                 <Grid>
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="2*"/>
+                        <!-- Wszystkie kategorie -->
                         <ColumnDefinition Width="16"/>
                         <ColumnDefinition Width="*"/>
+                        <!-- Szczegóły kategorii -->
                         <ColumnDefinition Width="16"/>
                         <ColumnDefinition Width="*"/>
+                        <!-- Struktura + porównanie -->
                     </Grid.ColumnDefinitions>
 
-                    <!-- LEWA KOLUMNA -->
+                    <!-- LEWA KOLUMNA: Wszystkie kategorie -->
                     <StackPanel Grid.Column="0">
-                        <!-- Wszystkie kategorie -->
                         <Border Padding="12"
                                 Background="{DynamicResource Surface.Background}"
                                 BorderBrush="{DynamicResource Surface.Border}"
@@ -363,7 +367,7 @@
                                         </Border>
                                     </Grid>
 
-                                    <!-- LISTA KATEGORII (MIN. 3 W RZĘDZIE, WrapPanel) -->
+                                    <!-- Lista kategorii (min 3 w rzędzie – WrapPanel) -->
                                     <ItemsControl x:Name="AllCategoriesList"
                                                   Margin="0,8,0,0"
                                                   ItemsSource="{Binding Categories}">
@@ -598,7 +602,7 @@
                                         </ItemsControl.ItemTemplate>
                                     </ItemsControl>
 
-                                    <!-- KAFEL DO DODANIA KATEGORII – POD LISTĄ -->
+                                    <!-- Kafelek "Dodaj kategorię" -->
                                     <Button Style="{StaticResource AddTileButtonStyle}"
                                             Margin="0,8,8,0"
                                             Click="AddCategoryTile_Click">
@@ -619,13 +623,74 @@
                                 </StackPanel>
                             </StackPanel>
                         </Border>
+                    </StackPanel>
 
-                        <!-- Struktura wydatków -->
+                    <!-- ŚRODEK: Szczegóły kategorii (zależne od okresu i wybranej kategorii) -->
+                    <Border Grid.Column="2"
+                            Padding="12"
+                            Background="{DynamicResource Surface.Background}"
+                            BorderBrush="{DynamicResource Surface.Border}"
+                            BorderThickness="1"
+                            CornerRadius="8">
+                        <StackPanel>
+                            <TextBlock Text="Szczegóły kategorii"
+                                       FontWeight="Bold"
+                                       Foreground="{DynamicResource App.Foreground}"/>
+                            <StackPanel Margin="0,8,0,0">
+                                <TextBlock Foreground="{DynamicResource App.Foreground}"
+                                           Text="Suma wydatków w tym okresie:"/>
+                                <TextBlock Foreground="{DynamicResource App.Foreground}"
+                                           Text="{Binding SelectedCategoryTotalAmount, StringFormat={}{0:N2} zł}"/>
+                                <TextBlock Foreground="{DynamicResource App.Foreground}"
+                                           Margin="0,8,0,0"
+                                           Text="Średni miesięczny wydatek:"/>
+                                <TextBlock Foreground="{DynamicResource App.Foreground}"
+                                           Text="{Binding SelectedCategoryAverageMonthly, StringFormat={}{0:N2} zł}"/>
+                                <TextBlock Foreground="{DynamicResource App.Foreground}"
+                                           Margin="0,8,0,0"
+                                           Text="Liczba transakcji w okresie:"/>
+                                <TextBlock Foreground="{DynamicResource App.Foreground}"
+                                           Text="{Binding SelectedCategoryTransactionCount}"/>
+                                <TextBlock Foreground="{DynamicResource App.Foreground}"
+                                           Margin="0,12,0,4"
+                                           Text="Ostatnie transakcje:"/>
+                                <ItemsControl ItemsSource="{Binding SelectedCategoryRecentTransactions}">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <Grid Margin="0,2,0,2">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="100"/>
+                                                    <ColumnDefinition Width="*"/>
+                                                    <ColumnDefinition Width="120"/>
+                                                </Grid.ColumnDefinitions>
+                                                <TextBlock Grid.Column="0"
+                                                           Foreground="{DynamicResource App.Foreground}"
+                                                           Text="{Binding Date, StringFormat={}{0:yyyy-MM-dd}}"/>
+                                                <TextBlock Grid.Column="1"
+                                                           Foreground="{DynamicResource App.Foreground}"
+                                                           Text="{Binding Description}"
+                                                           TextTrimming="CharacterEllipsis"/>
+                                                <TextBlock Grid.Column="2"
+                                                           Foreground="{DynamicResource App.Foreground}"
+                                                           TextAlignment="Right"
+                                                           Text="{Binding Amount, StringFormat={}{0:N2} zł}"/>
+                                            </Grid>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </StackPanel>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- PRAWA KOLUMNA: Struktura + Porównanie (zależne od okresu) -->
+                    <StackPanel Grid.Column="4">
+                        <!-- Struktura wydatków według kategorii -->
                         <Border Padding="12"
                                 Background="{DynamicResource Surface.Background}"
                                 BorderBrush="{DynamicResource Surface.Border}"
                                 BorderThickness="1"
-                                CornerRadius="8">
+                                CornerRadius="8"
+                                Margin="0,0,0,12">
                             <StackPanel>
                                 <TextBlock Text="Struktura wydatków według kategorii"
                                            FontWeight="Bold"
@@ -688,101 +753,43 @@
                                 </ItemsControl>
                             </StackPanel>
                         </Border>
+
+                        <!-- Porównanie z poprzednim okresem -->
+                        <Border Padding="12"
+                                Background="{DynamicResource Surface.Background}"
+                                BorderBrush="{DynamicResource Surface.Border}"
+                                BorderThickness="1"
+                                CornerRadius="8">
+                            <StackPanel>
+                                <TextBlock Text="Porównanie z poprzednim okresem"
+                                           FontWeight="Bold"
+                                           Foreground="{DynamicResource App.Foreground}"/>
+                                <StackPanel Margin="0,8,0,0">
+                                    <TextBlock Foreground="{DynamicResource App.Foreground}"
+                                               Text="Ten okres:"/>
+                                    <TextBlock Foreground="{DynamicResource App.Foreground}"
+                                               Text="{Binding CurrentPeriodAmount, StringFormat={}{0:N2} zł}"/>
+                                    <TextBlock Foreground="{DynamicResource App.Foreground}"
+                                               Margin="0,8,0,0"
+                                               Text="Poprzedni okres:"/>
+                                    <TextBlock Foreground="{DynamicResource App.Foreground}"
+                                               Text="{Binding PreviousPeriodAmount, StringFormat={}{0:N2} zł}"/>
+                                    <TextBlock Foreground="{DynamicResource App.Foreground}"
+                                               Margin="0,8,0,0"
+                                               Text="Różnica:"/>
+                                    <TextBlock Foreground="{DynamicResource App.Foreground}"
+                                               Text="{Binding AmountDifference, StringFormat={}{0:N2} zł}"/>
+                                    <TextBlock Foreground="{DynamicResource App.Foreground}"
+                                               Margin="0,4,0,0"
+                                               Text="{Binding PercentageDifference, StringFormat={}{0:N0}%}"/>
+                                </StackPanel>
+                            </StackPanel>
+                        </Border>
                     </StackPanel>
-
-                    <!-- ŚRODKOWA: Szczegóły -->
-                    <Border Grid.Column="2"
-                            Padding="12"
-                            Background="{DynamicResource Surface.Background}"
-                            BorderBrush="{DynamicResource Surface.Border}"
-                            BorderThickness="1"
-                            CornerRadius="8">
-                        <StackPanel>
-                            <TextBlock Text="Szczegóły kategorii"
-                                       FontWeight="Bold"
-                                       Foreground="{DynamicResource App.Foreground}"/>
-                            <StackPanel Margin="0,8,0,0">
-                                <TextBlock Foreground="{DynamicResource App.Foreground}"
-                                           Text="Suma wydatków w tym okresie:"/>
-                                <TextBlock Foreground="{DynamicResource App.Foreground}"
-                                           Text="{Binding SelectedCategoryTotalAmount, StringFormat={}{0:N2} zł}"/>
-                                <TextBlock Foreground="{DynamicResource App.Foreground}"
-                                           Margin="0,8,0,0"
-                                           Text="Średni miesięczny wydatek:"/>
-                                <TextBlock Foreground="{DynamicResource App.Foreground}"
-                                           Text="{Binding SelectedCategoryAverageMonthly, StringFormat={}{0:N2} zł}"/>
-                                <TextBlock Foreground="{DynamicResource App.Foreground}"
-                                           Margin="0,8,0,0"
-                                           Text="Liczba transakcji w okresie:"/>
-                                <TextBlock Foreground="{DynamicResource App.Foreground}"
-                                           Text="{Binding SelectedCategoryTransactionCount}"/>
-                                <TextBlock Foreground="{DynamicResource App.Foreground}"
-                                           Margin="0,12,0,4"
-                                           Text="Ostatnie transakcje:"/>
-                                <ItemsControl ItemsSource="{Binding SelectedCategoryRecentTransactions}">
-                                    <ItemsControl.ItemTemplate>
-                                        <DataTemplate>
-                                            <Grid Margin="0,2,0,2">
-                                                <Grid.ColumnDefinitions>
-                                                    <ColumnDefinition Width="100"/>
-                                                    <ColumnDefinition Width="*"/>
-                                                    <ColumnDefinition Width="120"/>
-                                                </Grid.ColumnDefinitions>
-                                                <TextBlock Grid.Column="0"
-                                                           Foreground="{DynamicResource App.Foreground}"
-                                                           Text="{Binding Date, StringFormat={}{0:yyyy-MM-dd}}"/>
-                                                <TextBlock Grid.Column="1"
-                                                           Foreground="{DynamicResource App.Foreground}"
-                                                           Text="{Binding Description}"
-                                                           TextTrimming="CharacterEllipsis"/>
-                                                <TextBlock Grid.Column="2"
-                                                           Foreground="{DynamicResource App.Foreground}"
-                                                           TextAlignment="Right"
-                                                           Text="{Binding Amount, StringFormat={}{0:N2} zł}"/>
-                                            </Grid>
-                                        </DataTemplate>
-                                    </ItemsControl.ItemTemplate>
-                                </ItemsControl>
-                            </StackPanel>
-                        </StackPanel>
-                    </Border>
-
-                    <!-- PRAWA: porównanie -->
-                    <Border Grid.Column="4"
-                            Padding="12"
-                            Background="{DynamicResource Surface.Background}"
-                            BorderBrush="{DynamicResource Surface.Border}"
-                            BorderThickness="1"
-                            CornerRadius="8">
-                        <StackPanel>
-                            <TextBlock Text="Porównanie z poprzednim okresem"
-                                       FontWeight="Bold"
-                                       Foreground="{DynamicResource App.Foreground}"/>
-                            <StackPanel Margin="0,8,0,0">
-                                <TextBlock Foreground="{DynamicResource App.Foreground}"
-                                           Text="Ten okres:"/>
-                                <TextBlock Foreground="{DynamicResource App.Foreground}"
-                                           Text="{Binding CurrentPeriodAmount, StringFormat={}{0:N2} zł}"/>
-                                <TextBlock Foreground="{DynamicResource App.Foreground}"
-                                           Margin="0,8,0,0"
-                                           Text="Poprzedni okres:"/>
-                                <TextBlock Foreground="{DynamicResource App.Foreground}"
-                                           Text="{Binding PreviousPeriodAmount, StringFormat={}{0:N2} zł}"/>
-                                <TextBlock Foreground="{DynamicResource App.Foreground}"
-                                           Margin="0,8,0,0"
-                                           Text="Różnica:"/>
-                                <TextBlock Foreground="{DynamicResource App.Foreground}"
-                                           Text="{Binding AmountDifference, StringFormat={}{0:N2} zł}"/>
-                                <TextBlock Foreground="{DynamicResource App.Foreground}"
-                                           Margin="0,4,0,0"
-                                           Text="{Binding PercentageDifference, StringFormat={}{0:N0}%}"/>
-                            </StackPanel>
-                        </StackPanel>
-                    </Border>
                 </Grid>
             </StackPanel>
 
-            <!-- 5) Dolne szczegóły (jak wcześniej) -->
+            <!-- 5) Dolne szczegóły – zostawione jako opcjonalne (domyślnie Collapsed) -->
             <Grid Grid.Row="4">
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto"/>
