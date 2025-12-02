@@ -1,5 +1,7 @@
 ﻿using Finly.Models;
 using Finly.Services;
+using Finly.ViewModels;
+using Finly.Views.Dialogs;
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
@@ -12,7 +14,6 @@ using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Shapes;
 using System.Windows.Threading;
-using Finly.ViewModels;
 
 namespace Finly.Pages
 {
@@ -548,7 +549,7 @@ namespace Finly.Pages
 
         private void BindIncomeTable(IEnumerable<DatabaseService.CategoryAmountDto> data)
         {
-            // data: zagregowane przychody (np. wg źródła) – wykorzystujemy tylko do sumy i centrum donuta
+            // data: zagregowane przychody (np. wg źródła) – wykorzystujemy tylko do sumy i centru donuta
             var aggregatedList = (data ?? Enumerable.Empty<DatabaseService.CategoryAmountDto>()).ToList();
             var sum = aggregatedList.Sum(x => x.Amount);
 
@@ -855,6 +856,112 @@ namespace Finly.Pages
         }
 
         private static Color Hex(string s) => (Color)ColorConverter.ConvertFromString(s)!;
+
+        private TransactionItem? GetSelectedIncome() => (FindName("IncomeTable") as ListBox)?.SelectedItem as TransactionItem;
+        private TransactionItem? GetSelectedExpense() => (FindName("ExpenseTable") as ListBox)?.SelectedItem as TransactionItem;
+        private TransactionItem? GetSelectedPlanned() => (FindName("PlannedTransactionsList") as ListBox)?.SelectedItem as TransactionItem;
+
+        // Header buttons handlers
+        private void DeleteIncomeHeader_Click(object sender, RoutedEventArgs e)
+        {
+            var item = GetSelectedIncome();
+            if (item == null) { ToastService.Info("Zaznacz pozycję do usunięcia."); return; }
+            try { DatabaseService.DeleteIncome(item.Id); ToastService.Success("Usunięto przychód."); ReloadAfterEdit(); }
+            catch (Exception ex) { ToastService.Error("Błąd usuwania przychodu.\n" + ex.Message); }
+        }
+        private void DeleteExpenseHeader_Click(object sender, RoutedEventArgs e)
+        {
+            var item = GetSelectedExpense();
+            if (item == null) { ToastService.Info("Zaznacz pozycję do usunięcia."); return; }
+            try { DatabaseService.DeleteExpense(item.Id); ToastService.Success("Usunięto wydatek."); ReloadAfterEdit(); }
+            catch (Exception ex) { ToastService.Error("Błąd usuwania wydatku.\n" + ex.Message); }
+        }
+        private void DeletePlannedHeader_Click(object sender, RoutedEventArgs e)
+        {
+            var item = GetSelectedPlanned();
+            if (item == null) { ToastService.Info("Zaznacz pozycję do usunięcia."); return; }
+            try
+            {
+                if (string.Equals(item.Kind, "Przychód", StringComparison.OrdinalIgnoreCase)) DatabaseService.DeleteIncome(item.Id);
+                else if (string.Equals(item.Kind, "Wydatek", StringComparison.OrdinalIgnoreCase)) DatabaseService.DeleteExpense(item.Id);
+                else { ToastService.Info("Transfer usuń poprzez powiązane wpisy."); }
+                ToastService.Success("Usunięto."); ReloadAfterEdit();
+            }
+            catch (Exception ex) { ToastService.Error("Błąd usuwania.\n" + ex.Message); }
+        }
+        private void ReloadAfterEdit()
+        {
+            try
+            {
+                // reload using current period bar state
+                if (FindName("PeriodBar") is Views.Controls.PeriodBarControl pb)
+                {
+                    _mode = pb.Mode; _startDate = pb.StartDate; _endDate = pb.EndDate;
+                }
+                _vm.LoadTransactions(_startDate, _endDate);
+                _vm.RefreshCharts(_startDate, _endDate);
+                LoadCharts();
+                UpdateTablesVisibility();
+            }
+            catch { }
+        }
+
+        private void ShowIncomeDeleteConfirm_Click(object sender, RoutedEventArgs e)
+        {
+            if (FindName("IncomeDeleteConfirmPanel") is FrameworkElement p) p.Visibility = Visibility.Visible;
+        }
+        private void IncomeDeleteConfirmNo_Click(object sender, RoutedEventArgs e)
+        {
+            if (FindName("IncomeDeleteConfirmPanel") is FrameworkElement p) p.Visibility = Visibility.Collapsed;
+        }
+        private void IncomeDeleteConfirmYes_Click(object sender, RoutedEventArgs e)
+        {
+            var item = GetSelectedIncome();
+            if (item == null) { ToastService.Info("Zaznacz pozycję do usunięcia."); return; }
+            try { DatabaseService.DeleteIncome(item.Id); ToastService.Success("Usunięto przychód."); }
+            catch (Exception ex) { ToastService.Error("Błąd usuwania przychodu.\n" + ex.Message); }
+            finally { IncomeDeleteConfirmNo_Click(sender, e); ReloadAfterEdit(); }
+        }
+
+        private void ShowExpenseDeleteConfirm_Click(object sender, RoutedEventArgs e)
+        {
+            if (FindName("ExpenseDeleteConfirmPanel") is FrameworkElement p) p.Visibility = Visibility.Visible;
+        }
+        private void ExpenseDeleteConfirmNo_Click(object sender, RoutedEventArgs e)
+        {
+            if (FindName("ExpenseDeleteConfirmPanel") is FrameworkElement p) p.Visibility = Visibility.Collapsed;
+        }
+        private void ExpenseDeleteConfirmYes_Click(object sender, RoutedEventArgs e)
+        {
+            var item = GetSelectedExpense();
+            if (item == null) { ToastService.Info("Zaznacz pozycję do usunięcia."); return; }
+            try { DatabaseService.DeleteExpense(item.Id); ToastService.Success("Usunięto wydatek."); }
+            catch (Exception ex) { ToastService.Error("Błąd usuwania wydatku.\n" + ex.Message); }
+            finally { ExpenseDeleteConfirmNo_Click(sender, e); ReloadAfterEdit(); }
+        }
+
+        private void ShowPlannedDeleteConfirm_Click(object sender, RoutedEventArgs e)
+        {
+            if (FindName("PlannedDeleteConfirmPanel") is FrameworkElement p) p.Visibility = Visibility.Visible;
+        }
+        private void PlannedDeleteConfirmNo_Click(object sender, RoutedEventArgs e)
+        {
+            if (FindName("PlannedDeleteConfirmPanel") is FrameworkElement p) p.Visibility = Visibility.Collapsed;
+        }
+        private void PlannedDeleteConfirmYes_Click(object sender, RoutedEventArgs e)
+        {
+            var item = GetSelectedPlanned();
+            if (item == null) { ToastService.Info("Zaznacz pozycję do usunięcia."); return; }
+            try
+            {
+                if (string.Equals(item.Kind, "Przychód", StringComparison.OrdinalIgnoreCase)) DatabaseService.DeleteIncome(item.Id);
+                else if (string.Equals(item.Kind, "Wydatek", StringComparison.OrdinalIgnoreCase)) DatabaseService.DeleteExpense(item.Id);
+                else { ToastService.Info("Transfer usuń poprzez powiązane wpisy."); }
+                ToastService.Success("Usunięto.");
+            }
+            catch (Exception ex) { ToastService.Error("Błąd usuwania.\n" + ex.Message); }
+            finally { PlannedDeleteConfirmNo_Click(sender, e); ReloadAfterEdit(); }
+        }
     }
 
     // =====================================================================

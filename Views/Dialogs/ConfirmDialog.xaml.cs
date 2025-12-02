@@ -33,6 +33,17 @@ namespace Finly.Views.Dialogs
             if (e.Key == Key.Escape) Cancel_Click(this, new RoutedEventArgs());
             if (e.Key == Key.Enter) Ok_Click(this, new RoutedEventArgs());
         }
+
+        // Static convenience API
+        public static bool Show(Window owner, string message)
+        {
+            var dlg = new ConfirmDialog(message)
+            {
+                Owner = owner
+            };
+            var res = dlg.ShowDialog();
+            return res == true && dlg.Result;
+        }
     }
 }
 
