@@ -54,7 +54,7 @@
  <StackPanel Grid.Row="0">
  <!-- Nazwa + ikonka -->
  <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
- <Image Source="/Assets/Icons/koperty.png" Width="24" Height="24" Margin="0,0,6,0" VerticalAlignment="Center"/>
+ <Image Source="/Assets/Icons/koperty.png" Width="24" Height="24" Margin="0,0,6,0" VerticalAlignment="Center" OpacityMask="{DynamicResource Brand.Orange}"/>
  <TextBlock Text="{Binding Row[Name]}" FontSize="18" FontWeight="Bold" Foreground="White" VerticalAlignment="Center" TextWrapping="Wrap" MaxWidth="180"/>
  </StackPanel>
 
