@@ -2,6 +2,9 @@
 using System.Windows;
 using System.Windows.Controls;
 using Finly.ViewModels;
+using LiveChartsCore;
+using LiveChartsCore.SkiaSharpView.Painting;
+using SkiaSharp;
 
 namespace Finly.Pages
 {
@@ -13,9 +16,31 @@ namespace Finly.Pages
 
             DataContext = new ChartsViewModel();
 
+            // Ustaw legendę/teksty na biało, jeśli dostępne
+            try
+            {
+                var white = new SolidColorPaint(new SKColor(255,255,255));
+                if (DataContext is ChartsViewModel vm)
+                {
+                    if (vm.CategoriesSeries != null)
+                        foreach (var series in vm.CategoriesSeries) series.DataLabelsPaint = white;
+                    if (vm.AccountsSeries != null)
+                        foreach (var series in vm.AccountsSeries) series.DataLabelsPaint = white;
+                    if (vm.TrendSeries != null)
+                        foreach (var series in vm.TrendSeries) series.DataLabelsPaint = white;
+                    if (vm.WeekdaySeries != null)
+                        foreach (var series in vm.WeekdaySeries) series.DataLabelsPaint = white;
+                }
+            }
+            catch { }
+
             // domyślny tryb: wydatki
             if (ModeExpensesBtn != null)
+            {
                 ApplyPrimary(ModeExpensesBtn);
+                if (DataContext is ChartsViewModel vm)
+                    vm.SetMode("Expenses");
+            }
 
             HookPeriodBar();
         }
@@ -46,12 +71,13 @@ namespace Finly.Pages
 
             SetActiveMode(btn);
 
-            switch (btn.Content?.ToString())
+            var tag = btn.Tag as string;
+            switch (tag)
             {
-                case "Wydatki":
+                case "Expenses":
                     vm.SetMode("Expenses");
                     break;
-                case "Przychody":
+                case "Incomes":
                     vm.SetMode("Incomes");
                     break;
                 case "Transfer":

@@ -34,16 +34,16 @@
             <Border Grid.Row="0" Style="{StaticResource Card}" Margin="0,0,0,12">
                 <Grid>
                     <Grid.ColumnDefinitions>
-                        <!-- lewa kolumna: eksport (pionowo, po lewej, wyśrodkowane względem paska) -->
-                        <ColumnDefinition Width="Auto"/>
-                        <!-- środek: pasek okresu -->
+                        <!-- lewa strefa: zajmuje dostępną przestrzeń po lewej stronie paska okresu -->
                         <ColumnDefinition Width="*"/>
-                        <!-- prawa kolumna: tryb -->
+                        <!-- środek: pasek okresu o szerokości automatycznej -->
                         <ColumnDefinition Width="Auto"/>
+                        <!-- prawa strefa: zajmuje dostępną przestrzeń po prawej stronie paska okresu -->
+                        <ColumnDefinition Width="*"/>
                     </Grid.ColumnDefinitions>
 
-                    <!-- Eksport: po lewej, pionowo; przyciski niebieskie i duże -->
-                    <StackPanel Grid.Column="0" Orientation="Vertical" VerticalAlignment="Center" HorizontalAlignment="Left" Margin="0,0,12,0">
+                    <!-- Eksport: wyśrodkowany po lewej -->
+                    <StackPanel Grid.Column="0" Orientation="Vertical" VerticalAlignment="Center" HorizontalAlignment="Center">
                         <Button Content="Eksport do PDF"
                                 Click="ExportPdf_Click"
                                 Style="{StaticResource PrimaryButton}"
@@ -54,18 +54,42 @@
                                 Width="180" Height="42"/>
                     </StackPanel>
 
-                    <!-- Pasek okresu (środek) -->
-                    <vc:PeriodBarControl Grid.Column="1" x:Name="PeriodBar" HorizontalAlignment="Stretch"/>
+                    <!-- Pasek okresu w środku, bez zmiany wielkości -->
+                    <vc:PeriodBarControl Grid.Column="1" x:Name="PeriodBar" HorizontalAlignment="Center"/>
 
-                    <!-- Tryb (prawa strona) -->
-                    <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center" Margin="12,0,0,0">
-                        <TextBlock Text="Tryb:" VerticalAlignment="Center" Margin="0,0,8,0" Foreground="{DynamicResource App.Foreground}"/>
-                        <StackPanel Orientation="Horizontal">
-                            <Button x:Name="ModeExpensesBtn" Content="Wydatki"  Click="Mode_Click"/>
-                            <Button x:Name="ModeIncomesBtn"  Content="Przychody" Click="Mode_Click" Margin="8,0,0,0"/>
-                            <Button x:Name="ModeTransferBtn" Content="Transfer" Click="Mode_Click" Margin="8,0,0,0"/>
-                            <Button x:Name="ModeCashflowBtn" Content="Cashflow" Click="Mode_Click" Margin="8,0,0,0"/>
-                        </StackPanel>
+                    <!-- Zakładki: wyśrodkowane po prawej między paskiem a prawą krawędzią -->
+                    <StackPanel Grid.Column="2" Orientation="Vertical" VerticalAlignment="Center" HorizontalAlignment="Center">
+                        <Button x:Name="ModeExpensesBtn" Tag="Expenses" Click="Mode_Click"
+                                Width="200" Height="56" Margin="0,0,0,10"
+                                Background="{DynamicResource Brand.Blue}" Foreground="White" BorderBrush="{DynamicResource Brand.Blue}" BorderThickness="1">
+                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                                <Image Source="/Assets/Icons/wydatki.png" Width="22" Height="22" Stretch="Uniform" Margin="0,0,8,0"/>
+                                <TextBlock Text="Wydatki" FontWeight="SemiBold"/>
+                            </StackPanel>
+                        </Button>
+                        <Button x:Name="ModeIncomesBtn" Tag="Incomes" Click="Mode_Click"
+                                Width="200" Height="56" Margin="0,0,0,10"
+                                Background="{DynamicResource Brand.Blue}" Foreground="White" BorderBrush="{DynamicResource Brand.Blue}" BorderThickness="1">
+                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                                <Image Source="/Assets/Icons/przychody.png" Width="22" Height="22" Stretch="Uniform" Margin="0,0,8,0"/>
+                                <TextBlock Text="Przychody" FontWeight="SemiBold"/>
+                            </StackPanel>
+                        </Button>
+                        <Button x:Name="ModeTransferBtn" Tag="Transfer" Click="Mode_Click"
+                                Width="200" Height="56" Margin="0,0,0,10"
+                                Background="{DynamicResource Brand.Blue}" Foreground="White" BorderBrush="{DynamicResource Brand.Blue}" BorderThickness="1">
+                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                                <Image Source="/Assets/Icons/transfer.png" Width="22" Height="22" Stretch="Uniform" Margin="0,0,8,0"/>
+                                <TextBlock Text="Transfery" FontWeight="SemiBold"/>
+                            </StackPanel>
+                        </Button>
+                        <Button x:Name="ModeCashflowBtn" Tag="Cashflow" Click="Mode_Click"
+                                Width="200" Height="56"
+                                Background="{DynamicResource Brand.Blue}" Foreground="White" BorderBrush="{DynamicResource Brand.Blue}" BorderThickness="1">
+                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                                <TextBlock Text="Cashflow" FontWeight="SemiBold"/>
+                            </StackPanel>
+                        </Button>
                     </StackPanel>
                 </Grid>
             </Border>
@@ -131,6 +155,323 @@
         </Grid>
     </ScrollViewer>
 </UserControl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 

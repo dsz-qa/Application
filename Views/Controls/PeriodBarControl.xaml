@@ -1,138 +1,138 @@
 ﻿<UserControl x:Class="Finly.Views.Controls.PeriodBarControl"
-             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
-             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-             x:Name="Root">
+ xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+ xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+ x:Name="Root">
 
-    <Grid>
-        <!-- Container styled like AccentCard (explicit to avoid dependency on page resources) -->
-        <Border Background="{DynamicResource Surface.Background}" BorderBrush="{DynamicResource Brand.Blue}" BorderThickness="2" CornerRadius="10" Padding="12" HorizontalAlignment="Center" Margin="0,0,0,16">
-            <StackPanel>
-                <TextBlock Text="Wybierz okres, z którego chcesz zobaczyć dane." FontWeight="SemiBold" Foreground="{StaticResource App.Foreground}" Margin="0,0,0,10" TextAlignment="Center" />
+ <Grid>
+ <!-- Container styled like AccentCard (explicit to avoid dependency on page resources) -->
+ <Border Background="{DynamicResource Surface.Background}" BorderBrush="{DynamicResource Brand.Blue}" BorderThickness="2" CornerRadius="10" Padding="12" HorizontalAlignment="Center" Margin="0,0,0,16">
+ <!-- Only the period bar content (no right-side buttons here) -->
+ <StackPanel>
+ <TextBlock Text="Wybierz okres, z którego chcesz zobaczyć dane." FontWeight="SemiBold" Foreground="{StaticResource App.Foreground}" Margin="0,0,0,10" TextAlignment="Center" />
 
-                <!-- original blue inner bar -->
-                <Border BorderBrush="{DynamicResource Brand.Blue}"
-                        BorderThickness="2"
-                        CornerRadius="12"
-                        Padding="8"
-                        HorizontalAlignment="Center"
-                        MaxWidth="880">
-                    <StackPanel>
-                        <!-- DARK INNER STRIP WITH ARROWS AND LABEL -->
-                        <Grid>
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="Auto"/>
-                                <ColumnDefinition Width="*"/>
-                                <ColumnDefinition Width="Auto"/>
-                            </Grid.ColumnDefinitions>
+ <!-- original blue inner bar -->
+ <Border BorderBrush="{DynamicResource Brand.Blue}"
+ BorderThickness="2"
+ CornerRadius="12"
+ Padding="8"
+ HorizontalAlignment="Center"
+ MaxWidth="880">
+ <StackPanel>
+ <!-- DARK INNER STRIP WITH ARROWS AND LABEL -->
+ <Grid>
+ <Grid.ColumnDefinitions>
+ <ColumnDefinition Width="Auto"/>
+ <ColumnDefinition Width="*"/>
+ <ColumnDefinition Width="Auto"/>
+ </Grid.ColumnDefinitions>
 
-                            <!-- ◀ -->
-                            <Button Grid.Column="0"
-                                    Click="Prev_Click"
-                                    Background="#22FFFFFF"
-                                    Foreground="White"
-                                    BorderBrush="{x:Null}"
-                                    Padding="12,6"
-                                    Margin="0,0,6,0"
-                                    Cursor="Hand">
-                                <TextBlock Text="◀" FontSize="14"/>
-                            </Button>
+ <!-- ◀ -->
+ <Button Grid.Column="0"
+ Click="Prev_Click"
+ Background="#22FFFFFF"
+ Foreground="White"
+ BorderBrush="{x:Null}"
+ Padding="12,6"
+ Margin="0,0,6,0"
+ Cursor="Hand">
+ <TextBlock Text="◀" FontSize="14"/>
+ </Button>
 
-                            <!-- ŚRODEK: ciemny pasek z etykietą -->
-                            <Border Grid.Column="1"
-                                    Background="{StaticResource Control.Background}"
-                                    CornerRadius="8"
-                                    Padding="8,6">
-                                <DockPanel LastChildFill="True"
-                                           Margin="4,0"
-                                           HorizontalAlignment="Stretch">
-                                    <TextBlock Text="{Binding PeriodLabel, ElementName=Root}"
-                                               Foreground="{StaticResource Control.Foreground}"
-                                               FontWeight="SemiBold"
-                                               HorizontalAlignment="Center"
-                                               VerticalAlignment="Center" />
-                                </DockPanel>
-                            </Border>
+ <!-- ŚRODEK: ciemny pasek z etykietą -->
+ <Border Grid.Column="1"
+ Background="{StaticResource Control.Background}"
+ CornerRadius="8"
+ Padding="8,6">
+ <DockPanel LastChildFill="True"
+ Margin="4,0"
+ HorizontalAlignment="Stretch">
+ <TextBlock Text="{Binding PeriodLabel, ElementName=Root}"
+ Foreground="{StaticResource Control.Foreground}"
+ FontWeight="SemiBold"
+ HorizontalAlignment="Center"
+ VerticalAlignment="Center" />
+ </DockPanel>
+ </Border>
 
-                            <!-- ▶ -->
-                            <Button Grid.Column="2"
-                                    Click="Next_Click"
-                                    Background="#22FFFFFF"
-                                    Foreground="White"
-                                    BorderBrush="{x:Null}"
-                                    Padding="12,6"
-                                    Cursor="Hand"
-                                    HorizontalAlignment="Right"
-                                    Margin="6,0,0,0">
-                                <TextBlock Text="▶" FontSize="14"/>
-                            </Button>
-                        </Grid>
+ <!-- ▶ -->
+ <Button Grid.Column="2"
+ Click="Next_Click"
+ Background="#22FFFFFF"
+ Foreground="White"
+ BorderBrush="{x:Null}"
+ Padding="12,6"
+ Cursor="Hand"
+ HorizontalAlignment="Right"
+ Margin="6,0,0,0">
+ <TextBlock Text="▶" FontSize="14"/>
+ </Button>
+ </Grid>
 
-                        <!-- dolny wiersz: date pickery i przyciski -->
-                        <!-- dolny wiersz: custom date display and icon buttons -->
-                        <StackPanel Orientation="Horizontal" Margin="8,8,8,0" HorizontalAlignment="Center" VerticalAlignment="Center" Height="36">
-                            <Border Background="{StaticResource Control.Background}" CornerRadius="4" Padding="4" VerticalAlignment="Center">
-                                <Grid>
-                                    <!-- display only textbox for Start date -->
-                                    <TextBox x:Name="StartTextBox" Width="140" IsReadOnly="True" Background="Transparent" BorderThickness="0" Foreground="{StaticResource Control.Foreground}" />
-                                    <Button Click="StartDateIcon_Click" Background="Transparent" BorderBrush="{x:Null}" HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,4,0" Padding="2">
-                                        <Image Source="/Finly;component/Assets/Icons/kalendarz.png" Width="18" Height="18" />
-                                    </Button>
-                                </Grid>
-                            </Border>
+ <!-- dolny wiersz: date pickery i przyciski -->
+ <StackPanel Orientation="Horizontal" Margin="8,8,8,0" HorizontalAlignment="Center" VerticalAlignment="Center" Height="36">
+ <Border Background="{StaticResource Control.Background}" CornerRadius="4" Padding="4" VerticalAlignment="Center">
+ <Grid>
+ <!-- display only textbox for Start date -->
+ <TextBox x:Name="StartTextBox" Width="140" IsReadOnly="True" Background="Transparent" BorderThickness="0" Foreground="{StaticResource Control.Foreground}" />
+ <Button Click="StartDateIcon_Click" Background="Transparent" BorderBrush="{x:Null}" HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,4,0" Padding="2">
+ <Image Source="/Finly;component/Assets/Icons/kalendarz.png" Width="18" Height="18" />
+ </Button>
+ </Grid>
+ </Border>
 
-                            <TextBlock Text="–" VerticalAlignment="Center" Foreground="{StaticResource Control.Foreground}" Margin="8,0" />
+ <TextBlock Text="–" VerticalAlignment="Center" Foreground="{StaticResource Control.Foreground}" Margin="8,0" />
 
-                            <Border Background="{StaticResource Control.Background}" CornerRadius="4" Padding="4" VerticalAlignment="Center">
-                                <Grid>
-                                    <TextBox x:Name="EndTextBox" Width="140" IsReadOnly="True" Background="Transparent" BorderThickness="0" Foreground="{StaticResource Control.Foreground}" />
-                                    <Button Click="EndDateIcon_Click" Background="Transparent" BorderBrush="{x:Null}" HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,4,0" Padding="2">
-                                        <Image Source="/Finly;component/Assets/Icons/kalendarz.png" Width="18" Height="18" />
-                                    </Button>
-                                </Grid>
-                            </Border>
+ <Border Background="{StaticResource Control.Background}" CornerRadius="4" Padding="4" VerticalAlignment="Center">
+ <Grid>
+ <TextBox x:Name="EndTextBox" Width="140" IsReadOnly="True" Background="Transparent" BorderThickness="0" Foreground="{StaticResource Control.Foreground}" />
+ <Button Click="EndDateIcon_Click" Background="Transparent" BorderBrush="{x:Null}" HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,4,0" Padding="2">
+ <Image Source="/Finly;component/Assets/Icons/kalendarz.png" Width="18" Height="18" />
+ </Button>
+ </Grid>
+ </Border>
 
-                            <Button Content="Szukaj" Click="Search_Click" Margin="12,0,0,0" Padding="8,4" />
-                            <Button Content="Wyczyść" Click="Clear_Click" Margin="6,0,0,0" Padding="8,4" />
-                        </StackPanel>
+ <Button Content="Szukaj" Click="Search_Click" Margin="12,0,0,0" Padding="8,4" />
+ <Button Content="Wyczyść" Click="Clear_Click" Margin="6,0,0,0" Padding="8,4" />
+ </StackPanel>
 
-                        <!-- Popup calendar (custom) -->
-                        <Popup x:Name="CalendarPopup" StaysOpen="False" AllowsTransparency="True">
-                            <Border Background="{DynamicResource Surface.Background}" BorderBrush="{DynamicResource Surface.Border}" BorderThickness="1" Padding="8" CornerRadius="6">
-                                <StackPanel>
-                                    <!-- header: month navigation -->
-                                    <DockPanel Margin="0,0,0,8">
-                                        <Button x:Name="PrevMonthBtn" Click="PrevMonthBtn_Click" DockPanel.Dock="Left" Padding="4" Margin="0,0,8,0">◀</Button>
-                                        <TextBlock x:Name="PopupMonthText" Text="Listopad2025" FontWeight="SemiBold" HorizontalAlignment="Center" VerticalAlignment="Center" />
-                                        <Button x:Name="NextMonthBtn" Click="NextMonthBtn_Click" DockPanel.Dock="Right" Padding="4" Margin="8,0,0,0">▶</Button>
-                                    </DockPanel>
+ <!-- Popup calendar (custom) -->
+ <Popup x:Name="CalendarPopup" StaysOpen="False" AllowsTransparency="True">
+ <Border Background="{DynamicResource Surface.Background}" BorderBrush="{DynamicResource Surface.Border}" BorderThickness="1" Padding="8" CornerRadius="6">
+ <StackPanel>
+ <!-- header: month navigation -->
+ <DockPanel Margin="0,0,0,8">
+ <Button x:Name="PrevMonthBtn" Click="PrevMonthBtn_Click" DockPanel.Dock="Left" Padding="4" Margin="0,0,8,0">◀</Button>
+ <TextBlock x:Name="PopupMonthText" Text="Listopad2025" FontWeight="SemiBold" HorizontalAlignment="Center" VerticalAlignment="Center" />
+ <Button x:Name="NextMonthBtn" Click="NextMonthBtn_Click" DockPanel.Dock="Right" Padding="4" Margin="8,0,0,0">▶</Button>
+ </DockPanel>
 
-                                    <!-- weekday headers -->
-                                    <UniformGrid Columns="7" Margin="0,0,0,4">
-                                        <TextBlock Text="Pn" HorizontalAlignment="Center" />
-                                        <TextBlock Text="Wt" HorizontalAlignment="Center" />
-                                        <TextBlock Text="Śr" HorizontalAlignment="Center" />
-                                        <TextBlock Text="Cz" HorizontalAlignment="Center" />
-                                        <TextBlock Text="Pt" HorizontalAlignment="Center" />
-                                        <TextBlock Text="Sb" HorizontalAlignment="Center" />
-                                        <TextBlock Text="Nd" HorizontalAlignment="Center" />
-                                    </UniformGrid>
+ <!-- weekday headers -->
+ <UniformGrid Columns="7" Margin="0,0,0,4">
+ <TextBlock Text="Pn" HorizontalAlignment="Center" />
+ <TextBlock Text="Wt" HorizontalAlignment="Center" />
+ <TextBlock Text="Śr" HorizontalAlignment="Center" />
+ <TextBlock Text="Cz" HorizontalAlignment="Center" />
+ <TextBlock Text="Pt" HorizontalAlignment="Center" />
+ <TextBlock Text="Sb" HorizontalAlignment="Center" />
+ <TextBlock Text="Nd" HorizontalAlignment="Center" />
+ </UniformGrid>
 
-                                    <!-- days grid populated dynamically -->
-                                    <UniformGrid x:Name="PopupDaysGrid" Columns="7" Rows="6" />
+ <!-- days grid populated dynamically -->
+ <UniformGrid x:Name="PopupDaysGrid" Columns="7" Rows="6" />
 
-                                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,8,0,0">
-                                        <Button Content="OK" Click="PopupOk_Click" Padding="8,4" />
-                                        <Button Content="Anuluj" Click="PopupCancel_Click" Padding="8,4" Margin="8,0,0,0" />
-                                    </StackPanel>
-                                </StackPanel>
-                            </Border>
-                        </Popup>
+ <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,8,0,0">
+ <Button Content="OK" Click="PopupOk_Click" Padding="8,4" />
+ <Button Content="Anuluj" Click="PopupCancel_Click" Padding="8,4" Margin="8,0,0,0" />
+ </StackPanel>
+ </StackPanel>
+ </Border>
+ </Popup>
 
-                    </StackPanel>
-                </Border>
-            </StackPanel>
-        </Border>
-    </Grid>
+ </StackPanel>
+ </Border>
+ </StackPanel>
+ </Border>
+ </Grid>
 </UserControl>
 
 
