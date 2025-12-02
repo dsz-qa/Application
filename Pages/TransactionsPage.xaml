@@ -304,6 +304,7 @@
  <ColumnDefinition Width="*"/>
  <ColumnDefinition Width="Auto"/>
  </Grid.ColumnDefinitions>
+ <!-- Left details -->
  <StackPanel Grid.Column="0" Margin="4,0,8,0" Orientation="Vertical">
  <StackPanel Orientation="Horizontal">
  <TextBlock Text="Data:" FontWeight="SemiBold" Foreground="{DynamicResource App.Foreground}" Margin="0,0,6,0"/>
@@ -347,13 +348,38 @@
  <TextBlock Text="Zaplanowana" Margin="8,0,0,0" Visibility="{Binding IsPlanned, Converter={StaticResource BoolToVisibilityConverter}}" Style="{StaticResource PlannedLabelStyle}"/>
  </StackPanel>
  </StackPanel>
- <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Top">
+
+ <!-- Bottom-right action bar (edit/delete + inline confirm) -->
+ <StackPanel Grid.ColumnSpan="2" Orientation="Vertical" HorizontalAlignment="Right" VerticalAlignment="Bottom">
+ <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
  <Button Style="{StaticResource TitleBarIconButton}" Margin="0,0,6,0" ToolTip="Edytuj">
  <Image Source="/Assets/Images/edit.png" Width="20" Height="20" Stretch="Uniform"/>
  </Button>
- <Button Style="{StaticResource TitleBarIconButton}" ToolTip="Usuń">
+ <Button Style="{StaticResource TitleBarIconButton}" ToolTip="Usuń" Click="ShowDeleteConfirm_Click">
  <Image Source="/Assets/Images/delete.png" Width="20" Height="20" Stretch="Uniform"/>
  </Button>
+ </StackPanel>
+ <Border x:Name="DeleteConfirmPanel" Visibility="Collapsed" Background="{DynamicResource Surface.Background}" BorderBrush="{DynamicResource Surface.Border}" BorderThickness="1" CornerRadius="6" Padding="8" Margin="0,6,0,0">
+ <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+ <TextBlock Foreground="{DynamicResource App.Foreground}" Margin="0,0,8,0">
+ <TextBlock.Style>
+ <Style TargetType="TextBlock">
+ <Setter Property="Text" Value="Czy na pewno chcesz usunąć transakcję?"/>
+ <Style.Triggers>
+ <DataTrigger Binding="{Binding Kind}" Value="Expense">
+ <Setter Property="Text" Value="Czy na pewno chcesz usunąć wydatek?"/>
+ </DataTrigger>
+ <DataTrigger Binding="{Binding Kind}" Value="Income">
+ <Setter Property="Text" Value="Czy na pewno chcesz usunąć przychód?"/>
+ </DataTrigger>
+ </Style.Triggers>
+ </Style>
+ </TextBlock.Style>
+ </TextBlock>
+ <Button Content="Tak" Width="60" Margin="0,0,6,0" Click="DeleteConfirmYes_Click"/>
+ <Button Content="Nie" Width="60" Click="DeleteConfirmNo_Click"/>
+ </StackPanel>
+ </Border>
  </StackPanel>
  </Grid>
  </Border>
@@ -459,13 +485,38 @@
  </TextBlock>
  </StackPanel>
  </StackPanel>
- <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Top">
+
+ <!-- Bottom-right action bar for planned -->
+ <StackPanel Grid.ColumnSpan="2" Orientation="Vertical" HorizontalAlignment="Right" VerticalAlignment="Bottom">
+ <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
  <Button Style="{StaticResource TitleBarIconButton}" Margin="0,0,6,0" ToolTip="Edytuj">
  <Image Source="/Assets/Images/edit.png" Width="20" Height="20" Stretch="Uniform"/>
  </Button>
- <Button Style="{StaticResource TitleBarIconButton}" ToolTip="Usuń">
+ <Button Style="{StaticResource TitleBarIconButton}" ToolTip="Usuń" Click="ShowDeleteConfirm_Click">
  <Image Source="/Assets/Images/delete.png" Width="20" Height="20" Stretch="Uniform"/>
  </Button>
+ </StackPanel>
+ <Border x:Name="DeleteConfirmPanel" Visibility="Collapsed" Background="{DynamicResource Surface.Background}" BorderBrush="{DynamicResource Surface.Border}" BorderThickness="1" CornerRadius="6" Padding="8" Margin="0,6,0,0">
+ <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+ <TextBlock Foreground="{DynamicResource App.Foreground}" Margin="0,0,8,0">
+ <TextBlock.Style>
+ <Style TargetType="TextBlock">
+ <Setter Property="Text" Value="Czy na pewno chcesz usunąć transakcję?"/>
+ <Style.Triggers>
+ <DataTrigger Binding="{Binding Kind}" Value="Expense">
+ <Setter Property="Text" Value="Czy na pewno chcesz usunąć wydatek?"/>
+ </DataTrigger>
+ <DataTrigger Binding="{Binding Kind}" Value="Income">
+ <Setter Property="Text" Value="Czy na pewno chcesz usunąć przychód?"/>
+ </DataTrigger>
+ </Style.Triggers>
+ </Style>
+ </TextBlock.Style>
+ </TextBlock>
+ <Button Content="Tak" Width="60" Margin="0,0,6,0" Click="DeleteConfirmYes_Click"/>
+ <Button Content="Nie" Width="60" Click="DeleteConfirmNo_Click"/>
+ </StackPanel>
+ </Border>
  </StackPanel>
  </Grid>
  </Border>
