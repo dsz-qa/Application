@@ -451,14 +451,12 @@ namespace Finly.Pages
         {
             SummaryPanel.Visibility = Visibility.Visible;
             TransactionsPanel.Visibility = Visibility.Visible;
-            SettingsPanel.Visibility = Visibility.Visible;
         }
 
         private void HideCategoryPanels()
         {
             SummaryPanel.Visibility = Visibility.Collapsed;
             TransactionsPanel.Visibility = Visibility.Collapsed;
-            SettingsPanel.Visibility = Visibility.Collapsed;
         }
 
         private void LoadSelectedCategoryDetails()
@@ -508,9 +506,7 @@ namespace Finly.Pages
                 _lastTransactions.Add(new CategoryTransactionRow { Date = t.Date, Amount = t.Amount, Description = t.Description });
             }
 
-            // load description draft (placeholder - no persistence column now)
-            CategoryDescriptionBox.Text = _categoryDescriptionDraft ?? string.Empty;
-
+            // description draft kept in memory with edit panel
             // color selection default
             _selectedColorHex = (_selectedCategory.ColorBrush as SolidColorBrush)?.Color.ToString() ?? string.Empty;
         }
@@ -531,28 +527,6 @@ namespace Finly.Pages
                 // Content may be a string (emoji) or a TextBlock; support both
                 _selectedIcon = b.Content as string ?? (b.Content as TextBlock)?.Text;
                 b.Focus();
-            }
-        }
-
-        private void SaveCategorySettings_Click(object sender, RoutedEventArgs e)
-        {
-            if (_selectedCategory == null) return;
-
-            _categoryDescriptionDraft = CategoryDescriptionBox.Text;
-
-            // apply color to VM only (no DB persistence yet)
-            try
-            {
-                if (!string.IsNullOrWhiteSpace(_selectedColorHex))
-                {
-                    var brush = (Brush)(new BrushConverter().ConvertFromString(_selectedColorHex)!);
-                    _selectedCategory.ColorBrush = brush;
-                }
-                MessageText.Text = "Zapisano ustawienia kategorii (lokalnie).";
-            }
-            catch (Exception ex)
-            {
-                MessageText.Text = "Błąd zapisu ustawień: " + ex.Message;
             }
         }
 
