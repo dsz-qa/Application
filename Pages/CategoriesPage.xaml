@@ -62,8 +62,9 @@
  <Grid.RowDefinitions>
  <RowDefinition Height="Auto"/>
  <RowDefinition Height="Auto"/>
- <RowDefinition Height="Auto"/>
- <RowDefinition Height="*"/> <!-- szczegóły -->
+ <RowDefinition Height="Auto"/> <!-- Add form row -->
+ <RowDefinition Height="Auto"/> <!-- Period bar row -->
+ <RowDefinition Height="*"/> <!-- Details row -->
  </Grid.RowDefinitions>
 
  <!--1) KPI: pełna szerokość, trzy kolumny -->
@@ -121,7 +122,7 @@
  </Border>
  </Grid>
 
- <!--2) Sekcja: Wszystkie Kategorie (PRZENIESIONA NAD PASEK OKRESU) -->
+ <!--2) Sekcja: Wszystkie Kategorie -->
  <Border Grid.Row="1"
  Padding="12"
  Background="{DynamicResource Surface.Background}"
@@ -133,9 +134,7 @@
  <Grid.RowDefinitions>
  <RowDefinition Height="Auto"/>
  <RowDefinition Height="Auto"/>
- <RowDefinition Height="Auto"/>
  <RowDefinition Height="*"/>
- <RowDefinition Height="Auto"/> <!-- edit panel -->
  </Grid.RowDefinitions>
 
  <TextBlock Text="Wszystkie Kategorie" FontSize="22" FontWeight="Bold" Foreground="{DynamicResource App.Foreground}" Margin="0,0,0,12"/>
@@ -152,22 +151,32 @@
  Style="{StaticResource WatermarkTextBoxStyle}"/>
  </DockPanel>
 
- <!-- Dodawanie kategorii: etykieta, pole, przycisk pod polem -->
- <StackPanel Grid.Row="2" Orientation="Vertical" Margin="0,0,0,8">
- <TextBlock Text="Dodaj kategorię" FontWeight="SemiBold" Foreground="{DynamicResource App.Foreground}"/>
- <TextBox x:Name="NewCategoryBox" Height="28" Width="320"/>
- <Button Content="Dodaj" Width="120" Margin="0,6,0,0" Click="AddCategory_Click"/>
- <TextBlock x:Name="MessageText" Margin="0,8,0,0" Foreground="OrangeRed" TextWrapping="Wrap"/>
- </StackPanel>
-
- <!-- Lista kategorii jako kafelki -->
- <ScrollViewer Grid.Row="3" VerticalScrollBarVisibility="Auto">
+ <!-- Lista kategorii jako kafelki + kafel dodawania -->
+ <ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto">
  <ItemsControl x:Name="CategoriesList">
  <ItemsControl.ItemsPanel>
  <ItemsPanelTemplate>
  <WrapPanel />
  </ItemsPanelTemplate>
  </ItemsControl.ItemsPanel>
+ <ItemsControl.ItemsSource>
+   <CompositeCollection>
+     <!-- Kafelek dodawania kategorii -->
+     <Border MinWidth="180" MinHeight="120" Margin="8" Padding="8"
+             Background="{DynamicResource Surface.Background}"
+             BorderBrush="{DynamicResource Brand.Orange}"
+             BorderThickness="1.5" CornerRadius="10">
+       <Button Click="AddCategoryTile_Click" Background="Transparent" BorderThickness="0" Cursor="Hand">
+         <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
+           <TextBlock Text="+" FontSize="28" HorizontalAlignment="Center" Foreground="{DynamicResource Brand.Orange}"/>
+           <TextBlock Text="Dodaj kategorię" FontSize="14" FontWeight="SemiBold" HorizontalAlignment="Center" Foreground="{DynamicResource App.Foreground}" Margin="0,6,0,0"/>
+         </StackPanel>
+       </Button>
+     </Border>
+     <!-- Właściwa lista kategorii -->
+     <CollectionContainer Collection="{Binding ElementName=CategoriesList, Path=Tag}" />
+   </CompositeCollection>
+ </ItemsControl.ItemsSource>
  <ItemsControl.ItemTemplate>
  <DataTemplate>
  <Border MinWidth="180" MinHeight="120" Margin="8" Padding="8"
@@ -205,21 +214,53 @@
  </ItemsControl.ItemTemplate>
  </ItemsControl>
  </ScrollViewer>
+ </Grid>
+ </Border>
 
- <!-- Panel edycji (połączony: nazwa + opis + kolor) -->
- <Border Grid.Row="4" x:Name="EditPanel" Background="{DynamicResource Surface.Background}" BorderBrush="{DynamicResource Surface.Border}" BorderThickness="1" CornerRadius="6" Padding="12" Margin="0,8,0,0" Visibility="Collapsed">
+ <!--3) Dodawanie nowej kategorii + panel edycji (pod ramką kategorii) -->
+ <StackPanel Grid.Row="2" Orientation="Vertical" Margin="0,0,0,12">
+ <!-- Add Panel -->
+ <Border x:Name="AddPanel" Background="{DynamicResource Surface.Background}" BorderBrush="{DynamicResource Surface.Border}" BorderThickness="1" CornerRadius="8" Padding="12" Margin="0,0,0,12">
  <StackPanel>
- <TextBlock Text="{Binding Name, StringFormat=Edytujesz kategorię: {0}}" FontWeight="Bold" Foreground="{DynamicResource App.Foreground}" FontSize="16"/>
+ <TextBlock Text="Dodaj nową kategorię" FontWeight="Bold" Foreground="{DynamicResource App.Foreground}" FontSize="16"/>
 
- <!-- Nazwa -->
+ <TextBlock Text="Nazwa" Margin="0,10,0,4" Foreground="{DynamicResource App.Foreground}"/>
+ <TextBox x:Name="AddNameBox" Width="360" Height="28"/>
+
+ <TextBlock Text="Opis kategorii" Margin="0,10,0,4" Foreground="{DynamicResource App.Foreground}"/>
+ <TextBox x:Name="AddDescriptionBox" Height="80" TextWrapping="Wrap" AcceptsReturn="True"/>
+
+ <TextBlock Text="Kolor kategorii" Margin="0,12,0,6" Foreground="{DynamicResource App.Foreground}"/>
+ <WrapPanel x:Name="AddColorPickerPanel" ItemWidth="32" ItemHeight="32">
+ <Button Width="32" Height="32" Margin="0,0,6,6" Background="#FFED7A1A" Tag="#FFED7A1A" Click="ColorPick_Click"/>
+ <Button Width="32" Height="32" Margin="0,0,6,6" Background="#FF3FA7D6" Tag="#FF3FA7D6" Click="ColorPick_Click"/>
+ <Button Width="32" Height="32" Margin="0,0,6,6" Background="#FF7BC96F" Tag="#FF7BC96F" Click="ColorPick_Click"/>
+ <Button Width="32" Height="32" Margin="0,0,6,6" Background="#FFAF7AC5" Tag="#FFAF7AC5" Click="ColorPick_Click"/>
+ <Button Width="32" Height="32" Margin="0,0,6,6" Background="#FFF6BF26" Tag="#FFF6BF26" Click="ColorPick_Click"/>
+ <Button Width="32" Height="32" Margin="0,0,6,6" Background="#FF56C1A7" Tag="#FF56C1A7" Click="ColorPick_Click"/>
+ <Button Width="32" Height="32" Margin="0,0,6,6" Background="#FFCE6A6B" Tag="#FFCE6A6B" Click="ColorPick_Click"/>
+ <Button Width="32" Height="32" Margin="0,0,6,6" Background="#FF9AA0A6" Tag="#FF9AA0A6" Click="ColorPick_Click"/>
+ </WrapPanel>
+
+ <StackPanel Orientation="Horizontal" Margin="0,12,0,0" HorizontalAlignment="Right">
+ <Button Content="Dodaj" Width="100" Margin="0,0,8,0" Click="AddCategory_Click"/>
+ <Button Content="Wyczyść" Width="100" Click="ClearAddPanel_Click"/>
+ </StackPanel>
+ <TextBlock x:Name="AddPanelMessage" Foreground="OrangeRed" Margin="0,8,0,0"/>
+ </StackPanel>
+ </Border>
+
+ <!-- Edit Panel (przywrócony) -->
+ <Border x:Name="EditPanel" Background="{DynamicResource Surface.Background}" BorderBrush="{DynamicResource Surface.Border}" BorderThickness="1" CornerRadius="8" Padding="12" Visibility="Collapsed">
+ <StackPanel>
+ <TextBlock Text="Edytuj kategorię" FontWeight="Bold" Foreground="{DynamicResource App.Foreground}" FontSize="16"/>
+
  <TextBlock Text="Nazwa" Margin="0,10,0,4" Foreground="{DynamicResource App.Foreground}"/>
  <TextBox x:Name="EditNameBox" Width="360" Height="28"/>
 
- <!-- Opis -->
  <TextBlock Text="Opis kategorii" Margin="0,10,0,4" Foreground="{DynamicResource App.Foreground}"/>
  <TextBox x:Name="EditDescriptionBox" Height="80" TextWrapping="Wrap" AcceptsReturn="True"/>
 
- <!-- Kolor -->
  <TextBlock Text="Kolor kategorii" Margin="0,12,0,6" Foreground="{DynamicResource App.Foreground}"/>
  <WrapPanel x:Name="EditColorPickerPanel" ItemWidth="32" ItemHeight="32">
  <Button Width="32" Height="32" Margin="0,0,6,6" Background="#FFED7A1A" Tag="#FFED7A1A" Click="ColorPick_Click"/>
@@ -232,7 +273,6 @@
  <Button Width="32" Height="32" Margin="0,0,6,6" Background="#FF9AA0A6" Tag="#FF9AA0A6" Click="ColorPick_Click"/>
  </WrapPanel>
 
- <!-- Akcje -->
  <StackPanel Orientation="Horizontal" Margin="0,12,0,0" HorizontalAlignment="Right">
  <Button Content="Zapisz" Width="100" Margin="0,0,8,0" Click="SaveEdit_Click"/>
  <Button Content="Anuluj" Width="100" Click="CancelEdit_Click"/>
@@ -240,11 +280,10 @@
  <TextBlock x:Name="EditPanelMessage" Foreground="OrangeRed" Margin="0,8,0,0"/>
  </StackPanel>
  </Border>
- </Grid>
- </Border>
+ </StackPanel>
 
- <!--3) Pasek wyboru okresu + trzy panele POD nim (wspólny kontener) -->
- <StackPanel Grid.Row="2" Orientation="Vertical">
+ <!--4) Pasek wyboru okresu + trzy panele POD nim (wspólny kontener) -->
+ <StackPanel Grid.Row="3" Orientation="Vertical">
    <ctrls:PeriodBarControl x:Name="PeriodBar" HorizontalAlignment="Center" Margin="0,0,0,12" />
    <Grid Margin="0,0,0,0">
      <Grid.ColumnDefinitions>
@@ -345,8 +384,8 @@
    </Grid>
  </StackPanel>
 
- <!--4) Szczegóły (pod ramką kategorii) -->
- <Grid Grid.Row="3">
+ <!--5) Szczegóły (pod ramką kategorii) -->
+ <Grid Grid.Row="4">
  <Grid.RowDefinitions>
  <RowDefinition Height="Auto"/>
  <RowDefinition Height="*"/>

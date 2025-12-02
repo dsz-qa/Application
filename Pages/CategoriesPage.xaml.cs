@@ -26,7 +26,7 @@ namespace Finly.Pages
         // selected category state
         private CategoryVm? _selectedCategory;
         private readonly ObservableCollection<CategoryTransactionRow> _lastTransactions = new();
-        private string _selectedColorHex = string.Empty;
+        private string _selectedColorHex = string.Empty; // used for edit and add panels
         private string? _categoryDescriptionDraft;
         private string? _selectedIcon;
 
@@ -51,7 +51,8 @@ namespace Finly.Pages
             InitializeComponent();
             _uid = userId <= 0 ? UserService.GetCurrentUserId() : userId;
 
-            CategoriesList.ItemsSource = _categories;
+            // CompositeCollection in XAML reads Items from CategoriesList.Tag
+            CategoriesList.Tag = _categories;
 
             Loaded += CategoriesPage_Loaded;
 
@@ -93,7 +94,7 @@ namespace Finly.Pages
             }
             catch (Exception ex)
             {
-                MessageText.Text = "Błąd ładowania kategorii: " + ex.Message;
+                MessageBox.Show("Błąd ładowania kategorii: " + ex.Message, "Błąd", MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
 
@@ -223,10 +224,9 @@ namespace Finly.Pages
 
         private void SearchBox_TextChanged(object sender, TextChangedEventArgs e)
         {
-            // mogą przychodzić zdarzenia podczas InitializeComponent zanim _categoriesView będzie ustawione
             if (_categoriesView == null) return;
 
-            var txt = SearchBox.Text?.Trim() ?? "";
+            var txt = (SearchBox.Text ?? string.Empty).Trim();
             if (string.IsNullOrEmpty(txt))
             {
                 _categoriesView.Filter = null;
@@ -237,7 +237,7 @@ namespace Finly.Pages
                 {
                     if (obj is CategoryVm vm)
                     {
-                        var name = vm.Name ?? string.Empty; // zabezpieczenie przed null
+                        var name = vm.Name ?? string.Empty;
                         return name.IndexOf(txt, StringComparison.CurrentCultureIgnoreCase) >= 0;
                     }
                     return false;
@@ -245,28 +245,69 @@ namespace Finly.Pages
             }
         }
 
+        // Kafelek "+ Dodaj kategorię" – przewiń do panelu dodawania
+        private void AddCategoryTile_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                AddPanel.BringIntoView();
+                AddNameBox.Focus();
+            }
+            catch { }
+        }
+
+        // Dodawanie kategorii z pełnego panelu
         private void AddCategory_Click(object sender, RoutedEventArgs e)
         {
-            var name = (NewCategoryBox.Text ?? "").Trim();
+            var name = (AddNameBox.Text ?? string.Empty).Trim();
             if (string.IsNullOrWhiteSpace(name))
             {
-                MessageText.Text = "Podaj nazwę kategorii.";
+                AddPanelMessage.Text = "Podaj nazwę kategorii.";
                 return;
             }
 
             try
             {
-                // metoda istnieje w projekcie (używana wcześniej)
-                DatabaseService.GetOrCreateCategoryId(_uid, name);
-                NewCategoryBox.Text = "";
-                MessageText.Text = "Kategoria dodana.";
+                // utwórz lub pobierz ID
+                int id = DatabaseService.GetOrCreateCategoryId(_uid, name);
+
+                // zapisz kolor (jeśli wybrany)
+                string? colorToSave = string.IsNullOrWhiteSpace(_selectedColorHex) ? null : _selectedColorHex;
+                DatabaseService.UpdateCategoryFull(id, _uid, name, colorToSave, null);
+
+                // spróbuj zapisać opis (jeśli kolumna istnieje)
+                try
+                {
+                    using var con = DatabaseService.GetConnection();
+                    using var cmd = con.CreateCommand();
+                    cmd.CommandText = "UPDATE Categories SET Description=@d WHERE Id=@id;";
+                    cmd.Parameters.AddWithValue("@d", (object?)AddDescriptionBox.Text ?? DBNull.Value);
+                    cmd.Parameters.AddWithValue("@id", id);
+                    cmd.ExecuteNonQuery();
+                }
+                catch { }
+
+                // wyczyść formularz i odśwież
+                AddPanelMessage.Text = "Dodano.";
+                AddNameBox.Text = string.Empty;
+                AddDescriptionBox.Text = string.Empty;
+                _selectedColorHex = string.Empty;
+
                 LoadCategories();
                 UpdateCategoryKpis();
             }
             catch (Exception ex)
             {
-                MessageText.Text = "Błąd dodawania kategorii: " + ex.Message;
+                AddPanelMessage.Text = "Błąd dodawania: " + ex.Message;
             }
+        }
+
+        private void ClearAddPanel_Click(object sender, RoutedEventArgs e)
+        {
+            AddNameBox.Text = string.Empty;
+            AddDescriptionBox.Text = string.Empty;
+            _selectedColorHex = string.Empty;
+            AddPanelMessage.Text = string.Empty;
         }
 
         private void EditCategory_Click(object sender, RoutedEventArgs e)
@@ -274,17 +315,14 @@ namespace Finly.Pages
             if ((sender as FrameworkElement)?.Tag is CategoryVm vm)
             {
                 _editingVm = vm;
-                _selectedCategory = vm; // set SelectedCategory-like state
+                _selectedCategory = vm;
 
-                // header is bound to DataContext of EditPanel; set locally via Name Text update
                 EditNameBox.Text = vm.Name;
                 EditDescriptionBox.Text = _categoryDescriptionDraft ?? string.Empty;
 
-                // open unified edit panel
                 EditPanel.Visibility = Visibility.Visible;
                 EditPanelMessage.Text = string.Empty;
 
-                // select current color
                 _selectedColorHex = (vm.ColorBrush as SolidColorBrush)?.Color.ToString() ?? string.Empty;
             }
         }
@@ -308,7 +346,7 @@ namespace Finly.Pages
                     }
                     catch (Exception ex)
                     {
-                        MessageText.Text = "Błąd usuwania: " + ex.Message;
+                        MessageBox.Show("Błąd usuwania: " + ex.Message, "Błąd", MessageBoxButton.OK, MessageBoxImage.Error);
                     }
                 }
             }
@@ -361,14 +399,14 @@ namespace Finly.Pages
                         DatabaseService.DeleteCategory(id.Value);
                 }
 
-                MessageText.Text = "Kategoria usunięta.";
+                MessageBox.Show("Kategoria usunięta.", "OK", MessageBoxButton.OK, MessageBoxImage.Information);
                 LoadCategories();
                 HideCategoryPanels();
                 UpdateCategoryKpis();
             }
             catch (Exception ex)
             {
-                MessageText.Text = "Błąd usuwania: " + ex.Message;
+                MessageBox.Show("Błąd usuwania: " + ex.Message, "Błąd", MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
 
@@ -385,18 +423,14 @@ namespace Finly.Pages
 
             try
             {
-                // Persist changes: name + color + description (description via categories table Description column if available)
                 string? colorToSave = null;
                 if (!string.IsNullOrWhiteSpace(_selectedColorHex))
                     colorToSave = _selectedColorHex;
 
-                // description capture
                 _categoryDescriptionDraft = EditDescriptionBox.Text;
 
-                // Update core fields we know exist (name/color/icon)
                 DatabaseService.UpdateCategoryFull(_editingVm.Id, _uid, newName, colorToSave, _editingVm.Icon);
 
-                // Try save description if DB has such column (best-effort)
                 try
                 {
                     using var con = DatabaseService.GetConnection();
@@ -408,7 +442,6 @@ namespace Finly.Pages
                 }
                 catch { }
 
-                // local update
                 _editingVm.Name = newName;
                 if (!string.IsNullOrWhiteSpace(_selectedColorHex))
                 {
@@ -524,7 +557,6 @@ namespace Finly.Pages
         {
             if (sender is Button b)
             {
-                // Content may be a string (emoji) or a TextBlock; support both
                 _selectedIcon = b.Content as string ?? (b.Content as TextBlock)?.Text;
                 b.Focus();
             }
@@ -551,11 +583,9 @@ namespace Finly.Pages
             }
             catch
             {
-                // nie przerywamy ładowania, ewentualne błędy zostaną pokazane przy późniejszych operacjach
+                // ignore
             }
         }
-
-        // === Pomocnicze ===
 
         private static T? FindAncestor<T>(DependencyObject start) where T : DependencyObject
         {
