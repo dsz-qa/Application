@@ -13,10 +13,11 @@ using System.Windows.Shapes;
 
 namespace Finly.Pages
 {
-    public partial class CategoriesPage : UserControl
+    public partial class CategoriesPage : UserControl, INotifyPropertyChanged
     {
         private readonly int _uid;
         private readonly ObservableCollection<CategoryVm> _categories = new();
+        public IEnumerable<CategoryVm> Categories => _categories;
 
         private CollectionView _categoriesView;
 
@@ -30,7 +31,10 @@ namespace Finly.Pages
         private string? _categoryDescriptionDraft;
         private string? _selectedIcon;
 
-        // KPI element refs (resolved via FindName to avoid generated field dependency)
+        public event PropertyChangedEventHandler? PropertyChanged;
+        private void RaisePropertyChanged(string name) => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
+
+        // KPI refs
         private TextBlock? _mostUsedName;
         private TextBlock? _mostUsedCount;
         private Rectangle? _mostUsedColor;
@@ -51,18 +55,15 @@ namespace Finly.Pages
             InitializeComponent();
             _uid = userId <= 0 ? UserService.GetCurrentUserId() : userId;
 
-            // CompositeCollection in XAML reads Items from CategoriesList.Tag
-            CategoriesList.Tag = _categories;
+            DataContext = this; // expose Categories to XAML via this
 
             Loaded += CategoriesPage_Loaded;
 
             _categoriesView = (CollectionView)CollectionViewSource.GetDefaultView(_categories);
 
-            // PeriodBar from XAML
             PeriodBar.RangeChanged += PeriodBar_RangeChanged;
 
-            // assign breakdown lists
-            LastTransactionsList.ItemsSource = _lastTransactions; // if exists (may be hidden now)
+            LastTransactionsList.ItemsSource = _lastTransactions;
 
             CategoriesList.AddHandler(Button.ClickEvent, new RoutedEventHandler(CategoryItem_Click));
         }
@@ -105,7 +106,6 @@ namespace Finly.Pages
             if (_selectedCategory != null) LoadSelectedCategoryDetails();
         }
 
-        // === KPI (nad szczegółami) ===
         private void UpdateCategoryKpis()
         {
             EnsureKpiRefs();
@@ -115,10 +115,8 @@ namespace Finly.Pages
                 DateTime to = PeriodBar.EndDate;
                 if (from > to) (from, to) = (to, from);
 
-                //1) Wydatki w okresie
                 var dt = DatabaseService.GetExpenses(_uid, from, to, null, null, null);
 
-                // mapy
                 var counts = new Dictionary<string, int>(StringComparer.CurrentCultureIgnoreCase);
                 var sums = new Dictionary<string, decimal>(StringComparer.CurrentCultureIgnoreCase);
                 decimal totalSum = 0m;
@@ -141,18 +139,12 @@ namespace Finly.Pages
                     catch { }
                 }
 
-                //2) Najczęściej używana
                 if (counts.Count > 0)
                 {
                     var mostUsed = counts.OrderByDescending(kv => kv.Value).First();
-                    if (_mostUsedName != null) _mostUsedName.Text = mostUsed.Key;
-                    if (_mostUsedCount != null) _mostUsedCount.Text = $"Liczba transakcji: {mostUsed.Value}";
-                    try
-                    {
-                        var brush = GetBrushForName(mostUsed.Key);
-                        if (_mostUsedColor != null) _mostUsedColor.Fill = brush;
-                    }
-                    catch { }
+                    _mostUsedName!.Text = mostUsed.Key;
+                    _mostUsedCount!.Text = $"Liczba transakcji: {mostUsed.Value}";
+                    _mostUsedColor!.Fill = GetBrushForName(mostUsed.Key);
                 }
                 else
                 {
@@ -161,7 +153,6 @@ namespace Finly.Pages
                     if (_mostUsedColor != null) _mostUsedColor.Fill = Brushes.Transparent;
                 }
 
-                //3) Najdroższa kategoria
                 if (sums.Count > 0)
                 {
                     var mostExp = sums.OrderByDescending(kv => kv.Value).First();
@@ -179,7 +170,6 @@ namespace Finly.Pages
                     if (_mostExpPercentText != null) _mostExpPercentText.Text = string.Empty;
                 }
 
-                //4) Twoje kategorie (łącznie, aktywne, nieużywane)
                 var allCats = DatabaseService.GetCategoriesByUser(_uid) ?? new List<string>();
                 int total = allCats.Count;
                 var activeSet = new HashSet<string>(sums.Where(kv => kv.Value > 0).Select(kv => kv.Key), StringComparer.CurrentCultureIgnoreCase);
@@ -190,25 +180,8 @@ namespace Finly.Pages
                 if (_activeCats != null) _activeCats.Text = active.ToString(CultureInfo.CurrentCulture);
                 if (_inactiveCats != null) _inactiveCats.Text = inactive.ToString(CultureInfo.CurrentCulture);
             }
-            catch
-            {
-                // fallback bez wywalania wyjątków do UI
-                if (_mostUsedName != null) _mostUsedName.Text = "Brak danych dla wybranego okresu";
-                if (_mostUsedCount != null) _mostUsedCount.Text = string.Empty;
-                if (_mostUsedColor != null) _mostUsedColor.Fill = Brushes.Transparent;
-
-                if (_mostExpName != null) _mostExpName.Text = "Brak danych dla wybranego okresu";
-                if (_mostExpAmount != null) _mostExpAmount.Text = string.Empty;
-                if (_mostExpPercentBar != null) _mostExpPercentBar.Value = 0;
-                if (_mostExpPercentText != null) _mostExpPercentText.Text = string.Empty;
-
-                if (_totalCats != null) _totalCats.Text = "0";
-                if (_activeCats != null) _activeCats.Text = "0";
-                if (_inactiveCats != null) _inactiveCats.Text = "0";
-            }
+            catch { }
         }
-
-        // === Lista kategorii ===
 
         private void LoadCategories()
         {
@@ -218,8 +191,10 @@ namespace Finly.Pages
             foreach (var (id, name, color, icon) in tuples)
             {
                 Brush brush = string.IsNullOrWhiteSpace(color) ? GetBrushForName(name) : (Brush)(new BrushConverter().ConvertFromString(color)!);
-                _categories.Add(new CategoryVm { Id=id, Name = name, ColorBrush = brush, Icon = icon });
+                _categories.Add(new CategoryVm { Id = id, Name = name, ColorBrush = brush, Icon = icon });
             }
+
+            RaisePropertyChanged(nameof(Categories));
         }
 
         private void SearchBox_TextChanged(object sender, TextChangedEventArgs e)
@@ -245,18 +220,17 @@ namespace Finly.Pages
             }
         }
 
-        // Kafelek "+ Dodaj kategorię" – przewiń do panelu dodawania
         private void AddCategoryTile_Click(object sender, RoutedEventArgs e)
         {
             try
             {
+                AddPanel.Visibility = Visibility.Visible;
                 AddPanel.BringIntoView();
                 AddNameBox.Focus();
             }
             catch { }
         }
 
-        // Dodawanie kategorii z pełnego panelu
         private void AddCategory_Click(object sender, RoutedEventArgs e)
         {
             var name = (AddNameBox.Text ?? string.Empty).Trim();
@@ -268,14 +242,9 @@ namespace Finly.Pages
 
             try
             {
-                // utwórz lub pobierz ID
                 int id = DatabaseService.GetOrCreateCategoryId(_uid, name);
-
-                // zapisz kolor (jeśli wybrany)
                 string? colorToSave = string.IsNullOrWhiteSpace(_selectedColorHex) ? null : _selectedColorHex;
                 DatabaseService.UpdateCategoryFull(id, _uid, name, colorToSave, null);
-
-                // spróbuj zapisać opis (jeśli kolumna istnieje)
                 try
                 {
                     using var con = DatabaseService.GetConnection();
@@ -287,7 +256,6 @@ namespace Finly.Pages
                 }
                 catch { }
 
-                // wyczyść formularz i odśwież
                 AddPanelMessage.Text = "Dodano.";
                 AddNameBox.Text = string.Empty;
                 AddDescriptionBox.Text = string.Empty;
@@ -308,6 +276,7 @@ namespace Finly.Pages
             AddDescriptionBox.Text = string.Empty;
             _selectedColorHex = string.Empty;
             AddPanelMessage.Text = string.Empty;
+            AddPanel.Visibility = Visibility.Collapsed;
         }
 
         private void EditCategory_Click(object sender, RoutedEventArgs e)
@@ -327,12 +296,10 @@ namespace Finly.Pages
             }
         }
 
-        // inline delete confirmation handlers
         private void ShowDeleteConfirm_Click(object sender, RoutedEventArgs e)
         {
             if (sender is FrameworkElement fe && fe.Tag is CategoryVm vm)
             {
-                // delete directly rather than inline panel for tiles
                 var result = MessageBox.Show($"Usunąć kategorię '{vm.Name}'?", "Potwierdź", MessageBoxButton.YesNo, MessageBoxImage.Warning);
                 if (result == MessageBoxResult.Yes)
                 {
@@ -342,6 +309,7 @@ namespace Finly.Pages
                         if (id.HasValue)
                             DatabaseService.ArchiveCategory(id.Value);
                         _ = _categories.Remove(vm);
+                        RaisePropertyChanged(nameof(Categories));
                         UpdateCategoryKpis();
                     }
                     catch (Exception ex)
@@ -358,46 +326,15 @@ namespace Finly.Pages
             {
                 TryDeleteCategory(vm);
             }
-            else if (sender is FrameworkElement fe)
-            {
-                var container = FindAncestor<ContentPresenter>(fe);
-                if (container == null) return;
-                var panel = FindDescendantByName<FrameworkElement>(container, "DeleteConfirmPanel");
-                if (panel != null && panel.Tag is CategoryVm vm2)
-                {
-                    TryDeleteCategory(vm2);
-                }
-            }
-        }
-
-        private void DeleteCancel_Click(object sender, RoutedEventArgs e)
-        {
-            if (sender is FrameworkElement fe)
-            {
-                var container = FindAncestor<ContentPresenter>(fe);
-                if (container == null) return;
-                var panel = FindDescendantByName<FrameworkElement>(container, "DeleteConfirmPanel");
-                if (panel != null)
-                    panel.Visibility = Visibility.Collapsed;
-            }
         }
 
         private void TryDeleteCategory(CategoryVm vm)
         {
             try
             {
-                var dsType = typeof(DatabaseService);
-                var safeMethod = dsType.GetMethod("DeleteCategorySafe");
-                if (safeMethod != null)
-                {
-                    safeMethod.Invoke(null, new object[] { _uid, vm.Name });
-                }
-                else
-                {
-                    var id = DatabaseService.GetCategoryIdByName(_uid, vm.Name);
-                    if (id.HasValue)
-                        DatabaseService.DeleteCategory(id.Value);
-                }
+                var id = DatabaseService.GetCategoryIdByName(_uid, vm.Name);
+                if (id.HasValue)
+                    DatabaseService.DeleteCategory(id.Value);
 
                 MessageBox.Show("Kategoria usunięta.", "OK", MessageBoxButton.OK, MessageBoxImage.Information);
                 LoadCategories();
@@ -469,7 +406,6 @@ namespace Finly.Pages
             EditPanelMessage.Text = string.Empty;
         }
 
-        // === Selection of category from list ===
         private void CategoryItem_Click(object sender, RoutedEventArgs e)
         {
             if (e.OriginalSource is FrameworkElement fe && fe.DataContext is CategoryVm vm)
@@ -509,7 +445,6 @@ namespace Finly.Pages
             DateTime to = PeriodBar.EndDate;
             if (from > to) (from, to) = (to, from);
 
-            // sum + count in period
             var expensesDt = DatabaseService.GetExpenses(_uid, from, to, catId, null, null);
             decimal sum = 0m;
             int count = 0;
@@ -524,14 +459,12 @@ namespace Finly.Pages
             }
             SummaryTotalText.Text = "Suma wydatków w tym okresie: " + sum.ToString("N2") + " zł";
 
-            // monthly avg (based on months span)
             double monthsSpan = Math.Max(1.0, (to - from).TotalDays / 30.0);
             decimal monthlyAvg = monthsSpan <= 0 ? 0 : sum / (decimal)monthsSpan;
             SummaryMonthlyAvgText.Text = "Średni wydatek w tej kategorii (miesiące)): " + monthlyAvg.ToString("N2") + " zł";
 
             SummaryTxnCountText.Text = count + (count == 1 ? " transakcja" : " transakcji");
 
-            // last transactions
             _lastTransactions.Clear();
             var txList = DatabaseService.GetLastTransactionsForCategory(_uid, catId.Value, 12);
             foreach (var t in txList)
@@ -539,52 +472,7 @@ namespace Finly.Pages
                 _lastTransactions.Add(new CategoryTransactionRow { Date = t.Date, Amount = t.Amount, Description = t.Description });
             }
 
-            // description draft kept in memory with edit panel
-            // color selection default
             _selectedColorHex = (_selectedCategory.ColorBrush as SolidColorBrush)?.Color.ToString() ?? string.Empty;
-        }
-
-        private void ColorPick_Click(object sender, RoutedEventArgs e)
-        {
-            if (sender is Button b && b.Tag is string hex)
-            {
-                _selectedColorHex = hex;
-                b.Focus();
-            }
-        }
-
-        public void PickIcon_Click(object sender, RoutedEventArgs e)
-        {
-            if (sender is Button b)
-            {
-                _selectedIcon = b.Content as string ?? (b.Content as TextBlock)?.Text;
-                b.Focus();
-            }
-        }
-
-        // === Domyślne kategorie ===
-
-        private void EnsureDefaultCategories()
-        {
-            try
-            {
-                var existing = DatabaseService.GetCategoriesByUser(_uid) ?? new List<string>();
-
-                var defaultExpenses = new[] { "Jedzenie", "Transport", "Mieszkanie", "Rachunki", "Rozrywka", "Zdrowie", "Ubrania" };
-                var defaultIncomes = new[] { "Wynagrodzenie", "Prezent", "Zwrot", "Inne" };
-
-                foreach (var c in defaultExpenses.Concat(defaultIncomes))
-                {
-                    if (!existing.Any(e => string.Equals(e, c, StringComparison.OrdinalIgnoreCase)))
-                    {
-                        DatabaseService.GetOrCreateCategoryId(_uid, c);
-                    }
-                }
-            }
-            catch
-            {
-                // ignore
-            }
         }
 
         private static T? FindAncestor<T>(DependencyObject start) where T : DependencyObject
@@ -624,7 +512,41 @@ namespace Finly.Pages
             return (Brush)(new BrushConverter().ConvertFromString(palette[idx])!);
         }
 
-        private class CategoryVm : INotifyPropertyChanged
+        // === Domyślne kategorie ===
+        private void EnsureDefaultCategories()
+        {
+            try
+            {
+                var existing = DatabaseService.GetCategoriesByUser(_uid) ?? new List<string>();
+
+                var defaultExpenses = new[] { "Jedzenie", "Transport", "Mieszkanie", "Rachunki", "Rozrywka", "Zdrowie", "Ubrania" };
+                var defaultIncomes = new[] { "Wynagrodzenie", "Prezent", "Zwrot", "Inne" };
+
+                foreach (var c in defaultExpenses.Concat(defaultIncomes))
+                {
+                    if (!existing.Any(e => string.Equals(e, c, StringComparison.OrdinalIgnoreCase)))
+                    {
+                        DatabaseService.GetOrCreateCategoryId(_uid, c);
+                    }
+                }
+            }
+            catch
+            {
+                // ignore seeding errors
+            }
+        }
+
+        // === Wybór koloru (Add/Edit panel) ===
+        private void ColorPick_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is Button b && b.Tag is string hex)
+            {
+                _selectedColorHex = hex;
+                b.Focus();
+            }
+        }
+
+        public class CategoryVm : INotifyPropertyChanged
         {
             private Brush _colorBrush = Brushes.Gray;
             public int Id { get; set; }

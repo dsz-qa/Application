@@ -160,22 +160,22 @@
  </ItemsPanelTemplate>
  </ItemsControl.ItemsPanel>
  <ItemsControl.ItemsSource>
-   <CompositeCollection>
-     <!-- Kafelek dodawania kategorii -->
-     <Border MinWidth="180" MinHeight="120" Margin="8" Padding="8"
-             Background="{DynamicResource Surface.Background}"
-             BorderBrush="{DynamicResource Brand.Orange}"
-             BorderThickness="1.5" CornerRadius="10">
-       <Button Click="AddCategoryTile_Click" Background="Transparent" BorderThickness="0" Cursor="Hand">
-         <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
-           <TextBlock Text="+" FontSize="28" HorizontalAlignment="Center" Foreground="{DynamicResource Brand.Orange}"/>
-           <TextBlock Text="Dodaj kategorię" FontSize="14" FontWeight="SemiBold" HorizontalAlignment="Center" Foreground="{DynamicResource App.Foreground}" Margin="0,6,0,0"/>
-         </StackPanel>
-       </Button>
-     </Border>
-     <!-- Właściwa lista kategorii -->
-     <CollectionContainer Collection="{Binding ElementName=CategoriesList, Path=Tag}" />
-   </CompositeCollection>
+ <CompositeCollection>
+ <!-- Kafelek dodawania kategorii -->
+ <Border MinWidth="180" MinHeight="120" Margin="8" Padding="8"
+ Background="{DynamicResource Surface.Background}"
+ BorderBrush="{DynamicResource Brand.Orange}"
+ BorderThickness="1.5" CornerRadius="10">
+ <Button Click="AddCategoryTile_Click" Background="Transparent" BorderThickness="0" Cursor="Hand">
+ <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
+ <TextBlock Text="+" FontSize="28" HorizontalAlignment="Center" Foreground="{DynamicResource Brand.Orange}"/>
+ <TextBlock Text="Dodaj kategorię" FontSize="14" FontWeight="SemiBold" HorizontalAlignment="Center" Foreground="{DynamicResource App.Foreground}" Margin="0,6,0,0"/>
+ </StackPanel>
+ </Button>
+ </Border>
+ <!-- Właściwa lista kategorii -->
+ <CollectionContainer Collection="{Binding Categories, RelativeSource={RelativeSource AncestorType=UserControl}}" />
+ </CompositeCollection>
  </ItemsControl.ItemsSource>
  <ItemsControl.ItemTemplate>
  <DataTemplate>
@@ -220,7 +220,7 @@
  <!--3) Dodawanie nowej kategorii + panel edycji (pod ramką kategorii) -->
  <StackPanel Grid.Row="2" Orientation="Vertical" Margin="0,0,0,12">
  <!-- Add Panel -->
- <Border x:Name="AddPanel" Background="{DynamicResource Surface.Background}" BorderBrush="{DynamicResource Surface.Border}" BorderThickness="1" CornerRadius="8" Padding="12" Margin="0,0,0,12">
+ <Border x:Name="AddPanel" Background="{DynamicResource Surface.Background}" BorderBrush="{DynamicResource Surface.Border}" BorderThickness="1" CornerRadius="8" Padding="12" Margin="0,0,0,12" Visibility="Collapsed">
  <StackPanel>
  <TextBlock Text="Dodaj nową kategorię" FontWeight="Bold" Foreground="{DynamicResource App.Foreground}" FontSize="16"/>
 
