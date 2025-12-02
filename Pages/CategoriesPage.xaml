@@ -57,12 +57,13 @@
  </Style>
  </UserControl.Resources>
 
+ <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
  <Grid Margin="16">
  <Grid.RowDefinitions>
  <RowDefinition Height="Auto"/>
  <RowDefinition Height="Auto"/>
- <RowDefinition Height="*"/> <!-- wspólna niebieska rama: Wszystkie Kategorie +3 panele -->
- <RowDefinition Height="Auto"/> <!-- szczegóły pod ramką -->
+ <RowDefinition Height="Auto"/>
+ <RowDefinition Height="*"/> <!-- szczegóły -->
  </Grid.RowDefinitions>
 
  <!--1) KPI: pełna szerokość, trzy kolumny -->
@@ -120,28 +121,11 @@
  </Border>
  </Grid>
 
- <!--2) Pasek wyboru okresu – na środku -->
- <ctrls:PeriodBarControl x:Name="PeriodBar" Grid.Row="1" HorizontalAlignment="Center" Margin="0,0,0,12" />
-
- <!--3) Wspólna ramka: Wszystkie Kategorie + trzy dolne panele -->
- <Border Grid.Row="2"
- Background="Transparent"
- BorderBrush="{DynamicResource Brand.Blue}"
- BorderThickness="2"
- CornerRadius="10"
- Padding="12"
- Margin="0,0,0,12">
- <Grid>
- <Grid.RowDefinitions>
- <RowDefinition Height="Auto"/>
- <RowDefinition Height="Auto"/>
- </Grid.RowDefinitions>
-
- <!-- Sekcja: Wszystkie Kategorie -->
- <Border Grid.Row="0"
+ <!--2) Sekcja: Wszystkie Kategorie (PRZENIESIONA NAD PASEK OKRESU) -->
+ <Border Grid.Row="1"
  Padding="12"
  Background="{DynamicResource Surface.Background}"
- BorderBrush="{DynamicResource Surface.Border}"
+ BorderBrush="{DynamicResource Brand.Orange}"
  BorderThickness="1"
  CornerRadius="8"
  Margin="0,0,0,12">
@@ -181,12 +165,12 @@
  <ItemsControl x:Name="CategoriesList">
  <ItemsControl.ItemsPanel>
  <ItemsPanelTemplate>
- <WrapPanel ItemWidth="180" ItemHeight="120" IsItemsHost="True" />
+ <WrapPanel />
  </ItemsPanelTemplate>
  </ItemsControl.ItemsPanel>
  <ItemsControl.ItemTemplate>
  <DataTemplate>
- <Border Width="180" Height="120" Margin="8" Padding="8"
+ <Border MinWidth="180" MinHeight="120" Margin="8" Padding="8"
  Background="{DynamicResource Surface.Background}"
  BorderBrush="{DynamicResource Surface.Border}" BorderThickness="1" CornerRadius="10">
  <Grid>
@@ -209,10 +193,10 @@
  <!-- Footer: actions -->
  <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Right">
  <Button Tag="{Binding}" Click="EditCategory_Click" Width="28" Height="28" Padding="0" Margin="0,0,6,0" ToolTip="Edytuj">
- <TextBlock FontFamily="Segoe MDL2 Assets" Text="&#xE70F;" FontSize="14"/>
+ <TextBlock FontFamily="Segoe MDL2 Assets" Text="&#xE70F;" FontSize="14" Foreground="{DynamicResource Brand.Blue}"/>
  </Button>
  <Button Tag="{Binding}" Click="ShowDeleteConfirm_Click" Width="28" Height="28" Padding="0" ToolTip="Usuń">
- <TextBlock FontFamily="Segoe MDL2 Assets" Text="&#xE74D;" FontSize="14"/>
+ <TextBlock FontFamily="Segoe MDL2 Assets" Text="&#xE74D;" FontSize="14" Foreground="Red"/>
  </Button>
  </StackPanel>
  </Grid>
@@ -259,106 +243,107 @@
  </Grid>
  </Border>
 
- <!-- Wewnątrz ramki: trzy panele poniżej listy -->
- <Grid Grid.Row="1" Margin="0,12,0,0">
- <Grid.ColumnDefinitions>
- <ColumnDefinition Width="2*"/>
- <ColumnDefinition Width="16"/>
- <ColumnDefinition Width="*"/>
- <ColumnDefinition Width="16"/>
- <ColumnDefinition Width="*"/>
- </Grid.ColumnDefinitions>
+ <!--3) Pasek wyboru okresu + trzy panele POD nim (wspólny kontener) -->
+ <StackPanel Grid.Row="2" Orientation="Vertical">
+   <ctrls:PeriodBarControl x:Name="PeriodBar" HorizontalAlignment="Center" Margin="0,0,0,12" />
+   <Grid Margin="0,0,0,0">
+     <Grid.ColumnDefinitions>
+       <ColumnDefinition Width="2*"/>
+       <ColumnDefinition Width="16"/>
+       <ColumnDefinition Width="*"/>
+       <ColumnDefinition Width="16"/>
+       <ColumnDefinition Width="*"/>
+     </Grid.ColumnDefinitions>
 
- <!-- Struktura wydatków -->
- <Border Grid.Column="0" Padding="12" Background="{DynamicResource Surface.Background}" BorderBrush="{DynamicResource Surface.Border}" BorderThickness="1" CornerRadius="8">
- <StackPanel>
- <TextBlock Text="Struktura wydatków według kategorii" FontWeight="Bold" Foreground="{DynamicResource App.Foreground}"/>
- <TextBlock Margin="0,8,0,8" Foreground="{DynamicResource App.Foreground}" Text="{Binding ActiveCategoriesSummary}"/>
- <ItemsControl ItemsSource="{Binding CategoryShares}">
- <ItemsControl.ItemTemplate>
- <DataTemplate>
- <DockPanel Margin="0,2,0,2">
- <TextBlock DockPanel.Dock="Left" Foreground="{DynamicResource App.Foreground}" Text="{Binding Name}"/>
- <TextBlock DockPanel.Dock="Right" Foreground="{DynamicResource App.Foreground}" Text="{Binding Percent, StringFormat={}{0:N0}%}"/>
- </DockPanel>
- </DataTemplate>
- </ItemsControl.ItemTemplate>
- </ItemsControl>
- <TextBlock Margin="0,10,0,4" FontWeight="SemiBold" Foreground="{DynamicResource App.Foreground}" Text="TOP3 kategorie"/>
- <ItemsControl ItemsSource="{Binding TopCategories}">
- <ItemsControl.ItemTemplate>
- <DataTemplate>
- <DockPanel>
- <TextBlock DockPanel.Dock="Left" Foreground="{DynamicResource App.Foreground}" Text="{Binding Name}"/>
- <TextBlock DockPanel.Dock="Right" Foreground="{DynamicResource App.Foreground}" Text="{Binding Percent, StringFormat={}{0:N0}%}"/>
- </DockPanel>
- </DataTemplate>
- </ItemsControl.ItemTemplate>
- </ItemsControl>
- <TextBlock Margin="0,10,0,4" FontWeight="SemiBold" Foreground="{DynamicResource App.Foreground}" Text="BOTTOM3"/>
- <ItemsControl ItemsSource="{Binding BottomCategories}">
- <ItemsControl.ItemTemplate>
- <DataTemplate>
- <DockPanel>
- <TextBlock DockPanel.Dock="Left" Foreground="{DynamicResource App.Foreground}" Text="{Binding Name}"/>
- <TextBlock DockPanel.Dock="Right" Foreground="{DynamicResource App.Foreground}" Text="{Binding Percent, StringFormat={}{0:N0}%}"/>
- </DockPanel>
- </DataTemplate>
- </ItemsControl.ItemTemplate>
- </ItemsControl>
- </StackPanel>
- </Border>
+     <!-- Struktura wydatków -->
+     <Border Grid.Column="0" Padding="12" Background="{DynamicResource Surface.Background}" BorderBrush="{DynamicResource Surface.Border}" BorderThickness="1" CornerRadius="8">
+       <StackPanel>
+         <TextBlock Text="Struktura wydatków według kategorii" FontWeight="Bold" Foreground="{DynamicResource App.Foreground}"/>
+         <TextBlock Margin="0,8,0,8" Foreground="{DynamicResource App.Foreground}" Text="{Binding ActiveCategoriesSummary}"/>
+         <ItemsControl ItemsSource="{Binding CategoryShares}">
+           <ItemsControl.ItemTemplate>
+             <DataTemplate>
+               <DockPanel Margin="0,2,0,2">
+                 <TextBlock DockPanel.Dock="Left" Foreground="{DynamicResource App.Foreground}" Text="{Binding Name}"/>
+                 <TextBlock DockPanel.Dock="Right" Foreground="{DynamicResource App.Foreground}" Text="{Binding Percent, StringFormat={}{0:N0}%}"/>
+               </DockPanel>
+             </DataTemplate>
+           </ItemsControl.ItemTemplate>
+         </ItemsControl>
+         <TextBlock Margin="0,10,0,4" FontWeight="SemiBold" Foreground="{DynamicResource App.Foreground}" Text="TOP3 kategorie"/>
+         <ItemsControl ItemsSource="{Binding TopCategories}">
+           <ItemsControl.ItemTemplate>
+             <DataTemplate>
+               <DockPanel>
+                 <TextBlock DockPanel.Dock="Left" Foreground="{DynamicResource App.Foreground}" Text="{Binding Name}"/>
+                 <TextBlock DockPanel.Dock="Right" Foreground="{DynamicResource App.Foreground}" Text="{Binding Percent, StringFormat={}{0:N0}%}"/>
+               </DockPanel>
+             </DataTemplate>
+           </ItemsControl.ItemTemplate>
+         </ItemsControl>
+         <TextBlock Margin="0,10,0,4" FontWeight="SemiBold" Foreground="{DynamicResource App.Foreground}" Text="BOTTOM3"/>
+         <ItemsControl ItemsSource="{Binding BottomCategories}">
+           <ItemsControl.ItemTemplate>
+             <DataTemplate>
+               <DockPanel>
+                 <TextBlock DockPanel.Dock="Left" Foreground="{DynamicResource App.Foreground}" Text="{Binding Name}"/>
+                 <TextBlock DockPanel.Dock="Right" Foreground="{DynamicResource App.Foreground}" Text="{Binding Percent, StringFormat={}{0:N0}%}"/>
+               </DockPanel>
+             </DataTemplate>
+           </ItemsControl.ItemTemplate>
+         </ItemsControl>
+       </StackPanel>
+     </Border>
 
- <!-- Szczegóły kategorii -->
- <Border Grid.Column="2" Padding="12" Background="{DynamicResource Surface.Background}" BorderBrush="{DynamicResource Surface.Border}" BorderThickness="1" CornerRadius="8">
- <StackPanel>
- <TextBlock Text="Szczegóły kategorii" FontWeight="Bold" Foreground="{DynamicResource App.Foreground}"/>
- <StackPanel Margin="0,8,0,0">
- <TextBlock Foreground="{DynamicResource App.Foreground}" Text="Suma wydatków w tym okresie:"/>
- <TextBlock Foreground="{DynamicResource App.Foreground}" Text="{Binding SelectedCategoryTotalAmount, StringFormat={}{0:N2} zł}"/>
- <TextBlock Foreground="{DynamicResource App.Foreground}" Margin="0,8,0,0" Text="Średni miesięczny wydatek:"/>
- <TextBlock Foreground="{DynamicResource App.Foreground}" Text="{Binding SelectedCategoryAverageMonthly, StringFormat={}{0:N2} zł}"/>
- <TextBlock Foreground="{DynamicResource App.Foreground}" Margin="0,8,0,0" Text="Liczba transakcji w okresie:"/>
- <TextBlock Foreground="{DynamicResource App.Foreground}" Text="{Binding SelectedCategoryTransactionCount}"/>
- <TextBlock Foreground="{DynamicResource App.Foreground}" Margin="0,12,0,4" Text="Ostatnie transakcje:"/>
- <ItemsControl ItemsSource="{Binding SelectedCategoryRecentTransactions}">
- <ItemsControl.ItemTemplate>
- <DataTemplate>
- <Grid Margin="0,2,0,2">
- <Grid.ColumnDefinitions>
- <ColumnDefinition Width="100"/>
- <ColumnDefinition Width="*"/>
- <ColumnDefinition Width="120"/>
- </Grid.ColumnDefinitions>
- <TextBlock Grid.Column="0" Foreground="{DynamicResource App.Foreground}" Text="{Binding Date, StringFormat={}{0:yyyy-MM-dd}}"/>
- <TextBlock Grid.Column="1" Foreground="{DynamicResource App.Foreground}" Text="{Binding Description}" TextTrimming="CharacterEllipsis"/>
- <TextBlock Grid.Column="2" Foreground="{DynamicResource App.Foreground}" TextAlignment="Right" Text="{Binding Amount, StringFormat={}{0:N2} zł}"/>
- </Grid>
- </DataTemplate>
- </ItemsControl.ItemTemplate>
- </ItemsControl>
- </StackPanel>
- </StackPanel>
- </Border>
+     <!-- Szczegóły kategorii -->
+     <Border Grid.Column="2" Padding="12" Background="{DynamicResource Surface.Background}" BorderBrush="{DynamicResource Surface.Border}" BorderThickness="1" CornerRadius="8">
+       <StackPanel>
+         <TextBlock Text="Szczegóły kategorii" FontWeight="Bold" Foreground="{DynamicResource App.Foreground}"/>
+         <StackPanel Margin="0,8,0,0">
+           <TextBlock Foreground="{DynamicResource App.Foreground}" Text="Suma wydatków w tym okresie:"/>
+           <TextBlock Foreground="{DynamicResource App.Foreground}" Text="{Binding SelectedCategoryTotalAmount, StringFormat={}{0:N2} zł}"/>
+           <TextBlock Foreground="{DynamicResource App.Foreground}" Margin="0,8,0,0" Text="Średni miesięczny wydatek:"/>
+           <TextBlock Foreground="{DynamicResource App.Foreground}" Text="{Binding SelectedCategoryAverageMonthly, StringFormat={}{0:N2} zł}"/>
+           <TextBlock Foreground="{DynamicResource App.Foreground}" Margin="0,8,0,0" Text="Liczba transakcji w okresie:"/>
+           <TextBlock Foreground="{DynamicResource App.Foreground}" Text="{Binding SelectedCategoryTransactionCount}"/>
+           <TextBlock Foreground="{DynamicResource App.Foreground}" Margin="0,12,0,4" Text="Ostatnie transakcje:"/>
+           <ItemsControl ItemsSource="{Binding SelectedCategoryRecentTransactions}">
+             <ItemsControl.ItemTemplate>
+               <DataTemplate>
+                 <Grid Margin="0,2,0,2">
+                   <Grid.ColumnDefinitions>
+                     <ColumnDefinition Width="100"/>
+                     <ColumnDefinition Width="*"/>
+                     <ColumnDefinition Width="120"/>
+                   </Grid.ColumnDefinitions>
+                   <TextBlock Grid.Column="0" Foreground="{DynamicResource App.Foreground}" Text="{Binding Date, StringFormat={}{0:yyyy-MM-dd}}"/>
+                   <TextBlock Grid.Column="1" Foreground="{DynamicResource App.Foreground}" Text="{Binding Description}" TextTrimming="CharacterEllipsis"/>
+                   <TextBlock Grid.Column="2" Foreground="{DynamicResource App.Foreground}" TextAlignment="Right" Text="{Binding Amount, StringFormat={}{0:N2} zł}"/>
+                 </Grid>
+               </DataTemplate>
+             </ItemsControl.ItemTemplate>
+           </ItemsControl>
+         </StackPanel>
+       </StackPanel>
+     </Border>
 
- <!-- Porównanie z poprzednim okresie -->
- <Border Grid.Column="4" Padding="12" Background="{DynamicResource Surface.Background}" BorderBrush="{DynamicResource Surface.Border}" BorderThickness="1" CornerRadius="8">
- <StackPanel>
- <TextBlock Text="Porównanie z poprzednim okresem" FontWeight="Bold" Foreground="{DynamicResource App.Foreground}"/>
- <StackPanel Margin="0,8,0,0">
- <TextBlock Foreground="{DynamicResource App.Foreground}" Text="Ten okres:"/>
- <TextBlock Foreground="{DynamicResource App.Foreground}" Text="{Binding CurrentPeriodAmount, StringFormat={}{0:N2} zł}"/>
- <TextBlock Foreground="{DynamicResource App.Foreground}" Margin="0,8,0,0" Text="Poprzedni okres:"/>
- <TextBlock Foreground="{DynamicResource App.Foreground}" Text="{Binding PreviousPeriodAmount, StringFormat={}{0:N2} zł}"/>
- <TextBlock Foreground="{DynamicResource App.Foreground}" Margin="0,8,0,0" Text="Różnica:"/>
- <TextBlock Foreground="{DynamicResource App.Foreground}" Text="{Binding AmountDifference, StringFormat={}{0:N2} zł}"/>
- <TextBlock Foreground="{DynamicResource App.Foreground}" Margin="0,4,0,0" Text="{Binding PercentageDifference, StringFormat={}{0:N0}%}"/>
+     <!-- Porównanie z poprzednim okresem -->
+     <Border Grid.Column="4" Padding="12" Background="{DynamicResource Surface.Background}" BorderBrush="{DynamicResource Surface.Border}" BorderThickness="1" CornerRadius="8">
+       <StackPanel>
+         <TextBlock Text="Porównanie z poprzednim okresem" FontWeight="Bold" Foreground="{DynamicResource App.Foreground}"/>
+         <StackPanel Margin="0,8,0,0">
+           <TextBlock Foreground="{DynamicResource App.Foreground}" Text="Ten okres:"/>
+           <TextBlock Foreground="{DynamicResource App.Foreground}" Text="{Binding CurrentPeriodAmount, StringFormat={}{0:N2} zł}"/>
+           <TextBlock Foreground="{DynamicResource App.Foreground}" Margin="0,8,0,0" Text="Poprzedni okres:"/>
+           <TextBlock Foreground="{DynamicResource App.Foreground}" Text="{Binding PreviousPeriodAmount, StringFormat={}{0:N2} zł}"/>
+           <TextBlock Foreground="{DynamicResource App.Foreground}" Margin="0,8,0,0" Text="Różnica:"/>
+           <TextBlock Foreground="{DynamicResource App.Foreground}" Text="{Binding AmountDifference, StringFormat={}{0:N2} zł}"/>
+           <TextBlock Foreground="{DynamicResource App.Foreground}" Margin="0,4,0,0" Text="{Binding PercentageDifference, StringFormat={}{0:N0}%}"/>
+         </StackPanel>
+       </StackPanel>
+     </Border>
+   </Grid>
  </StackPanel>
- </StackPanel>
- </Border>
- </Grid>
- </Grid>
- </Border>
 
  <!--4) Szczegóły (pod ramką kategorii) -->
  <Grid Grid.Row="3">
@@ -414,4 +399,5 @@
  </Grid>
  </Grid>
  </Grid>
+ </ScrollViewer>
 </UserControl>

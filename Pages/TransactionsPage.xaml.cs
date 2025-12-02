@@ -7,6 +7,8 @@ using Finly.Views.Controls;
 using System.Windows;
 using System.Windows.Media;
 using System.Linq;
+using System.Globalization;
+using System.Windows.Data;
 
 namespace Finly.Pages
 {
@@ -183,8 +185,13 @@ namespace Finly.Pages
         private void DateIcon_Click(object sender, RoutedEventArgs e)
         {
             if (sender is not FrameworkElement fe) return;
-            // Find the parent StackPanel that holds DateText, DateEditPanel and DateEditor
+            // find containing panel then hidden DatePicker named DateEditor
             var sp = FindAncestor<StackPanel>(fe);
+            if (sp == null)
+            {
+                // fallback: search up a couple of levels
+                sp = FindAncestor<StackPanel>(VisualTreeHelper.GetParent(fe));
+            }
             if (sp == null) return;
             var dp = FindDescendantByName<DatePicker>(sp, "DateEditor");
             if (dp != null)
@@ -192,6 +199,24 @@ namespace Finly.Pages
                 dp.IsDropDownOpen = true;
             }
         }
+    }
+
+    // Converter used in XAML to transform yyyy-MM-dd string into dd.MM.yyyy
+    public sealed class DateStringToPLConverter : IValueConverter
+    {
+        public object? Convert(object value, Type targetType, object parameter, CultureInfo culture)
+        {
+            var s = value as string;
+            if (string.IsNullOrWhiteSpace(s)) return string.Empty;
+            if (DateTime.TryParse(s, CultureInfo.InvariantCulture, DateTimeStyles.None, out var dt))
+                return dt.ToString("dd.MM.yyyy");
+            // try current culture as fallback
+            if (DateTime.TryParse(s, out dt)) return dt.ToString("dd.MM.yyyy");
+            return s;
+        }
+
+        public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
+            => Binding.DoNothing;
     }
 }
 
