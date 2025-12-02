@@ -3,7 +3,6 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:lvc="http://livecharts.com"
              xmlns:lvcwpf="clr-namespace:LiveChartsCore.SkiaSharpView.WPF;assembly=LiveChartsCore.SkiaSharpView.WPF"
-             xmlns:lvcsk="clr-namespace:LiveChartsCore.SkiaSharpView;assembly=LiveChartsCore.SkiaSharpView"
              xmlns:vc="clr-namespace:Finly.Views.Controls">
 
     <UserControl.Resources>
@@ -63,7 +62,10 @@
                         <StackPanel>
                             <TextBlock Text="Podział wg kategorii" Style="{StaticResource CardHeader}"/>
                             <lvcwpf:PieChart Series="{Binding CategoriesSeries}"
-                                             Background="{DynamicResource Surface.Background}"/>
+                                             Height="240"
+                                             LegendPosition="Right"
+                                             Background="Transparent"
+                                             Foreground="{DynamicResource App.Foreground}"/>
                         </StackPanel>
                     </Border>
 
@@ -73,7 +75,9 @@
                             <TextBlock Text="Trend w czasie" Style="{StaticResource CardHeader}"/>
                             <lvcwpf:CartesianChart Series="{Binding TrendSeries}"
                                                    XAxes="{Binding TrendXAxes}"
-                                                   Background="{DynamicResource Surface.Background}"/>
+                                                   Height="240"
+                                                   Background="Transparent"
+                                                   Foreground="{DynamicResource App.Foreground}"/>
                         </StackPanel>
                     </Border>
 
@@ -83,7 +87,9 @@
                             <TextBlock Text="Wg kont / kopert" Style="{StaticResource CardHeader}"/>
                             <lvcwpf:CartesianChart Series="{Binding AccountsSeries}"
                                                    XAxes="{Binding AccountsXAxes}"
-                                                   Background="{DynamicResource Surface.Background}"/>
+                                                   Height="240"
+                                                   Background="Transparent"
+                                                   Foreground="{DynamicResource App.Foreground}"/>
                         </StackPanel>
                     </Border>
 
@@ -93,7 +99,9 @@
                             <TextBlock Text="Wg dnia tygodnia" Style="{StaticResource CardHeader}"/>
                             <lvcwpf:CartesianChart Series="{Binding WeekdaySeries}"
                                                    XAxes="{Binding WeekdayXAxes}"
-                                                   Background="{DynamicResource Surface.Background}"/>
+                                                   Height="240"
+                                                   Background="Transparent"
+                                                   Foreground="{DynamicResource App.Foreground}"/>
                         </StackPanel>
                     </Border>
 
