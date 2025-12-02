@@ -10,6 +10,33 @@
 
     <UserControl.Resources>
         <BooleanToVisibilityConverter x:Key="BoolToVisibilityConverter"/>
+        
+        <!-- Styl kontenera edycji: ciemne tło, biała czcionka -->
+        <Style x:Key="EditContainerBorder" TargetType="Border">
+            <Setter Property="Background" Value="{StaticResource Control.Background}"/>
+            <Setter Property="CornerRadius" Value="6"/>
+            <Setter Property="Padding" Value="6,4"/>
+            <Setter Property="Margin" Value="4,0,0,0"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+            <Setter Property="Visibility" Value="Collapsed"/>
+        </Style>
+
+        <Style x:Key="EditTextBoxStyle" TargetType="TextBox">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Foreground" Value="{StaticResource Control.Foreground}"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
+            <Setter Property="Padding" Value="0"/>
+            <Setter Property="MinWidth" Value="120"/>
+        </Style>
+
+        <Style x:Key="EditComboStyle" TargetType="ComboBox">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Foreground" Value="{StaticResource Control.Foreground}"/>
+            <Setter Property="Padding" Value="0"/>
+            <Setter Property="MinWidth" Value="160"/>
+        </Style>
 
         <!-- Mały przycisk ikonowy -->
         <Style x:Key="IconButtonSmall" TargetType="Button">
@@ -439,33 +466,37 @@
                                                                        Foreground="{DynamicResource App.Foreground}"
                                                                        Margin="0,0,6,0"/>
                                                             <TextBlock x:Name="DateText"
-                                                                       Text="{Binding DateDisplay}"
-                                                                       Foreground="{DynamicResource App.Foreground}">
-                                                                <TextBlock.Style>
-                                                                    <Style TargetType="TextBlock">
-                                                                        <Setter Property="Visibility" Value="Visible"/>
-                                                                        <Style.Triggers>
-                                                                            <DataTrigger Binding="{Binding IsEditing}" Value="True">
-                                                                                <Setter Property="Visibility" Value="Collapsed"/>
-                                                                            </DataTrigger>
-                                                                        </Style.Triggers>
-                                                                    </Style>
-                                                                </TextBlock.Style>
+                                                                       Foreground="{DynamicResource App.Foreground}"
+                                                                       VerticalAlignment="Center"
+                                                                       Margin="0,0,8,0">
+                                                                <TextBlock.Text>
+                                                                    <Binding Path="EditDate" StringFormat="{}{0:yyyy-MM-dd}"/>
+                                                                </TextBlock.Text>
                                                             </TextBlock>
-                                                            <DatePicker x:Name="DateEditor"
-                                                                        Width="130"
-                                                                        SelectedDate="{Binding EditDate, Mode=TwoWay}">
-                                                                <DatePicker.Style>
-                                                                    <Style TargetType="DatePicker">
-                                                                        <Setter Property="Visibility" Value="Collapsed"/>
+                                                            <!-- Edytor daty: ciemne tło + ikona kalendarza -->
+                                                            <Border x:Name="DateEditPanel">
+                                                                <Border.Style>
+                                                                    <Style TargetType="Border" BasedOn="{StaticResource EditContainerBorder}">
                                                                         <Style.Triggers>
                                                                             <DataTrigger Binding="{Binding IsEditing}" Value="True">
                                                                                 <Setter Property="Visibility" Value="Visible"/>
                                                                             </DataTrigger>
                                                                         </Style.Triggers>
                                                                     </Style>
-                                                                </DatePicker.Style>
-                                                            </DatePicker>
+                                                                </Border.Style>
+                                                                <Grid>
+                                                                    <Grid.ColumnDefinitions>
+                                                                        <ColumnDefinition Width="Auto"/>
+                                                                        <ColumnDefinition Width="Auto"/>
+                                                                    </Grid.ColumnDefinitions>
+                                                                    <TextBlock Grid.Column="0" Text="{Binding EditDate, StringFormat={}{0:yyyy-MM-dd}}" Foreground="{StaticResource Control.Foreground}" VerticalAlignment="Center" Margin="2,0,8,0"/>
+                                                                    <Button Grid.Column="1" Click="DateIcon_Click" Background="Transparent" BorderBrush="{x:Null}" Padding="2">
+                                                                        <Image Source="/Assets/Icons/kalendarz.png" Width="18" Height="18"/>
+                                                                    </Button>
+                                                                </Grid>
+                                                            </Border>
+                                                            <!-- Ukryty DatePicker do wyboru daty -->
+                                                            <DatePicker x:Name="DateEditor" SelectedDate="{Binding EditDate, Mode=TwoWay}" Opacity="0" Width="1" Height="1"/>
                                                         </StackPanel>
 
                                                         <!-- KWOTA -->
@@ -488,21 +519,18 @@
                                                                     </Style>
                                                                 </TextBlock.Style>
                                                             </TextBlock>
-                                                            <TextBox x:Name="AmountBox"
-                                                                    Width="120"
-                                                                    Text="{Binding EditAmountText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                                                                    GotFocus="EditAmount_GotFocus">
-                                                                <TextBox.Style>
-                                                                    <Style TargetType="TextBox">
-                                                                        <Setter Property="Visibility" Value="Collapsed"/>
+                                                            <Border x:Name="AmountEditPanel">
+                                                                <Border.Style>
+                                                                    <Style TargetType="Border" BasedOn="{StaticResource EditContainerBorder}">
                                                                         <Style.Triggers>
                                                                             <DataTrigger Binding="{Binding IsEditing}" Value="True">
                                                                                 <Setter Property="Visibility" Value="Visible"/>
                                                                             </DataTrigger>
                                                                         </Style.Triggers>
                                                                     </Style>
-                                                                </TextBox.Style>
-                                                            </TextBox>
+                                                                </Border.Style>
+                                                                <TextBox x:Name="AmountBox" Style="{StaticResource EditTextBoxStyle}" Text="{Binding EditAmountText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" GotFocus="EditAmount_GotFocus"/>
+                                                            </Border>
                                                         </StackPanel>
 
                                                         <!-- KATEGORIA -->
@@ -525,21 +553,18 @@
                                                                     </Style>
                                                                 </TextBlock.Style>
                                                             </TextBlock>
-                                                            <ComboBox x:Name="CategoryCombo"
-                                                                      Width="180"
-                                                                      ItemsSource="{Binding Source={StaticResource CategoriesForEditRes}}"
-                                                                      SelectedItem="{Binding SelectedCategory, Mode=TwoWay}">
-                                                                <ComboBox.Style>
-                                                                    <Style TargetType="ComboBox">
-                                                                        <Setter Property="Visibility" Value="Collapsed"/>
+                                                            <Border x:Name="CategoryEditPanel">
+                                                                <Border.Style>
+                                                                    <Style TargetType="Border" BasedOn="{StaticResource EditContainerBorder}">
                                                                         <Style.Triggers>
                                                                             <DataTrigger Binding="{Binding IsEditing}" Value="True">
                                                                                 <Setter Property="Visibility" Value="Visible"/>
                                                                             </DataTrigger>
                                                                         </Style.Triggers>
                                                                     </Style>
-                                                                </ComboBox.Style>
-                                                            </ComboBox>
+                                                                </Border.Style>
+                                                                <ComboBox x:Name="CategoryCombo" Style="{StaticResource EditComboStyle}" ItemsSource="{Binding Source={StaticResource CategoriesForEditRes}}" SelectedItem="{Binding SelectedCategory, Mode=TwoWay}"/>
+                                                            </Border>
                                                         </StackPanel>
 
                                                         <!-- Z KONTA -->
@@ -564,21 +589,18 @@
                                                                     </Style>
                                                                 </TextBlock.Style>
                                                             </TextBlock>
-                                                            <ComboBox x:Name="FromAccountCombo"
-                                                                      Width="220"
-                                                                      ItemsSource="{Binding Source={StaticResource AccountsForEditRes}}"
-                                                                      SelectedItem="{Binding SelectedAccount, Mode=TwoWay}">
-                                                                <ComboBox.Style>
-                                                                    <Style TargetType="ComboBox">
-                                                                        <Setter Property="Visibility" Value="Collapsed"/>
+                                                            <Border x:Name="FromAccountEditPanel">
+                                                                <Border.Style>
+                                                                    <Style TargetType="Border" BasedOn="{StaticResource EditContainerBorder}">
                                                                         <Style.Triggers>
                                                                             <DataTrigger Binding="{Binding IsEditing}" Value="True">
                                                                                 <Setter Property="Visibility" Value="Visible"/>
                                                                             </DataTrigger>
                                                                         </Style.Triggers>
                                                                     </Style>
-                                                                </ComboBox.Style>
-                                                            </ComboBox>
+                                                                </Border.Style>
+                                                                <ComboBox x:Name="FromAccountCombo" Style="{StaticResource EditComboStyle}" ItemsSource="{Binding Source={StaticResource AccountsForEditRes}}" SelectedItem="{Binding SelectedAccount, Mode=TwoWay}"/>
+                                                            </Border>
                                                         </StackPanel>
 
                                                         <!-- NA KONTO -->
@@ -603,21 +625,18 @@
                                                                     </Style>
                                                                 </TextBlock.Style>
                                                             </TextBlock>
-                                                            <ComboBox x:Name="ToAccountCombo"
-                                                                      Width="220"
-                                                                      ItemsSource="{Binding Source={StaticResource AccountsForEditRes}}"
-                                                                      SelectedItem="{Binding SelectedAccount, Mode=TwoWay}">
-                                                                <ComboBox.Style>
-                                                                    <Style TargetType="ComboBox">
-                                                                        <Setter Property="Visibility" Value="Collapsed"/>
+                                                            <Border x:Name="ToAccountEditPanel">
+                                                                <Border.Style>
+                                                                    <Style TargetType="Border" BasedOn="{StaticResource EditContainerBorder}">
                                                                         <Style.Triggers>
                                                                             <DataTrigger Binding="{Binding IsEditing}" Value="True">
                                                                                 <Setter Property="Visibility" Value="Visible"/>
                                                                             </DataTrigger>
                                                                         </Style.Triggers>
                                                                     </Style>
-                                                                </ComboBox.Style>
-                                                            </ComboBox>
+                                                                </Border.Style>
+                                                                <ComboBox x:Name="ToAccountCombo" Style="{StaticResource EditComboStyle}" ItemsSource="{Binding Source={StaticResource AccountsForEditRes}}" SelectedItem="{Binding SelectedAccount, Mode=TwoWay}"/>
+                                                            </Border>
                                                         </StackPanel>
 
                                                         <!-- OPIS + znacznik zaplanowana -->
@@ -641,21 +660,18 @@
                                                                     </Style>
                                                                 </TextBlock.Style>
                                                             </TextBlock>
-                                                            <TextBox x:Name="DescriptionBox"
-                                                                     Width="260"
-                                                                     Text="{Binding EditDescription, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                                                                     GotFocus="EditDescription_GotFocus">
-                                                                <TextBox.Style>
-                                                                    <Style TargetType="TextBox">
-                                                                        <Setter Property="Visibility" Value="Collapsed"/>
+                                                            <Border x:Name="DescriptionEditPanel">
+                                                                <Border.Style>
+                                                                    <Style TargetType="Border" BasedOn="{StaticResource EditContainerBorder}">
                                                                         <Style.Triggers>
                                                                             <DataTrigger Binding="{Binding IsEditing}" Value="True">
                                                                                 <Setter Property="Visibility" Value="Visible"/>
                                                                             </DataTrigger>
                                                                         </Style.Triggers>
                                                                     </Style>
-                                                                </TextBox.Style>
-                                                            </TextBox>
+                                                                </Border.Style>
+                                                                <TextBox x:Name="DescriptionBox" Style="{StaticResource EditTextBoxStyle}" Width="260" Text="{Binding EditDescription, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" GotFocus="EditDescription_GotFocus"/>
+                                                            </Border>
                                                             <TextBlock Text="Zaplanowana"
                                                                        Margin="8,0,0,0"
                                                                        Visibility="{Binding IsPlanned, Converter={StaticResource BoolToVisibilityConverter}}"
@@ -678,6 +694,15 @@
                                                                       Stretch="Uniform"
                                                                       Width="14"
                                                                       Height="14"/>
+                                                            </Button>
+                                                            <!-- Zapisz widoczny tylko w trybie edycji -->
+                                                            <Button x:Name="SaveButton"
+                                                                    Style="{StaticResource IconButtonSmall}"
+                                                                    ToolTip="Zapisz"
+                                                                    Click="SaveEdit_Click"
+                                                                    Margin="6,0,0,0"
+                                                                    Visibility="Collapsed">
+                                                                <Path Data="M2,10 L6,14 L14,4" Stroke="{DynamicResource Brand.Blue}" StrokeThickness="2.4" StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round" Width="14" Height="14"/>
                                                             </Button>
                                                             <Button Style="{StaticResource IconButtonSmall}"
                                                                     ToolTip="Usuń"
@@ -748,6 +773,11 @@
                                                     <Setter TargetName="RealizedCard"
                                                             Property="Visibility"
                                                             Value="Collapsed"/>
+                                                </DataTrigger>
+
+                                                <!-- Pokaż przycisk Zapisz tylko podczas edycji -->
+                                                <DataTrigger Binding="{Binding IsEditing}" Value="True">
+                                                    <Setter TargetName="SaveButton" Property="Visibility" Value="Visible"/>
                                                 </DataTrigger>
                                             </DataTemplate.Triggers>
                                         </DataTemplate>

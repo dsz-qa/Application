@@ -74,6 +74,16 @@ namespace Finly.Pages
             return null;
         }
 
+        private T? FindAncestor<T>(DependencyObject? start) where T : DependencyObject
+        {
+            var cur = start;
+            while (cur != null && cur is not T)
+            {
+                cur = VisualTreeHelper.GetParent(cur);
+            }
+            return cur as T;
+        }
+
         private void HideAllDeletePanels()
         {
             void CollapseInside(ItemsControl? ic)
@@ -148,6 +158,14 @@ namespace Finly.Pages
             }
         }
 
+        private void SaveEdit_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is FrameworkElement fe && fe.DataContext is TransactionCardVm vm)
+            {
+                _vm.SaveEdit(vm);
+            }
+        }
+
         private void EditAmount_GotFocus(object sender, RoutedEventArgs e)
         {
             if (sender is TextBox tb)
@@ -160,6 +178,19 @@ namespace Finly.Pages
         private void EditDescription_GotFocus(object sender, RoutedEventArgs e)
         {
             if (sender is TextBox tb) tb.SelectAll();
+        }
+
+        private void DateIcon_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is not FrameworkElement fe) return;
+            // Find the parent StackPanel that holds DateText, DateEditPanel and DateEditor
+            var sp = FindAncestor<StackPanel>(fe);
+            if (sp == null) return;
+            var dp = FindDescendantByName<DatePicker>(sp, "DateEditor");
+            if (dp != null)
+            {
+                dp.IsDropDownOpen = true;
+            }
         }
     }
 }
