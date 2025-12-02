@@ -6,13 +6,13 @@
              xmlns:vc="clr-namespace:Finly.Views.Controls">
 
     <UserControl.Resources>
-        <!-- Ten sam styl kart co na Dashboardzie -->
         <Style x:Key="Card" TargetType="Border">
             <Setter Property="Background"      Value="{DynamicResource Surface.Background}"/>
             <Setter Property="BorderBrush"     Value="{DynamicResource Surface.Border}"/>
             <Setter Property="BorderThickness" Value="1"/>
             <Setter Property="CornerRadius"    Value="10"/>
             <Setter Property="Padding"         Value="12"/>
+            <Setter Property="Margin"          Value="0,0,0,12"/>
         </Style>
 
         <Style x:Key="CardHeader" TargetType="TextBlock">
@@ -22,27 +22,43 @@
         </Style>
     </UserControl.Resources>
 
-    <ScrollViewer VerticalScrollBarVisibility="Auto"
-                  HorizontalScrollBarVisibility="Disabled">
+    <!-- Global scroll -->
+    <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
         <Grid Margin="16">
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto"/>
                 <RowDefinition Height="*"/>
             </Grid.RowDefinitions>
 
-            <!-- Pasek okresu + tryb -->
+            <!-- Pasek okresu + eksport + tryb -->
             <Border Grid.Row="0" Style="{StaticResource Card}" Margin="0,0,0,12">
                 <Grid>
                     <Grid.ColumnDefinitions>
+                        <!-- lewa kolumna: eksport (pionowo, po lewej, wyśrodkowane względem paska) -->
+                        <ColumnDefinition Width="Auto"/>
+                        <!-- środek: pasek okresu -->
                         <ColumnDefinition Width="*"/>
+                        <!-- prawa kolumna: tryb -->
                         <ColumnDefinition Width="Auto"/>
                     </Grid.ColumnDefinitions>
 
-                    <!-- Własny pasek okresu -->
-                    <vc:PeriodBarControl Grid.Column="0" x:Name="PeriodBar"/>
+                    <!-- Eksport: po lewej, pionowo; przyciski niebieskie i duże -->
+                    <StackPanel Grid.Column="0" Orientation="Vertical" VerticalAlignment="Center" HorizontalAlignment="Left" Margin="0,0,12,0">
+                        <Button Content="Eksport do PDF"
+                                Click="ExportPdf_Click"
+                                Style="{StaticResource PrimaryButton}"
+                                Width="180" Height="42" Margin="0,0,0,8"/>
+                        <Button Content="Eksport do CSV"
+                                Click="ExportCsv_Click"
+                                Style="{StaticResource PrimaryButton}"
+                                Width="180" Height="42"/>
+                    </StackPanel>
 
-                    <!-- Tryb -->
-                    <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                    <!-- Pasek okresu (środek) -->
+                    <vc:PeriodBarControl Grid.Column="1" x:Name="PeriodBar" HorizontalAlignment="Stretch"/>
+
+                    <!-- Tryb (prawa strona) -->
+                    <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center" Margin="12,0,0,0">
                         <TextBlock Text="Tryb:" VerticalAlignment="Center" Margin="0,0,8,0" Foreground="{DynamicResource App.Foreground}"/>
                         <StackPanel Orientation="Horizontal">
                             <Button x:Name="ModeExpensesBtn" Content="Wydatki"  Click="Mode_Click"/>
@@ -54,66 +70,64 @@
                 </Grid>
             </Border>
 
-            <!-- Karty statystik -->
-            <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
-                <StackPanel>
-                    <!-- Karta 1: Pie -->
-                    <Border Style="{StaticResource Card}" Margin="0,0,0,12">
+            <!-- Dwie kolumny: lewa i prawa (wykresy) -->
+            <Grid Grid.Row="1">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="16"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+
+                <!-- Lewa kolumna: Pie + Accounts -->
+                <StackPanel Grid.Column="0">
+                    <Border Style="{StaticResource Card}">
                         <StackPanel>
                             <TextBlock Text="Podział wg kategorii" Style="{StaticResource CardHeader}"/>
                             <lvcwpf:PieChart Series="{Binding CategoriesSeries}"
-                                             Height="240"
+                                             Height="260"
                                              LegendPosition="Right"
                                              Background="Transparent"
                                              Foreground="{DynamicResource App.Foreground}"/>
                         </StackPanel>
                     </Border>
 
-                    <!-- Karta 2: Line -->
-                    <Border Style="{StaticResource Card}" Margin="0,0,0,12">
-                        <StackPanel>
-                            <TextBlock Text="Trend w czasie" Style="{StaticResource CardHeader}"/>
-                            <lvcwpf:CartesianChart Series="{Binding TrendSeries}"
-                                                   XAxes="{Binding TrendXAxes}"
-                                                   Height="240"
-                                                   Background="Transparent"
-                                                   Foreground="{DynamicResource App.Foreground}"/>
-                        </StackPanel>
-                    </Border>
-
-                    <!-- Karta 3: Column (konta/koperty) -->
-                    <Border Style="{StaticResource Card}" Margin="0,0,0,12">
+                    <Border Style="{StaticResource Card}">
                         <StackPanel>
                             <TextBlock Text="Wg kont / kopert" Style="{StaticResource CardHeader}"/>
                             <lvcwpf:CartesianChart Series="{Binding AccountsSeries}"
                                                    XAxes="{Binding AccountsXAxes}"
-                                                   Height="240"
+                                                   Height="260"
+                                                   Background="Transparent"
+                                                   Foreground="{DynamicResource App.Foreground}"/>
+                        </StackPanel>
+                    </Border>
+                </StackPanel>
+
+                <!-- Prawa kolumna: Trend + Weekday -->
+                <StackPanel Grid.Column="2">
+                    <Border Style="{StaticResource Card}">
+                        <StackPanel>
+                            <TextBlock Text="Trend w czasie" Style="{StaticResource CardHeader}"/>
+                            <lvcwpf:CartesianChart Series="{Binding TrendSeries}"
+                                                   XAxes="{Binding TrendXAxes}"
+                                                   Height="260"
                                                    Background="Transparent"
                                                    Foreground="{DynamicResource App.Foreground}"/>
                         </StackPanel>
                     </Border>
 
-                    <!-- Karta 4: Column (dni tygodnia) -->
-                    <Border Style="{StaticResource Card}" Margin="0,0,12,0">
+                    <Border Style="{StaticResource Card}">
                         <StackPanel>
                             <TextBlock Text="Wg dnia tygodnia" Style="{StaticResource CardHeader}"/>
                             <lvcwpf:CartesianChart Series="{Binding WeekdaySeries}"
                                                    XAxes="{Binding WeekdayXAxes}"
-                                                   Height="240"
+                                                   Height="260"
                                                    Background="Transparent"
                                                    Foreground="{DynamicResource App.Foreground}"/>
                         </StackPanel>
                     </Border>
-
-                    <!-- Sekcja eksportu -->
-                    <Border Style="{StaticResource Card}" Margin="0,12,0,0">
-                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
-                            <Button Content="Eksport do PDF" Click="ExportPdf_Click"/>
-                            <Button Content="Eksport do CSV" Click="ExportCsv_Click" Margin="8,0,0,0"/>
-                        </StackPanel>
-                    </Border>
                 </StackPanel>
-            </ScrollViewer>
+            </Grid>
         </Grid>
     </ScrollViewer>
 </UserControl>
