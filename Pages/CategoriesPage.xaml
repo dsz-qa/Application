@@ -224,14 +224,14 @@
 
                 <Grid>
                     <Grid.ColumnDefinitions>
-                        <!-- Lewa kolumna: wszystkie kategorie (połowa strony) -->
+                        <!-- Lewa kolumna: wszystkie kategorie -->
                         <ColumnDefinition Width="*" />
                         <ColumnDefinition Width="16" />
-                        <!-- Prawa kolumna: 3 ramki w jednym rzędzie -->
+                        <!-- Prawa kolumna: kafelki analityczne -->
                         <ColumnDefinition Width="*" />
                     </Grid.ColumnDefinitions>
 
-                    <!-- LEWA KOLUMNA: Wszystkie kategorie + dodawanie -->
+                    <!-- LEWA KOLUMNA: Wszystkie kategorie + dodawanie + analiza -->
                     <StackPanel Grid.Column="0">
                         <Border Padding="12"
                                 Background="{DynamicResource Surface.Background}"
@@ -281,7 +281,7 @@
                                         </Border>
                                     </Grid>
 
-                                    <!-- Lista kategorii (min 3 w rzędzie – WrapPanel) -->
+                                    <!-- Lista kategorii (WrapPanel) -->
                                     <ItemsControl x:Name="AllCategoriesList"
                                                   Margin="0,8,0,0"
                                                   ItemsSource="{Binding Categories}">
@@ -291,17 +291,14 @@
                                             </ItemsPanelTemplate>
                                         </ItemsControl.ItemsPanel>
 
-
                                         <ItemsControl.ItemTemplate>
                                             <DataTemplate>
                                                 <StackPanel>
                                                     <!-- kafelek kategorii -->
                                                     <Border Width="320"
-        Style="{StaticResource CategoryTileBorderStyle}"
-        Margin="0,0,8,8"
-        MouseLeftButtonUp="CategoryItem_Click">
-
-
+                                                            Style="{StaticResource CategoryTileBorderStyle}"
+                                                            Margin="0,0,8,8"
+                                                            MouseLeftButtonUp="CategoryItem_Click">
                                                         <Grid>
                                                             <Grid.RowDefinitions>
                                                                 <RowDefinition Height="Auto" />
@@ -343,7 +340,8 @@
                                                                                 <Trigger Property="Text" Value="">
                                                                                     <Setter Property="Visibility" Value="Collapsed" />
                                                                                 </Trigger>
-                                                                                <DataTrigger Binding="{Binding Description}" Value="{x:Null}">
+                                                                                <DataTrigger Binding="{Binding Description}"
+                                                                                            Value="{x:Null}">
                                                                                     <Setter Property="Visibility" Value="Collapsed" />
                                                                                 </DataTrigger>
                                                                             </Style.Triggers>
@@ -414,7 +412,6 @@
                                                                                 Height="24"
                                                                                 MinWidth="40"
                                                                                 Padding="6,0"
-                                                                                Margin="0,0,6,0"
                                                                                 Click="HideDeleteConfirm_Click"
                                                                                 Tag="{Binding}" />
                                                                     </StackPanel>
@@ -549,9 +546,8 @@
                                                        Margin="0,10,0,4"
                                                        Foreground="{DynamicResource App.Foreground}" />
                                             <TextBox x:Name="AddNameBox"
-         Height="28"
-         HorizontalAlignment="Stretch" />
-
+                                                     Height="28"
+                                                     HorizontalAlignment="Stretch" />
 
                                             <TextBlock Text="Opis kategorii"
                                                        Margin="0,10,0,4"
@@ -624,21 +620,18 @@
                         </Border>
 
                         <!-- Analiza transakcji według kategorii POD tabelą "Wszystkie kategorie" -->
-                        
-                        
                         <Border Padding="12"
                                 Background="{DynamicResource Surface.Background}"
                                 BorderBrush="{DynamicResource Surface.Border}"
                                 BorderThickness="1"
-                                CornerRadius="8"
-                                Margin="0,0,0,0">
+                                CornerRadius="8">
                             <StackPanel>
                                 <TextBlock Text="Analiza transakcji według kategorii"
-           FontWeight="Bold"
-           FontSize="20"
-           Foreground="{DynamicResource App.Foreground}" />
+                                           FontWeight="Bold"
+                                           FontSize="20"
+                                           Foreground="{DynamicResource App.Foreground}" />
 
-                                <!-- Nagłówki kolumn -->
+                                <!-- Nagłówki kolumn z pionowymi liniami -->
                                 <Grid Margin="0,8,0,4">
                                     <Grid.ColumnDefinitions>
                                         <ColumnDefinition Width="*" />
@@ -647,36 +640,55 @@
                                         <ColumnDefinition Width="Auto" />
                                     </Grid.ColumnDefinitions>
 
-                                    <TextBlock Grid.Column="0"
-               Text="Kategoria"
-               FontWeight="SemiBold"
-               Foreground="{DynamicResource App.Foreground}" />
+                                    <!-- Kategoria -->
+                                    <Border Grid.Column="0"
+                                            BorderBrush="{DynamicResource Surface.Border}"
+                                            BorderThickness="0,0,1,1"
+                                            Padding="0,0,8,2">
+                                        <TextBlock Text="Kategoria"
+                                                   FontWeight="SemiBold"
+                                                   Foreground="{DynamicResource App.Foreground}" />
+                                    </Border>
 
-                                    <TextBlock Grid.Column="1"
-               Text="Kwota"
-               FontWeight="SemiBold"
-               Foreground="{DynamicResource App.Foreground}"
-               TextAlignment="Right" />
+                                    <!-- Kwota -->
+                                    <Border Grid.Column="1"
+                                            BorderBrush="{DynamicResource Surface.Border}"
+                                            BorderThickness="0,0,1,1"
+                                            Padding="0,0,8,2">
+                                        <TextBlock Text="Kwota"
+                                                   FontWeight="SemiBold"
+                                                   Foreground="{DynamicResource App.Foreground}"
+                                                   TextAlignment="Right" />
+                                    </Border>
 
-                                    <TextBlock Grid.Column="2"
-               Text="Procent"
-               FontWeight="SemiBold"
-               Foreground="{DynamicResource App.Foreground}"
-               TextAlignment="Right" />
+                                    <!-- Procent -->
+                                    <Border Grid.Column="2"
+                                            BorderBrush="{DynamicResource Surface.Border}"
+                                            BorderThickness="0,0,1,1"
+                                            Padding="0,0,8,2">
+                                        <TextBlock Text="Procent"
+                                                   FontWeight="SemiBold"
+                                                   Foreground="{DynamicResource App.Foreground}"
+                                                   TextAlignment="Right" />
+                                    </Border>
 
-                                    <TextBlock Grid.Column="3"
-               Text="Status"
-               FontWeight="SemiBold"
-               Foreground="{DynamicResource App.Foreground}"
-               TextAlignment="Center" />
+                                    <!-- Status -->
+                                    <Border Grid.Column="3"
+                                            BorderBrush="{DynamicResource Surface.Border}"
+                                            BorderThickness="1,0,0,1"
+                                            Padding="8,0,0,2">
+                                        <TextBlock Text="Status"
+                                                   FontWeight="SemiBold"
+                                                   Foreground="{DynamicResource App.Foreground}"
+                                                   TextAlignment="Center" />
+                                    </Border>
                                 </Grid>
 
-                                <!-- DOTĄD nagłówki, poniżej Twoje ItemsControl -->
-                                <ItemsControl ItemsSource="{Binding CategoryShares}"
-              Margin="0,0,0,0">
+                                <!-- Dane -->
+                                <ItemsControl ItemsSource="{Binding CategoryShares}">
                                     <ItemsControl.ItemTemplate>
                                         <DataTemplate>
-                                            <Grid Margin="0,2,0,2">
+                                            <Grid>
                                                 <Grid.ColumnDefinitions>
                                                     <ColumnDefinition Width="*" />
                                                     <ColumnDefinition Width="120" />
@@ -684,43 +696,63 @@
                                                     <ColumnDefinition Width="Auto" />
                                                 </Grid.ColumnDefinitions>
 
-                                                <!-- kolumny muszą być w tej samej kolejności co nagłówki -->
+                                                <!-- Kategoria -->
+                                                <Border Grid.Column="0"
+                                                        BorderBrush="{DynamicResource Surface.Border}"
+                                                        BorderThickness="0,0,1,1"
+                                                        Padding="0,2,8,2">
+                                                    <TextBlock Text="{Binding Name}"
+                                                               Foreground="{DynamicResource App.Foreground}" />
+                                                </Border>
 
-                                                <TextBlock Grid.Column="0"
-                           Text="{Binding Name}"
-                           Foreground="{DynamicResource App.Foreground}" />
+                                                <!-- Kwota -->
+                                                <Border Grid.Column="1"
+                                                        BorderBrush="{DynamicResource Surface.Border}"
+                                                        BorderThickness="0,0,1,1"
+                                                        Padding="0,2,8,2">
+                                                    <TextBlock Text="{Binding Amount, StringFormat={}{0:N2} zł}"
+                                                               Foreground="{DynamicResource App.Foreground}"
+                                                               TextAlignment="Right" />
+                                                </Border>
 
-                                                <TextBlock Grid.Column="1"
-                           Text="{Binding Amount, StringFormat={}{0:N2} zł}"
-                           Foreground="{DynamicResource App.Foreground}"
-                           TextAlignment="Right" />
+                                                <!-- Procent -->
+                                                <Border Grid.Column="2"
+                                                        BorderBrush="{DynamicResource Surface.Border}"
+                                                        BorderThickness="0,0,1,1"
+                                                        Padding="0,2,8,2">
+                                                    <TextBlock Text="{Binding Percent, StringFormat={}{0:N0}%}"
+                                                               Foreground="{DynamicResource App.Foreground}"
+                                                               TextAlignment="Right" />
+                                                </Border>
 
-                                                <TextBlock Grid.Column="2"
-                           Text="{Binding Percent, StringFormat={}{0:N0}%}"
-                           Foreground="{DynamicResource App.Foreground}"
-                           TextAlignment="Right" />
-
+                                                <!-- Status / „dominujące” -->
                                                 <Border Grid.Column="3"
-                        Background="{DynamicResource Brand.Orange}"
-                        CornerRadius="4"
-                        Padding="6,2"
-                        Visibility="{Binding Dominant, Converter={StaticResource BoolToVisibility}}">
-                                                    <TextBlock Text="dominujące"
-                               Foreground="{DynamicResource OnAccent}"
-                               FontSize="12" />
+                                                        BorderBrush="{DynamicResource Surface.Border}"
+                                                        BorderThickness="1,0,0,1"
+                                                        Padding="8,2,8,2"
+                                                        MinWidth="90">
+                                                    <Border Background="{DynamicResource Brand.Orange}"
+                                                            CornerRadius="4"
+                                                            Padding="6,2"
+                                                            HorizontalAlignment="Center"
+                                                            Visibility="{Binding Dominant, Converter={StaticResource BoolToVisibility}}">
+                                                        <TextBlock Text="dominujące"
+                                                                   Foreground="{DynamicResource OnAccent}"
+                                                                   FontSize="12" />
+                                                    </Border>
                                                 </Border>
                                             </Grid>
                                         </DataTemplate>
                                     </ItemsControl.ItemTemplate>
                                 </ItemsControl>
-
                             </StackPanel>
                         </Border>
                     </StackPanel>
 
-                    <!-- PRAWA KOLUMNA: 3 ramki w jednym rzędzie -->
+                    <!-- PRAWA KOLUMNA: 2 rzędy kafelków (3 + 3) -->
                     <Grid Grid.Column="2">
                         <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
                             <RowDefinition Height="Auto" />
                         </Grid.RowDefinitions>
                         <Grid.ColumnDefinitions>
@@ -742,7 +774,10 @@
                                 <TextBlock Text="Aktywność kategorii w wybranym okresie"
                                            FontWeight="Bold"
                                            Foreground="{DynamicResource App.Foreground}"
-                                           FontSize="20" />
+                                           FontSize="20"
+                                           TextWrapping="Wrap"
+                                           Margin="0,0,0,4" />
+
                                 <StackPanel Margin="0,8,0,0">
                                     <Grid>
                                         <Grid.RowDefinitions>
@@ -823,18 +858,12 @@
                                 <TextBlock Text="Szczegóły kategorii"
                                            FontWeight="Bold"
                                            Foreground="{DynamicResource App.Foreground}"
-                                           FontSize="20"/>
+                                           FontSize="20" />
                                 <StackPanel Margin="0,8,0,0">
                                     <TextBlock Foreground="{DynamicResource App.Foreground}"
                                                Text="Suma transakcji w tym okresie:" />
                                     <TextBlock Foreground="{DynamicResource App.Foreground}"
                                                Text="{Binding SelectedCategoryTotalAmount, StringFormat={}{0:N2} zł}" />
-
-                                    <TextBlock Foreground="{DynamicResource App.Foreground}"
-                                               Margin="0,8,0,0"
-                                               Text="Średnia miesięczna kwota:" />
-                                    <TextBlock Foreground="{DynamicResource App.Foreground}"
-                                               Text="{Binding SelectedCategoryAverageMonthly, StringFormat={}{0:N2} zł}" />
 
                                     <TextBlock Foreground="{DynamicResource App.Foreground}"
                                                Margin="0,8,0,0"
@@ -875,7 +904,7 @@
                             </StackPanel>
                         </Border>
 
-                        <!-- DODATKOWA PUSTA RAMKA -->
+                        <!-- Pusta / przyszły insight -->
                         <Border Grid.Row="0"
                                 Grid.Column="2"
                                 Padding="12"
@@ -887,15 +916,230 @@
                                 <TextBlock Text="(Dodatkowa ramka)"
                                            Foreground="{DynamicResource App.Foreground}"
                                            Opacity="0.6"
-                                           FontSize="20"/>
-                                <!-- Tu później dołożymy kolejne insighty / wykres -->
+                                           FontSize="20" />
+                            </StackPanel>
+                        </Border>
+
+                        <!-- ===== DRUGI RZĄD KAFELKÓW PO PRAWEJ ===== -->
+
+                        <!-- Top 3 kategorie w okresie -->
+                        <!-- Top 3 kategorie w wybranym okresie – PODIUM -->
+                        <Border Grid.Row="1"
+        Grid.Column="0"
+        Padding="12"
+        Background="{DynamicResource Surface.Background}"
+        BorderBrush="{DynamicResource Surface.Border}"
+        BorderThickness="1"
+        CornerRadius="8"
+        Margin="0,16,12,0">
+                            <StackPanel>
+                                <TextBlock Text="Top 3 kategorie w wybranym okresie"
+                   FontWeight="Bold"
+                   Foreground="{DynamicResource App.Foreground}"
+                   FontSize="16"
+                   TextWrapping="Wrap" />
+
+                                <!-- PODIUM -->
+                                <Grid Margin="0,12,0,0"
+              Height="120"
+              VerticalAlignment="Bottom">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="*" />
+                                    </Grid.ColumnDefinitions>
+
+                                    <!-- 2 miejsce (lewa strona) = TopCategories[1] -->
+                                    <StackPanel Grid.Column="0"
+                        VerticalAlignment="Bottom"
+                        HorizontalAlignment="Center">
+                                        <Border Background="{DynamicResource Surface.Border}"
+                        CornerRadius="4"
+                        Height="70"
+                        Width="80"
+                        VerticalAlignment="Bottom">
+                                            <StackPanel VerticalAlignment="Bottom"
+                                Margin="4">
+                                                <TextBlock Text="{Binding TopCategories[1].Name}"
+                                   Foreground="{DynamicResource App.Foreground}"
+                                   FontSize="12"
+                                   TextWrapping="Wrap"
+                                   TextAlignment="Center" />
+                                                <TextBlock Text="{Binding TopCategories[1].Amount, StringFormat={}{0:N2} zł}"
+                                   Foreground="{DynamicResource App.Foreground}"
+                                   FontSize="10"
+                                   TextAlignment="Center" />
+                                                <TextBlock Text="{Binding TopCategories[1].Percent, StringFormat={}{0:N0}%}"
+                                   Foreground="{DynamicResource App.Foreground}"
+                                   FontSize="10"
+                                   TextAlignment="Center" />
+                                            </StackPanel>
+                                        </Border>
+                                        <TextBlock Text="2"
+                           Margin="0,4,0,0"
+                           FontWeight="Bold"
+                           Foreground="{DynamicResource App.Foreground}" />
+                                    </StackPanel>
+
+                                    <!-- 1 miejsce (środek) = TopCategories[0] -->
+                                    <StackPanel Grid.Column="1"
+                        VerticalAlignment="Bottom"
+                        HorizontalAlignment="Center">
+                                        <Border Background="{DynamicResource Brand.Orange}"
+                        CornerRadius="4"
+                        Height="90"
+                        Width="90"
+                        VerticalAlignment="Bottom">
+                                            <StackPanel VerticalAlignment="Bottom"
+                                Margin="4">
+                                                <TextBlock Text="{Binding TopCategories[0].Name}"
+                                   Foreground="{DynamicResource OnAccent}"
+                                   FontSize="13"
+                                   FontWeight="SemiBold"
+                                   TextWrapping="Wrap"
+                                   TextAlignment="Center" />
+                                                <TextBlock Text="{Binding TopCategories[0].Amount, StringFormat={}{0:N2} zł}"
+                                   Foreground="{DynamicResource OnAccent}"
+                                   FontSize="11"
+                                   TextAlignment="Center" />
+                                                <TextBlock Text="{Binding TopCategories[0].Percent, StringFormat={}{0:N0}%}"
+                                   Foreground="{DynamicResource OnAccent}"
+                                   FontSize="11"
+                                   TextAlignment="Center" />
+                                            </StackPanel>
+                                        </Border>
+                                        <TextBlock Text="1"
+                           Margin="0,4,0,0"
+                           FontWeight="Bold"
+                           Foreground="{DynamicResource App.Foreground}" />
+                                    </StackPanel>
+
+                                    <!-- 3 miejsce (prawa strona) = TopCategories[2] -->
+                                    <StackPanel Grid.Column="2"
+                        VerticalAlignment="Bottom"
+                        HorizontalAlignment="Center">
+                                        <Border Background="{DynamicResource Surface.Border}"
+                        CornerRadius="4"
+                        Height="50"
+                        Width="80"
+                        VerticalAlignment="Bottom">
+                                            <StackPanel VerticalAlignment="Bottom"
+                                Margin="4">
+                                                <TextBlock Text="{Binding TopCategories[2].Name}"
+                                   Foreground="{DynamicResource App.Foreground}"
+                                   FontSize="12"
+                                   TextWrapping="Wrap"
+                                   TextAlignment="Center" />
+                                                <TextBlock Text="{Binding TopCategories[2].Amount, StringFormat={}{0:N2} zł}"
+                                   Foreground="{DynamicResource App.Foreground}"
+                                   FontSize="10"
+                                   TextAlignment="Center" />
+                                                <TextBlock Text="{Binding TopCategories[2].Percent, StringFormat={}{0:N0}%}"
+                                   Foreground="{DynamicResource App.Foreground}"
+                                   FontSize="10"
+                                   TextAlignment="Center" />
+                                            </StackPanel>
+                                        </Border>
+                                        <TextBlock Text="3"
+                           Margin="0,4,0,0"
+                           FontWeight="Bold"
+                           Foreground="{DynamicResource App.Foreground}" />
+                                    </StackPanel>
+                                </Grid>
+                            </StackPanel>
+                        </Border>
+
+
+                        <!-- Najmniej używane kategorie (z aktywnych) -->
+                        <Border Grid.Row="1"
+                                Grid.Column="1"
+                                Padding="12"
+                                Background="{DynamicResource Surface.Background}"
+                                BorderBrush="{DynamicResource Surface.Border}"
+                                BorderThickness="1"
+                                CornerRadius="8"
+                                Margin="0,16,12,0">
+                            <StackPanel>
+                                <TextBlock Text="Najmniej używane kategorie (z aktywnych)"
+                                           FontWeight="Bold"
+                                           Foreground="{DynamicResource App.Foreground}"
+                                           FontSize="16"
+                                           TextWrapping="Wrap" />
+
+                                <ItemsControl ItemsSource="{Binding BottomCategories}"
+                                              Margin="0,8,0,0">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <Grid Margin="0,2,0,2">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*" />
+                                                    <ColumnDefinition Width="90" />
+                                                    <ColumnDefinition Width="70" />
+                                                </Grid.ColumnDefinitions>
+
+                                                <TextBlock Grid.Column="0"
+                                                           Text="{Binding Name}"
+                                                           Foreground="{DynamicResource App.Foreground}"
+                                                           TextTrimming="CharacterEllipsis" />
+                                                <TextBlock Grid.Column="1"
+                                                           Text="{Binding Amount, StringFormat={}{0:N2} zł}"
+                                                           Foreground="{DynamicResource App.Foreground}"
+                                                           TextAlignment="Right" />
+                                                <TextBlock Grid.Column="2"
+                                                           Text="{Binding Percent, StringFormat={}{0:N0}%}"
+                                                           Foreground="{DynamicResource App.Foreground}"
+                                                           TextAlignment="Right" />
+                                            </Grid>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </StackPanel>
+                        </Border>
+
+                        <!-- Transakcje bez kategorii w tym okresie -->
+                        <Border Grid.Row="1"
+                                Grid.Column="2"
+                                Padding="12"
+                                Background="{DynamicResource Surface.Background}"
+                                BorderBrush="{DynamicResource Surface.Border}"
+                                BorderThickness="1"
+                                CornerRadius="8"
+                                Margin="0,16,0,0">
+                            <StackPanel>
+                                <TextBlock Text="Transakcje bez kategorii w tym okresie"
+                                           FontWeight="Bold"
+                                           Foreground="{DynamicResource App.Foreground}"
+                                           FontSize="16"
+                                           TextWrapping="Wrap" />
+
+                                <TextBlock Text="Liczba transakcji"
+                                           Margin="0,8,0,2"
+                                           Foreground="{DynamicResource App.Foreground}" />
+                                <TextBlock Text="{Binding UncategorizedCount}"
+                                           FontSize="24"
+                                           FontWeight="Bold"
+                                           Foreground="{DynamicResource App.Foreground}" />
+
+                                <TextBlock Text="Łączna kwota"
+                                           Margin="0,8,0,2"
+                                           Foreground="{DynamicResource App.Foreground}" />
+                                <TextBlock Text="{Binding UncategorizedAmount, StringFormat={}{0:N2} zł}"
+                                           FontSize="16"
+                                           FontWeight="SemiBold"
+                                           Foreground="{DynamicResource App.Foreground}" />
+
+                                <TextBlock Text="Uzupełnij kategorie, żeby raporty były dokładniejsze."
+                                           Margin="0,8,0,0"
+                                           Foreground="{DynamicResource App.Foreground}"
+                                           Opacity="0.7"
+                                           TextWrapping="Wrap" />
                             </StackPanel>
                         </Border>
                     </Grid>
                 </Grid>
             </StackPanel>
 
-            <!-- 3) Dolne szczegóły – opcjonalne (domyślnie Collapsed) -->
+            <!-- 3) Dolne szczegóły – opcjonalne (stare panele, zostawione dla kodu-behind) -->
             <Grid Grid.Row="2">
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto" />

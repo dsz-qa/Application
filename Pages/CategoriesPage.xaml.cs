@@ -133,7 +133,7 @@ namespace Finly.Pages
 
         public ObservableCollection<CategoryTransactionRow> SelectedCategoryRecentTransactions { get; } = new();
 
-        // ===== STRUKTURA WYDATKÓW (prawa-góra) =====
+        // ===== STRUKTURA WYDATKÓW / KATEGORII (prawa część) =====
         public ObservableCollection<CategoryShareItem> CategoryShares { get; } = new();
         public ObservableCollection<CategoryShareItem> TopCategories { get; } = new();
         public ObservableCollection<CategoryShareItem> BottomCategories { get; } = new();
@@ -147,6 +147,17 @@ namespace Finly.Pages
                 _activeCategoriesCount = value;
                 RaisePropertyChanged(nameof(ActiveCategoriesCount));
                 RaisePropertyChanged(nameof(ActiveCategoriesSummary));
+            }
+        }
+
+        private int _inactiveCategoriesCount;
+        public int InactiveCategoriesCount
+        {
+            get => _inactiveCategoriesCount;
+            set
+            {
+                _inactiveCategoriesCount = value;
+                RaisePropertyChanged(nameof(InactiveCategoriesCount));
             }
         }
 
@@ -164,6 +175,52 @@ namespace Finly.Pages
 
         public string ActiveCategoriesSummary =>
             $"Aktywne kategorie w wybranym okresie: {ActiveCategoriesCount}/{TotalCategoriesCount}";
+
+        // Pokrycie kategorii i średnia liczba transakcji na aktywną kategorię
+        private double _coveragePercent;
+        public double CoveragePercent
+        {
+            get => _coveragePercent;
+            set
+            {
+                _coveragePercent = value;
+                RaisePropertyChanged(nameof(CoveragePercent));
+            }
+        }
+
+        private double _avgTransactionsPerActiveCategory;
+        public double AvgTransactionsPerActiveCategory
+        {
+            get => _avgTransactionsPerActiveCategory;
+            set
+            {
+                _avgTransactionsPerActiveCategory = value;
+                RaisePropertyChanged(nameof(AvgTransactionsPerActiveCategory));
+            }
+        }
+
+        // Transakcje bez kategorii w tym okresie
+        private int _uncategorizedCount;
+        public int UncategorizedCount
+        {
+            get => _uncategorizedCount;
+            set
+            {
+                _uncategorizedCount = value;
+                RaisePropertyChanged(nameof(UncategorizedCount));
+            }
+        }
+
+        private decimal _uncategorizedAmount;
+        public decimal UncategorizedAmount
+        {
+            get => _uncategorizedAmount;
+            set
+            {
+                _uncategorizedAmount = value;
+                RaisePropertyChanged(nameof(UncategorizedAmount));
+            }
+        }
 
         // ===== PORÓWNANIE Z POPRZEDNIM OKRESEM (prawa-dół) =====
         private decimal _currentPeriodAmount;
@@ -278,10 +335,10 @@ namespace Finly.Pages
         {
             EnsureKpiRefs();
 
-            UpdateCategoryKpis();       // górne trzy kafelki
-            UpdateCategoryStats();      // struktura wydatków + TOP/BOTTOM
-            UpdateCategoryComparison(); // porównanie okresów dla wybranej kategorii
-            LoadSelectedCategoryDetails(); // szczegóły wybranej kategorii
+            UpdateCategoryKpis();           // górne trzy kafelki
+            UpdateCategoryStats();          // struktura wydatków + TOP/BOTTOM + aktywność
+            UpdateCategoryComparison();     // porównanie okresów dla wybranej kategorii
+            LoadSelectedCategoryDetails();  // szczegóły wybranej kategorii
         }
 
         private void EnsureKpiRefs()
@@ -335,7 +392,11 @@ namespace Finly.Pages
                 {
                     using var con = DatabaseService.GetConnection();
                     using var cmd = con.CreateCommand();
-                    cmd.CommandText = @"SELECT c.Name, i.Amount FROM Incomes i JOIN Categories c ON c.Id = i.CategoryId WHERE i.UserId=@u AND i.Date>=@from AND i.Date<=@to AND i.CategoryId IS NOT NULL;";
+                    cmd.CommandText = @"SELECT c.Name, i.Amount 
+                                        FROM Incomes i 
+                                        JOIN Categories c ON c.Id = i.CategoryId 
+                                        WHERE i.UserId=@u AND i.Date>=@from AND i.Date<=@to 
+                                              AND i.CategoryId IS NOT NULL;";
                     cmd.Parameters.AddWithValue("@u", _uid);
                     cmd.Parameters.AddWithValue("@from", from.ToString("yyyy-MM-dd"));
                     cmd.Parameters.AddWithValue("@to", to.ToString("yyyy-MM-dd"));
@@ -388,9 +449,13 @@ namespace Finly.Pages
                 // Twoje kategorie – aktywne gdy mają jakiekolwiek tx (expense/income)
                 var allCats = DatabaseService.GetCategoriesByUser(_uid) ?? new List<string>();
                 int total = allCats.Count;
-                var activeSet = new HashSet<string>(sums.Where(kv => kv.Value > 0).Select(kv => kv.Key), StringComparer.CurrentCultureIgnoreCase);
+                var activeSet = new HashSet<string>(
+                    sums.Where(kv => kv.Value > 0).Select(kv => kv.Key),
+                    StringComparer.CurrentCultureIgnoreCase);
+
                 int active = allCats.Count(c => activeSet.Contains(c));
                 int inactive = Math.Max(0, total - active);
+
                 if (_totalCats != null) _totalCats.Text = total.ToString(CultureInfo.CurrentCulture);
                 if (_activeCats != null) _activeCats.Text = active.ToString(CultureInfo.CurrentCulture);
                 if (_inactiveCats != null) _inactiveCats.Text = inactive.ToString(CultureInfo.CurrentCulture);
@@ -428,7 +493,7 @@ namespace Finly.Pages
                 _categories.Add(vm);
             }
 
-            // opisy
+            // opisy + kolory z bazy
             try
             {
                 using var con = DatabaseService.GetConnection();
@@ -748,7 +813,12 @@ namespace Finly.Pages
                 SelectedCategoryRecentTransactions.Clear();
                 foreach (var t in txList)
                 {
-                    SelectedCategoryRecentTransactions.Add(new CategoryTransactionRow { Date = t.Date, Amount = t.Amount, Description = t.Description });
+                    SelectedCategoryRecentTransactions.Add(new CategoryTransactionRow
+                    {
+                        Date = t.Date,
+                        Amount = t.Amount,
+                        Description = t.Description
+                    });
                 }
             }
             catch { }
@@ -801,9 +871,23 @@ namespace Finly.Pages
                     list.Add((cat.Name, total, cnt));
                 }
 
+                // Aktywne / nieużyte kategorie + średnia liczba transakcji
                 ActiveCategoriesCount = list.Count(x => x.count > 0);
+                InactiveCategoriesCount = Math.Max(0, TotalCategoriesCount - ActiveCategoriesCount);
+
+                int totalTransactionsOnActive = list.Where(x => x.count > 0).Sum(x => x.count);
+
                 decimal totalAmount = list.Sum(x => x.amount);
 
+                CoveragePercent = TotalCategoriesCount > 0
+                    ? Math.Round((double)ActiveCategoriesCount / TotalCategoriesCount * 100.0, 1)
+                    : 0.0;
+
+                AvgTransactionsPerActiveCategory = ActiveCategoriesCount > 0
+                    ? Math.Round((double)totalTransactionsOnActive / ActiveCategoriesCount, 1)
+                    : 0.0;
+
+                // Struktura udziałów (CategoryShares)
                 CategoryShares.Clear();
                 if (totalAmount > 0)
                 {
@@ -834,8 +918,7 @@ namespace Finly.Pages
                     }
                 }
 
-
-
+                // Top 3 i Bottom 3 (tylko dodatnie kwoty)
                 var positive = list.Where(x => x.amount > 0).ToList();
 
                 TopCategories.Clear();
@@ -862,6 +945,34 @@ namespace Finly.Pages
                     });
                 }
 
+                // Transakcje bez kategorii (tylko wydatki)
+                int uncCount = 0;
+                decimal uncAmount = 0m;
+                try
+                {
+                    DataTable? allDt = DatabaseService.GetExpenses(_uid, from, to, null, null, null);
+                    if (allDt != null)
+                    {
+                        foreach (DataRow row in allDt.Rows)
+                        {
+                            try
+                            {
+                                string catName = (row[6]?.ToString() ?? string.Empty).Trim();
+                                if (string.IsNullOrEmpty(catName) || catName == "(brak)")
+                                {
+                                    uncCount++;
+                                    uncAmount += Math.Abs(Convert.ToDecimal(row[3]));
+                                }
+                            }
+                            catch { }
+                        }
+                    }
+                }
+                catch { }
+
+                UncategorizedCount = uncCount;
+                UncategorizedAmount = uncAmount;
+
                 RaisePropertyChanged(nameof(CategoryShares));
                 RaisePropertyChanged(nameof(TopCategories));
                 RaisePropertyChanged(nameof(BottomCategories));
@@ -872,7 +983,12 @@ namespace Finly.Pages
                 TopCategories.Clear();
                 BottomCategories.Clear();
                 ActiveCategoriesCount = 0;
+                InactiveCategoriesCount = 0;
                 TotalCategoriesCount = _categories.Count;
+                CoveragePercent = 0;
+                AvgTransactionsPerActiveCategory = 0;
+                UncategorizedCount = 0;
+                UncategorizedAmount = 0m;
             }
         }
 
@@ -959,7 +1075,6 @@ namespace Finly.Pages
             RaisePropertyChanged(nameof(EditCategoryColorBrush));
         }
 
-
         private void SaveDetails_Click(object sender, RoutedEventArgs e)
         {
             if (_selectedCategory == null) return;
@@ -971,7 +1086,10 @@ namespace Finly.Pages
             }
             try
             {
-                string? colorToSave = string.IsNullOrWhiteSpace(EditCategoryColorHex) ? _selectedCategory.ColorHex : EditCategoryColorHex;
+                string? colorToSave = string.IsNullOrWhiteSpace(EditCategoryColorHex)
+                    ? _selectedCategory.ColorHex
+                    : EditCategoryColorHex;
+
                 DatabaseService.UpdateCategoryFull(_selectedCategory.Id, _uid, newName, colorToSave, _selectedCategory.Icon);
                 using var con = DatabaseService.GetConnection();
                 using var cmd = con.CreateCommand();
@@ -991,7 +1109,8 @@ namespace Finly.Pages
 
                 // Odśwież listę i detale
                 LoadCategories();
-                _selectedCategory = _categories.FirstOrDefault(c => string.Equals(c.Name, newName, StringComparison.OrdinalIgnoreCase));
+                _selectedCategory = _categories.FirstOrDefault(c =>
+                    string.Equals(c.Name, newName, StringComparison.OrdinalIgnoreCase));
                 UpdateDetailsFrameFromSelection();
                 LoadSelectedCategoryDetails();
                 UpdateCategoryStats();
@@ -999,7 +1118,8 @@ namespace Finly.Pages
             }
             catch (Exception ex)
             {
-                MessageBox.Show("Błąd zapisu: " + ex.Message, "Błąd", MessageBoxButton.OK, MessageBoxImage.Error);
+                MessageBox.Show("Błąd zapisu: " + ex.Message, "Błąd",
+                    MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
 
@@ -1075,7 +1195,8 @@ namespace Finly.Pages
             {
                 using var con = DatabaseService.GetConnection();
                 using var cmd = con.CreateCommand();
-                cmd.CommandText = @"SELECT Amount, Date FROM Incomes WHERE UserId=@u AND Date>=@from AND Date<=@to" +
+                cmd.CommandText = @"SELECT Amount, Date FROM Incomes 
+                                    WHERE UserId=@u AND Date>=@from AND Date<=@to" +
                                   (categoryId.HasValue ? " AND CategoryId=@cat" : "") + ";";
                 cmd.Parameters.AddWithValue("@u", userId);
                 cmd.Parameters.AddWithValue("@from", from.ToString("yyyy-MM-dd"));
