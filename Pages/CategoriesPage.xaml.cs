@@ -810,11 +810,13 @@ namespace Finly.Pages
                     foreach (var it in list.OrderByDescending(x => x.amount))
                     {
                         double pct = (double)(it.amount / totalAmount) * 100.0;
+
                         CategoryShares.Add(new CategoryShareItem
                         {
                             Name = it.name,
                             Amount = it.amount,
-                            Percent = pct
+                            Percent = pct,
+                            Dominant = pct >= 20.0   // dominujące = min. 20% wszystkich transakcji
                         });
                     }
                 }
@@ -826,10 +828,13 @@ namespace Finly.Pages
                         {
                             Name = it.name,
                             Amount = 0m,
-                            Percent = 0
+                            Percent = 0.0,
+                            Dominant = false
                         });
                     }
                 }
+
+
 
                 var positive = list.Where(x => x.amount > 0).ToList();
 
@@ -1181,6 +1186,10 @@ namespace Finly.Pages
             public string Name { get; set; } = string.Empty;
             public double Percent { get; set; }
             public decimal Amount { get; set; }
+
+            // czy kategoria jest „dominująca” w analizowanym okresie
+            public bool Dominant { get; set; }
         }
+
     }
 }
