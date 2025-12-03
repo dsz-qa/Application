@@ -24,8 +24,9 @@ namespace Finly.Pages
                 {
                     if (vm.CategoriesSeries != null)
                         foreach (var series in vm.CategoriesSeries) series.DataLabelsPaint = white;
-                    if (vm.AccountsSeries != null)
-                        foreach (var series in vm.AccountsSeries) series.DataLabelsPaint = white;
+                    // Poprawka: użyj właściwej kolekcji zamiast AccountsSeries
+                    if (vm.BankAccountsSeries != null)
+                        foreach (var series in vm.BankAccountsSeries) series.DataLabelsPaint = white;
                     if (vm.TrendSeries != null)
                         foreach (var series in vm.TrendSeries) series.DataLabelsPaint = white;
                     if (vm.WeekdaySeries != null)
