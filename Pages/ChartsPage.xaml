@@ -102,7 +102,7 @@
                     <ColumnDefinition Width="*"/>
                 </Grid.ColumnDefinitions>
 
-                <!-- Lewa kolumna: Pie + Accounts -->
+                <!-- Lewa kolumna: Pie + accounts/free/saved/envelopes -->
                 <StackPanel Grid.Column="0">
                     <Border Style="{StaticResource Card}">
                         <StackPanel>
@@ -117,9 +117,42 @@
 
                     <Border Style="{StaticResource Card}">
                         <StackPanel>
-                            <TextBlock Text="Wg kont / kopert" Style="{StaticResource CardHeader}"/>
+                            <TextBlock Text="Wg kont (rachunki bankowe)" Style="{StaticResource CardHeader}"/>
                             <lvcwpf:CartesianChart Series="{Binding AccountsSeries}"
                                                    XAxes="{Binding AccountsXAxes}"
+                                                   Height="260"
+                                                   Background="Transparent"
+                                                   Foreground="White"/>
+                        </StackPanel>
+                    </Border>
+
+                    <Border Style="{StaticResource Card}">
+                        <StackPanel>
+                            <TextBlock Text="Wolna gotówka" Style="{StaticResource CardHeader}"/>
+                            <lvcwpf:CartesianChart Series="{Binding FreeCashSeries}"
+                                                   XAxes="{Binding FreeCashXAxes}"
+                                                   Height="200"
+                                                   Background="Transparent"
+                                                   Foreground="White"/>
+                        </StackPanel>
+                    </Border>
+
+                    <Border Style="{StaticResource Card}">
+                        <StackPanel>
+                            <TextBlock Text="Odłożona gotówka" Style="{StaticResource CardHeader}"/>
+                            <lvcwpf:CartesianChart Series="{Binding SavedCashSeries}"
+                                                   XAxes="{Binding SavedCashXAxes}"
+                                                   Height="200"
+                                                   Background="Transparent"
+                                                   Foreground="White"/>
+                        </StackPanel>
+                    </Border>
+
+                    <Border Style="{StaticResource Card}">
+                        <StackPanel>
+                            <TextBlock Text="Wg kopert" Style="{StaticResource CardHeader}"/>
+                            <lvcwpf:CartesianChart Series="{Binding EnvelopesSeries}"
+                                                   XAxes="{Binding EnvelopesXAxes}"
                                                    Height="260"
                                                    Background="Transparent"
                                                    Foreground="White"/>
