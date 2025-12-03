@@ -1,7 +1,7 @@
-using System;
+﻿using System;
 using System.Windows;
 
-namespace Finly.Pages
+namespace Finly.Views
 {
     public partial class LoanDetailsWindow : Window
     {

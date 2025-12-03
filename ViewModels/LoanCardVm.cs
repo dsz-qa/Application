@@ -1,8 +1,9 @@
-using System;
+ï»¿using System;
 
-namespace Finly.Pages
+namespace Finly.ViewModels
 {
-    public sealed class LoanCardVm
+    public class LoanCardVm   // bez sealed!
+
     {
         public int Id { get; set; }
         public int UserId { get; set; }
@@ -13,7 +14,7 @@ namespace Finly.Pages
         public int TermMonths { get; set; }
         public int PaymentDay { get; set; } = 0; // 0 = unspecified
 
-        public string PrincipalStr => Principal.ToString("N0") + " z³";
+        public string PrincipalStr => Principal.ToString("N0") + " zÅ‚";
 
         public double PercentPaidClamped
         {
@@ -57,13 +58,13 @@ namespace Finly.Pages
         }
 
         public decimal NextPayment => Math.Round(Principal > 0 ? Principal / Math.Max(1, TermMonths) : 0m, 0);
-        public string NextPaymentInfo => NextPayment.ToString("N0") + " z³ · " + NextPaymentDate.ToString("dd.MM.yyyy");
+        public string NextPaymentInfo => NextPayment.ToString("N0") + " zÅ‚ Â· " + NextPaymentDate.ToString("dd.MM.yyyy");
 
         public string RemainingTermStr
         {
             get
             {
-                if (TermMonths <= 0) return "—";
+                if (TermMonths <= 0) return "â€”";
                 var monthsLeft = Math.Max(0, TermMonths - ((DateTime.Today.Year - StartDate.Year) * 12 + DateTime.Today.Month - StartDate.Month));
                 var years = monthsLeft / 12;
                 var months = monthsLeft % 12;

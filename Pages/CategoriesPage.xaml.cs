@@ -10,6 +10,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Data;
 using System.Windows.Media;
+using System.Windows.Shapes;
 
 namespace Finly.Pages
 {
@@ -42,6 +43,57 @@ namespace Finly.Pages
         // wybrana kategoria (dla szczegółów / porównania)
         private CategoryVm? _selectedCategory;
 
+        // Szczegóły do ramki po prawej
+        private string _selectedCategoryName = string.Empty;
+        public string SelectedCategoryName
+        {
+            get => _selectedCategoryName;
+            private set
+            {
+                _selectedCategoryName = value;
+                RaisePropertyChanged(nameof(SelectedCategoryName));
+            }
+        }
+
+        private Brush _selectedCategoryColorBrush = Brushes.Transparent;
+        public Brush SelectedCategoryColorBrush
+        {
+            get => _selectedCategoryColorBrush;
+            private set
+            {
+                _selectedCategoryColorBrush = value;
+                RaisePropertyChanged(nameof(SelectedCategoryColorBrush));
+            }
+        }
+
+        private string? _selectedCategoryDescriptionText;
+        public string? SelectedCategoryDescriptionText
+        {
+            get => _selectedCategoryDescriptionText;
+            private set
+            {
+                _selectedCategoryDescriptionText = value;
+                RaisePropertyChanged(nameof(SelectedCategoryDescriptionText));
+            }
+        }
+
+        // Tryb edycji w ramce szczegółów
+        private bool _isDetailsEditMode;
+        public bool IsDetailsEditMode
+        {
+            get => _isDetailsEditMode;
+            set
+            {
+                _isDetailsEditMode = value;
+                RaisePropertyChanged(nameof(IsDetailsEditMode));
+            }
+        }
+
+        public string EditCategoryName { get; set; } = string.Empty;
+        public string? EditCategoryDescription { get; set; }
+        public string? EditCategoryColorHex { get; set; }
+        public Brush EditCategoryColorBrush { get; set; } = Brushes.Transparent;
+
         // kolor wybrany w panelu dodawania
         private string _selectedColorHex = string.Empty;
 
@@ -50,21 +102,33 @@ namespace Finly.Pages
         public decimal SelectedCategoryTotalAmount
         {
             get => _selectedCategoryTotalAmount;
-            set { _selectedCategoryTotalAmount = value; RaisePropertyChanged(nameof(SelectedCategoryTotalAmount)); }
+            set
+            {
+                _selectedCategoryTotalAmount = value;
+                RaisePropertyChanged(nameof(SelectedCategoryTotalAmount));
+            }
         }
 
         private decimal _selectedCategoryAverageMonthly;
         public decimal SelectedCategoryAverageMonthly
         {
             get => _selectedCategoryAverageMonthly;
-            set { _selectedCategoryAverageMonthly = value; RaisePropertyChanged(nameof(SelectedCategoryAverageMonthly)); }
+            set
+            {
+                _selectedCategoryAverageMonthly = value;
+                RaisePropertyChanged(nameof(SelectedCategoryAverageMonthly));
+            }
         }
 
         private int _selectedCategoryTransactionCount;
         public int SelectedCategoryTransactionCount
         {
             get => _selectedCategoryTransactionCount;
-            set { _selectedCategoryTransactionCount = value; RaisePropertyChanged(nameof(SelectedCategoryTransactionCount)); }
+            set
+            {
+                _selectedCategoryTransactionCount = value;
+                RaisePropertyChanged(nameof(SelectedCategoryTransactionCount));
+            }
         }
 
         public ObservableCollection<CategoryTransactionRow> SelectedCategoryRecentTransactions { get; } = new();
@@ -138,7 +202,7 @@ namespace Finly.Pages
         // ===== KPI U GÓRY =====
         private TextBlock? _mostUsedName;
         private TextBlock? _mostUsedCount;
-        private System.Windows.Shapes.Rectangle? _mostUsedColor;
+        private Rectangle? _mostUsedColor;
 
         private TextBlock? _mostExpName;
         private TextBlock? _mostExpAmount;
@@ -214,9 +278,9 @@ namespace Finly.Pages
         {
             EnsureKpiRefs();
 
-            UpdateCategoryKpis();          // górne trzy kafelki
-            UpdateCategoryStats();         // struktura wydatków + TOP/BOTTOM
-            UpdateCategoryComparison();    // porównanie okresów dla wybranej kategorii
+            UpdateCategoryKpis();       // górne trzy kafelki
+            UpdateCategoryStats();      // struktura wydatków + TOP/BOTTOM
+            UpdateCategoryComparison(); // porównanie okresów dla wybranej kategorii
             LoadSelectedCategoryDetails(); // szczegóły wybranej kategorii
         }
 
@@ -224,7 +288,7 @@ namespace Finly.Pages
         {
             _mostUsedName ??= FindName("MostUsedCategoryNameText") as TextBlock;
             _mostUsedCount ??= FindName("MostUsedCountText") as TextBlock;
-            _mostUsedColor ??= FindName("MostUsedColorRect") as System.Windows.Shapes.Rectangle;
+            _mostUsedColor ??= FindName("MostUsedColorRect") as Rectangle;
 
             _mostExpName ??= FindName("MostExpensiveNameText") as TextBlock;
             _mostExpAmount ??= FindName("MostExpensiveAmountText") as TextBlock;
@@ -247,32 +311,46 @@ namespace Finly.Pages
                 DateTime to = PeriodBar.EndDate;
                 if (from > to) (from, to) = (to, from);
 
+                // Expenses by category name
                 var dt = DatabaseService.GetExpenses(_uid, from, to, null, null, null);
-
                 var counts = new Dictionary<string, int>(StringComparer.CurrentCultureIgnoreCase);
                 var sums = new Dictionary<string, decimal>(StringComparer.CurrentCultureIgnoreCase);
                 decimal totalSum = 0m;
-
                 foreach (DataRow row in dt.Rows)
                 {
                     try
                     {
                         var name = (row[6]?.ToString() ?? "").Trim();
                         if (string.IsNullOrWhiteSpace(name) || name == "(brak)") continue;
-
-                        decimal amount;
-                        var val = row[3];
-                        if (val is decimal dec) amount = dec;
-                        else if (val is double d) amount = (decimal)d;
-                        else amount = Convert.ToDecimal(val);
-                        amount = Math.Abs(amount);
-
+                        var amount = Math.Abs(Convert.ToDecimal(row[3]));
                         counts[name] = counts.TryGetValue(name, out var c) ? c + 1 : 1;
                         sums[name] = sums.TryGetValue(name, out var s) ? s + amount : amount;
                         totalSum += amount;
                     }
                     catch { }
                 }
+
+                // Incomes aggregate by category – add to existing aggregates
+                try
+                {
+                    using var con = DatabaseService.GetConnection();
+                    using var cmd = con.CreateCommand();
+                    cmd.CommandText = @"SELECT c.Name, i.Amount FROM Incomes i JOIN Categories c ON c.Id = i.CategoryId WHERE i.UserId=@u AND i.Date>=@from AND i.Date<=@to AND i.CategoryId IS NOT NULL;";
+                    cmd.Parameters.AddWithValue("@u", _uid);
+                    cmd.Parameters.AddWithValue("@from", from.ToString("yyyy-MM-dd"));
+                    cmd.Parameters.AddWithValue("@to", to.ToString("yyyy-MM-dd"));
+                    using var r = cmd.ExecuteReader();
+                    while (r.Read())
+                    {
+                        string name = r.IsDBNull(0) ? "" : r.GetString(0);
+                        if (string.IsNullOrWhiteSpace(name)) continue;
+                        var amount = Math.Abs(Convert.ToDecimal(r.GetValue(1)));
+                        counts[name] = counts.TryGetValue(name, out var c) ? c + 1 : 1;
+                        sums[name] = sums.TryGetValue(name, out var s) ? s + amount : amount;
+                        totalSum += amount;
+                    }
+                }
+                catch { }
 
                 // Najczęściej używana
                 if (counts.Count > 0)
@@ -289,7 +367,7 @@ namespace Finly.Pages
                     if (_mostUsedColor != null) _mostUsedColor.Fill = Brushes.Transparent;
                 }
 
-                // Najdroższa
+                // Najdroższa (sumy wydatków+przychodów)
                 if (sums.Count > 0)
                 {
                     var mostExp = sums.OrderByDescending(kv => kv.Value).First();
@@ -297,7 +375,7 @@ namespace Finly.Pages
                     if (_mostExpAmount != null) _mostExpAmount.Text = mostExp.Value.ToString("N2") + " zł";
                     var pct = totalSum > 0m ? (double)(mostExp.Value / totalSum * 100m) : 0.0;
                     if (_mostExpPercentBar != null) _mostExpPercentBar.Value = pct;
-                    if (_mostExpPercentText != null) _mostExpPercentText.Text = Math.Round(pct, 0) + "% wszystkich wydatków";
+                    if (_mostExpPercentText != null) _mostExpPercentText.Text = Math.Round(pct, 0) + "% wszystkich transakcji";
                 }
                 else
                 {
@@ -307,24 +385,17 @@ namespace Finly.Pages
                     if (_mostExpPercentText != null) _mostExpPercentText.Text = string.Empty;
                 }
 
-                // Twoje kategorie
+                // Twoje kategorie – aktywne gdy mają jakiekolwiek tx (expense/income)
                 var allCats = DatabaseService.GetCategoriesByUser(_uid) ?? new List<string>();
                 int total = allCats.Count;
-                var activeSet = new HashSet<string>(
-                    sums.Where(kv => kv.Value > 0).Select(kv => kv.Key),
-                    StringComparer.CurrentCultureIgnoreCase);
-
+                var activeSet = new HashSet<string>(sums.Where(kv => kv.Value > 0).Select(kv => kv.Key), StringComparer.CurrentCultureIgnoreCase);
                 int active = allCats.Count(c => activeSet.Contains(c));
                 int inactive = Math.Max(0, total - active);
-
                 if (_totalCats != null) _totalCats.Text = total.ToString(CultureInfo.CurrentCulture);
                 if (_activeCats != null) _activeCats.Text = active.ToString(CultureInfo.CurrentCulture);
                 if (_inactiveCats != null) _inactiveCats.Text = inactive.ToString(CultureInfo.CurrentCulture);
             }
-            catch
-            {
-                // nie wywalaj UI przy błędzie
-            }
+            catch { }
         }
 
         // ========== ŁADOWANIE LISTY KATEGORII (niezależne od okresu) ==========
@@ -362,20 +433,28 @@ namespace Finly.Pages
             {
                 using var con = DatabaseService.GetConnection();
                 using var cmd = con.CreateCommand();
-                cmd.CommandText = "SELECT Id, Description FROM Categories WHERE UserId=@u;";
+                cmd.CommandText = "SELECT Id, Description, Color FROM Categories WHERE UserId=@u;";
                 cmd.Parameters.AddWithValue("@u", _uid);
                 using var reader = cmd.ExecuteReader();
-                var map = new Dictionary<int, string?>(256);
+                var mapDesc = new Dictionary<int, string?>(256);
+                var mapColor = new Dictionary<int, string?>(256);
                 while (reader.Read())
                 {
                     var id = reader.GetInt32(0);
                     string? desc = reader.IsDBNull(1) ? null : reader.GetString(1);
-                    map[id] = desc;
+                    string? colorHex = reader.IsDBNull(2) ? null : reader.GetString(2);
+                    mapDesc[id] = desc;
+                    mapColor[id] = colorHex;
                 }
 
                 foreach (var vm in _categories)
                 {
-                    if (map.TryGetValue(vm.Id, out var d)) vm.Description = d;
+                    if (mapDesc.TryGetValue(vm.Id, out var d)) vm.Description = d;
+                    if (mapColor.TryGetValue(vm.Id, out var ch) && !string.IsNullOrWhiteSpace(ch))
+                    {
+                        vm.ColorHex = ch;
+                        try { vm.ColorBrush = (Brush)(new BrushConverter().ConvertFromString(ch)!); } catch { }
+                    }
                 }
             }
             catch { }
@@ -466,6 +545,7 @@ namespace Finly.Pages
 
                 LoadSelectedCategoryDetails();
                 UpdateCategoryComparison();
+                UpdateDetailsFrameFromSelection();
             }
         }
 
@@ -514,6 +594,7 @@ namespace Finly.Pages
 
                 LoadCategories();
                 UpdateCategoryKpis();
+                UpdateDetailsFrameFromSelection();
             }
             catch (Exception ex)
             {
@@ -530,6 +611,7 @@ namespace Finly.Pages
                 vm.IsEditing = false;
                 // odśwież listę z bazy, żeby odrzucić lokalne zmiany
                 LoadCategories();
+                UpdateDetailsFrameFromSelection();
             }
         }
 
@@ -572,6 +654,7 @@ namespace Finly.Pages
 
                 LoadCategories();
                 UpdateCategoryKpis();
+                UpdateDetailsFrameFromSelection();
             }
             catch (Exception ex)
             {
@@ -585,11 +668,38 @@ namespace Finly.Pages
         {
             if (e.OriginalSource is FrameworkElement fe && fe.DataContext is CategoryVm vm)
             {
+                // zaznacz tylko jedną kartę: reset dla innych
+                foreach (var c in _categories)
+                {
+                    if (ReferenceEquals(c, vm)) continue;
+                    c.IsSelected = false;
+                }
+                vm.IsSelected = true;
+
                 _selectedCategory = vm;
                 LoadSelectedCategoryDetails();
                 UpdateCategoryComparison();
+                UpdateDetailsFrameFromSelection();
             }
         }
+
+        private void UpdateDetailsFrameFromSelection()
+        {
+            if (_selectedCategory == null)
+            {
+                SelectedCategoryName = string.Empty;
+                SelectedCategoryColorBrush = Brushes.Transparent;
+                SelectedCategoryDescriptionText = null;
+                IsDetailsEditMode = false;
+                return;
+            }
+
+            SelectedCategoryName = _selectedCategory.Name;
+            SelectedCategoryColorBrush = _selectedCategory.ColorBrush;
+            SelectedCategoryDescriptionText = _selectedCategory.Description;
+            IsDetailsEditMode = false;
+        }
+
 
         // ========== SZCZEGÓŁY WYBRANEJ KATEGORII (zależne od okresu) ==========
 
@@ -609,47 +719,42 @@ namespace Finly.Pages
             DateTime to = PeriodBar.EndDate;
             if (from > to) (from, to) = (to, from);
 
+            // Expenses table
             DataTable? expensesDt = null;
             try { expensesDt = DatabaseService.GetExpenses(_uid, from, to, catId, null, null); } catch { }
-
-            decimal sum = 0m;
-            int count = 0;
+            decimal sumExp = 0m; int countExp = 0;
             if (expensesDt != null)
             {
                 foreach (DataRow row in expensesDt.Rows)
                 {
-                    try
-                    {
-                        sum += Math.Abs(Convert.ToDecimal(row[3]));
-                        count++;
-                    }
-                    catch { }
+                    try { sumExp += Math.Abs(Convert.ToDecimal(row[3])); countExp++; } catch { }
                 }
             }
 
-            SelectedCategoryTotalAmount = sum;
-            SelectedCategoryTransactionCount = count;
+            // Incomes for category
+            var (sumInc, countInc) = SumIncomes(_uid, from, to, catId);
+            var totalSum = sumExp + sumInc;
+            var totalCount = countExp + countInc;
+            SelectedCategoryTotalAmount = totalSum;
+            SelectedCategoryTransactionCount = totalCount;
 
             double monthsSpan = Math.Max(1.0, (to - from).TotalDays / 30.0);
-            SelectedCategoryAverageMonthly = monthsSpan <= 0 ? 0 : sum / (decimal)monthsSpan;
+            SelectedCategoryAverageMonthly = monthsSpan <= 0 ? 0 : totalSum / (decimal)monthsSpan;
 
+            // Ostatnie transakcje
             try
             {
-                var txList = DatabaseService.GetLastTransactionsForCategory(_uid, catId.Value, 12);
+                var txList = DatabaseService.GetLastTransactionsForCategory(_uid, catId.Value, 5);
+                SelectedCategoryRecentTransactions.Clear();
                 foreach (var t in txList)
                 {
-                    SelectedCategoryRecentTransactions.Add(new CategoryTransactionRow
-                    {
-                        Date = t.Date,
-                        Amount = t.Amount,
-                        Description = t.Description
-                    });
+                    SelectedCategoryRecentTransactions.Add(new CategoryTransactionRow { Date = t.Date, Amount = t.Amount, Description = t.Description });
                 }
             }
             catch { }
         }
 
-        // ========== STRUKTURA WYDATKÓW + TOP/BOTTOM (zależne od okresu) ==========
+        // ========== STRUKTURA KATEGORII (wydatki+przychody) ==========
 
         private void UpdateCategoryStats()
         {
@@ -674,26 +779,26 @@ namespace Finly.Pages
                         continue;
                     }
 
+                    // expenses
                     DataTable? dt = null;
                     try { dt = DatabaseService.GetExpenses(_uid, from, to, catId, null, null); } catch { }
-
-                    decimal sum = 0m;
-                    int cnt = 0;
+                    decimal sumExp = 0m;
+                    int cntExp = 0;
 
                     if (dt != null)
                     {
                         foreach (DataRow r in dt.Rows)
                         {
-                            try
-                            {
-                                sum += Math.Abs(Convert.ToDecimal(r[3]));
-                                cnt++;
-                            }
-                            catch { }
+                            try { sumExp += Math.Abs(Convert.ToDecimal(r[3])); cntExp++; } catch { }
                         }
                     }
 
-                    list.Add((cat.Name, sum, cnt));
+                    // incomes
+                    var (sumInc, cntInc) = SumIncomes(_uid, from, to, catId);
+                    var total = sumExp + sumInc;
+                    var cnt = cntExp + cntInc;
+
+                    list.Add((cat.Name, total, cnt));
                 }
 
                 ActiveCategoriesCount = list.Count(x => x.count > 0);
@@ -766,7 +871,7 @@ namespace Finly.Pages
             }
         }
 
-        // ========== PORÓWNANIE Z POPRZEDNIM OKRESEM (zależne od okresu + kategorii) ==========
+        // ========== PORÓWNANIE OKRESÓW (wydatki+przychody) ==========
 
         private void UpdateCategoryComparison()
         {
@@ -796,36 +901,107 @@ namespace Finly.Pages
                 DateTime prevTo = from;
                 DateTime prevFrom = from - span;
 
-                decimal curr = 0m;
+                // current
+                decimal currExp = 0m;
                 DataTable? cdt = null;
                 try { cdt = DatabaseService.GetExpenses(_uid, from, to, catId, null, null); } catch { }
                 if (cdt != null)
                 {
                     foreach (DataRow r in cdt.Rows)
                     {
-                        try { curr += Math.Abs(Convert.ToDecimal(r[3])); } catch { }
+                        try { currExp += Math.Abs(Convert.ToDecimal(r[3])); } catch { }
                     }
                 }
 
-                decimal prev = 0m;
+                var (currInc, _) = SumIncomes(_uid, from, to, catId);
+
+                // previous
+                decimal prevExp = 0m;
                 DataTable? pdt = null;
                 try { pdt = DatabaseService.GetExpenses(_uid, prevFrom, prevTo, catId, null, null); } catch { }
                 if (pdt != null)
                 {
                     foreach (DataRow r in pdt.Rows)
                     {
-                        try { prev += Math.Abs(Convert.ToDecimal(r[3])); } catch { }
+                        try { prevExp += Math.Abs(Convert.ToDecimal(r[3])); } catch { }
                     }
                 }
 
-                CurrentPeriodAmount = curr;
-                PreviousPeriodAmount = prev;
+                var (prevInc, _) = SumIncomes(_uid, prevFrom, prevTo, catId);
+
+                CurrentPeriodAmount = currExp + currInc;
+                PreviousPeriodAmount = prevExp + prevInc;
             }
             catch
             {
                 CurrentPeriodAmount = 0;
                 PreviousPeriodAmount = 0;
             }
+        }
+
+        // ===== Ramka szczegółów: akcje edycji =====
+        private void EditDetails_Click(object sender, RoutedEventArgs e)
+        {
+            if (_selectedCategory == null) return;
+            IsDetailsEditMode = true;
+            EditCategoryName = _selectedCategory.Name;
+            EditCategoryDescription = _selectedCategory.Description;
+            EditCategoryColorHex = _selectedCategory.ColorHex;
+            EditCategoryColorBrush = _selectedCategory.ColorBrush;
+            RaisePropertyChanged(nameof(EditCategoryName));
+            RaisePropertyChanged(nameof(EditCategoryDescription));
+            RaisePropertyChanged(nameof(EditCategoryColorHex));
+            RaisePropertyChanged(nameof(EditCategoryColorBrush));
+        }
+
+
+        private void SaveDetails_Click(object sender, RoutedEventArgs e)
+        {
+            if (_selectedCategory == null) return;
+            var newName = (EditCategoryName ?? string.Empty).Trim();
+            if (string.IsNullOrWhiteSpace(newName))
+            {
+                MessageBox.Show("Podaj nazwę kategorii.", "Błąd", MessageBoxButton.OK, MessageBoxImage.Warning);
+                return;
+            }
+            try
+            {
+                string? colorToSave = string.IsNullOrWhiteSpace(EditCategoryColorHex) ? _selectedCategory.ColorHex : EditCategoryColorHex;
+                DatabaseService.UpdateCategoryFull(_selectedCategory.Id, _uid, newName, colorToSave, _selectedCategory.Icon);
+                using var con = DatabaseService.GetConnection();
+                using var cmd = con.CreateCommand();
+                cmd.CommandText = "UPDATE Categories SET Description=@d WHERE Id=@id;";
+                cmd.Parameters.AddWithValue("@d", (object?)EditCategoryDescription ?? DBNull.Value);
+                cmd.Parameters.AddWithValue("@id", _selectedCategory.Id);
+                cmd.ExecuteNonQuery();
+
+                // Lokalnie zaktualizuj VM
+                _selectedCategory.Name = newName;
+                _selectedCategory.Description = EditCategoryDescription;
+                if (!string.IsNullOrWhiteSpace(colorToSave))
+                {
+                    _selectedCategory.ColorHex = colorToSave;
+                    try { _selectedCategory.ColorBrush = (Brush)(new BrushConverter().ConvertFromString(colorToSave)!); } catch { }
+                }
+
+                // Odśwież listę i detale
+                LoadCategories();
+                _selectedCategory = _categories.FirstOrDefault(c => string.Equals(c.Name, newName, StringComparison.OrdinalIgnoreCase));
+                UpdateDetailsFrameFromSelection();
+                LoadSelectedCategoryDetails();
+                UpdateCategoryStats();
+                IsDetailsEditMode = false;
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Błąd zapisu: " + ex.Message, "Błąd", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+
+        private void CancelDetails_Click(object sender, RoutedEventArgs e)
+        {
+            IsDetailsEditMode = false;
+            UpdateDetailsFrameFromSelection();
         }
 
         // ========== POMOCNICZE ==========
@@ -887,6 +1063,36 @@ namespace Finly.Pages
             }
         }
 
+        // Helper: sum incomes for user in range optionally for specific category
+        private static (decimal sum, int count) SumIncomes(int userId, DateTime from, DateTime to, int? categoryId)
+        {
+            try
+            {
+                using var con = DatabaseService.GetConnection();
+                using var cmd = con.CreateCommand();
+                cmd.CommandText = @"SELECT Amount, Date FROM Incomes WHERE UserId=@u AND Date>=@from AND Date<=@to" +
+                                  (categoryId.HasValue ? " AND CategoryId=@cat" : "") + ";";
+                cmd.Parameters.AddWithValue("@u", userId);
+                cmd.Parameters.AddWithValue("@from", from.ToString("yyyy-MM-dd"));
+                cmd.Parameters.AddWithValue("@to", to.ToString("yyyy-MM-dd"));
+                if (categoryId.HasValue) cmd.Parameters.AddWithValue("@cat", categoryId.Value);
+                using var r = cmd.ExecuteReader();
+                decimal sum = 0m; int count = 0;
+                while (r.Read())
+                {
+                    try
+                    {
+                        var amt = Convert.ToDecimal(r.GetValue(0));
+                        sum += Math.Abs(amt);
+                        count++;
+                    }
+                    catch { }
+                }
+                return (sum, count);
+            }
+            catch { return (0m, 0); }
+        }
+
         // ===== MODELE WEWNĘTRZNE =====
 
         public class CategoryVm : INotifyPropertyChanged
@@ -896,6 +1102,7 @@ namespace Finly.Pages
             private string? _description;
             private bool _isEditing;
             private string? _colorHex;
+            private bool _isSelected;
 
             public int Id { get; set; }
             public string Name { get; set; } = string.Empty;
@@ -949,6 +1156,12 @@ namespace Finly.Pages
             {
                 get => _colorHex;
                 set { _colorHex = value; OnPropertyChanged(nameof(ColorHex)); }
+            }
+
+            public bool IsSelected
+            {
+                get => _isSelected;
+                set { _isSelected = value; OnPropertyChanged(nameof(IsSelected)); }
             }
 
             public event PropertyChangedEventHandler? PropertyChanged;

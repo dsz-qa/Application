@@ -1,0 +1,230 @@
+﻿<Window x:Class="Finly.Views.Dialogs.EditBudgetDialog"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Budżet"
+        WindowStartupLocation="CenterOwner"
+        SizeToContent="WidthAndHeight"
+        ResizeMode="NoResize"
+        Background="{DynamicResource App.Background}"
+        Foreground="{DynamicResource App.Foreground}" Width="1730">
+
+    <Window.Resources>
+        <Style TargetType="ComboBox" x:Key="DarkComboBox">
+            <Setter Property="Foreground" Value="#DDD"/>
+            <Setter Property="Background" Value="#333"/>
+            <Setter Property="BorderBrush" Value="#555"/>
+            <Setter Property="Padding" Value="6"/>
+            <Setter Property="BorderThickness" Value="1"/>
+
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ComboBox">
+                        <Grid>
+                            <!-- Pole combo -->
+                            <Border x:Name="Border"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="4"/>
+
+                            <DockPanel>
+                                <ContentPresenter Margin="8,2,25,2"
+                                              VerticalAlignment="Center"
+                                              HorizontalAlignment="Left"/>
+                            </DockPanel>
+
+                            <!-- Strzałka -->
+                            <ToggleButton Grid.Column="1"
+                                      Focusable="False"
+                                      Background="#333"
+                                      BorderBrush="#555"
+                                      BorderThickness="1"
+                                      Width="25"
+                                      HorizontalAlignment="Right"
+                                      IsChecked="{Binding IsDropDownOpen, RelativeSource={RelativeSource TemplatedParent}}">
+                                <Path Data="M 0 0 L 4 4 L 8 0 Z"
+                                  Fill="#DDD"
+                                  HorizontalAlignment="Center"
+                                  VerticalAlignment="Center"/>
+                            </ToggleButton>
+
+                            <!-- Lista rozwijana -->
+                            <Popup x:Name="Popup"
+                               Placement="Bottom"
+                               IsOpen="{TemplateBinding IsDropDownOpen}"
+                               AllowsTransparency="True"
+                               PopupAnimation="Slide">
+                                <Border Background="#2A2A2A"
+                                    BorderBrush="#555"
+                                    BorderThickness="1"
+                                    CornerRadius="4"
+                                    SnapsToDevicePixels="True">
+                                    <ScrollViewer>
+                                        <StackPanel>
+                                            <ItemsPresenter/>
+                                        </StackPanel>
+                                    </ScrollViewer>
+                                </Border>
+                            </Popup>
+                        </Grid>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- Styl elementów listy -->
+        <Style TargetType="ComboBoxItem">
+            <Setter Property="Background" Value="#2A2A2A"/>
+            <Setter Property="Foreground" Value="#DDD"/>
+            <Setter Property="Padding" Value="6"/>
+            <Setter Property="Margin" Value="0"/>
+            <Setter Property="HorizontalContentAlignment" Value="Left"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ComboBoxItem">
+                        <Border x:Name="Border"
+                            Background="{TemplateBinding Background}"
+                            Padding="{TemplateBinding Padding}">
+                            <ContentPresenter/>
+                        </Border>
+
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Border" Property="Background" Value="#444"/>
+                            </Trigger>
+                            <Trigger Property="IsSelected" Value="True">
+                                <Setter TargetName="Border" Property="Background" Value="#555"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+    </Window.Resources>
+
+    <Border Margin="20"
+            Padding="20"
+            Background="{DynamicResource Surface.Background}"
+            BorderBrush="{DynamicResource Surface.Border}"
+            BorderThickness="1"
+            CornerRadius="10">
+
+        <Grid Margin="0,0,5,0">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+            </Grid.RowDefinitions>
+
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="*"/>
+                <!-- Rozciąga się na całą szerokość -->
+            </Grid.ColumnDefinitions>
+
+            <!-- Nagłówek -->
+            <TextBlock Grid.Row="0"
+                       Grid.ColumnSpan="2"
+                       Text="Budżet"
+                       FontSize="18"
+                       FontWeight="Bold"
+                       Margin="0,0,0,12"/>
+
+            <!-- Nazwa budżetu -->
+            <TextBlock Grid.Row="1"
+                       Grid.Column="0"
+                       Margin="0,0,8,8"
+                       VerticalAlignment="Center"
+                       Text="Nazwa budżetu:"/>
+
+            <TextBox Grid.Row="1"
+                     Grid.Column="1"
+                     Margin="0,0,0,8"
+                     MinWidth="220"
+                     Text="{Binding Name,
+                                    Mode=TwoWay,
+                                    UpdateSourceTrigger=PropertyChanged}"/>
+
+            <!-- Typ -->
+            <TextBlock Grid.Row="2" 
+                       Grid.Column="0" 
+                       Margin="0,0,8,8"
+                       VerticalAlignment="Center"
+                       Text="Typ:"/>
+            <ComboBox Grid.Row="2"
+                      Grid.Column="1"
+                      Margin="0,0,0,8"
+                      SelectedValue="{Binding Type}"
+                      SelectedValuePath="Content"
+                      Style="{StaticResource DarkComboBox}">
+                <ComboBoxItem Content="Miesięczny"/>
+                <ComboBoxItem Content="Roczny"/>
+                <ComboBoxItem Content="Cel specjalny"/>
+            </ComboBox>
+
+            <!-- Okres -->
+            <TextBlock Grid.Row="3"
+                       Grid.Column="0"
+                       Margin="0,0,8,8"
+                       VerticalAlignment="Center"
+                       Text="Okres:"/>
+
+            <StackPanel Grid.Row="3"
+                        Grid.Column="1"
+                        Orientation="Horizontal"
+                        Margin="0,0,-94,8">
+
+                <!-- Data od -->
+                <DatePicker Width="130"
+                            SelectedDate="{Binding StartDate,
+                                                   Mode=TwoWay,
+                                                   UpdateSourceTrigger=PropertyChanged}"/>
+
+                <TextBlock Text=" — "
+                           Margin="4,0"
+                           VerticalAlignment="Center"/>
+
+                <!-- Data do -->
+                <DatePicker Width="143"
+                            SelectedDate="{Binding EndDate,
+                                                   Mode=TwoWay,
+                                                   UpdateSourceTrigger=PropertyChanged}"/>
+            </StackPanel>
+
+            <!-- Planowana kwota -->
+            <TextBlock Grid.Row="4"
+                       Grid.Column="0"
+                       Margin="0,0,8,0"
+                       VerticalAlignment="Center"
+                       Text="Kwota planowana:"/>
+
+            <StackPanel Grid.Row="4"
+                        Grid.Column="1"
+                        Orientation="Horizontal"
+                        HorizontalAlignment="Left" Margin="10,0,-70,0" Width="344">
+
+                <!-- Używamy PlannedAmount (decimal) z VM -->
+                <TextBox Width="140"
+                         Text="{Binding PlannedAmount,
+                                        Mode=TwoWay,
+                                        UpdateSourceTrigger=PropertyChanged,
+                                        StringFormat=F2}"/>
+
+                <Button Content="OK"
+                        Width="80"
+                        Margin="12,0,0,0"
+                        IsDefault="True"
+                        Click="Ok_Click"/>
+
+                <Button Content="Anuluj"
+                        Width="80"
+                        Margin="8,0,0,0"
+                        IsCancel="True"
+                        Click="Cancel_Click"/>
+            </StackPanel>
+        </Grid>
+    </Border>
+</Window>

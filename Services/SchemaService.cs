@@ -35,6 +35,18 @@ namespace Finly.Services
 
                 // ===== Tabele (idempotentnie) =====
                 using (var cmd = Cmd(@"
+
+
+CREATE TABLE IF NOT EXISTS Budgets (
+    Id            INTEGER PRIMARY KEY AUTOINCREMENT,
+    UserId        INTEGER NOT NULL,
+    Name          TEXT    NOT NULL,
+    Type          TEXT    NOT NULL,   -- 'Monthly', 'Yearly', itd. albo co tam masz w enumie
+    StartDate     TEXT    NOT NULL,   -- 'yyyy-MM-dd'
+    EndDate       TEXT    NOT NULL,
+    PlannedAmount REAL    NOT NULL,   -- decimal -> REAL w SQLite
+    IsDeleted     INTEGER NOT NULL DEFAULT 0
+);
 CREATE TABLE IF NOT EXISTS Users(
     Id                      INTEGER PRIMARY KEY AUTOINCREMENT,
     Username                TEXT NOT NULL UNIQUE,
