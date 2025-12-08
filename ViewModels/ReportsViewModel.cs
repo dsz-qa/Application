@@ -93,6 +93,98 @@ namespace Finly.ViewModels
         public enum SourceType { All = 0, FreeCash = 1, SavedCash = 2, BankAccounts = 3, Envelopes = 4 }
         public Array SourceOptions => Enum.GetValues(typeof(SourceType));
 
+        // Rodzaj wybranego okresu czasowego
+        private enum PeriodKind
+        {
+            Custom,
+            Today,
+            ThisWeek,
+            ThisMonth,
+            ThisQuarter,
+            ThisYear
+        }
+
+        private string _currentPeriodName = "ten okres";
+        public string CurrentPeriodName
+        {
+            get => _currentPeriodName;
+            private set { _currentPeriodName = value; Raise(nameof(CurrentPeriodName)); }
+        }
+
+        private string _previousPeriodName = "poprzedni okres";
+        public string PreviousPeriodName
+        {
+            get => _previousPeriodName;
+            private set { _previousPeriodName = value; Raise(nameof(PreviousPeriodName)); }
+        }
+
+        // Teksty do kart po prawej (u¿ywane te¿ w PDF)
+        private string _analyzedPeriodLabel = string.Empty;
+        public string AnalyzedPeriodLabel
+        {
+            get => _analyzedPeriodLabel;
+            private set { _analyzedPeriodLabel = value; Raise(nameof(AnalyzedPeriodLabel)); }
+        }
+
+        private string _comparisonPeriodLabel = string.Empty;
+        public string ComparisonPeriodLabel
+        {
+            get => _comparisonPeriodLabel;
+            private set { _comparisonPeriodLabel = value; Raise(nameof(ComparisonPeriodLabel)); }
+        }
+
+        private static PeriodKind DetectPeriodKind(DateTime from, DateTime to, DateTime today)
+        {
+            from = from.Date;
+            to = to.Date;
+            today = today.Date;
+
+            if (from == today && to == today)
+                return PeriodKind.Today;
+
+            var startOfWeek = StartOfWeek(today, DayOfWeek.Monday);
+            var endOfWeek = startOfWeek.AddDays(6);
+            if (from == startOfWeek && to == endOfWeek)
+                return PeriodKind.ThisWeek;
+
+            var startOfMonth = new DateTime(today.Year, today.Month, 1);
+            var endOfMonth = startOfMonth.AddMonths(1).AddDays(-1);
+            if (from == startOfMonth && to == endOfMonth)
+                return PeriodKind.ThisMonth;
+
+            int quarterIndex = (today.Month - 1) / 3;
+            var startOfQuarter = new DateTime(today.Year, quarterIndex * 3 + 1, 1);
+            var endOfQuarter = startOfQuarter.AddMonths(3).AddDays(-1);
+            if (from == startOfQuarter && to == endOfQuarter)
+                return PeriodKind.ThisQuarter;
+
+            var startOfYear = new DateTime(today.Year, 1, 1);
+            var endOfYear = new DateTime(today.Year, 12, 31);
+            if (from == startOfYear && to == endOfYear)
+                return PeriodKind.ThisYear;
+
+            return PeriodKind.Custom;
+        }
+
+        private static DateTime StartOfWeek(DateTime dt, DayOfWeek startOfWeek)
+        {
+            int diff = (7 + (dt.DayOfWeek - startOfWeek)) % 7;
+            return dt.AddDays(-1 * diff).Date;
+        }
+
+        private static (string current, string previous) GetPeriodNames(PeriodKind kind)
+        {
+            return kind switch
+            {
+                PeriodKind.Today => ("dzisiaj", "wczoraj"),
+                PeriodKind.ThisWeek => ("ten tydzieñ", "poprzedni tydzieñ"),
+                PeriodKind.ThisMonth => ("ten miesi¹c", "poprzedni miesi¹c"),
+                PeriodKind.ThisQuarter => ("ten kwarta³", "poprzedni kwarta³"),
+                PeriodKind.ThisYear => ("ten rok", "poprzedni rok"),
+                _ => ("ten okres", "poprzedni okres")
+            };
+        }
+
         // ========= zakres dat (powi¹zany z PeriodBarControl) =========
         private DateTime _fromDate;
         private DateTime _toDate;
@@ -424,17 +516,6 @@ namespace Finly.ViewModels
             }
         }
 
-        private string _comparisonPeriodLabel = string.Empty;
-        public string ComparisonPeriodLabel
-        {
-            get => _comparisonPeriodLabel;
-            private set
-            {
-                _comparisonPeriodLabel = value;
-                Raise(nameof(ComparisonPeriodLabel));
-            }
-        }
-
         // ========= pomocnicze metody agreguj¹ce =========
 
         private void PopulateFromDataTable(DataTable dt)
@@ -624,7 +705,15 @@ namespace Finly.ViewModels
                 var prev = GetPreviousPeriod(FromDate, ToDate);
                 _previousFromDate = prev.PrevFrom;
                 _previousToDate = prev.PrevTo;
-                ComparisonPeriodLabel = $"Porównanie z okresem: {prev.PrevFrom:dd.MM.yyyy} – {prev.PrevTo:dd.MM.yyyy}";
+
+                // okresy nazwane
+                var kind = DetectPeriodKind(FromDate.Date, ToDate.Date, DateTime.Today);
+                var (currentName, previousName) = GetPeriodNames(kind);
+                CurrentPeriodName = currentName;
+                PreviousPeriodName = previousName;
+
+                AnalyzedPeriodLabel = $"{CurrentPeriodName} ({FromDate:dd.MM.yyyy} – {ToDate:dd.MM.yyyy})";
+                ComparisonPeriodLabel = $"{PreviousPeriodName} ({prev.PrevFrom:dd.MM.yyyy} – {prev.PrevTo:dd.MM.yyyy})";
 
                 var prevDt = GetFilteredExpensesDataTable(uid, prev.PrevFrom, prev.PrevTo, accountId);
                 PreviousExpensesTotal = SumAmount(prevDt, "Amount");
@@ -651,23 +740,23 @@ namespace Finly.ViewModels
 
                 // ====== KPI & insighty ======
                 KPIList.Clear();
-                KPIList.Add(new KeyValuePair<string, string>("Suma wydatków (ten okres)", ExpensesTotalStr));
-                KPIList.Add(new KeyValuePair<string, string>("Suma wydatków (poprz. okres)", PreviousExpensesTotalStr));
+                KPIList.Add(new KeyValuePair<string, string>($"Suma wydatków ({CurrentPeriodName})", ExpensesTotalStr));
+                KPIList.Add(new KeyValuePair<string, string>($"Suma wydatków ({PreviousPeriodName})", PreviousExpensesTotalStr));
                 KPIList.Add(new KeyValuePair<string, string>("Zmiana wydatków", ExpensesChangePercentStr));
 
-                KPIList.Add(new KeyValuePair<string, string>("Suma przychodów (ten okres)", IncomesTotalStr));
-                KPIList.Add(new KeyValuePair<string, string>("Suma przychodów (poprz. okres)", PreviousIncomesTotalStr));
+                KPIList.Add(new KeyValuePair<string, string>($"Suma przychodów ({CurrentPeriodName})", IncomesTotalStr));
+                KPIList.Add(new KeyValuePair<string, string>($"Suma przychodów ({PreviousPeriodName})", PreviousIncomesTotalStr));
                 KPIList.Add(new KeyValuePair<string, string>("Zmiana przychodów", IncomesChangePercentStr));
 
-                KPIList.Add(new KeyValuePair<string, string>("Saldo (ten okres)", BalanceTotalStr));
-                KPIList.Add(new KeyValuePair<string, string>("Saldo (poprz. okres)", PreviousBalanceTotalStr));
+                KPIList.Add(new KeyValuePair<string, string>($"Saldo ({CurrentPeriodName})", BalanceTotalStr));
+                KPIList.Add(new KeyValuePair<string, string>($"Saldo ({PreviousPeriodName})", PreviousBalanceTotalStr));
                 KPIList.Add(new KeyValuePair<string, string>("Zmiana salda", BalanceChangePercentStr));
 
                 Insights.Clear();
-                Insights.Add($"Analizowany okres: {FromDate:dd.MM.yyyy} – {ToDate:dd.MM.yyyy}");
-                Insights.Add(ComparisonPeriodLabel);
-                Insights.Add($"Wydajesz {ExpensesChangePercentStr} {(ExpensesTotal >= PreviousExpensesTotal ? "wiêcej" : "mniej")} ni¿ w poprzednim okresie.");
-                Insights.Add($"Twoje przychody s¹ {IncomesChangePercentStr} {(IncomesTotal >= PreviousIncomesTotal ? "wy¿sze" : "ni¿sze")} ni¿ wczeœniej.");
+                Insights.Add($"Analizowany okres: {AnalyzedPeriodLabel}");
+                Insights.Add($"Porównanie z okresem: {ComparisonPeriodLabel}");
+                Insights.Add($"Wydajesz {ExpensesChangePercentStr} {(ExpensesTotal > PreviousExpensesTotal ? "wiêcej" : ExpensesTotal < PreviousExpensesTotal ? "mniej" : "(bez zmian)")} ni¿ w {PreviousPeriodName}.");
+                Insights.Add($"Twoje przychody s¹ {IncomesChangePercentStr} {(IncomesTotal > PreviousIncomesTotal ? "wy¿sze" : IncomesTotal < PreviousIncomesTotal ? "ni¿sze" : "(bez zmian)")} ni¿ w {PreviousPeriodName}.");
 
                 Raise(nameof(Details));
                 Raise(nameof(ChartTotals));
