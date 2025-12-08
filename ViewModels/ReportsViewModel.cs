@@ -22,8 +22,12 @@ namespace Finly.ViewModels
 
         public ReportsViewModel()
         {
-            _fromDate = DateTime.Today;
-            _toDate = DateTime.Today;
+            var today = DateTime.Today;
+            var startOfMonth = new DateTime(today.Year, today.Month, 1);
+            var endOfMonth = startOfMonth.AddMonths(1).AddDays(-1);
+
+            _fromDate = startOfMonth;
+            _toDate = endOfMonth;
 
             // initialize collections to be filled dynamically
             Accounts   = new ObservableCollection<string>();
