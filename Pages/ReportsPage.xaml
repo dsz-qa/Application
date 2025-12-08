@@ -14,45 +14,7 @@
         <conv:BoolToVisibilityConverter x:Key="BoolToVisibilityConverter" />
         <conv:InverseBoolToVisibilityConverter x:Key="InverseBoolToVisibilityConverter" />
 
-        <!-- Ikona kalendarza (fallback wektorowy) -->
-        <DrawingImage x:Key="CalendarIcon">
-            <DrawingImage.Drawing>
-                <DrawingGroup>
-                    <GeometryDrawing Brush="{StaticResource Control.Foreground}" Geometry="M1,2 L17,2 L17,5 L1,5 Z" />
-                    <GeometryDrawing Brush="{x:Null}">
-                        <GeometryDrawing.Pen>
-                            <Pen Brush="{StaticResource Surface.Border}" Thickness="1" />
-                        </GeometryDrawing.Pen>
-                        <GeometryDrawing.Geometry>
-                            <RectangleGeometry Rect="1,4,16,14" />
-                        </GeometryDrawing.Geometry>
-                    </GeometryDrawing>
-                    <GeometryDrawing Brush="{StaticResource Control.Foreground}">
-                        <GeometryDrawing.Geometry>
-                            <EllipseGeometry Center="4,2" RadiusX="1" RadiusY="1" />
-                        </GeometryDrawing.Geometry>
-                    </GeometryDrawing>
-                    <GeometryDrawing Brush="{StaticResource Control.Foreground}">
-                        <GeometryDrawing.Geometry>
-                            <EllipseGeometry Center="14,2" RadiusX="1" RadiusY="1" />
-                        </GeometryDrawing.Geometry>
-                    </GeometryDrawing>
-                    <GeometryDrawing Brush="{StaticResource Control.Foreground}">
-                        <GeometryDrawing.Geometry>
-                            <GeometryGroup>
-                                <RectangleGeometry Rect="3,7,1,1" />
-                                <RectangleGeometry Rect="6,7,1,1" />
-                                <RectangleGeometry Rect="9,7,1,1" />
-                                <RectangleGeometry Rect="12,7,1,1" />
-                                <RectangleGeometry Rect="15,7,1,1" />
-                            </GeometryGroup>
-                        </GeometryDrawing.Geometry>
-                    </GeometryDrawing>
-                </DrawingGroup>
-            </DrawingImage.Drawing>
-        </DrawingImage>
-
-        <!-- Ciemne brush’e dla popupów/comboboxów -->
+        <!-- system brushes override for dark popups -->
         <SolidColorBrush x:Key="{x:Static SystemColors.WindowBrushKey}" Color="#26282D" />
         <SolidColorBrush x:Key="{x:Static SystemColors.WindowTextBrushKey}" Color="#EAEAEA" />
         <SolidColorBrush x:Key="{x:Static SystemColors.ControlBrushKey}" Color="#26282D" />
@@ -60,7 +22,7 @@
         <SolidColorBrush x:Key="{x:Static SystemColors.HighlightBrushKey}" Color="#3B82F6" />
         <SolidColorBrush x:Key="{x:Static SystemColors.HighlightTextBrushKey}" Color="#FFFFFF" />
 
-        <!-- Podstawowe style ciemne -->
+        <!-- Basic dark styles -->
         <Style TargetType="Button">
             <Setter Property="Background" Value="{StaticResource Control.Background}" />
             <Setter Property="Foreground" Value="{StaticResource Control.Foreground}" />
@@ -81,7 +43,6 @@
             <Setter Property="BorderBrush" Value="{StaticResource Surface.Border}" />
         </Style>
 
-        <!-- TabControl / TabItem -->
         <Style TargetType="TabItem">
             <Setter Property="Background" Value="{StaticResource Control.Background}" />
             <Setter Property="Foreground" Value="{StaticResource Control.Foreground}" />
@@ -171,17 +132,83 @@
         </Style>
     </UserControl.Resources>
 
-    <!-- GŁÓWNY UKŁAD: środek + prawa kolumna KPI -->
+    <!-- Main layout -->
     <Grid Margin="12,0,12,12" Background="{StaticResource App.Background}">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
         <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="300" />
             <ColumnDefinition Width="*" />
-            <!-- środkowy panel (pasek + zakładki + wykres) -->
-            <ColumnDefinition Width="360" />
-            <!-- Analizy finansowe / KPI, trochę szersze -->
+            <ColumnDefinition Width="320" />
         </Grid.ColumnDefinitions>
 
-        <!-- ŚRODKOWY PANEL: okres, zakładki, filtry, wykres, szczegóły -->
-        <Border Grid.Column="0"
+        <!-- LEFT: Filtry -->
+        <Border Grid.Row="0"
+                Grid.Column="0"
+                Background="{StaticResource Surface.Background}"
+                Padding="12"
+                CornerRadius="6"
+                Margin="0,0,12,0"
+                BorderBrush="{StaticResource Surface.Border}"
+                BorderThickness="1">
+            <StackPanel>
+                <TextBlock Text="Filtry" FontSize="16" FontWeight="SemiBold" Margin="0,0,0,8" />
+
+                <TextBlock Text="Źródło" FontWeight="Bold" />
+                <ComboBox x:Name="SourceCombo" Width="160" SelectedIndex="0" Margin="0,4,0,8">
+                    <ComboBoxItem Content="Wszystko" Tag="All"/>
+                    <ComboBoxItem Content="Wolna gotówka" Tag="FreeCash"/>
+                    <ComboBoxItem Content="Odłożona gotówka" Tag="SavedCash"/>
+                    <ComboBoxItem Content="Konta bankowe" Tag="BankAccounts"/>
+                    <ComboBoxItem Content="Koperty" Tag="Envelopes"/>
+                </ComboBox>
+
+                <!-- Konto bankowe -->
+                <StackPanel Orientation="Vertical"
+                            Margin="0,4,0,8"
+                            Visibility="{Binding ShowBankSelector, Converter={StaticResource BoolToVisibilityConverter}}">
+                    <TextBlock Text="Konto" FontWeight="Bold" />
+                    <ComboBox ItemsSource="{Binding BankAccounts}"
+                              SelectedItem="{Binding SelectedBankAccount}"
+                              DisplayMemberPath="AccountName"
+                              SelectedValuePath="Id" />
+                </StackPanel>
+
+                <!-- Koperta -->
+                <StackPanel Orientation="Vertical"
+                            Margin="0,4,0,8"
+                            Visibility="{Binding ShowEnvelopeSelector, Converter={StaticResource BoolToVisibilityConverter}}">
+                    <TextBlock Text="Koperta" FontWeight="Bold" />
+                    <ComboBox ItemsSource="{Binding Envelopes}"
+                              SelectedItem="{Binding SelectedEnvelope}" />
+                </StackPanel>
+
+                <TextBlock Text="Kategoria" FontWeight="Bold" />
+                <ComboBox ItemsSource="{Binding Categories}"
+                          SelectedItem="{Binding SelectedCategory}"
+                          Margin="0,4,0,8" />
+
+                <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
+                    <Button Content="Odśwież" Command="{Binding RefreshCommand}" Width="100" />
+                    <Button Content="Eksport" Width="100" Margin="8,0,0,0">
+                        <Button.ContextMenu>
+                            <ContextMenu>
+                                <MenuItem Header="CSV" Command="{Binding ExportCsvCommand}" />
+                                <MenuItem Header="Excel" Command="{Binding ExportExcelCommand}" />
+                                <MenuItem Header="PDF" Command="{Binding ExportPdfCommand}" />
+                            </ContextMenu>
+                        </Button.ContextMenu>
+                    </Button>
+                </StackPanel>
+            </StackPanel>
+        </Border>
+
+        <!-- CENTER: pasek okresu + zakładki + wykres + tabele -->
+        <Border Grid.Row="0"
+                Grid.RowSpan="2"
+                Grid.Column="1"
                 Background="{StaticResource Surface.Background}"
                 Padding="12"
                 CornerRadius="6"
@@ -191,14 +218,11 @@
             <Grid>
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto" />
-                    <!-- Pasek okresu -->
                     <RowDefinition Height="Auto" />
-                    <!-- Zakładki + filtry -->
                     <RowDefinition Height="*" />
-                    <!-- Wykres + szczegóły -->
                 </Grid.RowDefinitions>
 
-                <!-- Pasek wyboru okresu -->
+                <!-- Pasek okresu -->
                 <ctrls:PeriodBarControl x:Name="PeriodBar"
                                         Grid.Row="0"
                                         HorizontalAlignment="Center"
@@ -206,108 +230,33 @@
                                         StartDate="{Binding FromDate, Mode=TwoWay}"
                                         EndDate="{Binding ToDate, Mode=TwoWay}" />
 
-                <!-- Zakładki + filtry -->
-                <StackPanel Grid.Row="1">
-                    <!-- Zakładki -->
-                    <TabControl Background="{StaticResource Control.Background}"
-                                Foreground="{StaticResource Control.Foreground}">
-                        <TabItem Header="Przegląd" />
-                        <TabItem Header="Kategorie" />
-                        <TabItem Header="Czas" />
-                        <TabItem Header="Cashflow" />
-                        <TabItem Header="Subskrypcje" />
-                        <TabItem Header="Budżety" />
-                        <TabItem Header="Cele" />
-                    </TabControl>
-
-                    <!-- Wiersz z filtrami: Źródło / Konto / Koperta / Kategoria / przyciski -->
-                    <StackPanel Orientation="Horizontal"
-                                Margin="0,8,0,0"
-                                VerticalAlignment="Center">
-                        <!-- Źródło -->
-                        <TextBlock Text="Źródło"
-                                   FontWeight="Bold"
-                                   Margin="0,0,6,0"
-                                   VerticalAlignment="Center" />
-                        <ComboBox ItemsSource="{Binding SourceOptions}"
-                                  SelectedItem="{Binding SelectedSource, Mode=TwoWay}"
-                                  Width="140"
-                                  Margin="0,0,16,0" />
-
-                        <!-- Konto bankowe (widoczne tylko przy kontach bankowych) -->
-                        <StackPanel Orientation="Horizontal"
-                                    Margin="0,0,16,0"
-                                    VerticalAlignment="Center"
-                                    Visibility="{Binding ShowBankSelector, Converter={StaticResource BoolToVisibilityConverter}}">
-                            <TextBlock Text="Konto"
-                                       FontWeight="Bold"
-                                       Margin="0,0,6,0"
-                                       VerticalAlignment="Center" />
-                            <ComboBox ItemsSource="{Binding BankAccounts}"
-                                      SelectedItem="{Binding SelectedBankAccount}"
-                                      DisplayMemberPath="AccountName"
-                                      SelectedValuePath="Id"
-                                      Width="180" />
-                        </StackPanel>
-
-                        <!-- Koperta (widoczna tylko przy źródle: Koperty) -->
-                        <StackPanel Orientation="Horizontal"
-                                    Margin="0,0,16,0"
-                                    VerticalAlignment="Center"
-                                    Visibility="{Binding ShowEnvelopeSelector, Converter={StaticResource BoolToVisibilityConverter}}">
-                            <TextBlock Text="Koperta"
-                                       FontWeight="Bold"
-                                       Margin="0,0,6,0"
-                                       VerticalAlignment="Center" />
-                            <ComboBox ItemsSource="{Binding Envelopes}"
-                                      SelectedItem="{Binding SelectedEnvelope}"
-                                      Width="170" />
-                        </StackPanel>
-
-                        <!-- Kategoria -->
-                        <TextBlock Text="Kategoria"
-                                   FontWeight="Bold"
-                                   Margin="0,0,6,0"
-                                   VerticalAlignment="Center" />
-                        <ComboBox ItemsSource="{Binding Categories}"
-                                  SelectedItem="{Binding SelectedCategory}"
-                                  Width="180"
-                                  Margin="0,0,16,0" />
-
-                        <!-- Przyciski -->
-                        <Button Content="Odśwież"
-                                Command="{Binding RefreshCommand}"
-                                Width="100" />
-                        <Button Content="Eksport"
-                                Width="100"
-                                Margin="8,0,0,0">
-                            <Button.ContextMenu>
-                                <ContextMenu>
-                                    <MenuItem Header="CSV"   Command="{Binding ExportCsvCommand}" />
-                                    <MenuItem Header="Excel" Command="{Binding ExportExcelCommand}" />
-                                    <MenuItem Header="PDF"   Command="{Binding ExportPdfCommand}" />
-                                </ContextMenu>
-                            </Button.ContextMenu>
-                        </Button>
-                    </StackPanel>
-                </StackPanel>
+                <!-- Zakładki -->
+                <TabControl Grid.Row="1">
+                    <TabItem Header="Przegląd" />
+                    <TabItem Header="Kategorie" />
+                    <TabItem Header="Czas" />
+                    <TabItem Header="Cashflow" />
+                    <TabItem Header="Subskrypcje" />
+                    <TabItem Header="Budżety" />
+                    <TabItem Header="Cele" />
+                </TabControl>
 
                 <!-- Wykres + szczegóły / drilldown -->
-                <Grid Grid.Row="2" Margin="0,12,0,0">
+                <Grid Grid.Row="2" Margin="0,8,0,0">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="2*" />
                         <ColumnDefinition Width="*" />
                     </Grid.ColumnDefinitions>
 
-                    <!-- Wykres kołowy / donut -->
+                    <!-- Donut chart -->
                     <ctrls:DonutChartControl x:Name="MainChart"
                                              Grid.Column="0"
                                              HorizontalAlignment="Stretch"
                                              VerticalAlignment="Stretch"
                                              Background="Transparent" />
 
-                    <!-- Szczegóły po prawej od wykresu -->
-                    <StackPanel Grid.Column="1" Margin="12,0,0,0">
+                    <!-- Szczegóły / drilldown -->
+                    <StackPanel Grid.Column="1">
                         <TextBlock Text="Szczegóły kategorii"
                                    FontWeight="Bold"
                                    Margin="0,0,0,8" />
@@ -317,10 +266,8 @@
                                   AutoGenerateColumns="False"
                                   IsReadOnly="True"
                                   Height="220"
-                                  Background="{StaticResource Control.Background}"
-                                  Foreground="{StaticResource Control.Foreground}"
-                                  RowBackground="{x:Null}"
-                                  ItemsSource="{Binding Details}">
+                                  ItemsSource="{Binding Details}"
+                                  Visibility="{Binding IsSummaryActive, Converter={StaticResource BoolToVisibilityConverter}}">
                             <DataGrid.Columns>
                                 <DataGridTextColumn Header="Kategoria" Binding="{Binding Name}" />
                                 <DataGridTextColumn Header="Kwota" Binding="{Binding Amount, StringFormat=N2}" />
@@ -330,30 +277,31 @@
 
                         <Button x:Name="BackButton"
                                 Content="Wróć"
-                                Margin="0,8,0,0"
                                 Command="{Binding BackCommand}"
-                                Visibility="{Binding IsDrilldownActive, Converter={StaticResource BoolToVisibilityConverter}}" />
+                                Visibility="{Binding IsDrilldownActive, Converter={StaticResource BoolToVisibilityConverter}}"
+                                Margin="0,8,0,0" />
 
-                        <TextBlock Text="Kliknij element wykresu, aby zobaczyć szczegóły transakcji."
+                        <TextBlock Text="Kliknij element wykresu, aby zobaczyć transakcje w tej kategorii."
                                    FontStyle="Italic"
                                    Margin="0,8,0,0" />
 
-                        <!-- Lista transakcji w drilldown -->
+                        <!-- Lista transakcji dla wybranej kategorii -->
                         <DataGrid x:Name="DrilldownGrid"
                                   AutoGenerateColumns="False"
                                   IsReadOnly="True"
                                   Height="220"
-                                  Background="{StaticResource Control.Background}"
-                                  Foreground="{StaticResource Control.Foreground}"
-                                  RowBackground="{x:Null}"
-                                  Margin="0,8,0,0"
                                   ItemsSource="{Binding FilteredTransactions}"
+                                  Margin="0,8,0,0"
                                   Visibility="{Binding IsDrilldownActive, Converter={StaticResource BoolToVisibilityConverter}}">
                             <DataGrid.Columns>
-                                <DataGridTextColumn Header="Data" Binding="{Binding Date, StringFormat=dd.MM.yyyy}" />
-                                <DataGridTextColumn Header="Kategoria" Binding="{Binding Category}" />
-                                <DataGridTextColumn Header="Opis" Binding="{Binding Description}" />
-                                <DataGridTextColumn Header="Kwota" Binding="{Binding Amount, StringFormat=N2}" />
+                                <DataGridTextColumn Header="Data"
+                                                    Binding="{Binding Date, StringFormat=\{0:yyyy-MM-dd\}}" />
+                                <DataGridTextColumn Header="Kategoria"
+                                                    Binding="{Binding Category}" />
+                                <DataGridTextColumn Header="Opis"
+                                                    Binding="{Binding Description}" />
+                                <DataGridTextColumn Header="Kwota"
+                                                    Binding="{Binding Amount, StringFormat=N2}" />
                             </DataGrid.Columns>
                         </DataGrid>
                     </StackPanel>
@@ -361,8 +309,9 @@
             </Grid>
         </Border>
 
-        <!-- PRAWY PANEL: Analizy finansowe / KPI -->
-        <Border Grid.Column="1"
+        <!-- RIGHT: Analizy + KPI -->
+        <Border Grid.Row="0"
+                Grid.Column="2"
                 Background="{StaticResource Surface.Background}"
                 Padding="12"
                 CornerRadius="6"
@@ -374,75 +323,86 @@
                            FontWeight="SemiBold"
                            Margin="0,0,0,8" />
 
-                <!-- Suma wydatków / przychodów / saldo -->
-                <Border Background="{StaticResource Control.Background}"
+                <!-- Kafelek 1: BIEŻĄCY OKRES -->
+                <Border Background="Transparent"
                         CornerRadius="4"
                         Padding="8"
                         Margin="0,0,0,8"
-                        BorderBrush="{StaticResource Surface.Border}"
-                        BorderThickness="1">
+                        BorderBrush="#FFA500"
+                        BorderThickness="2">
                     <StackPanel>
+                        <TextBlock FontWeight="SemiBold" Margin="0,0,0,4">
+                            <Run Text="Bieżący okres – " />
+                            <Run Text="{Binding CurrentPeriodLabel, Mode=OneWay}" />
+                        </TextBlock>
+
                         <StackPanel Orientation="Horizontal" Margin="0,2">
-                            <TextBlock Text="Suma wydatków:"
-                                       FontWeight="SemiBold"
-                                       Width="160" />
-                            <TextBlock Text="{Binding ExpensesTotalStr}"
-                                       HorizontalAlignment="Right" />
+                            <TextBlock Text="Suma wydatków:" FontWeight="SemiBold" Width="170" />
+                            <TextBlock Text="{Binding ExpensesTotalStr}" HorizontalAlignment="Right" />
                         </StackPanel>
                         <StackPanel Orientation="Horizontal" Margin="0,2">
-                            <TextBlock Text="Suma przychodów:"
-                                       FontWeight="SemiBold"
-                                       Width="160" />
-                            <TextBlock Text="{Binding IncomesTotalStr}"
-                                       HorizontalAlignment="Right" />
+                            <TextBlock Text="Suma przychodów:" FontWeight="SemiBold" Width="170" />
+                            <TextBlock Text="{Binding IncomesTotalStr}" HorizontalAlignment="Right" />
                         </StackPanel>
                         <StackPanel Orientation="Horizontal" Margin="0,2">
-                            <TextBlock Text="Saldo:"
-                                       FontWeight="SemiBold"
-                                       Width="160" />
-                            <TextBlock Text="{Binding BalanceTotalStr}"
-                                       HorizontalAlignment="Right" />
+                            <TextBlock Text="Saldo:" FontWeight="SemiBold" Width="170" />
+                            <TextBlock Text="{Binding BalanceTotalStr}" HorizontalAlignment="Right" />
                         </StackPanel>
                     </StackPanel>
                 </Border>
 
-                <!-- Opisy okresów / insighty -->
-                <ItemsControl ItemsSource="{Binding Insights}">
-                    <ItemsControl.ItemTemplate>
-                        <DataTemplate>
-                            <Border Background="{StaticResource Control.Background}"
-                                    CornerRadius="4"
-                                    Padding="8"
-                                    Margin="0,0,0,8"
-                                    BorderBrush="{StaticResource Surface.Border}"
-                                    BorderThickness="1">
-                                <TextBlock Text="{Binding}"
-                                           TextWrapping="Wrap"
-                                           Foreground="{StaticResource Control.Foreground}" />
-                            </Border>
-                        </DataTemplate>
-                    </ItemsControl.ItemTemplate>
-                </ItemsControl>
+                <!-- Kafelek 2: POPRZEDNI OKRES -->
+                <Border Background="Transparent"
+                        CornerRadius="4"
+                        Padding="8"
+                        Margin="0,0,0,8"
+                        BorderBrush="#FFA500"
+                        BorderThickness="2">
+                    <StackPanel>
+                        <TextBlock FontWeight="SemiBold" Margin="0,0,0,4">
+                            <Run Text="Poprzedni okres – " />
+                            <Run Text="{Binding PreviousPeriodLabel, Mode=OneWay}" />
+                        </TextBlock>
 
-                <!-- KPI lista -->
-                <TextBlock Text="KPI"
-                           FontWeight="Bold"
-                           Margin="0,12,0,6" />
-                <ItemsControl ItemsSource="{Binding KPIList}">
-                    <ItemsControl.ItemTemplate>
-                        <DataTemplate>
-                            <StackPanel Orientation="Horizontal"
-                                        HorizontalAlignment="Stretch"
-                                        Margin="0,2">
-                                <TextBlock Text="{Binding Key}"
-                                           FontWeight="SemiBold"
-                                           Width="220" />
-                                <TextBlock Text="{Binding Value}"
-                                           HorizontalAlignment="Right" />
-                            </StackPanel>
-                        </DataTemplate>
-                    </ItemsControl.ItemTemplate>
-                </ItemsControl>
+                        <StackPanel Orientation="Horizontal" Margin="0,2">
+                            <TextBlock Text="Suma wydatków:" FontWeight="SemiBold" Width="170" />
+                            <TextBlock Text="{Binding PreviousExpensesTotalStr}" HorizontalAlignment="Right" />
+                        </StackPanel>
+                        <StackPanel Orientation="Horizontal" Margin="0,2">
+                            <TextBlock Text="Suma przychodów:" FontWeight="SemiBold" Width="170" />
+                            <TextBlock Text="{Binding PreviousIncomesTotalStr}" HorizontalAlignment="Right" />
+                        </StackPanel>
+                        <StackPanel Orientation="Horizontal" Margin="0,2">
+                            <TextBlock Text="Saldo:" FontWeight="SemiBold" Width="170" />
+                            <TextBlock Text="{Binding PreviousBalanceTotalStr}" HorizontalAlignment="Right" />
+                        </StackPanel>
+                    </StackPanel>
+                </Border>
+
+                <!-- Kafelek 3: PORÓWNANIE -->
+                <Border Background="Transparent"
+                        CornerRadius="4"
+                        Padding="8"
+                        Margin="0,0,0,0"
+                        BorderBrush="#FFA500"
+                        BorderThickness="2">
+                    <StackPanel>
+                        <TextBlock Text="Porównanie okresów" FontWeight="SemiBold" Margin="0,0,0,4" />
+
+                        <StackPanel Orientation="Horizontal" Margin="0,2">
+                            <TextBlock Text="Zmiana wydatków:" FontWeight="SemiBold" Width="170" />
+                            <TextBlock Text="{Binding ExpensesChangeStr}" HorizontalAlignment="Right" />
+                        </StackPanel>
+                        <StackPanel Orientation="Horizontal" Margin="0,2">
+                            <TextBlock Text="Zmiana przychodów:" FontWeight="SemiBold" Width="170" />
+                            <TextBlock Text="{Binding IncomesChangeStr}" HorizontalAlignment="Right" />
+                        </StackPanel>
+                        <StackPanel Orientation="Horizontal" Margin="0,2">
+                            <TextBlock Text="Zmiana salda:" FontWeight="SemiBold" Width="170" />
+                            <TextBlock Text="{Binding BalanceChangeStr}" HorizontalAlignment="Right" />
+                        </StackPanel>
+                    </StackPanel>
+                </Border>
             </StackPanel>
         </Border>
     </Grid>

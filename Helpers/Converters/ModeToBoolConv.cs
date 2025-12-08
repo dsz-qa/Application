@@ -4,7 +4,7 @@ using System.Globalization;
 using System.Windows.Data;
 using Finly.Models;
 
-namespace Finly.Controls
+namespace Finly.Helpers.Converters
 {
     public sealed class ModeToBoolConv : IValueConverter
     {
@@ -15,4 +15,5 @@ namespace Finly.Controls
             => Binding.DoNothing;
     }
 }
+
 

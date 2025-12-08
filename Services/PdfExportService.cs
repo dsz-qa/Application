@@ -1,6 +1,7 @@
 ﻿using System;
 using System.IO;
 using System.Linq;
+using System.Collections.Generic;
 using Finly.ViewModels;
 using QuestPDF.Fluent;
 using QuestPDF.Helpers;
@@ -64,6 +65,94 @@ namespace Finly.Services
 
             document.GeneratePdf(path);
             return path;
+        }
+
+        // Nowy, prosty eksport zgodny z podanym podpisem metody
+        public static string ExportPeriodReport(
+            DateTime start,
+            DateTime end,
+            PeriodSummary curr,
+            PeriodSummary prev,
+            IEnumerable<CategoryDetail> categories,
+            Dictionary<string, decimal> chartTotals)
+        {
+            var path = Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory),
+                $"Finly_Raport_{start:yyyyMMdd}-{end:yyyyMMdd}.pdf");
+
+            var doc = Document.Create(container =>
+            {
+                container.Page(page =>
+                {
+                    page.Margin(30);
+                    page.Size(PageSizes.A4);
+                    page.DefaultTextStyle(x => x.FontSize(11));
+
+                    page.Header().Text($"Raport finansowy – {start:dd.MM.yyyy} – {end:dd.MM.yyyy}")
+                        .FontSize(20).Bold().AlignLeft();
+
+                    page.Content().Column(col =>
+                    {
+                        col.Item().Text("Podsumowanie bieżącego okresu")
+                            .FontSize(16).Bold();
+
+                        col.Item().Text($@"
+Suma wydatków: {curr.Expenses:N2} zł
+Suma przychodów: {curr.Incomes:N2} zł
+Saldo: {curr.Saldo:N2} zł
+").FontSize(12);
+
+                        col.Item().PaddingTop(10).Text("Podsumowanie poprzedniego okresu")
+                            .FontSize(16).Bold();
+
+                        col.Item().Text($@"
+Suma wydatków: {prev.Expenses:N2} zł
+Suma przychodów: {prev.Incomes:N2} zł
+Saldo: {prev.Saldo:N2} zł
+").FontSize(12);
+
+                        col.Item().PaddingTop(10).Text("Porównanie okresów")
+                            .FontSize(16).Bold();
+
+                        col.Item().Text($@"
+Zmiana wydatków: {curr.ExpensesChangeText}
+Zmiana przychodów: {curr.IncomesChangeText}
+Zmiana salda: {curr.SaldoChangeText}
+").FontSize(12);
+
+                        col.Item().PaddingTop(10).Text("Kategorie").FontSize(16).Bold();
+
+                        if (categories != null)
+                        {
+                            foreach (var c in categories)
+                            {
+                                col.Item().Text($"{c.Name} – {c.Amount:N2} zł ({c.Percent:N2}%)");
+                            }
+                        }
+                    });
+                });
+            });
+
+            doc.GeneratePdf(path);
+            return path;
+        }
+
+        // ===== Lekkie modele danych na potrzeby prostego eksportu =====
+        public class PeriodSummary
+        {
+            public decimal Expenses { get; set; }
+            public decimal Incomes { get; set; }
+            public decimal Saldo { get; set; }
+            public string ExpensesChangeText { get; set; } = string.Empty;
+            public string IncomesChangeText { get; set; } = string.Empty;
+            public string SaldoChangeText { get; set; } = string.Empty;
+        }
+
+        public class CategoryDetail
+        {
+            public string Name { get; set; } = string.Empty;
+            public decimal Amount { get; set; }
+            public decimal Percent { get; set; }
         }
 
         // ===== Sekcje dokumentu =====

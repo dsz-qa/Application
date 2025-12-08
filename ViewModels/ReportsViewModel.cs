@@ -122,6 +122,10 @@ namespace Finly.ViewModels
             private set { _previousPeriodName = value; Raise(nameof(PreviousPeriodName)); }
         }
 
+        // Alias properties expected by XAML
+        public string CurrentPeriodLabel => CurrentPeriodName;
+        public string PreviousPeriodLabel => PreviousPeriodName;
+
         // Teksty do kart po prawej (u¿ywane te¿ w PDF)
         private string _analyzedPeriodLabel = string.Empty;
         public string AnalyzedPeriodLabel
@@ -224,6 +228,25 @@ namespace Finly.ViewModels
         public ObservableCollection<string> Tags { get; }
         public ObservableCollection<string> Currencies { get; }
         public ObservableCollection<string> Templates { get; }
+
+        // Nowy filtr: typ transakcji
+        public ObservableCollection<string> TransactionTypes { get; } =
+            new ObservableCollection<string> { "Wszystko", "Wydatki", "Przychody" };
+
+        private string _selectedTransactionType = "Wydatki";
+        public string SelectedTransactionType
+        {
+            get => _selectedTransactionType;
+            set
+            {
+                if (_selectedTransactionType != value)
+                {
+                    _selectedTransactionType = value ?? "Wydatki";
+                    Raise(nameof(SelectedTransactionType));
+                    Refresh();
+                }
+            }
+        }
 
         private string _selectedAccount = "Wszystkie konta";
         public string SelectedAccount
@@ -495,6 +518,7 @@ namespace Finly.ViewModels
             {
                 _expensesChangePercentStr = value;
                 Raise(nameof(ExpensesChangePercentStr));
+                Raise(nameof(ExpensesChangeStr));
             }
         }
 
@@ -506,6 +530,7 @@ namespace Finly.ViewModels
             {
                 _incomesChangePercentStr = value;
                 Raise(nameof(IncomesChangePercentStr));
+                Raise(nameof(IncomesChangeStr));
             }
         }
 
@@ -517,8 +542,14 @@ namespace Finly.ViewModels
             {
                 _balanceChangePercentStr = value;
                 Raise(nameof(BalanceChangePercentStr));
+                Raise(nameof(BalanceChangeStr));
             }
         }
+
+        // Aliasy na potrzeby XAML
+        public string ExpensesChangeStr => ExpensesChangePercentStr;
+        public string IncomesChangeStr => IncomesChangePercentStr;
+        public string BalanceChangeStr => BalanceChangePercentStr;
 
         // ========= pomocnicze metody agreguj¹ce =========
 
