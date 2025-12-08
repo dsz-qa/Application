@@ -172,17 +172,59 @@
                 </Grid.ColumnDefinitions>
 
                 <!-- RZĄD 1 -->
-                <Border Grid.Row="0" Grid.Column="0"
-                        Style="{StaticResource Card}">
-                    <StackPanel>
-                        <TextBlock Text="Podział według kategorii"
-                                   Style="{StaticResource CardHeader}"/>
-                        <lvcwpf:PieChart Series="{Binding CategoriesSeries}"
-                                         Height="260"
-                                         LegendPosition="Right"
-                                         Background="Transparent"
-                                         Foreground="White"/>
-                    </StackPanel>
+                <!-- PODZIAŁ WEDŁUG KATEGORII -->
+                <Border Grid.Row="0" Grid.Column="0" Style="{StaticResource Card}">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <!-- lewa część: wykres, prawa: legenda -->
+                            <ColumnDefinition Width="2*" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+
+                        <!-- wykres kołowy – legenda wbudowana WYŁĄCZONA -->
+                        <StackPanel Grid.Column="0">
+                            <TextBlock Text="Podział według kategorii"
+                                       Style="{StaticResource CardHeader}" />
+                            <lvcwpf:PieChart x:Name="CategoriesPieChart"
+                                             Series="{Binding CategoriesSeries}"
+                                             LegendPosition="Hidden"
+                                             Height="260"
+                                             Background="Transparent"
+                                             Foreground="White" />
+                        </StackPanel>
+
+                        <!-- własna legenda po prawej, z małą czcionką + scroll -->
+                        <StackPanel Grid.Column="1"
+                                    Margin="12,0,0,0">
+                            <TextBlock Text="Kategorie"
+                                       FontWeight="Bold"
+                                       Foreground="{DynamicResource App.Foreground}"
+                                       Margin="0,0,0,4"/>
+
+                            <ScrollViewer VerticalScrollBarVisibility="Auto"
+                                          MaxHeight="240">
+                                <ItemsControl ItemsSource="{Binding CategoriesSeries}">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <StackPanel Orientation="Horizontal"
+                                                        Margin="0,2">
+                                                <!-- kolorowa „kropka” -->
+                                                <TextBlock Text="●"
+                                                           Margin="0,0,6,0"
+                                                           VerticalAlignment="Center"
+                                                           FontSize="14"
+                                                           Foreground="White"/>
+                                                <!-- nazwa serii (kategorii) -->
+                                                <TextBlock Text="{Binding Name}"
+                                                           FontSize="11"
+                                                           Foreground="White" />
+                                            </StackPanel>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </ScrollViewer>
+                        </StackPanel>
+                    </Grid>
                 </Border>
 
                 <Border Grid.Row="0" Grid.Column="1"
@@ -266,7 +308,19 @@
                     </StackPanel>
                 </Border>
 
-                <!-- Grid.Row="3" Grid.Column="1" zostawiony pusty na przyszłość -->
+                <Border Grid.Row="3" Grid.Column="1"
+                        Style="{StaticResource Card}">
+                    <StackPanel>
+                        <TextBlock Text="Liczba transakcji wg przedziału kwot"
+                                   Style="{StaticResource CardHeader}"/>
+                        <lvcwpf:CartesianChart Series="{Binding AmountBucketsSeries}"
+                                               XAxes="{Binding AmountBucketsXAxes}"
+                                               YAxes="{Binding AmountBucketsYAxes}"
+                                               Height="260"
+                                               Background="Transparent"
+                                               Foreground="White"/>
+                    </StackPanel>
+                </Border>
             </Grid>
         </Grid>
     </ScrollViewer>

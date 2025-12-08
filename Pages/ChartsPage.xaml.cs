@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Media;
 using Finly.ViewModels;
 using LiveChartsCore;
 using LiveChartsCore.SkiaSharpView.Painting;
@@ -104,15 +105,26 @@ namespace Finly.Pages
             if (active == null) return;
 
             ResetModeButtons();
-            ApplyPrimary(active);
+
+            // aktywny tryb → pomarańczowa ramka
+            active.BorderThickness = new Thickness(2);
+            active.BorderBrush = (Brush)Application.Current.Resources["Brand.Orange"];
         }
 
         private void ResetModeButtons()
         {
-            if (ModeExpensesBtn != null) ClearPrimary(ModeExpensesBtn);
-            if (ModeIncomesBtn != null) ClearPrimary(ModeIncomesBtn);
-            if (ModeTransferBtn != null) ClearPrimary(ModeTransferBtn);
-            if (ModeCashflowBtn != null) ClearPrimary(ModeCashflowBtn);
+            ClearBorder(ModeExpensesBtn);
+            ClearBorder(ModeIncomesBtn);
+            ClearBorder(ModeTransferBtn);
+            ClearBorder(ModeCashflowBtn);
+        }
+
+        private void ClearBorder(Button? btn)
+        {
+            if (btn == null) return;
+
+            btn.BorderThickness = new Thickness(1);
+            btn.BorderBrush = (Brush)Application.Current.Resources["Brand.Blue"]; // domyślna rama
         }
 
         private static void ApplyPrimary(Button btn)
