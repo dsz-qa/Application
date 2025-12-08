@@ -154,103 +154,119 @@
                 </Grid>
             </Border>
 
-            <!-- DÓŁ: WYKRESY -->
+            <!-- DÓŁ: WYKRESY W SIATCE 4x2 -->
             <Grid Grid.Row="1">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <!-- rząd 1 -->
+                    <RowDefinition Height="Auto"/>
+                    <!-- rząd 2 -->
+                    <RowDefinition Height="Auto"/>
+                    <!-- rząd 3 -->
+                    <RowDefinition Height="Auto"/>
+                    <!-- rząd 4 -->
+                </Grid.RowDefinitions>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*"/>
-                    <ColumnDefinition Width="16"/>
                     <ColumnDefinition Width="*"/>
                 </Grid.ColumnDefinitions>
 
-                <!-- LEWA KOLUMNA: kategorie, trend, dni, wolna, odłożona -->
-                <StackPanel Grid.Column="0">
-                    <Border Style="{StaticResource Card}">
-                        <StackPanel>
-                            <TextBlock Text="Podział według kategorii"
-                                       Style="{StaticResource CardHeader}"/>
-                            <lvcwpf:PieChart Series="{Binding CategoriesSeries}"
-                                             Height="260"
-                                             LegendPosition="Right"
-                                             Background="Transparent"
-                                             Foreground="White"/>
-                        </StackPanel>
-                    </Border>
+                <!-- RZĄD 1 -->
+                <Border Grid.Row="0" Grid.Column="0"
+                        Style="{StaticResource Card}">
+                    <StackPanel>
+                        <TextBlock Text="Podział według kategorii"
+                                   Style="{StaticResource CardHeader}"/>
+                        <lvcwpf:PieChart Series="{Binding CategoriesSeries}"
+                                         Height="260"
+                                         LegendPosition="Right"
+                                         Background="Transparent"
+                                         Foreground="White"/>
+                    </StackPanel>
+                </Border>
 
-                    <Border Style="{StaticResource Card}">
-                        <StackPanel>
-                            <TextBlock Text="Trend w czasie"
-                                       Style="{StaticResource CardHeader}"/>
-                            <lvcwpf:CartesianChart Series="{Binding TrendSeries}"
-                                                   XAxes="{Binding TrendXAxes}"
-                                                   Height="260"
-                                                   Background="Transparent"
-                                                   Foreground="White"/>
-                        </StackPanel>
-                    </Border>
+                <Border Grid.Row="0" Grid.Column="1"
+                        Style="{StaticResource Card}">
+                    <StackPanel>
+                        <TextBlock Text="Trend w czasie"
+                                   Style="{StaticResource CardHeader}"/>
+                        <lvcwpf:CartesianChart Series="{Binding TrendSeries}"
+                                               XAxes="{Binding TrendXAxes}"
+                                               Height="260"
+                                               Background="Transparent"
+                                               Foreground="White"/>
+                    </StackPanel>
+                </Border>
 
-                    <Border Style="{StaticResource Card}">
-                        <StackPanel>
-                            <TextBlock Text="Według dnia tygodnia"
-                                       Style="{StaticResource CardHeader}"/>
-                            <lvcwpf:CartesianChart Series="{Binding WeekdaySeries}"
-                                                   XAxes="{Binding WeekdayXAxes}"
-                                                   Height="260"
-                                                   Background="Transparent"
-                                                   Foreground="White"/>
-                        </StackPanel>
-                    </Border>
+                <!-- RZĄD 2 -->
+                <Border Grid.Row="1" Grid.Column="0"
+                        Style="{StaticResource Card}">
+                    <StackPanel>
+                        <TextBlock Text="Według wolnej gotówki"
+                                   Style="{StaticResource CardHeader}"/>
+                        <lvcwpf:CartesianChart Series="{Binding FreeCashSeries}"
+                                               XAxes="{Binding FreeCashXAxes}"
+                                               Height="200"
+                                               Background="Transparent"
+                                               Foreground="White"/>
+                    </StackPanel>
+                </Border>
 
-                    <Border Style="{StaticResource Card}">
-                        <StackPanel>
-                            <TextBlock Text="Według wolnej gotówki"
-                                       Style="{StaticResource CardHeader}"/>
-                            <lvcwpf:CartesianChart Series="{Binding FreeCashSeries}"
-                                                   XAxes="{Binding FreeCashXAxes}"
-                                                   Height="200"
-                                                   Background="Transparent"
-                                                   Foreground="White"/>
-                        </StackPanel>
-                    </Border>
+                <Border Grid.Row="1" Grid.Column="1"
+                        Style="{StaticResource Card}">
+                    <StackPanel>
+                        <TextBlock Text="Według odłożonej gotówki"
+                                   Style="{StaticResource CardHeader}"/>
+                        <lvcwpf:CartesianChart Series="{Binding SavedCashSeries}"
+                                               XAxes="{Binding SavedCashXAxes}"
+                                               Height="200"
+                                               Background="Transparent"
+                                               Foreground="White"/>
+                    </StackPanel>
+                </Border>
 
-                    <Border Style="{StaticResource Card}">
-                        <StackPanel>
-                            <TextBlock Text="Według odłożonej gotówki"
-                                       Style="{StaticResource CardHeader}"/>
-                            <lvcwpf:CartesianChart Series="{Binding SavedCashSeries}"
-                                                   XAxes="{Binding SavedCashXAxes}"
-                                                   Height="200"
-                                                   Background="Transparent"
-                                                   Foreground="White"/>
-                        </StackPanel>
-                    </Border>
-                </StackPanel>
+                <!-- RZĄD 3 -->
+                <Border Grid.Row="2" Grid.Column="0"
+                        Style="{StaticResource Card}">
+                    <StackPanel>
+                        <TextBlock Text="Według kont bankowych"
+                                   Style="{StaticResource CardHeader}"/>
+                        <lvcwpf:CartesianChart Series="{Binding BankAccountsSeries}"
+                                               XAxes="{Binding BankAccountsXAxes}"
+                                               Height="260"
+                                               Background="Transparent"
+                                               Foreground="White"/>
+                    </StackPanel>
+                </Border>
 
-                <!-- PRAWA KOLUMNA: konta bankowe + koperty -->
-                <StackPanel Grid.Column="2">
-                    <Border Style="{StaticResource Card}">
-                        <StackPanel>
-                            <TextBlock Text="Według kont bankowych"
-                                       Style="{StaticResource CardHeader}"/>
-                            <lvcwpf:CartesianChart Series="{Binding BankAccountsSeries}"
-                                                   XAxes="{Binding BankAccountsXAxes}"
-                                                   Height="260"
-                                                   Background="Transparent"
-                                                   Foreground="White"/>
-                        </StackPanel>
-                    </Border>
+                <Border Grid.Row="2" Grid.Column="1"
+                        Style="{StaticResource Card}">
+                    <StackPanel>
+                        <TextBlock Text="Według kopert"
+                                   Style="{StaticResource CardHeader}"/>
+                        <lvcwpf:CartesianChart Series="{Binding EnvelopesSeries}"
+                                               XAxes="{Binding EnvelopesXAxes}"
+                                               Height="260"
+                                               Background="Transparent"
+                                               Foreground="White"/>
+                    </StackPanel>
+                </Border>
 
-                    <Border Style="{StaticResource Card}">
-                        <StackPanel>
-                            <TextBlock Text="Według kopert"
-                                       Style="{StaticResource CardHeader}"/>
-                            <lvcwpf:CartesianChart Series="{Binding EnvelopesSeries}"
-                                                   XAxes="{Binding EnvelopesXAxes}"
-                                                   Height="260"
-                                                   Background="Transparent"
-                                                   Foreground="White"/>
-                        </StackPanel>
-                    </Border>
-                </StackPanel>
+                <!-- RZĄD 4 -->
+                <Border Grid.Row="3" Grid.Column="0"
+                        Style="{StaticResource Card}">
+                    <StackPanel>
+                        <TextBlock Text="Według dnia tygodnia"
+                                   Style="{StaticResource CardHeader}"/>
+                        <lvcwpf:CartesianChart Series="{Binding WeekdaySeries}"
+                                               XAxes="{Binding WeekdayXAxes}"
+                                               Height="260"
+                                               Background="Transparent"
+                                               Foreground="White"/>
+                    </StackPanel>
+                </Border>
+
+                <!-- Grid.Row="3" Grid.Column="1" zostawiony pusty na przyszłość -->
             </Grid>
         </Grid>
     </ScrollViewer>
