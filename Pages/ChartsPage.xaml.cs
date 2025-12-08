@@ -19,28 +19,37 @@ namespace Finly.Pages
             // Ustaw legendę/teksty na biało, jeśli dostępne
             try
             {
-                var white = new SolidColorPaint(new SKColor(255,255,255));
+                var white = new SolidColorPaint(new SKColor(255, 255, 255));
+
                 if (DataContext is ChartsViewModel vm)
                 {
                     if (vm.CategoriesSeries != null)
-                        foreach (var series in vm.CategoriesSeries) series.DataLabelsPaint = white;
-                    // Poprawka: użyj właściwej kolekcji zamiast AccountsSeries
+                        foreach (var series in vm.CategoriesSeries)
+                            series.DataLabelsPaint = white;
+
                     if (vm.BankAccountsSeries != null)
-                        foreach (var series in vm.BankAccountsSeries) series.DataLabelsPaint = white;
+                        foreach (var series in vm.BankAccountsSeries)
+                            series.DataLabelsPaint = white;
+
                     if (vm.TrendSeries != null)
-                        foreach (var series in vm.TrendSeries) series.DataLabelsPaint = white;
+                        foreach (var series in vm.TrendSeries)
+                            series.DataLabelsPaint = white;
+
                     if (vm.WeekdaySeries != null)
-                        foreach (var series in vm.WeekdaySeries) series.DataLabelsPaint = white;
+                        foreach (var series in vm.WeekdaySeries)
+                            series.DataLabelsPaint = white;
                 }
             }
-            catch { }
+            catch
+            {
+                // ignorujemy błędy z kosmetyki etykiet
+            }
 
             // domyślny tryb: wydatki
-            if (ModeExpensesBtn != null)
+            if (ModeExpensesBtn != null && DataContext is ChartsViewModel vm2)
             {
                 ApplyPrimary(ModeExpensesBtn);
-                if (DataContext is ChartsViewModel vm)
-                    vm.SetMode("Expenses");
+                vm2.SetMode("Expenses");
             }
 
             HookPeriodBar();
@@ -108,7 +117,6 @@ namespace Finly.Pages
 
         private static void ApplyPrimary(Button btn)
         {
-            // korzystamy ze stylu PrimaryButton, który masz już w zasobach
             if (Application.Current.Resources["PrimaryButton"] is Style s)
                 btn.Style = s;
         }

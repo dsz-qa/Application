@@ -537,8 +537,6 @@ ORDER BY Name;";
         // =========================================================
         // ======================= KREDYTY =======================
         // =========================================================
-        // Dodaj poni¿sze metody wewn¹trz klasy `DatabaseService` (namespace Finly.Services).
-
         public static System.Collections.Generic.List<Finly.Models.LoanModel> GetLoans(int userId)
         {
             var list = new System.Collections.Generic.List<Finly.Models.LoanModel>();

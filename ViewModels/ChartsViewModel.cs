@@ -27,9 +27,35 @@ namespace Finly.ViewModels
         public enum Mode { Expenses, Incomes, Transfer, Cashflow }
 
         private Period _selectedPeriod = Period.Month;
-        public Period SelectedPeriod { get => _selectedPeriod; set { if (_selectedPeriod != value) { _selectedPeriod = value; Raise(nameof(SelectedPeriod)); _useCustomRange = false; LoadStatistics(); } } }
+        public Period SelectedPeriod
+        {
+            get => _selectedPeriod;
+            set
+            {
+                if (_selectedPeriod != value)
+                {
+                    _selectedPeriod = value;
+                    Raise(nameof(SelectedPeriod));
+                    _useCustomRange = false;
+                    LoadStatistics();
+                }
+            }
+        }
+
         private Mode _selectedMode = Mode.Expenses;
-        public Mode SelectedMode { get => _selectedMode; set { if (_selectedMode != value) { _selectedMode = value; Raise(nameof(SelectedMode)); LoadStatistics(); } } }
+        public Mode SelectedMode
+        {
+            get => _selectedMode;
+            set
+            {
+                if (_selectedMode != value)
+                {
+                    _selectedMode = value;
+                    Raise(nameof(SelectedMode));
+                    LoadStatistics();
+                }
+            }
+        }
 
         public ObservableCollection<ISeries> CategoriesSeries { get; } = new();
         public ObservableCollection<ISeries> TrendSeries { get; } = new();
@@ -60,36 +86,98 @@ namespace Finly.ViewModels
         public ObservableCollection<string> SavedCashLabels { get; } = new();
 
         private readonly int _userId;
+
         public ChartsViewModel()
         {
             _userId = UserService.GetCurrentUserId();
-            try { DatabaseService.DataChanged += (_, __) => LoadStatistics(); } catch { }
+            try
+            {
+                DatabaseService.DataChanged += (_, __) => LoadStatistics();
+            }
+            catch { }
+
             LoadStatistics();
         }
 
-        public void SetPeriod(string period) { if (Enum.TryParse(period, true, out Period p)) SelectedPeriod = p; }
-        public void SetMode(string mode) { if (Enum.TryParse(mode, true, out Mode m)) SelectedMode = m; }
-        public void SetCustomRange(DateTime start, DateTime end) { _customFrom = start.Date; _customTo = end.Date; _useCustomRange = true; LoadStatistics(); }
+        public void SetPeriod(string period)
+        {
+            if (Enum.TryParse(period, true, out Period p))
+                SelectedPeriod = p;
+        }
 
-        private bool _useCustomRange; private DateTime? _customFrom; private DateTime? _customTo;
+        public void SetMode(string mode)
+        {
+            if (Enum.TryParse(mode, true, out Mode m))
+                SelectedMode = m;
+        }
+
+        public void SetCustomRange(DateTime start, DateTime end)
+        {
+            _customFrom = start.Date;
+            _customTo = end.Date;
+            _useCustomRange = true;
+            LoadStatistics();
+        }
+
+        private bool _useCustomRange;
+        private DateTime? _customFrom;
+        private DateTime? _customTo;
 
         private (DateTime? From, DateTime? To, string Bucket) ResolveRange()
         {
             if (_useCustomRange && _customFrom.HasValue && _customTo.HasValue)
-            { var from = _customFrom.Value.Date; var to = _customTo.Value.Date; var span = (to - from).TotalDays; string bucket = span <=7 ? "day" : span <=35 ? "week" : "month"; return (from, to, bucket); }
+            {
+                var from = _customFrom.Value.Date;
+                var to = _customTo.Value.Date;
+                var span = (to - from).TotalDays;
+                string bucket = span <= 7 ? "day" : span <= 35 ? "week" : "month";
+                return (from, to, bucket);
+            }
+
             var today = DateTime.Today;
             return SelectedPeriod switch
-            { Period.Today => (today, today, "day"), Period.Week => (today.AddDays(-6), today, "day"), Period.Month => (new DateTime(today.Year, today.Month,1), new DateTime(today.Year, today.Month,1).AddMonths(1).AddDays(-1), "week"), Period.Year => (new DateTime(today.Year,1,1), new DateTime(today.Year,12,31), "month"), _ => (null, null, "month") };
+            {
+                Period.Today => (today, today, "day"),
+                Period.Week => (today.AddDays(-6), today, "day"),
+                Period.Month => (new DateTime(today.Year, today.Month, 1),
+                                 new DateTime(today.Year, today.Month, 1).AddMonths(1).AddDays(-1),
+                                 "week"),
+                Period.Year => (new DateTime(today.Year, 1, 1),
+                                new DateTime(today.Year, 12, 31),
+                                "month"),
+                _ => (null, null, "month")
+            };
         }
 
         public void LoadStatistics()
         {
-            CategoriesSeries.Clear(); TrendSeries.Clear(); WeekdaySeries.Clear(); EnvelopesSeries.Clear();
-            BankAccountsSeries.Clear(); FreeCashSeries.Clear(); SavedCashSeries.Clear();
-            TrendLabels.Clear(); WeekdayLabels.Clear(); EnvelopeLabels.Clear();
-            BankAccountLabels.Clear(); FreeCashLabels.Clear(); SavedCashLabels.Clear();
-            TrendXAxes.Clear(); TrendYAxes.Clear(); WeekdayXAxes.Clear(); WeekdayYAxes.Clear(); EnvelopesXAxes.Clear(); EnvelopesYAxes.Clear();
-            BankAccountsXAxes.Clear(); BankAccountsYAxes.Clear(); FreeCashXAxes.Clear(); FreeCashYAxes.Clear(); SavedCashXAxes.Clear(); SavedCashYAxes.Clear();
+            CategoriesSeries.Clear();
+            TrendSeries.Clear();
+            WeekdaySeries.Clear();
+            EnvelopesSeries.Clear();
+            BankAccountsSeries.Clear();
+            FreeCashSeries.Clear();
+            SavedCashSeries.Clear();
+
+            TrendLabels.Clear();
+            WeekdayLabels.Clear();
+            EnvelopeLabels.Clear();
+            BankAccountLabels.Clear();
+            FreeCashLabels.Clear();
+            SavedCashLabels.Clear();
+
+            TrendXAxes.Clear();
+            TrendYAxes.Clear();
+            WeekdayXAxes.Clear();
+            WeekdayYAxes.Clear();
+            EnvelopesXAxes.Clear();
+            EnvelopesYAxes.Clear();
+            BankAccountsXAxes.Clear();
+            BankAccountsYAxes.Clear();
+            FreeCashXAxes.Clear();
+            FreeCashYAxes.Clear();
+            SavedCashXAxes.Clear();
+            SavedCashYAxes.Clear();
 
             var (from, to, bucket) = ResolveRange();
             var white = new SolidColorPaint(SKColors.White);
@@ -98,10 +186,15 @@ namespace Finly.ViewModels
             {
                 var data = BuildAggregates(from, to, bucket);
 
-                // Pie
-                if (data.ByCategory.Count ==0)
+                // Pie: podzia³ wg kategorii
+                if (data.ByCategory.Count == 0)
                 {
-                    CategoriesSeries.Add(new PieSeries<double> { Name = "Brak danych", Values = new[] {1d }, DataLabelsPaint = white });
+                    CategoriesSeries.Add(new PieSeries<double>
+                    {
+                        Name = "Brak danych",
+                        Values = new[] { 1d },
+                        DataLabelsPaint = white
+                    });
                 }
                 else
                 {
@@ -117,104 +210,291 @@ namespace Finly.ViewModels
                 }
 
                 // Trend
-                if (data.Trend.Count ==0)
+                if (data.Trend.Count == 0)
                 {
                     TrendLabels.Add("-");
-                    TrendSeries.Add(new LineSeries<double> { Values = new[] {0d }, GeometrySize =8, Fill = null, DataLabelsPaint = white });
+                    TrendSeries.Add(new LineSeries<double>
+                    {
+                        Values = new[] { 0d },
+                        GeometrySize = 8,
+                        Fill = null,
+                        DataLabelsPaint = white
+                    });
                 }
                 else
                 {
-                    foreach (var t in data.Trend) TrendLabels.Add(t.Label);
-                    TrendSeries.Add(new LineSeries<double> { Values = data.Trend.Select(t => (double)t.Value).ToArray(), GeometrySize =8, Fill = null, DataLabelsPaint = white });
+                    foreach (var t in data.Trend)
+                        TrendLabels.Add(t.Label);
+
+                    TrendSeries.Add(new LineSeries<double>
+                    {
+                        Values = data.Trend.Select(t => (double)t.Value).ToArray(),
+                        GeometrySize = 8,
+                        Fill = null,
+                        DataLabelsPaint = white
+                    });
                 }
 
-                TrendXAxes.Add(new Axis { Labels = TrendLabels.ToArray(), LabelsRotation =45, Name = "Okres", LabelsPaint = white, NamePaint = white });
+                TrendXAxes.Add(new Axis
+                {
+                    Labels = TrendLabels.ToArray(),
+                    LabelsRotation = 45,
+                    Name = "Okres",
+                    LabelsPaint = white,
+                    NamePaint = white
+                });
                 TrendYAxes.Add(new Axis { LabelsPaint = white, NamePaint = white });
 
-                // Envelopes
-                if (data.ByEnvelope.Count ==0)
+                // Koperty
+                if (data.ByEnvelope.Count == 0)
                 {
                     EnvelopeLabels.Add("-");
-                    EnvelopesSeries.Add(new ColumnSeries<double> { Values = new[] {0d }, DataLabelsPaint = white });
+                    EnvelopesSeries.Add(new ColumnSeries<double>
+                    {
+                        Values = new[] { 0d },
+                        DataLabelsPaint = white
+                    });
                 }
                 else
                 {
-                    foreach (var e in data.ByEnvelope) EnvelopeLabels.Add(e.Name);
-                    EnvelopesSeries.Add(new ColumnSeries<double> { Values = data.ByEnvelope.Select(e => (double)e.Sum).ToArray(), DataLabelsPaint = white });
+                    foreach (var e in data.ByEnvelope)
+                        EnvelopeLabels.Add(e.Name);
+
+                    EnvelopesSeries.Add(new ColumnSeries<double>
+                    {
+                        Values = data.ByEnvelope.Select(e => (double)e.Sum).ToArray(),
+                        DataLabelsPaint = white
+                    });
                 }
-                EnvelopesXAxes.Add(new Axis { Labels = EnvelopeLabels.ToArray(), Name = "Koperty", LabelsPaint = white, NamePaint = white });
+
+                EnvelopesXAxes.Add(new Axis
+                {
+                    Labels = EnvelopeLabels.ToArray(),
+                    Name = "Koperty",
+                    LabelsPaint = white,
+                    NamePaint = white
+                });
                 EnvelopesYAxes.Add(new Axis { LabelsPaint = white, NamePaint = white });
 
-                // Weekday
-                if (data.ByWeekday.Count ==0)
+                // Dni tygodnia
+                if (data.ByWeekday.Count == 0)
                 {
                     WeekdayLabels.Add("-");
-                    WeekdaySeries.Add(new ColumnSeries<double> { Values = new[] {0d }, DataLabelsPaint = white });
+                    WeekdaySeries.Add(new ColumnSeries<double>
+                    {
+                        Values = new[] { 0d },
+                        DataLabelsPaint = white
+                    });
                 }
                 else
                 {
-                    foreach (var d in data.ByWeekday) WeekdayLabels.Add(d.Name);
-                    WeekdaySeries.Add(new ColumnSeries<double> { Values = data.ByWeekday.Select(d => (double)d.Sum).ToArray(), DataLabelsPaint = white });
+                    foreach (var d in data.ByWeekday)
+                        WeekdayLabels.Add(d.Name);
+
+                    WeekdaySeries.Add(new ColumnSeries<double>
+                    {
+                        Values = data.ByWeekday.Select(d => (double)d.Sum).ToArray(),
+                        DataLabelsPaint = white
+                    });
                 }
-                WeekdayXAxes.Add(new Axis { Labels = WeekdayLabels.ToArray(), Name = "Dzieñ tygodnia", LabelsPaint = white, NamePaint = white });
+
+                WeekdayXAxes.Add(new Axis
+                {
+                    Labels = WeekdayLabels.ToArray(),
+                    Name = "Dzieñ tygodnia",
+                    LabelsPaint = white,
+                    NamePaint = white
+                });
                 WeekdayYAxes.Add(new Axis { LabelsPaint = white, NamePaint = white });
 
-                // Bank accounts
-                if (data.ByBankAccount.Count ==0)
+                // Rachunki bankowe
+                if (data.ByBankAccount.Count == 0)
                 {
                     BankAccountLabels.Add("-");
-                    BankAccountsSeries.Add(new ColumnSeries<double> { Values = new[] {0d }, DataLabelsPaint = white });
+                    BankAccountsSeries.Add(new ColumnSeries<double>
+                    {
+                        Values = new[] { 0d },
+                        DataLabelsPaint = white
+                    });
                 }
                 else
                 {
-                    foreach (var a in data.ByBankAccount) BankAccountLabels.Add(a.Name);
-                    BankAccountsSeries.Add(new ColumnSeries<double> { Values = data.ByBankAccount.Select(a => (double)a.Sum).ToArray(), DataLabelsPaint = white });
+                    foreach (var a in data.ByBankAccount)
+                        BankAccountLabels.Add(a.Name);
+
+                    BankAccountsSeries.Add(new ColumnSeries<double>
+                    {
+                        Values = data.ByBankAccount.Select(a => (double)a.Sum).ToArray(),
+                        DataLabelsPaint = white
+                    });
                 }
-                BankAccountsXAxes.Add(new Axis { Labels = BankAccountLabels.ToArray(), Name = "Rachunki bankowe", LabelsPaint = white, NamePaint = white });
+
+                BankAccountsXAxes.Add(new Axis
+                {
+                    Labels = BankAccountLabels.ToArray(),
+                    Name = "Rachunki bankowe",
+                    LabelsPaint = white,
+                    NamePaint = white
+                });
                 BankAccountsYAxes.Add(new Axis { LabelsPaint = white, NamePaint = white });
 
-                // Free cash
-                if (data.FreeCash.Count ==0)
+                // Wolna gotówka
+                if (data.FreeCash.Count == 0)
                 {
                     FreeCashLabels.Add("-");
-                    FreeCashSeries.Add(new ColumnSeries<double> { Values = new[] {0d }, DataLabelsPaint = white });
+                    FreeCashSeries.Add(new ColumnSeries<double>
+                    {
+                        Values = new[] { 0d },
+                        DataLabelsPaint = white
+                    });
                 }
                 else
                 {
-                    foreach (var a in data.FreeCash) FreeCashLabels.Add(a.Name);
-                    FreeCashSeries.Add(new ColumnSeries<double> { Values = data.FreeCash.Select(a => (double)a.Sum).ToArray(), DataLabelsPaint = white });
+                    foreach (var a in data.FreeCash)
+                        FreeCashLabels.Add(a.Name);
+
+                    FreeCashSeries.Add(new ColumnSeries<double>
+                    {
+                        Values = data.FreeCash.Select(a => (double)a.Sum).ToArray(),
+                        DataLabelsPaint = white
+                    });
                 }
-                FreeCashXAxes.Add(new Axis { Labels = FreeCashLabels.ToArray(), Name = "Wolna gotówka", LabelsPaint = white, NamePaint = white });
+
+                FreeCashXAxes.Add(new Axis
+                {
+                    Labels = FreeCashLabels.ToArray(),
+                    Name = "Wolna gotówka",
+                    LabelsPaint = white,
+                    NamePaint = white
+                });
                 FreeCashYAxes.Add(new Axis { LabelsPaint = white, NamePaint = white });
 
-                // Saved cash
-                if (data.SavedCash.Count ==0)
+                // Od³o¿ona gotówka
+                if (data.SavedCash.Count == 0)
                 {
                     SavedCashLabels.Add("-");
-                    SavedCashSeries.Add(new ColumnSeries<double> { Values = new[] {0d }, DataLabelsPaint = white });
+                    SavedCashSeries.Add(new ColumnSeries<double>
+                    {
+                        Values = new[] { 0d },
+                        DataLabelsPaint = white
+                    });
                 }
                 else
                 {
-                    foreach (var a in data.SavedCash) SavedCashLabels.Add(a.Name);
-                    SavedCashSeries.Add(new ColumnSeries<double> { Values = data.SavedCash.Select(a => (double)a.Sum).ToArray(), DataLabelsPaint = white });
+                    foreach (var a in data.SavedCash)
+                        SavedCashLabels.Add(a.Name);
+
+                    SavedCashSeries.Add(new ColumnSeries<double>
+                    {
+                        Values = data.SavedCash.Select(a => (double)a.Sum).ToArray(),
+                        DataLabelsPaint = white
+                    });
                 }
-                SavedCashXAxes.Add(new Axis { Labels = SavedCashLabels.ToArray(), Name = "Od³o¿ona gotówka", LabelsPaint = white, NamePaint = white });
+
+                SavedCashXAxes.Add(new Axis
+                {
+                    Labels = SavedCashLabels.ToArray(),
+                    Name = "Od³o¿ona gotówka",
+                    LabelsPaint = white,
+                    NamePaint = white
+                });
                 SavedCashYAxes.Add(new Axis { LabelsPaint = white, NamePaint = white });
             }
             catch
             {
-                // defaults for all charts
-                CategoriesSeries.Add(new PieSeries<double> { Name = "Brak danych", Values = new[] {1d }, DataLabelsPaint = white });
-                TrendLabels.Add("-"); TrendSeries.Add(new LineSeries<double> { Values = new[] {0d }, Fill = null, DataLabelsPaint = white });
-                TrendXAxes.Add(new Axis { Labels = TrendLabels.ToArray(), LabelsPaint = white, NamePaint = white }); TrendYAxes.Add(new Axis { LabelsPaint = white, NamePaint = white });
+                var whitePaint = new SolidColorPaint(SKColors.White);
 
-                EnvelopeLabels.Add("-"); EnvelopesSeries.Add(new ColumnSeries<double> { Values = new[] {0d }, DataLabelsPaint = white }); EnvelopesXAxes.Add(new Axis { Labels = EnvelopeLabels.ToArray(), LabelsPaint = white, NamePaint = white }); EnvelopesYAxes.Add(new Axis { LabelsPaint = white, NamePaint = white });
+                CategoriesSeries.Add(new PieSeries<double>
+                {
+                    Name = "Brak danych",
+                    Values = new[] { 1d },
+                    DataLabelsPaint = whitePaint
+                });
 
-                BankAccountLabels.Add("-"); BankAccountsSeries.Add(new ColumnSeries<double> { Values = new[] {0d }, DataLabelsPaint = white }); BankAccountsXAxes.Add(new Axis { Labels = BankAccountLabels.ToArray(), LabelsPaint = white, NamePaint = white }); BankAccountsYAxes.Add(new Axis { LabelsPaint = white, NamePaint = white });
-                FreeCashLabels.Add("-"); FreeCashSeries.Add(new ColumnSeries<double> { Values = new[] {0d }, DataLabelsPaint = white }); FreeCashXAxes.Add(new Axis { Labels = FreeCashLabels.ToArray(), LabelsPaint = white, NamePaint = white }); FreeCashYAxes.Add(new Axis { LabelsPaint = white, NamePaint = white });
-                SavedCashLabels.Add("-"); SavedCashSeries.Add(new ColumnSeries<double> { Values = new[] {0d }, DataLabelsPaint = white }); SavedCashXAxes.Add(new Axis { Labels = SavedCashLabels.ToArray(), LabelsPaint = white, NamePaint = white }); SavedCashYAxes.Add(new Axis { LabelsPaint = white, NamePaint = white });
+                TrendLabels.Add("-");
+                TrendSeries.Add(new LineSeries<double>
+                {
+                    Values = new[] { 0d },
+                    Fill = null,
+                    DataLabelsPaint = whitePaint
+                });
+                TrendXAxes.Add(new Axis
+                {
+                    Labels = TrendLabels.ToArray(),
+                    LabelsPaint = whitePaint,
+                    NamePaint = whitePaint
+                });
+                TrendYAxes.Add(new Axis { LabelsPaint = whitePaint, NamePaint = whitePaint });
 
-                WeekdayLabels.Add("-"); WeekdaySeries.Add(new ColumnSeries<double> { Values = new[] {0d }, DataLabelsPaint = white }); WeekdayXAxes.Add(new Axis { Labels = WeekdayLabels.ToArray(), LabelsPaint = white, NamePaint = white }); WeekdayYAxes.Add(new Axis { LabelsPaint = white, NamePaint = white });
+                EnvelopeLabels.Add("-");
+                EnvelopesSeries.Add(new ColumnSeries<double>
+                {
+                    Values = new[] { 0d },
+                    DataLabelsPaint = whitePaint
+                });
+                EnvelopesXAxes.Add(new Axis
+                {
+                    Labels = EnvelopeLabels.ToArray(),
+                    LabelsPaint = whitePaint,
+                    NamePaint = whitePaint
+                });
+                EnvelopesYAxes.Add(new Axis { LabelsPaint = whitePaint, NamePaint = whitePaint });
+
+                BankAccountLabels.Add("-");
+                BankAccountsSeries.Add(new ColumnSeries<double>
+                {
+                    Values = new[] { 0d },
+                    DataLabelsPaint = whitePaint
+                });
+                BankAccountsXAxes.Add(new Axis
+                {
+                    Labels = BankAccountLabels.ToArray(),
+                    LabelsPaint = whitePaint,
+                    NamePaint = whitePaint
+                });
+                BankAccountsYAxes.Add(new Axis { LabelsPaint = whitePaint, NamePaint = whitePaint });
+
+                FreeCashLabels.Add("-");
+                FreeCashSeries.Add(new ColumnSeries<double>
+                {
+                    Values = new[] { 0d },
+                    DataLabelsPaint = whitePaint
+                });
+                FreeCashXAxes.Add(new Axis
+                {
+                    Labels = FreeCashLabels.ToArray(),
+                    LabelsPaint = whitePaint,
+                    NamePaint = whitePaint
+                });
+                FreeCashYAxes.Add(new Axis { LabelsPaint = whitePaint, NamePaint = whitePaint });
+
+                SavedCashLabels.Add("-");
+                SavedCashSeries.Add(new ColumnSeries<double>
+                {
+                    Values = new[] { 0d },
+                    DataLabelsPaint = whitePaint
+                });
+                SavedCashXAxes.Add(new Axis
+                {
+                    Labels = SavedCashLabels.ToArray(),
+                    LabelsPaint = whitePaint,
+                    NamePaint = whitePaint
+                });
+                SavedCashYAxes.Add(new Axis { LabelsPaint = whitePaint, NamePaint = whitePaint });
+
+                WeekdayLabels.Add("-");
+                WeekdaySeries.Add(new ColumnSeries<double>
+                {
+                    Values = new[] { 0d },
+                    DataLabelsPaint = whitePaint
+                });
+                WeekdayXAxes.Add(new Axis
+                {
+                    Labels = WeekdayLabels.ToArray(),
+                    LabelsPaint = whitePaint,
+                    NamePaint = whitePaint
+                });
+                WeekdayYAxes.Add(new Axis { LabelsPaint = whitePaint, NamePaint = whitePaint });
             }
         }
 
@@ -317,48 +597,103 @@ namespace Finly.ViewModels
                             col.Item().PaddingTop(10).Text("Rachunki bankowe").Bold();
                             col.Item().Table(t =>
                             {
-                                t.ColumnsDefinition(c => { c.ConstantColumn(260); c.RelativeColumn(); });
-                                t.Header(h => { h.Cell().Text("Nazwa").Bold(); h.Cell().Text("Suma [PLN]").Bold(); });
+                                t.ColumnsDefinition(c =>
+                                {
+                                    c.ConstantColumn(260);
+                                    c.RelativeColumn();
+                                });
+                                t.Header(h =>
+                                {
+                                    h.Cell().Text("Nazwa").Bold();
+                                    h.Cell().Text("Suma [PLN]").Bold();
+                                });
                                 foreach (var r2 in data.ByBankAccount)
-                                { t.Cell().Text(r2.Name); t.Cell().Text(r2.Sum.ToString("N2")); }
+                                {
+                                    t.Cell().Text(r2.Name);
+                                    t.Cell().Text(r2.Sum.ToString("N2"));
+                                }
                             });
 
                             col.Item().PaddingTop(10).Text("Wolna gotówka").Bold();
                             col.Item().Table(t =>
                             {
-                                t.ColumnsDefinition(c => { c.ConstantColumn(260); c.RelativeColumn(); });
-                                t.Header(h => { h.Cell().Text("Nazwa").Bold(); h.Cell().Text("Suma [PLN]").Bold(); });
+                                t.ColumnsDefinition(c =>
+                                {
+                                    c.ConstantColumn(260);
+                                    c.RelativeColumn();
+                                });
+                                t.Header(h =>
+                                {
+                                    h.Cell().Text("Nazwa").Bold();
+                                    h.Cell().Text("Suma [PLN]").Bold();
+                                });
                                 foreach (var r2 in data.FreeCash)
-                                { t.Cell().Text(r2.Name); t.Cell().Text(r2.Sum.ToString("N2")); }
+                                {
+                                    t.Cell().Text(r2.Name);
+                                    t.Cell().Text(r2.Sum.ToString("N2"));
+                                }
                             });
 
                             col.Item().PaddingTop(10).Text("Od³o¿ona gotówka").Bold();
                             col.Item().Table(t =>
                             {
-                                t.ColumnsDefinition(c => { c.ConstantColumn(260); c.RelativeColumn(); });
-                                t.Header(h => { h.Cell().Text("Nazwa").Bold(); h.Cell().Text("Suma [PLN]").Bold(); });
+                                t.ColumnsDefinition(c =>
+                                {
+                                    c.ConstantColumn(260);
+                                    c.RelativeColumn();
+                                });
+                                t.Header(h =>
+                                {
+                                    h.Cell().Text("Nazwa").Bold();
+                                    h.Cell().Text("Suma [PLN]").Bold();
+                                });
                                 foreach (var r2 in data.SavedCash)
-                                { t.Cell().Text(r2.Name); t.Cell().Text(r2.Sum.ToString("N2")); }
+                                {
+                                    t.Cell().Text(r2.Name);
+                                    t.Cell().Text(r2.Sum.ToString("N2"));
+                                }
                             });
 
                             // Koperty
                             col.Item().PaddingTop(10).Text("Koperty").Bold();
                             col.Item().Table(t =>
                             {
-                                t.ColumnsDefinition(c => { c.ConstantColumn(260); c.RelativeColumn(); });
-                                t.Header(h => { h.Cell().Text("Nazwa").Bold(); h.Cell().Text("Suma [PLN]").Bold(); });
+                                t.ColumnsDefinition(c =>
+                                {
+                                    c.ConstantColumn(260);
+                                    c.RelativeColumn();
+                                });
+                                t.Header(h =>
+                                {
+                                    h.Cell().Text("Nazwa").Bold();
+                                    h.Cell().Text("Suma [PLN]").Bold();
+                                });
                                 foreach (var r2 in data.ByEnvelope)
-                                { t.Cell().Text(r2.Name); t.Cell().Text(r2.Sum.ToString("N2")); }
+                                {
+                                    t.Cell().Text(r2.Name);
+                                    t.Cell().Text(r2.Sum.ToString("N2"));
+                                }
                             });
 
                             // Dni tygodnia
                             col.Item().PaddingTop(10).Text("Dni tygodnia").Bold();
                             col.Item().Table(t =>
                             {
-                                t.ColumnsDefinition(c => { c.ConstantColumn(120); c.RelativeColumn(); });
-                                t.Header(h => { h.Cell().Text("Dzieñ").Bold(); h.Cell().Text("Suma [PLN]").Bold(); });
+                                t.ColumnsDefinition(c =>
+                                {
+                                    c.ConstantColumn(120);
+                                    c.RelativeColumn();
+                                });
+                                t.Header(h =>
+                                {
+                                    h.Cell().Text("Dzieñ").Bold();
+                                    h.Cell().Text("Suma [PLN]").Bold();
+                                });
                                 foreach (var r2 in data.ByWeekday)
-                                { t.Cell().Text(r2.Name); t.Cell().Text(r2.Sum.ToString("N2")); }
+                                {
+                                    t.Cell().Text(r2.Name);
+                                    t.Cell().Text(r2.Sum.ToString("N2"));
+                                }
                             });
                         });
 
@@ -444,8 +779,15 @@ namespace Finly.ViewModels
             }
         }
 
-        private static string Escape(string? s) => string.IsNullOrEmpty(s) ? "" : s.Replace(";", ",");
-        private string DescribePeriod(DateTime? from, DateTime? to) { if (from == null && to == null) return "Ca³y czas"; if (from == to) return from?.ToString("yyyy-MM-dd") ?? ""; return $"{from:yyyy-MM-dd} – {to:yyyy-MM-dd}"; }
+        private static string Escape(string? s) =>
+            string.IsNullOrEmpty(s) ? "" : s.Replace(";", ",");
+
+        private string DescribePeriod(DateTime? from, DateTime? to)
+        {
+            if (from == null && to == null) return "Ca³y czas";
+            if (from == to) return from?.ToString("yyyy-MM-dd") ?? "";
+            return $"{from:yyyy-MM-dd} – {to:yyyy-MM-dd}";
+        }
 
         private (decimal SummaryTotal, decimal TotalIncomes, decimal TotalExpenses,
                  List<(string Name, decimal Sum)> ByCategory,
@@ -457,51 +799,99 @@ namespace Finly.ViewModels
                  List<(string Name, decimal Sum)> ByWeekday)
             BuildAggregates(DateTime? from, DateTime? to, string bucket)
         {
+            // aktualny snapshot œrodków – fallback dla gotówki i kopert
+            var snapshot = DatabaseService.GetMoneySnapshot(_userId);
+
+            // ===== CASHFLOW =====
             if (SelectedMode == Mode.Cashflow)
             {
                 var exp = DatabaseService.GetExpenses(_userId, from, to).AsEnumerable()
-                    .Select(r => new { Date = SafeDate(r["Date"]), Amount = SafeDecimal(r["Amount"]) }).ToList();
+                    .Select(r => new { Date = SafeDate(r["Date"]), Amount = SafeDecimal(r["Amount"]) })
+                    .ToList();
+
                 var inc = DatabaseService.GetIncomes(_userId, from, to).AsEnumerable()
-                    .Select(r => new { Date = SafeDate(r["Date"]), Amount = SafeDecimal(r["Amount"]) }).ToList();
+                    .Select(r => new { Date = SafeDate(r["Date"]), Amount = SafeDecimal(r["Amount"]) })
+                    .ToList();
 
                 var incomeTotal = inc.Sum(x => Math.Abs(x.Amount));
                 var expenseTotal = exp.Sum(x => Math.Abs(x.Amount));
-                var byCategory = new List<(string Name, decimal Sum)> { ("Przychody", incomeTotal), ("Wydatki", expenseTotal) };
+
+                var byCategory = new List<(string Name, decimal Sum)>
+                {
+                    ("Przychody", incomeTotal),
+                    ("Wydatki",  expenseTotal)
+                };
+
                 var merged = new List<(DateTime Date, decimal Amount)>();
                 merged.AddRange(inc.Select(x => (x.Date, Math.Abs(x.Amount))));
                 merged.AddRange(exp.Select(x => (x.Date, -Math.Abs(x.Amount))));
-                var trend = BuildTrendList(merged, from, to, bucket, null);
-                var byAccount = new List<(string Name, decimal Sum)> { ("Przychody", incomeTotal), ("Wydatki", expenseTotal) };
-                var byEnvelope = new List<(string Name, decimal Sum)>(); // cashflow: brak sensownego rozbicia na koperty
-                var weekdays = GroupByWeekday(merged, null);
-                var order = new[] { DayOfWeek.Monday, DayOfWeek.Tuesday, DayOfWeek.Wednesday, DayOfWeek.Thursday, DayOfWeek.Friday, DayOfWeek.Saturday, DayOfWeek.Sunday };
-                var byWeekday = order.Select(d => (PolishShortDayName(d), weekdays.TryGetValue(d, out var v) ? v : 0m)).ToList();
 
-                // Dodaj brakuj¹ce listy FreeCash i SavedCash jako puste
+                var trend = BuildTrendList(merged, from, to, bucket, null);
+
+                var byAccount = new List<(string Name, decimal Sum)>
+                {
+                    ("Przychody", incomeTotal),
+                    ("Wydatki",  expenseTotal)
+                };
+
+                var weekdaysDict = GroupByWeekday(merged, null);
+                var orderCf = new[]
+                {
+                    DayOfWeek.Monday, DayOfWeek.Tuesday, DayOfWeek.Wednesday,
+                    DayOfWeek.Thursday, DayOfWeek.Friday, DayOfWeek.Saturday, DayOfWeek.Sunday
+                };
+                var byWeekday = orderCf
+                    .Select(d => (PolishShortDayName(d),
+                                  weekdaysDict.TryGetValue(d, out var v) ? v : 0m))
+                    .ToList();
+
+                var byEnvelope = new List<(string Name, decimal Sum)>();
                 var byFreeCash = new List<(string Name, decimal Sum)>();
                 var bySavedCash = new List<(string Name, decimal Sum)>();
 
+                if (snapshot.Cash != 0m)
+                    byFreeCash.Add(("Wolna gotówka", Math.Abs(snapshot.Cash)));
+
+                if (snapshot.Saved != 0m)
+                    bySavedCash.Add(("Od³o¿ona gotówka", Math.Abs(snapshot.Saved)));
+
+                if (snapshot.Envelopes != 0m)
+                    byEnvelope.Add(("Koperty", Math.Abs(snapshot.Envelopes)));
+
                 var summary = incomeTotal - expenseTotal;
-                return (summary, incomeTotal, expenseTotal, byCategory, trend, byAccount, byFreeCash, bySavedCash, byEnvelope, byWeekday);
+
+                return (summary, incomeTotal, expenseTotal,
+                        byCategory, trend, byAccount,
+                        byFreeCash, bySavedCash, byEnvelope, byWeekday);
             }
 
+            // ===== INCOMES =====
             if (SelectedMode == Mode.Incomes)
             {
-                // incomes: sources are bank accounts or cash kinds
                 var dt = DatabaseService.GetIncomes(_userId, from, to);
                 var rows = dt.AsEnumerable().Select(r => new
                 {
                     Date = SafeDate(r["Date"]),
                     Amount = SafeDecimal(r["Amount"]),
-                    Category = (r.Table.Columns.Contains("CategoryName") ? (r["CategoryName"]?.ToString() ?? "(brak)") : "(brak)").Trim(),
-                    Source = (r.Table.Columns.Contains("Source") ? (r["Source"]?.ToString() ?? "Przychody") : "Przychody").Trim()
+                    Category = (r.Table.Columns.Contains("CategoryName")
+                        ? (r["CategoryName"]?.ToString() ?? "(brak)")
+                        : "(brak)").Trim(),
+                    Source = (r.Table.Columns.Contains("Source")
+                        ? (r["Source"]?.ToString() ?? "Przychody")
+                        : "Przychody").Trim()
                 }).ToList();
 
                 var total = rows.Sum(x => Math.Abs(x.Amount));
-                var byCategory = rows.GroupBy(x => string.IsNullOrWhiteSpace(x.Category) ? "(brak)" : x.Category)
+
+                var byCategory = rows
+                    .GroupBy(x => string.IsNullOrWhiteSpace(x.Category) ? "(brak)" : x.Category)
                     .Select(g => (g.Key, g.Sum(x => Math.Abs(x.Amount))))
-                    .OrderByDescending(x => x.Item2).ToList();
-                var trend = BuildTrendList(rows.Select(r => (r.Date, r.Amount)), from, to, bucket, false);
+                    .OrderByDescending(x => x.Item2)
+                    .ToList();
+
+                var trend = BuildTrendList(
+                    rows.Select(r => (r.Date, r.Amount)),
+                    from, to, bucket, false);
 
                 var byBank = new Dictionary<string, decimal>(StringComparer.OrdinalIgnoreCase);
                 var byFree = new Dictionary<string, decimal>(StringComparer.OrdinalIgnoreCase);
@@ -511,27 +901,63 @@ namespace Finly.ViewModels
                 {
                     var name = r.Source;
                     var amount = Math.Abs(r.Amount);
+
                     if (string.Equals(name, "Wolna gotówka", StringComparison.OrdinalIgnoreCase))
+                    {
                         byFree[name] = byFree.TryGetValue(name, out var cur) ? cur + amount : amount;
+                    }
                     else if (string.Equals(name, "Od³o¿ona gotówka", StringComparison.OrdinalIgnoreCase))
+                    {
                         bySaved[name] = bySaved.TryGetValue(name, out var cur) ? cur + amount : amount;
+                    }
                     else if (name.StartsWith("Konto:", StringComparison.OrdinalIgnoreCase))
-                        byBank[name.Substring("Konto:".Length).Trim()] = byBank.TryGetValue(name.Substring("Konto:".Length).Trim(), out var cur) ? cur + amount : amount;
+                    {
+                        var key = name.Substring("Konto:".Length).Trim();
+                        byBank[key] = byBank.TryGetValue(key, out var cur) ? cur + amount : amount;
+                    }
                     else
+                    {
                         byBank[name] = byBank.TryGetValue(name, out var cur) ? cur + amount : amount;
+                    }
                 }
 
                 var byEnvelope = new List<(string, decimal)>();
-                var weekdays = GroupByWeekday(rows.Select(r => (r.Date, r.Amount)), false);
-                var order = new[] { DayOfWeek.Monday, DayOfWeek.Tuesday, DayOfWeek.Wednesday, DayOfWeek.Thursday, DayOfWeek.Friday, DayOfWeek.Saturday, DayOfWeek.Sunday };
-                var byWeekday = order.Select(d => (PolishShortDayName(d), weekdays.TryGetValue(d, out var v) ? v : 0m)).ToList();
-                return (total, total, 0m, byCategory, trend,
-                        byBank.Select(kv => (kv.Key, kv.Value)).OrderByDescending(x => x.Value).ToList(),
-                        byFree.Select(kv => (kv.Key, kv.Value)).OrderByDescending(x => x.Value).ToList(),
-                        bySaved.Select(kv => (kv.Key, kv.Value)).OrderByDescending(x => x.Value).ToList(),
+
+                var weekdaysDict = GroupByWeekday(
+                    rows.Select(r => (r.Date, r.Amount)), false);
+
+                var orderInc = new[]
+                {
+                    DayOfWeek.Monday, DayOfWeek.Tuesday, DayOfWeek.Wednesday,
+                    DayOfWeek.Thursday, DayOfWeek.Friday, DayOfWeek.Saturday, DayOfWeek.Sunday
+                };
+                var byWeekday = orderInc
+                    .Select(d => (PolishShortDayName(d),
+                                  weekdaysDict.TryGetValue(d, out var v) ? v : 0m))
+                    .ToList();
+
+                // fallback z snapshotu
+                if (byFree.Count == 0 && snapshot.Cash != 0m)
+                    byFree["Wolna gotówka"] = Math.Abs(snapshot.Cash);
+
+                if (bySaved.Count == 0 && snapshot.Saved != 0m)
+                    bySaved["Od³o¿ona gotówka"] = Math.Abs(snapshot.Saved);
+
+                if (byEnvelope.Count == 0 && snapshot.Envelopes != 0m)
+                    byEnvelope.Add(("Koperty", Math.Abs(snapshot.Envelopes)));
+
+                return (total, total, 0m,
+                        byCategory, trend,
+                        byBank.Select(kv => (kv.Key, kv.Value))
+                              .OrderByDescending(x => x.Value).ToList(),
+                        byFree.Select(kv => (kv.Key, kv.Value))
+                              .OrderByDescending(x => x.Value).ToList(),
+                        bySaved.Select(kv => (kv.Key, kv.Value))
+                               .OrderByDescending(x => x.Value).ToList(),
                         byEnvelope, byWeekday);
             }
 
+            // ===== TRANSFER =====
             if (SelectedMode == Mode.Transfer)
             {
                 var dt = DatabaseService.GetIncomes(_userId, from, to);
@@ -539,47 +965,95 @@ namespace Finly.ViewModels
                 {
                     Date = SafeDate(r["Date"]),
                     Amount = SafeDecimal(r["Amount"]),
-                    Source = (r.Table.Columns.Contains("Source") ? (r["Source"]?.ToString() ?? string.Empty) : string.Empty).Trim()
-                }).Where(x => string.Equals(x.Source, "Przelew", StringComparison.OrdinalIgnoreCase) || x.Source.StartsWith("Konto:", StringComparison.OrdinalIgnoreCase)).ToList();
+                    Source = (r.Table.Columns.Contains("Source")
+                        ? (r["Source"]?.ToString() ?? string.Empty)
+                        : string.Empty).Trim()
+                })
+                .Where(x => string.Equals(x.Source, "Przelew", StringComparison.OrdinalIgnoreCase)
+                            || x.Source.StartsWith("Konto:", StringComparison.OrdinalIgnoreCase))
+                .ToList();
 
                 var total = rows.Sum(x => Math.Abs(x.Amount));
-                var byCategory = new List<(string, decimal)> { ("Transfery", total) };
-                var trend = BuildTrendList(rows.Select(r => (r.Date, r.Amount)), from, to, bucket, false);
-                var byAccount = rows.GroupBy(r => r.Source).Select(g => (string.IsNullOrWhiteSpace(g.Key) ? "Przelew" : g.Key, g.Sum(x => Math.Abs(x.Amount)))).OrderByDescending(x => x.Item2).ToList();
-                var byEnvelope = new List<(string, decimal)>();
-                var weekdays = GroupByWeekday(rows.Select(r => (r.Date, r.Amount)), false);
-                var order = new[] { DayOfWeek.Monday, DayOfWeek.Tuesday, DayOfWeek.Wednesday, DayOfWeek.Thursday, DayOfWeek.Friday, DayOfWeek.Saturday, DayOfWeek.Sunday };
-                var byWeekday = order.Select(d => (PolishShortDayName(d), weekdays.TryGetValue(d, out var v) ? v : 0m)).ToList();
 
-                // Dodaj brakuj¹ce listy FreeCash i SavedCash jako puste
+                var byCategory = new List<(string, decimal)> { ("Transfery", total) };
+
+                var trend = BuildTrendList(
+                    rows.Select(r => (r.Date, r.Amount)),
+                    from, to, bucket, false);
+
+                var byAccount = rows
+                    .GroupBy(r => r.Source)
+                    .Select(g => (string.IsNullOrWhiteSpace(g.Key) ? "Przelew" : g.Key,
+                                  g.Sum(x => Math.Abs(x.Amount))))
+                    .OrderByDescending(x => x.Item2)
+                    .ToList();
+
+                var byEnvelope = new List<(string, decimal)>();
+
+                var weekdaysDict = GroupByWeekday(
+                    rows.Select(r => (r.Date, r.Amount)), false);
+
+                var orderTr = new[]
+                {
+                    DayOfWeek.Monday, DayOfWeek.Tuesday, DayOfWeek.Wednesday,
+                    DayOfWeek.Thursday, DayOfWeek.Friday, DayOfWeek.Saturday, DayOfWeek.Sunday
+                };
+                var byWeekday = orderTr
+                    .Select(d => (PolishShortDayName(d),
+                                  weekdaysDict.TryGetValue(d, out var v) ? v : 0m))
+                    .ToList();
+
                 var byFreeCash = new List<(string Name, decimal Sum)>();
                 var bySavedCash = new List<(string Name, decimal Sum)>();
 
-                return (total, 0m, 0m, byCategory, trend, byAccount, byFreeCash, bySavedCash, byEnvelope, byWeekday);
+                if (snapshot.Cash != 0m)
+                    byFreeCash.Add(("Wolna gotówka", Math.Abs(snapshot.Cash)));
+
+                if (snapshot.Saved != 0m)
+                    bySavedCash.Add(("Od³o¿ona gotówka", Math.Abs(snapshot.Saved)));
+
+                if (snapshot.Envelopes != 0m)
+                    byEnvelope.Add(("Koperty", Math.Abs(snapshot.Envelopes)));
+
+                return (total, 0m, 0m,
+                        byCategory, trend,
+                        byAccount, byFreeCash, bySavedCash, byEnvelope, byWeekday);
             }
 
-            // Expenses
+            // ===== EXPENSES (domyœlnie) =====
             {
                 var dt = DatabaseService.GetExpenses(_userId, from, to);
                 var rows = dt.AsEnumerable().Select(r => new
                 {
                     Date = SafeDate(r["Date"]),
                     Amount = SafeDecimal(r["Amount"]),
-                    Category = (r.Table.Columns.Contains("CategoryName") ? (r["CategoryName"]?.ToString() ?? "(brak)") : "(brak)").Trim(),
-                    AccountText = (r.Table.Columns.Contains("Account") ? (r["Account"]?.ToString() ?? string.Empty) : string.Empty).Trim(),
-                    AccountId = SafeNullableInt(r["AccountId"]) // may be null
+                    Category = (r.Table.Columns.Contains("CategoryName")
+                        ? (r["CategoryName"]?.ToString() ?? "(brak)")
+                        : "(brak)").Trim(),
+                    AccountText = (r.Table.Columns.Contains("Account")
+                        ? (r["Account"]?.ToString() ?? string.Empty)
+                        : string.Empty).Trim(),
+                    AccountId = SafeNullableInt(r["AccountId"])
                 }).ToList();
 
                 var total = rows.Sum(x => Math.Abs(x.Amount));
-                var byCategory = rows.GroupBy(x => string.IsNullOrWhiteSpace(x.Category) ? "(brak)" : x.Category)
- .Select(g => (g.Key, g.Sum(x => Math.Abs(x.Amount))))
- .OrderByDescending(x => x.Item2).ToList();
-                var trend = BuildTrendList(rows.Select(r => (r.Date, r.Amount)), from, to, bucket, true);
+
+                var byCategory = rows
+                    .GroupBy(x => string.IsNullOrWhiteSpace(x.Category) ? "(brak)" : x.Category)
+                    .Select(g => (g.Key, g.Sum(x => Math.Abs(x.Amount))))
+                    .OrderByDescending(x => x.Item2)
+                    .ToList();
+
+                var trend = BuildTrendList(
+                    rows.Select(r => (r.Date, r.Amount)),
+                    from, to, bucket, true);
 
                 var byBank = new Dictionary<string, decimal>(StringComparer.OrdinalIgnoreCase);
                 var byFree = new Dictionary<string, decimal>(StringComparer.OrdinalIgnoreCase);
                 var bySaved = new Dictionary<string, decimal>(StringComparer.OrdinalIgnoreCase);
                 var byEnv = new Dictionary<string, decimal>(StringComparer.OrdinalIgnoreCase);
+
+                Dictionary<int, string>? accountsCache = null;
 
                 foreach (var row in rows)
                 {
@@ -600,83 +1074,204 @@ namespace Finly.ViewModels
                     }
                     else if (string.Equals(acc, "Wolna gotówka", StringComparison.OrdinalIgnoreCase))
                     {
-                        var name = "Wolna gotówka";
+                        const string name = "Wolna gotówka";
                         byFree[name] = byFree.TryGetValue(name, out var cur) ? cur + amount : amount;
                     }
                     else if (string.Equals(acc, "Od³o¿ona gotówka", StringComparison.OrdinalIgnoreCase))
                     {
-                        var name = "Od³o¿ona gotówka";
+                        const string name = "Od³o¿ona gotówka";
                         bySaved[name] = bySaved.TryGetValue(name, out var cur) ? cur + amount : amount;
                     }
                     else
                     {
-                        // fallback: group by resolved bank account name if AccountId exists, otherwise bucket as "Inne"
                         string name;
                         if (row.AccountId is int id)
                         {
-                            var accounts = DatabaseService.GetAccounts(_userId).ToDictionary(a => a.Id, a => string.IsNullOrWhiteSpace(a.AccountName) ? (a.BankName ?? $"Konto {a.Id}") : a.AccountName);
-                            name = accounts.TryGetValue(id, out var n) ? n : $"Konto {id}";
+                            accountsCache ??= DatabaseService
+                                .GetAccounts(_userId)
+                                .ToDictionary(
+                                    a => a.Id,
+                                    a => string.IsNullOrWhiteSpace(a.AccountName)
+                                        ? (a.BankName ?? $"Konto {a.Id}")
+                                        : a.AccountName);
+
+                            name = accountsCache.TryGetValue(id, out var n)
+                                ? n
+                                : $"Konto {id}";
                         }
                         else
                         {
                             name = string.IsNullOrWhiteSpace(acc) ? "Inne" : acc;
                         }
+
                         byBank[name] = byBank.TryGetValue(name, out var cur) ? cur + amount : amount;
                     }
                 }
 
-                var weekdays = GroupByWeekday(rows.Select(r => (r.Date, r.Amount)), true);
-                var order = new[] { DayOfWeek.Monday, DayOfWeek.Tuesday, DayOfWeek.Wednesday, DayOfWeek.Thursday, DayOfWeek.Friday, DayOfWeek.Saturday, DayOfWeek.Sunday };
-                var byWeekday = order.Select(d => (PolishShortDayName(d), weekdays.TryGetValue(d, out var v) ? v : 0m)).ToList();
-                return (total, 0m, total, byCategory, trend,
- byBank.Select(kv => (kv.Key, kv.Value)).OrderByDescending(x => x.Value).ToList(),
- byFree.Select(kv => (kv.Key, kv.Value)).OrderByDescending(x => x.Value).ToList(),
- bySaved.Select(kv => (kv.Key, kv.Value)).OrderByDescending(x => x.Value).ToList(),
- byEnv.Select(kv => (kv.Key, kv.Value)).OrderByDescending(x => x.Value).ToList(),
- byWeekday);
+                var weekdaysDict = GroupByWeekday(
+                    rows.Select(r => (r.Date, r.Amount)), true);
+
+                var orderExp = new[]
+                {
+                    DayOfWeek.Monday, DayOfWeek.Tuesday, DayOfWeek.Wednesday,
+                    DayOfWeek.Thursday, DayOfWeek.Friday, DayOfWeek.Saturday, DayOfWeek.Sunday
+                };
+                var byWeekday = orderExp
+                    .Select(d => (PolishShortDayName(d),
+                                  weekdaysDict.TryGetValue(d, out var v) ? v : 0m))
+                    .ToList();
+
+                // fallback z snapshotu, gdy brak danych
+                if (byFree.Count == 0 && snapshot.Cash != 0m)
+                    byFree["Wolna gotówka"] = Math.Abs(snapshot.Cash);
+
+                if (bySaved.Count == 0 && snapshot.Saved != 0m)
+                    bySaved["Od³o¿ona gotówka"] = Math.Abs(snapshot.Saved);
+
+                if (byEnv.Count == 0 && snapshot.Envelopes != 0m)
+                    byEnv["Koperty"] = Math.Abs(snapshot.Envelopes);
+
+                return (total, 0m, total,
+                        byCategory, trend,
+                        byBank.Select(kv => (kv.Key, kv.Value))
+                              .OrderByDescending(x => x.Value).ToList(),
+                        byFree.Select(kv => (kv.Key, kv.Value))
+                              .OrderByDescending(x => x.Value).ToList(),
+                        bySaved.Select(kv => (kv.Key, kv.Value))
+                               .OrderByDescending(x => x.Value).ToList(),
+                        byEnv.Select(kv => (kv.Key, kv.Value))
+                             .OrderByDescending(x => x.Value).ToList(),
+                        byWeekday);
             }
         }
 
-        private List<(string Label, decimal Value)> BuildTrendList(IEnumerable<(DateTime Date, decimal Amount)> items, DateTime? from, DateTime? to, string bucket, bool? isExpense)
+        private List<(string Label, decimal Value)> BuildTrendList(
+            IEnumerable<(DateTime Date, decimal Amount)> items,
+            DateTime? from, DateTime? to, string bucket, bool? isExpense)
         {
-            var list = items.ToList(); if (list.Count ==0) return new() { ("-",0m) };
-            DateTime start = from ?? list.Min(x => x.Date).Date; DateTime end = to ?? list.Max(x => x.Date).Date;
+            var list = items.ToList();
+            if (list.Count == 0) return new() { ("-", 0m) };
+
+            DateTime start = from ?? list.Min(x => x.Date).Date;
+            DateTime end = to ?? list.Max(x => x.Date).Date;
+
             var buckets = new List<(string Label, DateTime KeyStart, DateTime KeyEnd)>();
-            if (bucket == "day") { for (var d = start; d <= end; d = d.AddDays(1)) buckets.Add((d.ToString("dd.MM"), d, d)); }
-            else if (bucket == "week") { var cur = start.AddDays(-(((int)start.DayOfWeek +6) %7)); while (cur <= end) { var s = cur; var e = cur.AddDays(6); buckets.Add(($"{s:dd.MM}-{e:dd.MM}", s, e)); cur = cur.AddDays(7); } }
-            else { var cur = new DateTime(start.Year, start.Month,1); while (cur <= end) { var s = cur; var e = cur.AddMonths(1).AddDays(-1); buckets.Add(($"{s:MM.yyyy}", s, e)); cur = cur.AddMonths(1); } }
+
+            if (bucket == "day")
+            {
+                for (var d = start; d <= end; d = d.AddDays(1))
+                    buckets.Add((d.ToString("dd.MM"), d, d));
+            }
+            else if (bucket == "week")
+            {
+                var cur = start.AddDays(-(((int)start.DayOfWeek + 6) % 7));
+                while (cur <= end)
+                {
+                    var s = cur;
+                    var e = cur.AddDays(6);
+                    buckets.Add(($"{s:dd.MM}-{e:dd.MM}", s, e));
+                    cur = cur.AddDays(7);
+                }
+            }
+            else
+            {
+                var cur = new DateTime(start.Year, start.Month, 1);
+                while (cur <= end)
+                {
+                    var s = cur;
+                    var e = cur.AddMonths(1).AddDays(-1);
+                    buckets.Add(($"{s:MM.yyyy}", s, e));
+                    cur = cur.AddMonths(1);
+                }
+            }
+
             var result = new List<(string, decimal)>();
+
             foreach (var b in buckets)
             {
-                var sum = list.Where(x => x.Date.Date >= b.KeyStart.Date && x.Date.Date <= b.KeyEnd.Date).Sum(x => x.Amount);
-                if (isExpense == true) sum = -Math.Abs(sum); else if (isExpense == false) sum = Math.Abs(sum);
+                var sum = list
+                    .Where(x => x.Date.Date >= b.KeyStart.Date && x.Date.Date <= b.KeyEnd.Date)
+                    .Sum(x => x.Amount);
+
+                if (isExpense == true) sum = -Math.Abs(sum);
+                else if (isExpense == false) sum = Math.Abs(sum);
+
                 result.Add((b.Label, sum));
             }
+
             return result;
         }
 
-        private Dictionary<DayOfWeek, decimal> GroupByWeekday(IEnumerable<(DateTime Date, decimal Amount)> items, bool? isExpense)
+        private Dictionary<DayOfWeek, decimal> GroupByWeekday(
+            IEnumerable<(DateTime Date, decimal Amount)> items,
+            bool? isExpense)
         {
             var dict = new Dictionary<DayOfWeek, decimal>();
+
             foreach (var (date, amountRaw) in items)
             {
-                var amount = amountRaw; if (isExpense == true) amount = -Math.Abs(amountRaw); else if (isExpense == false) amount = Math.Abs(amountRaw);
-                var d = date.DayOfWeek; if (!dict.TryGetValue(d, out var cur)) cur =0m; dict[d] = cur + amount;
+                var amount = amountRaw;
+                if (isExpense == true) amount = -Math.Abs(amountRaw);
+                else if (isExpense == false) amount = Math.Abs(amountRaw);
+
+                var d = date.DayOfWeek;
+                if (!dict.TryGetValue(d, out var cur)) cur = 0m;
+                dict[d] = cur + amount;
             }
+
             return dict;
         }
 
         private static string PolishShortDayName(DayOfWeek d) => d switch
-        { DayOfWeek.Monday => "Pn", DayOfWeek.Tuesday => "Wt", DayOfWeek.Wednesday => "Œr", DayOfWeek.Thursday => "Cz", DayOfWeek.Friday => "Pt", DayOfWeek.Saturday => "So", DayOfWeek.Sunday => "Nd", _ => d.ToString() };
-        private static DateTime SafeDate(object? o) { if (o == null || o is DBNull) return DateTime.Today; if (o is DateTime dt) return dt; return DateTime.TryParse(Convert.ToString(o, CultureInfo.InvariantCulture), out var parsed) ? parsed : DateTime.Today; }
+        {
+            DayOfWeek.Monday => "Pn",
+            DayOfWeek.Tuesday => "Wt",
+            DayOfWeek.Wednesday => "Œr",
+            DayOfWeek.Thursday => "Cz",
+            DayOfWeek.Friday => "Pt",
+            DayOfWeek.Saturday => "So",
+            DayOfWeek.Sunday => "Nd",
+            _ => d.ToString()
+        };
+
+        private static DateTime SafeDate(object? o)
+        {
+            if (o == null || o is DBNull) return DateTime.Today;
+            if (o is DateTime dt) return dt;
+
+            return DateTime.TryParse(
+                       Convert.ToString(o, CultureInfo.InvariantCulture),
+                       out var parsed)
+                ? parsed
+                : DateTime.Today;
+        }
+
         private static decimal SafeDecimal(object? o)
         {
             if (o == null || o is DBNull) return 0m;
             if (o is decimal d) return d;
             if (o is double dbl) return (decimal)dbl;
             if (o is float fl) return (decimal)fl;
-            return decimal.TryParse(Convert.ToString(o, CultureInfo.InvariantCulture), NumberStyles.Any, CultureInfo.InvariantCulture, out var parsed) ? parsed : 0m;
+
+            return decimal.TryParse(
+                       Convert.ToString(o, CultureInfo.InvariantCulture),
+                       NumberStyles.Any,
+                       CultureInfo.InvariantCulture,
+                       out var parsed)
+                ? parsed
+                : 0m;
         }
-        private static int? SafeNullableInt(object? o) { if (o == null || o is DBNull) return null; if (o is int i) return i; return int.TryParse(Convert.ToString(o, CultureInfo.InvariantCulture), out var parsed) ? parsed : (int?)null; }
+
+        private static int? SafeNullableInt(object? o)
+        {
+            if (o == null || o is DBNull) return null;
+            if (o is int i) return i;
+
+            return int.TryParse(
+                       Convert.ToString(o, CultureInfo.InvariantCulture),
+                       out var parsed)
+                ? parsed
+                : (int?)null;
+        }
     }
 }
