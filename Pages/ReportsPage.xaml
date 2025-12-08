@@ -156,15 +156,6 @@
             <StackPanel>
                 <TextBlock Text="Filtry" FontSize="16" FontWeight="SemiBold" Margin="0,0,0,8" />
 
-                <!-- ŹRÓDŁO -->
-                <TextBlock Text="Źródło"
-                           Margin="0,0,0,4"
-                           Foreground="{DynamicResource App.Foreground}"/>
-                <ComboBox ItemsSource="{Binding Sources}"
-                          SelectedItem="{Binding SelectedSource}"
-                          Height="28"
-                          Margin="0,0,0,8"/>
-
                 <!-- KATEGORIA -->
                 <TextBlock Text="Kategoria"
                            Margin="0,0,0,4"
@@ -183,8 +174,8 @@
                           Height="28"
                           Margin="0,0,0,8"/>
 
-                <!-- NOWE: KONTO / KOPERTA -->
-                <TextBlock Text="Konto / koperta"
+                <!-- NOWE: RODZAJ PIENIĘDZY -->
+                <TextBlock Text="Rodzaj pieniędzy"
                            Margin="0,0,0,4"
                            Foreground="{DynamicResource App.Foreground}"/>
                 <ComboBox ItemsSource="{Binding MoneyPlaces}"
@@ -200,16 +191,15 @@
                             Margin="0,0,8,0"
                             Command="{Binding RefreshCommand}"/>
 
-                    <Button Content="Eksportuj raport z bieżącego okresu"
+                    <Button Content="Eksportuj Raport"
                             Style="{StaticResource SecondaryButton}"
                             Click="ExportButton_Click"/>
                 </StackPanel>
             </StackPanel>
         </Border>
 
-        <!-- CENTER: pasek okresu + zakładki + wykres + tabele -->
+        <!-- CENTER TOP: pasek okresu + zakładki -->
         <Border Grid.Row="0"
-                Grid.RowSpan="2"
                 Grid.Column="1"
                 Background="{StaticResource Surface.Background}"
                 Padding="12"
@@ -221,7 +211,6 @@
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto" />
                     <RowDefinition Height="Auto" />
-                    <RowDefinition Height="*" />
                 </Grid.RowDefinitions>
 
                 <!-- Pasek okresu -->
@@ -237,20 +226,11 @@
                     <TabItem Header="Przegląd" />
                     <TabItem Header="Kategorie" />
                     <TabItem Header="Czas" />
-                    <TabItem Header="Cashflow" />
-                    <TabItem Header="Subskrypcje" />
                     <TabItem Header="Budżety" />
+                    <TabItem Header="Koperty" />
                     <TabItem Header="Cele" />
+                    <TabItem Header="Symulacja rachunku" />
                 </TabControl>
-
-                <!-- Wykres + szczegóły / drilldown -->
-                <Grid Grid.Row="2" Margin="0,8,0,0">
-                    <!-- Donut chart only in center frame -->
-                    <ctrls:DonutChartControl x:Name="MainChart"
-                                             HorizontalAlignment="Stretch"
-                                             VerticalAlignment="Stretch"
-                                             Background="Transparent" />
-                </Grid>
             </Grid>
         </Border>
 
@@ -348,58 +328,48 @@
                         </StackPanel>
                     </StackPanel>
                 </Border>
-
-                <!-- Szczegóły kategorii przeniesione pod KPI -->
-                <StackPanel Orientation="Vertical" Margin="0,12,0,0">
-                    <TextBlock Text="Szczegóły kategorii"
-                               FontWeight="Bold"
-                               Margin="0,0,0,8" />
-
-                    <!-- Podsumowanie kategorii -->
-                    <DataGrid x:Name="SummaryGrid"
-                              AutoGenerateColumns="False"
-                              IsReadOnly="True"
-                              Height="220"
-                              ItemsSource="{Binding Details}"
-                              Visibility="{Binding IsSummaryActive, Converter={StaticResource BoolToVisibilityConverter}}">
-                        <DataGrid.Columns>
-                            <DataGridTextColumn Header="Kategoria" Binding="{Binding Name}" />
-                            <DataGridTextColumn Header="Kwota" Binding="{Binding Amount, StringFormat=N2}" />
-                            <DataGridTextColumn Header="Udział %" Binding="{Binding SharePercent, StringFormat=N1}" />
-                        </DataGrid.Columns>
-                    </DataGrid>
-
-                    <Button x:Name="BackButton"
-                            Content="Wróć"
-                            Command="{Binding BackCommand}"
-                            Visibility="{Binding IsDrilldownActive, Converter={StaticResource BoolToVisibilityConverter}}"
-                            Margin="0,8,0,0" />
-
-                    <TextBlock Text="Kliknij element wykresu, aby zobaczyć transakcje w tej kategorii."
-                               FontStyle="Italic"
-                               Margin="0,8,0,0" />
-
-                    <!-- Lista transakcji dla wybranej kategorii -->
-                    <DataGrid x:Name="DrilldownGrid"
-                              AutoGenerateColumns="False"
-                              IsReadOnly="True"
-                              Height="220"
-                              ItemsSource="{Binding FilteredTransactions}"
-                              Margin="0,8,0,0"
-                              Visibility="{Binding IsDrilldownActive, Converter={StaticResource BoolToVisibilityConverter}}">
-                        <DataGrid.Columns>
-                            <DataGridTextColumn Header="Data"
-                                                Binding="{Binding Date, StringFormat=\{0:yyyy-MM-dd\}}" />
-                            <DataGridTextColumn Header="Kategoria"
-                                                Binding="{Binding Category}" />
-                            <DataGridTextColumn Header="Opis"
-                                                Binding="{Binding Description}" />
-                            <DataGridTextColumn Header="Kwota"
-                                                Binding="{Binding Amount, StringFormat=N2}" />
-                        </DataGrid.Columns>
-                    </DataGrid>
-                </StackPanel>
             </StackPanel>
+        </Border>
+
+        <!-- BOTTOM: jedna duża ramka z „odnogami” pod filtrami i KPI -->
+        <Border Grid.Row="1"
+                Grid.ColumnSpan="3"
+                Background="{StaticResource Surface.Background}"
+                BorderBrush="{StaticResource Surface.Border}"
+                BorderThickness="1"
+                CornerRadius="6"
+                Margin="0,8,0,0">
+            <Grid Margin="12">
+                <!-- 3 kolumny: lewa odnoga, środek, prawa odnoga -->
+                <Grid.ColumnDefinitions>
+                    <!-- szerokości dopasowane do lewej i prawej kolumny głównego Grid-a -->
+                    <ColumnDefinition Width="260" />   <!-- pod filtrami -->
+                    <ColumnDefinition Width="*" />     <!-- środek -->
+                    <ColumnDefinition Width="320" />   <!-- pod KPI -->
+                </Grid.ColumnDefinitions>
+
+                <!-- lewa odnoga – pod filtrami, na razie pusta (tylko tło ramki) -->
+                <Border Grid.Column="0"
+                        Background="{StaticResource Surface.Background}"
+                        BorderThickness="0" />
+
+                <!-- prawa odnoga – pod KPI, też pusta -->
+                <Border Grid.Column="2"
+                        Background="{StaticResource Surface.Background}"
+                        BorderThickness="0" />
+
+                <!-- środkowa część: tutaj wstawiamy zawartość zakładek -->
+                <!-- Na start przenosimy donut z wcześniejszego miejsca (Przegląd) -->
+                <Border Grid.Column="1"
+                        Background="{StaticResource Surface.Background}"
+                        BorderThickness="0"
+                        Padding="12">
+                    <ctrls:DonutChartControl x:Name="MainChart"
+                                             HorizontalAlignment="Stretch"
+                                             VerticalAlignment="Stretch"
+                                             Background="Transparent" />
+                </Border>
+            </Grid>
         </Border>
     </Grid>
 </UserControl>

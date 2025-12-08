@@ -63,6 +63,10 @@ namespace Finly.ViewModels
             LoadMoneyPlaces();
         }
 
+        // Podsumowania kategorii dla zak³adki "Kategorie"
+        public ObservableCollection<CategoryAmount> ExpenseCategoriesSummary { get; } = new();
+        public ObservableCollection<CategoryAmount> IncomeCategoriesSummary  { get; } = new();
+
         private void LoadAccountsAndEnvelopes()
         {
             try
@@ -855,6 +859,9 @@ namespace Finly.ViewModels
                 foreach (var row in currentRows)
                     Rows.Add(row);
 
+                // tu DODAJ:
+                RebuildCategorySummariesFromRows();
+
                 // KPI for current period based on unified rows
                 var totalExpenses = currentRows.Where(r => r.Amount < 0m).Sum(r => -r.Amount);
                 var totalIncomes  = currentRows.Where(r => r.Amount > 0m).Sum(r =>  r.Amount);
@@ -989,22 +996,88 @@ namespace Finly.ViewModels
             try
             {
                 var path = PdfExportService.ExportReportsPdf(this);
-                MessageBox.Show(
-                    $"Raport PDF zapisano na pulpicie:\n{path}",
-                    "Eksport PDF",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Information);
+                // zamiast MessageBox ? lekki toast w rogu okna
+                ToastService.Success($"Raport PDF zapisano na pulpicie: {path}");
             }
             catch (Exception ex)
             {
-                MessageBox.Show(
-                    $"B³¹d eksportu PDF: {ex.Message}",
-                    "B³¹d eksportu PDF",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Error);
+                ToastService.Error($"B³¹d eksportu PDF: {ex.Message}");
             }
         }
 
+        private void RebuildCategorySummariesFromRows()
+        {
+            ExpenseCategoriesSummary.Clear();
+            IncomeCategoriesSummary.Clear();
+
+            if (Rows == null || Rows.Count == 0)
+                return;
+
+            // ===== Wydatki wed³ug kategorii =====
+            var expenseGroups = Rows
+                .Where(r => r.Amount < 0m)
+                .GroupBy(r => string.IsNullOrWhiteSpace(r.Category) ? "(brak kategorii)" : r.Category);
+
+            decimal totalExpenses = expenseGroups.Sum(g => -g.Sum(x => x.Amount));
+
+            foreach (var g in expenseGroups.OrderByDescending(g => -g.Sum(x => x.Amount)))
+            {
+                var sum = -g.Sum(x => x.Amount);
+                var share = totalExpenses > 0m ? (double)(sum / totalExpenses * 100m) : 0.0;
+
+                ExpenseCategoriesSummary.Add(new CategoryAmount
+                {
+                    Name = g.Key,
+                    Amount = sum,
+                    SharePercent = share
+                });
+            }
+
+            // ===== Przychody wed³ug kategorii =====
+            var incomeGroups = Rows
+                .Where(r => r.Amount > 0m)
+                .GroupBy(r => string.IsNullOrWhiteSpace(r.Category) ? "(brak kategorii)" : r.Category);
+
+            decimal totalIncomes = incomeGroups.Sum(g => g.Sum(x => x.Amount));
+
+            foreach (var g in incomeGroups.OrderByDescending(g => g.Sum(x => x.Amount)))
+            {
+                var sum = g.Sum(x => x.Amount);
+                var share = totalIncomes > 0m ? (double)(sum / totalIncomes * 100m) : 0.0;
+
+                IncomeCategoriesSummary.Add(new CategoryAmount
+                {
+                    Name = g.Key,
+                    Amount = sum,
+                    SharePercent = share
+                });
+            }
+
+            // powiadom widok na wszelki wypadek
+            Raise(nameof(ExpenseCategoriesSummary));
+            Raise(nameof(IncomeCategoriesSummary));
+        }
+
+        // ====== Zak³adki raportów ======
+        private int _selectedTabIndex = 0;
+        public int SelectedTabIndex
+        {
+            get => _selectedTabIndex;
+            set
+            {
+                if (_selectedTabIndex != value)
+                {
+                    _selectedTabIndex = value;
+                    Raise(nameof(SelectedTabIndex));
+                    Raise(nameof(IsOverviewTab));
+                    Raise(nameof(IsCategoriesTab));
+                    // w przysz³oœci: IsTimeTab, IsBudgetsTab itd.
+                }
+            }
+        }
+
+        public bool IsOverviewTab   => SelectedTabIndex == 0;
+        public bool IsCategoriesTab => SelectedTabIndex == 1;
     }
 
     static class DataTableExtensions
