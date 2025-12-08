@@ -54,7 +54,13 @@ namespace Finly.ViewModels
             FilteredTransactions = new ObservableCollection<TransactionDto>();
             _transactionsSnapshot = new List<TransactionDto>();
 
+            // unified rows collection for KPI/exports
+            Rows = new ObservableCollection<ReportsService.ReportItem>();
+
             LoadAccountsAndEnvelopes();
+
+            // new: load money places for specific Konto/Koperta selection
+            LoadMoneyPlaces();
         }
 
         private void LoadAccountsAndEnvelopes()
@@ -96,6 +102,19 @@ namespace Finly.ViewModels
 
         public enum SourceType { All = 0, FreeCash = 1, SavedCash = 2, BankAccounts = 3, Envelopes = 4 }
         public Array SourceOptions => Enum.GetValues(typeof(SourceType));
+
+        // map enum source to UI string used in DB
+        private string GetSourceString()
+        {
+            return SelectedSource switch
+            {
+                SourceType.FreeCash => "Wolna gotówka",
+                SourceType.SavedCash => "Od³o¿ona gotówka",
+                SourceType.BankAccounts => "Konta bankowe",
+                SourceType.Envelopes => "Koperty",
+                _ => "Wszystko"
+            };
+        }
 
         // Rodzaj wybranego okresu czasowego
         private enum PeriodKind
@@ -229,23 +248,113 @@ namespace Finly.ViewModels
         public ObservableCollection<string> Currencies { get; }
         public ObservableCollection<string> Templates { get; }
 
-        // Nowy filtr: typ transakcji
-        public ObservableCollection<string> TransactionTypes { get; } =
-            new ObservableCollection<string> { "Wszystko", "Wydatki", "Przychody" };
+        // unified rows of current period
+        public ObservableCollection<ReportsService.ReportItem> Rows { get; private set; }
 
-        private string _selectedTransactionType = "Wydatki";
+        // Typ transakcji: wszystko / tylko wydatki / tylko przychody
+        public ObservableCollection<string> TransactionTypes { get; } =
+            new ObservableCollection<string>
+            {
+                "Wszystko",
+                "Wydatki",
+                "Przychody"
+            };
+
+        // keep single backing field, default "Wszystko"
+        private string _selectedTransactionType = "Wszystko";
         public string SelectedTransactionType
         {
             get => _selectedTransactionType;
             set
             {
-                if (_selectedTransactionType != value)
+                var newValue = string.IsNullOrWhiteSpace(value) ? "Wszystko" : value;
+                if (_selectedTransactionType != newValue)
                 {
-                    _selectedTransactionType = value ?? "Wydatki";
+                    _selectedTransactionType = newValue;
                     Raise(nameof(SelectedTransactionType));
                     Refresh();
                 }
             }
+        }
+
+        // Lista konkretnych miejsc: gotówka, koperty, konta bankowe
+        public ObservableCollection<string> MoneyPlaces { get; } =
+            new ObservableCollection<string>();
+
+        private string _selectedMoneyPlace = "Wszystko";
+        public string SelectedMoneyPlace
+        {
+            get => _selectedMoneyPlace;
+            set
+            {
+                if (_selectedMoneyPlace != value)
+                {
+                    _selectedMoneyPlace = string.IsNullOrWhiteSpace(value)
+                        ? "Wszystko"
+                        : value;
+
+                    Raise(nameof(SelectedMoneyPlace));
+                    // auto-refresh on change; remove if you want only manual refresh
+                    Refresh();
+                }
+            }
+        }
+
+        // Czy combobox z kontem/kopert¹ ma byæ aktywny
+        private bool _isMoneyPlaceFilterEnabled;
+        public bool IsMoneyPlaceFilterEnabled
+        {
+            get => _isMoneyPlaceFilterEnabled;
+            set
+            {
+                if (_isMoneyPlaceFilterEnabled != value)
+                {
+                    _isMoneyPlaceFilterEnabled = value;
+                    Raise(nameof(IsMoneyPlaceFilterEnabled));
+                }
+            }
+        }
+
+        private void LoadMoneyPlaces()
+        {
+            MoneyPlaces.Clear();
+            MoneyPlaces.Add("Wszystko");
+
+            // sta³e pozycje – wolna / od³o¿ona gotówka
+            MoneyPlaces.Add("Wolna gotówka");
+            MoneyPlaces.Add("Od³o¿ona gotówka");
+
+            try
+            {
+                var uid = UserService.GetCurrentUserId();
+                // Koperty
+                var envs = DatabaseService.GetEnvelopesNames(uid) ?? new List<string>();
+                foreach (var env in envs)
+                {
+                    MoneyPlaces.Add($"Koperta: {env}");
+                }
+            }
+            catch
+            {
+                // jeœli coœ siê wywali – trudno, lista kopert po prostu bêdzie pusta
+            }
+
+            try
+            {
+                var uid = UserService.GetCurrentUserId();
+                // Konta bankowe
+                var accs = DatabaseService.GetAccounts(uid) ?? new List<BankAccountModel>();
+                foreach (var acc in accs)
+                {
+                    MoneyPlaces.Add($"Konto: {acc.AccountName}");
+                }
+            }
+            catch
+            {
+                // jw.
+            }
+
+            SelectedMoneyPlace = MoneyPlaces.FirstOrDefault() ?? "Wszystko";
         }
 
         private string _selectedAccount = "Wszystkie konta";
@@ -302,11 +411,30 @@ namespace Finly.ViewModels
                     Raise(nameof(SelectedSource));
                     Raise(nameof(ShowBankSelector));
                     Raise(nameof(ShowEnvelopeSelector));
+
+                    // new: enable/disable money place filter depending on source
+                    UpdateMoneyPlaceFilterState();
+
+                    Refresh();
                 }
             }
         }
         public bool ShowBankSelector => SelectedSource == SourceType.BankAccounts;
         public bool ShowEnvelopeSelector => SelectedSource == SourceType.Envelopes;
+
+        private void UpdateMoneyPlaceFilterState()
+        {
+            if (SelectedSource == SourceType.BankAccounts || SelectedSource == SourceType.Envelopes)
+            {
+                IsMoneyPlaceFilterEnabled = true;
+            }
+            else
+            {
+                IsMoneyPlaceFilterEnabled = false;
+                // Reset na "Wszystko", ¿eby nie zosta³y stare wybory
+                SelectedMoneyPlace = MoneyPlaces.FirstOrDefault() ?? "Wszystko";
+            }
+        }
 
         private ObservableCollection<BankAccountModel> _bankAccounts = new();
         public ObservableCollection<BankAccountModel> BankAccounts
@@ -353,12 +481,17 @@ namespace Finly.ViewModels
 
         public void ResetFilters()
         {
-            SelectedAccount = Accounts.Count > 0 ? Accounts[0] : string.Empty;
+            SelectedAccount  = Accounts.Count   > 0 ? Accounts[0]   : string.Empty;
             SelectedCategory = Categories.Count > 0 ? Categories[0] : string.Empty;
-            SelectedTemplate = Templates.Count > 0 ? Templates[0] : string.Empty;
-            SelectedSource = SourceType.All;
-            SelectedBankAccount = BankAccounts.FirstOrDefault();
-            SelectedEnvelope = Envelopes.Count > 0 ? Envelopes[0] : "Wszystkie koperty";
+            SelectedTemplate = Templates.Count  > 0 ? Templates[0]  : string.Empty;
+
+            SelectedSource       = SourceType.All;
+            SelectedBankAccount  = BankAccounts.FirstOrDefault();
+            SelectedEnvelope     = Envelopes.Count > 0 ? Envelopes[0] : "Wszystkie koperty";
+            SelectedTransactionType = TransactionTypes.FirstOrDefault() ?? "Wszystko";
+            SelectedMoneyPlace      = MoneyPlaces.FirstOrDefault()      ?? "Wszystko";
+
+            UpdateMoneyPlaceFilterState();
         }
 
         // ========= modele danych do widoku =========
@@ -705,41 +838,50 @@ namespace Finly.ViewModels
                 if (SelectedSource == SourceType.BankAccounts && SelectedBankAccount != null && SelectedBankAccount.Id > 0)
                     accountId = SelectedBankAccount.Id;
 
+                var currentRows = ReportsService.LoadReport(
+                    uid,
+                    GetSourceString(),
+                    SelectedCategory,
+                    SelectedTransactionType,
+                    SelectedMoneyPlace,
+                    FromDate,
+                    ToDate
+                ).ToList();
+
                 // ====== aktualny okres ======
                 var currentDt = GetFilteredExpensesDataTable(uid, FromDate, ToDate, accountId);
 
-                FilteredTransactions.Clear();
-                Details.Clear();
-                if (currentDt.Rows.Count > 0)
-                    PopulateFromDataTable(currentDt);
-                else
-                {
-                    ChartTotals = new Dictionary<string, decimal>();
-                    ChartTotalAll = 0m;
-                }
+                Rows.Clear();
+                foreach (var row in currentRows)
+                    Rows.Add(row);
 
-                // wydatki bie¿¹ce
-                ExpensesTotal = SumAmount(currentDt, "Amount");
+                // KPI for current period based on unified rows
+                var totalExpenses = currentRows.Where(r => r.Amount < 0m).Sum(r => -r.Amount);
+                var totalIncomes  = currentRows.Where(r => r.Amount > 0m).Sum(r =>  r.Amount);
 
-                // przychody bie¿¹ce
-                decimal incomes = 0m;
-                try
-                {
-                    var inc = DatabaseService.GetIncomeBySourceSafe(uid, FromDate, ToDate) ?? new List<DatabaseService.CategoryAmountDto>();
-                    incomes = inc.Sum(x => x.Amount);
-                }
-                catch
-                {
-                    incomes = 0m;
-                }
-                IncomesTotal = incomes;
-
-                BalanceTotal = IncomesTotal - ExpensesTotal;
+                ExpensesTotal = totalExpenses;
+                IncomesTotal  = totalIncomes;
+                BalanceTotal  = totalIncomes - totalExpenses;
 
                 // ====== poprzedni okres o tej samej d³ugoœci ======
                 var prev = GetPreviousPeriod(FromDate, ToDate);
                 _previousFromDate = prev.PrevFrom;
                 _previousToDate = prev.PrevTo;
+
+                // previous period rows with same filters
+                var previousRows = ReportsService.LoadReport(
+                    uid,
+                    GetSourceString(),
+                    SelectedCategory,
+                    SelectedTransactionType,
+                    SelectedMoneyPlace,
+                    _previousFromDate,
+                    _previousToDate
+                ).ToList();
+
+                PreviousExpensesTotal = previousRows.Where(r => r.Amount < 0m).Sum(r => -r.Amount);
+                PreviousIncomesTotal  = previousRows.Where(r => r.Amount > 0m).Sum(r =>  r.Amount);
+                PreviousBalanceTotal  = PreviousIncomesTotal - PreviousExpensesTotal;
 
                 // okresy nazwane
                 var kind = DetectPeriodKind(FromDate.Date, ToDate.Date, DateTime.Today);
@@ -749,22 +891,6 @@ namespace Finly.ViewModels
 
                 AnalyzedPeriodLabel = $"{CurrentPeriodName} ({FromDate:dd.MM.yyyy} – {ToDate:dd.MM.yyyy})";
                 ComparisonPeriodLabel = $"{PreviousPeriodName} ({prev.PrevFrom:dd.MM.yyyy} – {prev.PrevTo:dd.MM.yyyy})";
-
-                var prevDt = GetFilteredExpensesDataTable(uid, prev.PrevFrom, prev.PrevTo, accountId);
-                PreviousExpensesTotal = SumAmount(prevDt, "Amount");
-
-                decimal prevIncomes = 0m;
-                try
-                {
-                    var pinc = DatabaseService.GetIncomeBySourceSafe(uid, prev.PrevFrom, prev.PrevTo) ?? new List<DatabaseService.CategoryAmountDto>();
-                    prevIncomes = pinc.Sum(x => x.Amount);
-                }
-                catch
-                {
-                    prevIncomes = 0m;
-                }
-                PreviousIncomesTotal = prevIncomes;
-                PreviousBalanceTotal = PreviousIncomesTotal - PreviousExpensesTotal;
 
                 // ====== ró¿nice procentowe ======
                 ExpensesChangePercentStr = FormatPercentChange(PreviousExpensesTotal, ExpensesTotal);
@@ -788,10 +914,23 @@ namespace Finly.ViewModels
                 KPIList.Add(new KeyValuePair<string, string>("Zmiana salda", BalanceChangePercentStr));
 
                 Insights.Clear();
+                Insights.Add($"Filtrowanie: Ÿród³o = {SelectedSource}, typ transakcji = {SelectedTransactionType}, miejsce = {SelectedMoneyPlace}");
                 Insights.Add($"Analizowany okres: {AnalyzedPeriodLabel}");
                 Insights.Add($"Porównanie z okresem: {ComparisonPeriodLabel}");
                 Insights.Add($"Wydajesz {ExpensesChangePercentStr} {(ExpensesTotal > PreviousExpensesTotal ? "wiêcej" : ExpensesTotal < PreviousExpensesTotal ? "mniej" : "(bez zmian)")} ni¿ w {PreviousPeriodName}.");
                 Insights.Add($"Twoje przychody s¹ {IncomesChangePercentStr} {(IncomesTotal > PreviousIncomesTotal ? "wy¿sze" : IncomesTotal < PreviousIncomesTotal ? "ni¿sze" : "(bez zmian)")} ni¿ w {PreviousPeriodName}.");
+
+                // ====== wykres i szczegó³y kategorii – nadal z wydatków (jak dot¹d)
+                var currentExpensesDt = GetFilteredExpensesDataTable(uid, FromDate, ToDate, accountId);
+                FilteredTransactions.Clear();
+                Details.Clear();
+                if (currentExpensesDt.Rows.Count > 0)
+                    PopulateFromDataTable(currentExpensesDt);
+                else
+                {
+                    ChartTotals = new Dictionary<string, decimal>();
+                    ChartTotalAll = 0m;
+                }
 
                 Raise(nameof(Details));
                 Raise(nameof(ChartTotals));

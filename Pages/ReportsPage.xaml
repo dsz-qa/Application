@@ -139,7 +139,7 @@
             <RowDefinition Height="*" />
         </Grid.RowDefinitions>
         <Grid.ColumnDefinitions>
-            <ColumnDefinition Width="300" />
+            <ColumnDefinition Width="260" />
             <ColumnDefinition Width="*" />
             <ColumnDefinition Width="320" />
         </Grid.ColumnDefinitions>
@@ -156,51 +156,53 @@
             <StackPanel>
                 <TextBlock Text="Filtry" FontSize="16" FontWeight="SemiBold" Margin="0,0,0,8" />
 
-                <TextBlock Text="Źródło" FontWeight="Bold" />
-                <ComboBox x:Name="SourceCombo" Width="160" SelectedIndex="0" Margin="0,4,0,8">
-                    <ComboBoxItem Content="Wszystko" Tag="All"/>
-                    <ComboBoxItem Content="Wolna gotówka" Tag="FreeCash"/>
-                    <ComboBoxItem Content="Odłożona gotówka" Tag="SavedCash"/>
-                    <ComboBoxItem Content="Konta bankowe" Tag="BankAccounts"/>
-                    <ComboBoxItem Content="Koperty" Tag="Envelopes"/>
-                </ComboBox>
+                <!-- ŹRÓDŁO -->
+                <TextBlock Text="Źródło"
+                           Margin="0,0,0,4"
+                           Foreground="{DynamicResource App.Foreground}"/>
+                <ComboBox ItemsSource="{Binding Sources}"
+                          SelectedItem="{Binding SelectedSource}"
+                          Height="28"
+                          Margin="0,0,0,8"/>
 
-                <!-- Konto bankowe -->
-                <StackPanel Orientation="Vertical"
-                            Margin="0,4,0,8"
-                            Visibility="{Binding ShowBankSelector, Converter={StaticResource BoolToVisibilityConverter}}">
-                    <TextBlock Text="Konto" FontWeight="Bold" />
-                    <ComboBox ItemsSource="{Binding BankAccounts}"
-                              SelectedItem="{Binding SelectedBankAccount}"
-                              DisplayMemberPath="AccountName"
-                              SelectedValuePath="Id" />
-                </StackPanel>
-
-                <!-- Koperta -->
-                <StackPanel Orientation="Vertical"
-                            Margin="0,4,0,8"
-                            Visibility="{Binding ShowEnvelopeSelector, Converter={StaticResource BoolToVisibilityConverter}}">
-                    <TextBlock Text="Koperta" FontWeight="Bold" />
-                    <ComboBox ItemsSource="{Binding Envelopes}"
-                              SelectedItem="{Binding SelectedEnvelope}" />
-                </StackPanel>
-
-                <TextBlock Text="Kategoria" FontWeight="Bold" />
+                <!-- KATEGORIA -->
+                <TextBlock Text="Kategoria"
+                           Margin="0,0,0,4"
+                           Foreground="{DynamicResource App.Foreground}"/>
                 <ComboBox ItemsSource="{Binding Categories}"
                           SelectedItem="{Binding SelectedCategory}"
-                          Margin="0,4,0,8" />
+                          Height="28"
+                          Margin="0,0,0,8"/>
 
-                <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
-                    <Button Content="Odśwież" Command="{Binding RefreshCommand}" Width="100" />
-                    <Button Content="Eksport" Width="100" Margin="8,0,0,0">
-                        <Button.ContextMenu>
-                            <ContextMenu>
-                                <MenuItem Header="CSV" Command="{Binding ExportCsvCommand}" />
-                                <MenuItem Header="Excel" Command="{Binding ExportExcelCommand}" />
-                                <MenuItem Header="PDF" Command="{Binding ExportPdfCommand}" />
-                            </ContextMenu>
-                        </Button.ContextMenu>
-                    </Button>
+                <!-- NOWE: TYP TRANSAKCJI -->
+                <TextBlock Text="Typ transakcji"
+                           Margin="0,0,0,4"
+                           Foreground="{DynamicResource App.Foreground}"/>
+                <ComboBox ItemsSource="{Binding TransactionTypes}"
+                          SelectedItem="{Binding SelectedTransactionType}"
+                          Height="28"
+                          Margin="0,0,0,8"/>
+
+                <!-- NOWE: KONTO / KOPERTA -->
+                <TextBlock Text="Konto / koperta"
+                           Margin="0,0,0,4"
+                           Foreground="{DynamicResource App.Foreground}"/>
+                <ComboBox ItemsSource="{Binding MoneyPlaces}"
+                          SelectedItem="{Binding SelectedMoneyPlace}"
+                          Height="28"
+                          Margin="0,0,0,12"/>
+
+                <!-- PRZYCISKI -->
+                <StackPanel Orientation="Horizontal"
+                            HorizontalAlignment="Left">
+                    <Button Content="Odśwież"
+                            Style="{StaticResource PrimaryButton}"
+                            Margin="0,0,8,0"
+                            Command="{Binding RefreshCommand}"/>
+
+                    <Button Content="Eksportuj raport z bieżącego okresu"
+                            Style="{StaticResource SecondaryButton}"
+                            Click="ExportButton_Click"/>
                 </StackPanel>
             </StackPanel>
         </Border>
@@ -243,68 +245,11 @@
 
                 <!-- Wykres + szczegóły / drilldown -->
                 <Grid Grid.Row="2" Margin="0,8,0,0">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="2*" />
-                        <ColumnDefinition Width="*" />
-                    </Grid.ColumnDefinitions>
-
-                    <!-- Donut chart -->
+                    <!-- Donut chart only in center frame -->
                     <ctrls:DonutChartControl x:Name="MainChart"
-                                             Grid.Column="0"
                                              HorizontalAlignment="Stretch"
                                              VerticalAlignment="Stretch"
                                              Background="Transparent" />
-
-                    <!-- Szczegóły / drilldown -->
-                    <StackPanel Grid.Column="1">
-                        <TextBlock Text="Szczegóły kategorii"
-                                   FontWeight="Bold"
-                                   Margin="0,0,0,8" />
-
-                        <!-- Podsumowanie kategorii -->
-                        <DataGrid x:Name="SummaryGrid"
-                                  AutoGenerateColumns="False"
-                                  IsReadOnly="True"
-                                  Height="220"
-                                  ItemsSource="{Binding Details}"
-                                  Visibility="{Binding IsSummaryActive, Converter={StaticResource BoolToVisibilityConverter}}">
-                            <DataGrid.Columns>
-                                <DataGridTextColumn Header="Kategoria" Binding="{Binding Name}" />
-                                <DataGridTextColumn Header="Kwota" Binding="{Binding Amount, StringFormat=N2}" />
-                                <DataGridTextColumn Header="Udział %" Binding="{Binding SharePercent, StringFormat=N1}" />
-                            </DataGrid.Columns>
-                        </DataGrid>
-
-                        <Button x:Name="BackButton"
-                                Content="Wróć"
-                                Command="{Binding BackCommand}"
-                                Visibility="{Binding IsDrilldownActive, Converter={StaticResource BoolToVisibilityConverter}}"
-                                Margin="0,8,0,0" />
-
-                        <TextBlock Text="Kliknij element wykresu, aby zobaczyć transakcje w tej kategorii."
-                                   FontStyle="Italic"
-                                   Margin="0,8,0,0" />
-
-                        <!-- Lista transakcji dla wybranej kategorii -->
-                        <DataGrid x:Name="DrilldownGrid"
-                                  AutoGenerateColumns="False"
-                                  IsReadOnly="True"
-                                  Height="220"
-                                  ItemsSource="{Binding FilteredTransactions}"
-                                  Margin="0,8,0,0"
-                                  Visibility="{Binding IsDrilldownActive, Converter={StaticResource BoolToVisibilityConverter}}">
-                            <DataGrid.Columns>
-                                <DataGridTextColumn Header="Data"
-                                                    Binding="{Binding Date, StringFormat=\{0:yyyy-MM-dd\}}" />
-                                <DataGridTextColumn Header="Kategoria"
-                                                    Binding="{Binding Category}" />
-                                <DataGridTextColumn Header="Opis"
-                                                    Binding="{Binding Description}" />
-                                <DataGridTextColumn Header="Kwota"
-                                                    Binding="{Binding Amount, StringFormat=N2}" />
-                            </DataGrid.Columns>
-                        </DataGrid>
-                    </StackPanel>
                 </Grid>
             </Grid>
         </Border>
@@ -403,6 +348,57 @@
                         </StackPanel>
                     </StackPanel>
                 </Border>
+
+                <!-- Szczegóły kategorii przeniesione pod KPI -->
+                <StackPanel Orientation="Vertical" Margin="0,12,0,0">
+                    <TextBlock Text="Szczegóły kategorii"
+                               FontWeight="Bold"
+                               Margin="0,0,0,8" />
+
+                    <!-- Podsumowanie kategorii -->
+                    <DataGrid x:Name="SummaryGrid"
+                              AutoGenerateColumns="False"
+                              IsReadOnly="True"
+                              Height="220"
+                              ItemsSource="{Binding Details}"
+                              Visibility="{Binding IsSummaryActive, Converter={StaticResource BoolToVisibilityConverter}}">
+                        <DataGrid.Columns>
+                            <DataGridTextColumn Header="Kategoria" Binding="{Binding Name}" />
+                            <DataGridTextColumn Header="Kwota" Binding="{Binding Amount, StringFormat=N2}" />
+                            <DataGridTextColumn Header="Udział %" Binding="{Binding SharePercent, StringFormat=N1}" />
+                        </DataGrid.Columns>
+                    </DataGrid>
+
+                    <Button x:Name="BackButton"
+                            Content="Wróć"
+                            Command="{Binding BackCommand}"
+                            Visibility="{Binding IsDrilldownActive, Converter={StaticResource BoolToVisibilityConverter}}"
+                            Margin="0,8,0,0" />
+
+                    <TextBlock Text="Kliknij element wykresu, aby zobaczyć transakcje w tej kategorii."
+                               FontStyle="Italic"
+                               Margin="0,8,0,0" />
+
+                    <!-- Lista transakcji dla wybranej kategorii -->
+                    <DataGrid x:Name="DrilldownGrid"
+                              AutoGenerateColumns="False"
+                              IsReadOnly="True"
+                              Height="220"
+                              ItemsSource="{Binding FilteredTransactions}"
+                              Margin="0,8,0,0"
+                              Visibility="{Binding IsDrilldownActive, Converter={StaticResource BoolToVisibilityConverter}}">
+                        <DataGrid.Columns>
+                            <DataGridTextColumn Header="Data"
+                                                Binding="{Binding Date, StringFormat=\{0:yyyy-MM-dd\}}" />
+                            <DataGridTextColumn Header="Kategoria"
+                                                Binding="{Binding Category}" />
+                            <DataGridTextColumn Header="Opis"
+                                                Binding="{Binding Description}" />
+                            <DataGridTextColumn Header="Kwota"
+                                                Binding="{Binding Amount, StringFormat=N2}" />
+                        </DataGrid.Columns>
+                    </DataGrid>
+                </StackPanel>
             </StackPanel>
         </Border>
     </Grid>

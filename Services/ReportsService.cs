@@ -2,19 +2,21 @@
 using System.Data;
 // using System.Data.SQLite; // removed to avoid missing reference; we use DatabaseService.GetConnection()
 using Finly.ViewModels;
+using System.Collections.Generic;
 
 namespace Finly.Services
 {
-    /// <summary>
-    /// Pomocniczy serwis raportów – logika niezwiązana bezpośrednio z UI.
-    /// Na razie dostarcza m.in. spójną nazwę pliku PDF dla raportu.
-    /// </summary>
     public static class ReportsService
     {
-        /// <summary>
-        /// Buduje domyślną nazwę pliku raportu PDF na podstawie zakresu dat.
-        /// Przykład: Finly_Raport_20250101_20250131.pdf
-        /// </summary>
+        public sealed class ReportItem
+        {
+            public DateTime Date { get; set; }
+            public string Category { get; set; } = "";
+            public decimal Amount { get; set; }
+            public string Account { get; set; } = "";
+            public string Type { get; set; } = ""; // "Wydatek" / "Przychód"
+        }
+
         public static string BuildDefaultReportFileName(DateTime fromDate, DateTime toDate)
         {
             return $"Finly_Raport_{fromDate:yyyyMMdd}_{toDate:yyyyMMdd}.pdf";
@@ -24,7 +26,6 @@ namespace Finly.Services
             ReportsViewModel.SourceType source, string selectedCategory,
             Finly.Models.BankAccountModel? selectedBankAccount, string selectedEnvelope)
         {
-            // Reuse existing DatabaseService.GetExpenses with optional filters
             int? accountId = (source == ReportsViewModel.SourceType.BankAccounts && selectedBankAccount != null && selectedBankAccount.Id > 0)
                 ? selectedBankAccount.Id
                 : (int?)null;
@@ -126,6 +127,103 @@ ORDER BY Date ASC";
             catch { }
 
             return dt;
+        }
+
+        public static List<ReportItem> LoadReport(
+            int userId,
+            string source,
+            string category,
+            string transactionType,
+            string moneyPlace,
+            DateTime from,
+            DateTime to)
+        {
+            using var con = DatabaseService.GetConnection();
+            using var cmd = con.CreateCommand();
+
+            // Budujemy osobne SELECT-y dla wydatków i przychodów.
+            // Uwaga: NIE używamy już e.Source / i.Source, bo takich kolumn nie ma.
+            var parts = new List<string>();
+
+            if (transactionType == "Wydatki" || transactionType == "Wszystko")
+            {
+                parts.Add(@"
+SELECT 
+    e.Date                                   AS TxDate,
+    'Wydatek'                                AS TxType,
+    COALESCE(c.Name,'(brak kategorii)')      AS CategoryName,
+    ''                                       AS AccountName,
+    e.Amount * -1                            AS Amount
+FROM Expenses e
+LEFT JOIN Categories c ON c.Id = e.CategoryId
+WHERE e.UserId = @uid
+  AND IFNULL(e.IsPlanned,0) = 0
+  AND e.Date >= @from AND e.Date <= @to
+");
+            }
+
+            if (transactionType == "Przychody" || transactionType == "Wszystko")
+            {
+                parts.Add(@"
+SELECT 
+    i.Date                                   AS TxDate,
+    'Przychód'                               AS TxType,
+    COALESCE(c.Name,'(brak kategorii)')      AS CategoryName,
+    ''                                       AS AccountName,
+    i.Amount                                 AS Amount
+FROM Incomes i
+LEFT JOIN Categories c ON c.Id = i.CategoryId
+WHERE i.UserId = @uid
+  AND IFNULL(i.IsPlanned,0) = 0
+  AND i.Date >= @from AND i.Date <= @to
+");
+            }
+
+            if (parts.Count == 0)
+                return new List<ReportItem>();
+
+            var innerSql = string.Join("\nUNION ALL\n", parts);
+
+            // Zewnętrzne SELECT + proste filtry po kategorii.
+            var sql = $@"
+SELECT *
+FROM (
+    {innerSql}
+) t
+WHERE 1=1
+";
+
+            if (!string.IsNullOrWhiteSpace(category) && category != "Wszystkie kategorie")
+            {
+                sql += " AND t.CategoryName = @cat";
+                cmd.Parameters.AddWithValue("@cat", category);
+            }
+
+            // Docelowo można dodać filtr po source / moneyPlace, kiedy AccountName będzie realnie wyliczany.
+
+            sql += " ORDER BY t.TxDate;";
+
+            cmd.CommandText = sql;
+            cmd.Parameters.AddWithValue("@uid", userId);
+            cmd.Parameters.AddWithValue("@from", from.ToString("yyyy-MM-dd"));
+            cmd.Parameters.AddWithValue("@to", to.ToString("yyyy-MM-dd"));
+
+            var result = new List<ReportItem>();
+            using var r = cmd.ExecuteReader();
+            while (r.Read())
+            {
+                var item = new ReportItem
+                {
+                    Date     = DateTime.Parse(r["TxDate"].ToString() ?? DateTime.MinValue.ToString("yyyy-MM-dd")),
+                    Category = r["CategoryName"]?.ToString() ?? "(brak kategorii)",
+                    Amount   = Convert.ToDecimal(r["Amount"]),
+                    Account  = r["AccountName"]?.ToString() ?? "",
+                    Type     = r["TxType"]?.ToString() ?? ""
+                };
+                result.Add(item);
+            }
+
+            return result;
         }
 
         private static int? GetCategoryIdSafe(int uid, string selectedCategory)

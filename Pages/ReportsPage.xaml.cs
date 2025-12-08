@@ -118,5 +118,21 @@ namespace Finly.Pages
             if (DataContext is ReportsViewModel vm)
                 vm.BackToSummary();
         }
+
+        private void ExportButton_Click(object sender, RoutedEventArgs e)
+        {
+            if (DataContext is ReportsViewModel vm)
+            {
+                // Preferuj komendę VM jeśli dostępna
+                if (vm.ExportPdfCommand != null && vm.ExportPdfCommand.CanExecute(null))
+                {
+                    vm.ExportPdfCommand.Execute(null);
+                }
+                else if (vm.ExportCsvCommand != null && vm.ExportCsvCommand.CanExecute(null))
+                {
+                    vm.ExportCsvCommand.Execute(null);
+                }
+            }
+        }
     }
 }
