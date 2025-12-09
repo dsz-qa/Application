@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
@@ -9,104 +8,190 @@ using System.Windows.Shapes;
 
 namespace Finly.Views.Controls
 {
- public partial class DonutChartControl : UserControl
- {
- public DonutChartControl()
- {
- InitializeComponent();
- }
+    public partial class DonutChartControl : UserControl
+    {
+        private Dictionary<string, decimal>? _data;
+        private decimal _total;
+        private Brush[]? _brushes;
 
- public event EventHandler<SliceClickedEventArgs>? SliceClicked;
+        public DonutChartControl()
+        {
+            InitializeComponent();
 
- public void Draw(Dictionary<string, decimal> totals, decimal totalAll, Brush[] brushes)
- {
- ChartCanvas.Children.Clear();
- NoDataText.Visibility = Visibility.Collapsed;
+            Loaded += (_, __) => Redraw();
+            SizeChanged += (_, __) => Redraw();
+        }
 
- if (totalAll <=0 || totals == null || totals.Values.Sum() <=0)
- {
- NoDataText.Visibility = Visibility.Visible;
- return;
- }
+        /// <summary>
+        /// Rysuje wykres donut na podstawie s³ownika:
+        /// nazwa kategorii -> wartoœæ.
+        /// total – ca³kowita suma (jeœli 0 lub mniejsza, liczymy sumê z danych).
+        /// </summary>
+        public void Draw(Dictionary<string, decimal> data, decimal total, Brush[] brushes)
+        {
+            _data = data;
+            _total = total;
+            _brushes = brushes;
+            Redraw();
+        }
 
- double width = ChartCanvas.ActualWidth;
- double height = ChartCanvas.ActualHeight;
- if (width <=0 || height <=0)
- {
- width =220;
- height =220;
- }
+        private void Redraw()
+        {
+            ChartCanvas.Children.Clear();
 
- double size = Math.Min(width, height) *0.9;
- double cx = width /2.0;
- double cy = height /2.0;
- double r = size /2.0;
- double startAngle = -90.0;
+            if (!IsLoaded)
+                return;
 
- int idx =0;
- foreach (var kv in totals)
- {
- var value = (double)kv.Value;
- if (value <=0) { idx++; continue; }
- double sweep = value / (double)totalAll *360.0;
+            if (_data == null || _data.Count == 0)
+            {
+                CenterPanel.Visibility = Visibility.Collapsed;
+                NoDataText.Visibility = Visibility.Visible;
+                return;
+            }
 
- var path = CreatePieSlice(cx, cy, r, startAngle, sweep, brushes[idx % brushes.Length]);
- path.ToolTip = $"{kv.Key}\n{kv.Value:N2} z³ • {(sweep /360.0 *100.0):N1}%";
- var name = kv.Key;
- var amount = kv.Value;
- path.MouseLeftButtonDown += (s, e) => SliceClicked?.Invoke(this, new SliceClickedEventArgs(name, amount));
- ChartCanvas.Children.Add(path);
+            if (_total <= 0)
+                _total = 0m;
 
- startAngle += sweep;
- idx++;
- }
- }
+            if (_total <= 0)
+            {
+                foreach (var v in _data.Values)
+                    _total += v;
+            }
 
- private static Path CreatePieSlice(double cx, double cy, double r, double startAngleDeg, double sweepAngleDeg, Brush fill)
- {
- double startRad = startAngleDeg * Math.PI /180.0;
- double endRad = (startAngleDeg + sweepAngleDeg) * Math.PI /180.0;
+            if (_total <= 0)
+            {
+                CenterPanel.Visibility = Visibility.Collapsed;
+                NoDataText.Visibility = Visibility.Visible;
+                return;
+            }
 
- Point p0 = new Point(cx, cy);
- Point p1 = new Point(cx + r * Math.Cos(startRad), cy + r * Math.Sin(startRad));
- Point p2 = new Point(cx + r * Math.Cos(endRad), cy + r * Math.Sin(endRad));
+            NoDataText.Visibility = Visibility.Collapsed;
+            CenterPanel.Visibility = Visibility.Visible;
 
- bool isLarge = Math.Abs(sweepAngleDeg) >180.0;
+            double width = ChartCanvas.ActualWidth;
+            double height = ChartCanvas.ActualHeight;
 
- var pf = new PathFigure { StartPoint = p0, IsClosed = true, IsFilled = true };
- pf.Segments.Add(new LineSegment(p1, true));
- pf.Segments.Add(new ArcSegment
- {
- Point = p2,
- Size = new Size(r, r),
- SweepDirection = SweepDirection.Clockwise,
- IsLargeArc = isLarge,
- RotationAngle =0
- });
+            if (width <= 0 || height <= 0)
+            {
+                width = ActualWidth > 0 ? ActualWidth : 200;
+                height = ActualHeight > 0 ? ActualHeight : 200;
+            }
 
- var pg = new PathGeometry();
- pg.Figures.Add(pf);
+            double cx = width / 2.0;
+            double cy = height / 2.0;
+            double outerRadius = Math.Min(width, height) / 2.0 - 10;
+            double innerRadius = outerRadius * 0.6;
 
- var path = new Path
- {
- Data = pg,
- Fill = fill,
- Stroke = Brushes.White,
- StrokeThickness =1
- };
+            double startAngle = -90.0; // od góry
+            int index = 0;
 
- return path;
- }
- }
+            foreach (var kv in _data)
+            {
+                var value = kv.Value;
+                if (value <= 0) continue;
 
- public class SliceClickedEventArgs : EventArgs
- {
- public string Name { get; }
- public decimal Amount { get; }
- public SliceClickedEventArgs(string name, decimal amount)
- {
- Name = name;
- Amount = amount;
- }
- }
+                double sweepAngle = (double)(value / _total) * 360.0;
+                if (sweepAngle <= 0) continue;
+
+                var path = CreateDonutSlice(cx, cy, innerRadius, outerRadius, startAngle, sweepAngle);
+
+                Brush fill;
+                if (_brushes != null && _brushes.Length > 0)
+                    fill = _brushes[index % _brushes.Length];
+                else
+                    fill = Brushes.SteelBlue;
+
+                path.Fill = fill;
+                path.Stroke = Brushes.Transparent;
+                path.Tag = kv; // przechowujemy parê (nazwa, wartoœæ)
+                path.Cursor = Cursors.Hand;
+                path.MouseLeftButtonDown += Slice_MouseLeftButtonDown;
+
+                ChartCanvas.Children.Add(path);
+
+                startAngle += sweepAngle;
+                index++;
+            }
+
+            // Domyœlnie w œrodku pokazujemy sumê
+            CenterTitleText.Text = "Suma";
+            CenterValueText.Text = $"{_total:N2} z³";
+        }
+
+        private static Path CreateDonutSlice(
+            double cx, double cy,
+            double innerR, double outerR,
+            double startAngle, double sweepAngle)
+        {
+            double startRad = startAngle * Math.PI / 180.0;
+            double endRad = (startAngle + sweepAngle) * Math.PI / 180.0;
+
+            var p1 = new Point(cx + outerR * Math.Cos(startRad), cy + outerR * Math.Sin(startRad));
+            var p2 = new Point(cx + outerR * Math.Cos(endRad), cy + outerR * Math.Sin(endRad));
+
+            var p3 = new Point(cx + innerR * Math.Cos(endRad), cy + innerR * Math.Sin(endRad));
+            var p4 = new Point(cx + innerR * Math.Cos(startRad), cy + innerR * Math.Sin(startRad));
+
+            bool largeArc = sweepAngle > 180.0;
+
+            var figure = new PathFigure { StartPoint = p1, IsClosed = true };
+
+            // zewnêtrzny ³uk
+            figure.Segments.Add(new ArcSegment
+            {
+                Point = p2,
+                Size = new Size(outerR, outerR),
+                IsLargeArc = largeArc,
+                SweepDirection = SweepDirection.Clockwise
+            });
+
+            // linia do wewnêtrznego okrêgu
+            figure.Segments.Add(new LineSegment { Point = p3 });
+
+            // wewnêtrzny ³uk (w drug¹ stronê)
+            figure.Segments.Add(new ArcSegment
+            {
+                Point = p4,
+                Size = new Size(innerR, innerR),
+                IsLargeArc = largeArc,
+                SweepDirection = SweepDirection.Counterclockwise
+            });
+
+            figure.Segments.Add(new LineSegment { Point = p1 });
+
+            var geom = new PathGeometry();
+            geom.Figures.Add(figure);
+
+            return new Path { Data = geom };
+        }
+
+        // ===== EVENTY =====
+
+        public event EventHandler<SliceClickedEventArgs>? SliceClicked;
+
+        private void Slice_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+        {
+            if (sender is Path p && p.Tag is KeyValuePair<string, decimal> kv)
+            {
+                // aktualizacja œrodka donuta
+                CenterTitleText.Text = kv.Key;
+                CenterValueText.Text = $"{kv.Value:N2} z³";
+
+                // powiadom zewnêtrzny kod (ReportsPage)
+                SliceClicked?.Invoke(this, new SliceClickedEventArgs(kv.Key, kv.Value));
+            }
+        }
+    }
+
+    public class SliceClickedEventArgs : EventArgs
+    {
+        public string Name { get; }
+        public decimal Value { get; }
+
+        public SliceClickedEventArgs(string name, decimal value)
+        {
+            Name = name;
+            Value = value;
+        }
+    }
 }
