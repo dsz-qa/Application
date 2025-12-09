@@ -253,8 +253,8 @@ namespace Finly.Pages
 
         public double PercentageDifference =>
             PreviousPeriodAmount == 0
-                ? 0
-                : (double)((CurrentPeriodAmount - PreviousPeriodAmount) / PreviousPeriodAmount) * 100.0;
+            ? 0
+            : (double)((CurrentPeriodAmount - PreviousPeriodAmount) / PreviousPeriodAmount) * 100.0;
 
         // ===== KPI U GÓRY =====
         private TextBlock? _mostUsedName;
@@ -327,7 +327,7 @@ namespace Finly.Pages
             catch (Exception ex)
             {
                 MessageBox.Show("Błąd ładowania kategorii: " + ex.Message,
-                    "Błąd", MessageBoxButton.OK, MessageBoxImage.Error);
+                                "Błąd", MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
 
@@ -335,10 +335,10 @@ namespace Finly.Pages
         {
             EnsureKpiRefs();
 
-            UpdateCategoryKpis();           // górne trzy kafelki
-            UpdateCategoryStats();          // struktura wydatków + TOP/BOTTOM + aktywność
-            UpdateCategoryComparison();     // porównanie okresów dla wybranej kategorii
-            LoadSelectedCategoryDetails();  // szczegóły wybranej kategorii
+            UpdateCategoryKpis(); // górne trzy kafelki
+            UpdateCategoryStats(); // struktura wydatków + TOP/BOTTOM + aktywność
+            UpdateCategoryComparison(); // porównanie okresów dla wybranej kategorii
+            LoadSelectedCategoryDetails(); // szczegóły wybranej kategorii
         }
 
         private void EnsureKpiRefs()
@@ -396,7 +396,7 @@ namespace Finly.Pages
                                         FROM Incomes i 
                                         JOIN Categories c ON c.Id = i.CategoryId 
                                         WHERE i.UserId=@u AND i.Date>=@from AND i.Date<=@to 
-                                              AND i.CategoryId IS NOT NULL;";
+                                        AND i.CategoryId IS NOT NULL;";
                     cmd.Parameters.AddWithValue("@u", _uid);
                     cmd.Parameters.AddWithValue("@from", from.ToString("yyyy-MM-dd"));
                     cmd.Parameters.AddWithValue("@to", to.ToString("yyyy-MM-dd"));
@@ -634,7 +634,7 @@ namespace Finly.Pages
             if (string.IsNullOrWhiteSpace(newName))
             {
                 MessageBox.Show("Podaj nazwę kategorii.", "Błąd",
-                    MessageBoxButton.OK, MessageBoxImage.Warning);
+                                MessageBoxButton.OK, MessageBoxImage.Warning);
                 return;
             }
 
@@ -664,7 +664,7 @@ namespace Finly.Pages
             catch (Exception ex)
             {
                 MessageBox.Show("Błąd zapisu kategorii: " + ex.Message,
-                    "Błąd", MessageBoxButton.OK, MessageBoxImage.Error);
+                                "Błąd", MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
 
@@ -714,8 +714,8 @@ namespace Finly.Pages
                 if (id.HasValue)
                     DatabaseService.DeleteCategory(id.Value);
 
-                MessageBox.Show("Kategoria usunięta.", "OK",
-                    MessageBoxButton.OK, MessageBoxImage.Information);
+                // zamiana MessageBox na toast
+                ToastService.Success("Kategoria usunięta.");
 
                 LoadCategories();
                 UpdateCategoryKpis();
@@ -724,7 +724,7 @@ namespace Finly.Pages
             catch (Exception ex)
             {
                 MessageBox.Show("Błąd usuwania: " + ex.Message,
-                    "Błąd", MessageBoxButton.OK, MessageBoxImage.Error);
+                                "Błąd", MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
 
@@ -900,7 +900,7 @@ namespace Finly.Pages
                             Name = it.name,
                             Amount = it.amount,
                             Percent = pct,
-                            Dominant = pct >= 20.0   // dominujące = min. 20% wszystkich transakcji
+                            Dominant = pct >= 20.0 // dominujące = min.20% wszystkich transakcji
                         });
                     }
                 }
@@ -918,7 +918,7 @@ namespace Finly.Pages
                     }
                 }
 
-                // Top 3 i Bottom 3 (tylko dodatnie kwoty)
+                // Top3 i Bottom3 (tylko dodatnie kwoty)
                 var positive = list.Where(x => x.amount > 0).ToList();
 
                 TopCategories.Clear();
@@ -1119,7 +1119,7 @@ namespace Finly.Pages
             catch (Exception ex)
             {
                 MessageBox.Show("Błąd zapisu: " + ex.Message, "Błąd",
-                    MessageBoxButton.OK, MessageBoxImage.Error);
+                                MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
 
@@ -1313,4 +1313,5 @@ namespace Finly.Pages
         }
 
     }
+    // Dodaj brakujący nawias zamykający na końcu pliku
 }

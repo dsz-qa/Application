@@ -271,12 +271,7 @@
                                 <RowDefinition Height="Auto"/>
                                 <RowDefinition Height="*"/>
                             </Grid.RowDefinitions>
-                            <TextBlock Grid.Row="0"
-                                       Text="{TemplateBinding Header}"
-                                       FontWeight="Bold"
-                                       FontSize="16"
-                                       Foreground="{DynamicResource App.Foreground}"
-                                       Margin="0,0,0,6"/>
+
                             <Border Grid.Row="1"
                                     Background="{DynamicResource Surface.Background}"
                                     BorderBrush="{TemplateBinding BorderBrush}"
@@ -291,6 +286,18 @@
                     </ControlTemplate>
                 </Setter.Value>
             </Setter>
+        </Style>
+
+        <!-- Styl przycisku w nagłówkach filtrów -->
+        <Style x:Key="FilterHeaderButtonStyle" TargetType="Button">
+            <Setter Property="Margin" Value="8,0,0,0"/>
+            <Setter Property="Padding" Value="6,2"/>
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="Foreground" Value="{DynamicResource App.Foreground}"/>
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource Surface.Border}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Cursor" Value="Hand"/>
         </Style>
 
         <!-- listy do edycji -->
@@ -356,9 +363,22 @@
                         <ColumnDefinition Width="*"/>
                     </Grid.ColumnDefinitions>
 
+                    <!-- Typ transakcji GroupBox header with 'Pokaż wszystko' -->
                     <GroupBox Grid.Column="0"
-                              Style="{StaticResource FilterPanelStyle}"
-                              Header="Typ transakcji">
+                              Style="{StaticResource FilterPanelStyle}">
+                        <GroupBox.Header>
+                            <DockPanel>
+                                <TextBlock Text="Typ transakcji"
+                                           FontWeight="Bold"
+                                           FontSize="16"
+                                           Foreground="{DynamicResource App.Foreground}"
+                                           VerticalAlignment="Center"/>
+                                <Button Content="Pokaż wszystko"
+                                        Style="{StaticResource FilterHeaderButtonStyle}"
+                                        Click="ShowAllTypes_Click"
+                                        DockPanel.Dock="Right"/>
+                            </DockPanel>
+                        </GroupBox.Header>
                         <ScrollViewer VerticalScrollBarVisibility="Auto">
                             <StackPanel>
                                 <CheckBox Style="{StaticResource FilterCheckBoxStyle}"
@@ -374,9 +394,22 @@
                         </ScrollViewer>
                     </GroupBox>
 
+                    <!-- Kategorie GroupBox header with 'Pokaż wszystko' -->
                     <GroupBox Grid.Column="1"
-                              Style="{StaticResource FilterPanelStyle}"
-                              Header="Kategorie">
+                              Style="{StaticResource FilterPanelStyle}">
+                        <GroupBox.Header>
+                            <DockPanel>
+                                <TextBlock Text="Kategorie"
+                                           FontWeight="Bold"
+                                           FontSize="16"
+                                           Foreground="{DynamicResource App.Foreground}"
+                                           VerticalAlignment="Center"/>
+                                <Button Content="Pokaż wszystko"
+                                        Style="{StaticResource FilterHeaderButtonStyle}"
+                                        Click="ShowAllCategories_Click"
+                                        DockPanel.Dock="Right"/>
+                            </DockPanel>
+                        </GroupBox.Header>
                         <ScrollViewer VerticalScrollBarVisibility="Auto">
                             <ItemsControl ItemsSource="{Binding Categories}">
                                 <ItemsControl.ItemTemplate>
@@ -390,9 +423,22 @@
                         </ScrollViewer>
                     </GroupBox>
 
+                    <!-- Konta GroupBox header with 'Pokaż wszystko' -->
                     <GroupBox Grid.Column="2"
-                              Style="{StaticResource FilterPanelStyle}"
-                              Header="Konta">
+                              Style="{StaticResource FilterPanelStyle}">
+                        <GroupBox.Header>
+                            <DockPanel>
+                                <TextBlock Text="Konta"
+                                           FontWeight="Bold"
+                                           FontSize="16"
+                                           Foreground="{DynamicResource App.Foreground}"
+                                           VerticalAlignment="Center"/>
+                                <Button Content="Pokaż wszystko"
+                                        Style="{StaticResource FilterHeaderButtonStyle}"
+                                        Click="ShowAllAccounts_Click"
+                                        DockPanel.Dock="Right"/>
+                            </DockPanel>
+                        </GroupBox.Header>
                         <ScrollViewer VerticalScrollBarVisibility="Auto">
                             <ItemsControl ItemsSource="{Binding Accounts}">
                                 <ItemsControl.ItemTemplate>
@@ -495,6 +541,69 @@
                                                     <StackPanel Grid.Column="0"
                                                                 Margin="4,0,8,0"
                                                                 Orientation="Vertical">
+
+                                                        <!-- TYPE LABEL simple -->
+                                                        <TextBlock Margin="0,0,0,10"
+                                                                   FontSize="16"
+                                                                   FontWeight="Bold"
+                                                                   Foreground="{DynamicResource App.Foreground}">
+                                                            <TextBlock.Style>
+                                                                <Style TargetType="TextBlock">
+                                                                    <Setter Property="Text" Value="Transakcja"/>
+                                                                    <Style.Triggers>
+                                                                        <DataTrigger Binding="{Binding Kind}" Value="Expense">
+                                                                            <Setter Property="Text" Value="Wydatek"/>
+                                                                        </DataTrigger>
+                                                                        <DataTrigger Binding="{Binding Kind}" Value="Income">
+                                                                            <Setter Property="Text" Value="Przychód"/>
+                                                                        </DataTrigger>
+                                                                        <DataTrigger Binding="{Binding Kind}" Value="Transfer">
+                                                                            <Setter Property="Text" Value="Transfer"/>
+                                                                        </DataTrigger>
+                                                                    </Style.Triggers>
+                                                                </Style>
+                                                            </TextBlock.Style>
+                                                        </TextBlock>
+
+                                                        <!-- TYPE LABEL with icon -->
+                                                        <StackPanel Orientation="Horizontal" Margin="0,0,0,10" Visibility="Collapsed">
+                                                            <Image Width="18" Height="18" Margin="0,0,6,0">
+                                                                <Image.Style>
+                                                                    <Style TargetType="Image">
+                                                                        <Setter Property="Source" Value="pack://application:,,,/Assets/Icons/wydatki.png"/>
+                                                                        <Style.Triggers>
+                                                                            <DataTrigger Binding="{Binding Kind}" Value="Expense">
+                                                                                <Setter Property="Source" Value="pack://application:,,,/Assets/Icons/wydatki.png"/>
+                                                                            </DataTrigger>
+                                                                            <DataTrigger Binding="{Binding Kind}" Value="Income">
+                                                                                <Setter Property="Source" Value="pack://application:,,,/Assets/Icons/przychody.png"/>
+                                                                            </DataTrigger>
+                                                                            <DataTrigger Binding="{Binding Kind}" Value="Transfer">
+                                                                                <Setter Property="Source" Value="pack://application:,,,/Assets/Icons/transfer.png"/>
+                                                                            </DataTrigger>
+                                                                        </Style.Triggers>
+                                                                    </Style>
+                                                                </Image.Style>
+                                                            </Image>
+                                                            <TextBlock FontSize="16" FontWeight="Bold" Foreground="{DynamicResource App.Foreground}">
+                                                                <TextBlock.Style>
+                                                                    <Style TargetType="TextBlock">
+                                                                        <Setter Property="Text" Value="Transakcja"/>
+                                                                        <Style.Triggers>
+                                                                            <DataTrigger Binding="{Binding Kind}" Value="Expense">
+                                                                                <Setter Property="Text" Value="Wydatek"/>
+                                                                            </DataTrigger>
+                                                                            <DataTrigger Binding="{Binding Kind}" Value="Income">
+                                                                                <Setter Property="Text" Value="Przychód"/>
+                                                                            </DataTrigger>
+                                                                            <DataTrigger Binding="{Binding Kind}" Value="Transfer">
+                                                                                <Setter Property="Text" Value="Transfer"/>
+                                                                            </DataTrigger>
+                                                                        </Style.Triggers>
+                                                                    </Style>
+                                                                </TextBlock.Style>
+                                                            </TextBlock>
+                                                        </StackPanel>
 
                                                         <!-- DATA simplified -->
                                                         <StackPanel Orientation="Horizontal" x:Name="DateLine">
@@ -875,6 +984,69 @@
                                                     <StackPanel Grid.Column="0"
                                                                 Margin="4,0,8,0"
                                                                 Orientation="Vertical">
+                                                        <!-- TYPE LABEL simple -->
+                                                        <TextBlock Margin="0,0,0,10"
+                                                                   FontSize="16"
+                                                                   FontWeight="Bold"
+                                                                   Foreground="{DynamicResource App.Foreground}">
+                                                            <TextBlock.Style>
+                                                                <Style TargetType="TextBlock">
+                                                                    <Setter Property="Text" Value="Transakcja"/>
+                                                                    <Style.Triggers>
+                                                                        <DataTrigger Binding="{Binding Kind}" Value="Expense">
+                                                                            <Setter Property="Text" Value="Wydatek"/>
+                                                                        </DataTrigger>
+                                                                        <DataTrigger Binding="{Binding Kind}" Value="Income">
+                                                                            <Setter Property="Text" Value="Przychód"/>
+                                                                        </DataTrigger>
+                                                                        <DataTrigger Binding="{Binding Kind}" Value="Transfer">
+                                                                            <Setter Property="Text" Value="Transfer"/>
+                                                                        </DataTrigger>
+                                                                    </Style.Triggers>
+                                                                </Style>
+                                                            </TextBlock.Style>
+                                                        </TextBlock>
+
+                                                        <!-- TYPE LABEL with icon -->
+                                                        <StackPanel Orientation="Horizontal" Margin="0,0,0,10" Visibility="Collapsed">
+                                                            <Image Width="18" Height="18" Margin="0,0,6,0">
+                                                                <Image.Style>
+                                                                    <Style TargetType="Image">
+                                                                        <Setter Property="Source" Value="pack://application:,,,/Assets/Icons/wydatki.png"/>
+                                                                        <Style.Triggers>
+                                                                            <DataTrigger Binding="{Binding Kind}" Value="Expense">
+                                                                                <Setter Property="Source" Value="pack://application:,,,/Assets/Icons/wydatki.png"/>
+                                                                            </DataTrigger>
+                                                                            <DataTrigger Binding="{Binding Kind}" Value="Income">
+                                                                                <Setter Property="Source" Value="pack://application:,,,/Assets/Icons/przychody.png"/>
+                                                                            </DataTrigger>
+                                                                            <DataTrigger Binding="{Binding Kind}" Value="Transfer">
+                                                                                <Setter Property="Source" Value="pack://application:,,,/Assets/Icons/transfer.png"/>
+                                                                            </DataTrigger>
+                                                                        </Style.Triggers>
+                                                                    </Style>
+                                                                </Image.Style>
+                                                            </Image>
+                                                            <TextBlock FontSize="16" FontWeight="Bold" Foreground="{DynamicResource App.Foreground}">
+                                                                <TextBlock.Style>
+                                                                    <Style TargetType="TextBlock">
+                                                                        <Setter Property="Text" Value="Transakcja"/>
+                                                                        <Style.Triggers>
+                                                                            <DataTrigger Binding="{Binding Kind}" Value="Expense">
+                                                                                <Setter Property="Text" Value="Wydatek"/>
+                                                                            </DataTrigger>
+                                                                            <DataTrigger Binding="{Binding Kind}" Value="Income">
+                                                                                <Setter Property="Text" Value="Przychód"/>
+                                                                            </DataTrigger>
+                                                                            <DataTrigger Binding="{Binding Kind}" Value="Transfer">
+                                                                                <Setter Property="Text" Value="Transfer"/>
+                                                                            </DataTrigger>
+                                                                        </Style.Triggers>
+                                                                    </Style>
+                                                                </TextBlock.Style>
+                                                            </TextBlock>
+                                                        </StackPanel>
+
                                                         <!-- DATA (unified with left) -->
                                                         <StackPanel Orientation="Horizontal">
                                                             <TextBlock Text="Data:" FontWeight="SemiBold" Foreground="{DynamicResource App.Foreground}" Margin="0,0,6,0"/>

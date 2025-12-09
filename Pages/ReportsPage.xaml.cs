@@ -2,6 +2,7 @@
 using Finly.ViewModels;
 using System.ComponentModel;
 using System.Windows;
+using Finly.Views.Controls; // add namespace for custom controls and event args
 
 namespace Finly.Pages
 {
@@ -57,12 +58,6 @@ namespace Finly.Pages
                 {
                     vm.PropertyChanged -= Vm_PropertyChanged;
                 }
-
-                if (PeriodBar != null)
-                {
-                    // Mamy tu anonimowe delegaty, więc realnie ich nie odepniesz,
-                    // ale zostawiamy komentarz – w większej aplikacji warto to zrobić nazwanymi handlerami.
-                }
             };
         }
 
@@ -103,11 +98,14 @@ namespace Finly.Pages
             }
         }
 
-        private void MainChart_SliceClicked(object? sender, Views.Controls.SliceClickedEventArgs e)
+        private void MainChart_SliceClicked(object? sender, SliceClickedEventArgs e)
         {
             if (DataContext is ReportsViewModel vm)
             {
-                vm.ShowDrilldown(e.Name);
+                // opis w środku dona zamiast drilldownu
+                vm.UpdateSelectedSliceInfo(e.Name);
+                // jeśli chcesz także drilldown w tabeli:
+                // vm.ShowDrilldown(e.Name);
             }
         }
 

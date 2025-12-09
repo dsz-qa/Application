@@ -199,6 +199,31 @@ namespace Finly.Pages
                 dp.IsDropDownOpen = true;
             }
         }
+
+        private void ShowAllTypes_Click(object sender, RoutedEventArgs e)
+        {
+            if (_vm == null) return;
+            _vm.ShowExpenses = true;
+            _vm.ShowIncomes = true;
+            _vm.ShowTransfers = true;
+            _vm.RefreshData();
+        }
+
+        private void ShowAllCategories_Click(object sender, RoutedEventArgs e)
+        {
+            if (_vm == null) return;
+            foreach (var c in _vm.Categories)
+                c.IsSelected = true;
+            _vm.RefreshData();
+        }
+
+        private void ShowAllAccounts_Click(object sender, RoutedEventArgs e)
+        {
+            if (_vm == null) return;
+            foreach (var a in _vm.Accounts)
+                a.IsSelected = true;
+            _vm.RefreshData();
+        }
     }
 
     // Converter used in XAML to transform yyyy-MM-dd string into dd.MM.yyyy
@@ -219,6 +244,158 @@ namespace Finly.Pages
             => Binding.DoNothing;
     }
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 

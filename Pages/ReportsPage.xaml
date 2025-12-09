@@ -198,8 +198,9 @@
             </StackPanel>
         </Border>
 
-        <!-- CENTER TOP: pasek okresu + zakładki -->
+        <!-- CENTER: pasek okresu + zakładki + zawartość -->
         <Border Grid.Row="0"
+                Grid.RowSpan="2"
                 Grid.Column="1"
                 Background="{StaticResource Surface.Background}"
                 Padding="12"
@@ -210,7 +211,7 @@
             <Grid>
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto" />
-                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="*" />
                 </Grid.RowDefinitions>
 
                 <!-- Pasek okresu -->
@@ -223,7 +224,130 @@
 
                 <!-- Zakładki -->
                 <TabControl Grid.Row="1">
-                    <TabItem Header="Przegląd" />
+                    <!-- ================== PRZEGLĄD ================== -->
+                    <TabItem Header="Przegląd">
+                        <Grid Margin="0,8,0,0">
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="2*" />
+                                <RowDefinition Height="*" />
+                            </Grid.RowDefinitions>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="3*" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+
+                            <!-- KARTA: Donut + tekst w środku -->
+                            <Border Grid.Row="0"
+                                    Grid.Column="0"
+                                    Margin="0,0,8,8"
+                                    Background="{StaticResource Surface.Background}"
+                                    BorderBrush="{StaticResource Surface.Border}"
+                                    BorderThickness="1"
+                                    CornerRadius="6"
+                                    Padding="8">
+                                <Grid>
+                                    <!-- Donut -->
+                                    <ctrls:DonutChartControl x:Name="MainChart"
+                                                             HorizontalAlignment="Stretch"
+                                                             VerticalAlignment="Stretch"
+                                                             Background="Transparent" />
+
+                                    <!-- Tekst w środku donuta -->
+                                    <StackPanel HorizontalAlignment="Center"
+                                                VerticalAlignment="Center"
+                                                TextBlock.FontSize="14"
+                                                TextBlock.Foreground="{StaticResource App.Foreground}"
+                                                TextBlock.TextAlignment="Center">
+                                        <TextBlock Text="{Binding OverviewCenterTitle}"
+                                                   FontWeight="Bold" />
+                                        <TextBlock Text="{Binding OverviewCenterSubtitle}"
+                                                   Margin="0,4,0,0" />
+                                    </StackPanel>
+                                </Grid>
+                            </Border>
+
+                            <!-- KARTA: mini-podsumowanie przeglądu -->
+                            <Border Grid.Row="0"
+                                    Grid.Column="1"
+                                    Margin="0,0,0,8"
+                                    Background="{StaticResource Surface.Background}"
+                                    BorderBrush="{StaticResource Surface.Border}"
+                                    BorderThickness="1"
+                                    CornerRadius="6"
+                                    Padding="8">
+                                <StackPanel>
+                                    <TextBlock Text="Podsumowanie przeglądu"
+                                               FontWeight="SemiBold"
+                                               Margin="0,0,0,8" />
+
+                                    <StackPanel Orientation="Horizontal" Margin="0,2">
+                                        <TextBlock Text="Liczba transakcji:"
+                                                   Width="150" />
+                                        <TextBlock Text="{Binding OverviewTransactionsCountStr}" />
+                                    </StackPanel>
+
+                                    <StackPanel Orientation="Horizontal" Margin="0,2">
+                                        <TextBlock Text="Łączna wartość:"
+                                                   Width="150" />
+                                        <TextBlock Text="{Binding OverviewTotalAmountStr}" />
+                                    </StackPanel>
+
+                                    <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
+                                        <TextBlock Text="Top kategoria:"
+                                                   Width="150" />
+                                        <TextBlock Text="{Binding OverviewTopCategoryStr}" />
+                                    </StackPanel>
+                                </StackPanel>
+                            </Border>
+
+                            <!-- KARTA: lista transakcji w wybranym okresie -->
+                            <Border Grid.Row="1"
+                                    Grid.ColumnSpan="2"
+                                    Background="{StaticResource Surface.Background}"
+                                    BorderBrush="{StaticResource Surface.Border}"
+                                    BorderThickness="1"
+                                    CornerRadius="6"
+                                    Padding="8">
+                                <StackPanel>
+                                    <TextBlock Text="Transakcje w wybranym okresie"
+                                               FontWeight="SemiBold"
+                                               Margin="0,0,0,8" />
+
+                                    <DataGrid ItemsSource="{Binding FilteredTransactions}"
+                                              AutoGenerateColumns="False"
+                                              IsReadOnly="True"
+                                              CanUserAddRows="False"
+                                              CanUserDeleteRows="False"
+                                              HeadersVisibility="Column"
+                                              GridLinesVisibility="None">
+                                        <DataGrid.Columns>
+                                            <DataGridTextColumn Header="Data"
+                                                                Binding="{Binding Date, StringFormat=\{0:yyyy-MM-dd\}}"
+                                                                Width="*" />
+                                            <DataGridTextColumn Header="Kategoria"
+                                                                Binding="{Binding Category}"
+                                                                Width="2*" />
+                                            <DataGridTextColumn Header="Opis"
+                                                                Binding="{Binding Description}"
+                                                                Width="3*" />
+                                            <DataGridTextColumn Header="Kwota"
+                                                                Binding="{Binding Amount, StringFormat=N2}"
+                                                                Width="*" />
+                                        </DataGrid.Columns>
+                                    </DataGrid>
+
+                                    <!-- Przyciski na dole tabeli -->
+                                    <StackPanel Orientation="Horizontal"
+                                                Margin="0,8,0,0">
+                                        <Button Content="Wróć do wszystkich kategorii"
+                                                Command="{Binding BackCommand}" />
+                                    </StackPanel>
+                                </StackPanel>
+                            </Border>
+                        </Grid>
+                    </TabItem>
+
+                    <!-- NA RAZIE – puste zakładki, wypełnimy później -->
                     <TabItem Header="Kategorie" />
                     <TabItem Header="Czas" />
                     <TabItem Header="Budżety" />
@@ -329,47 +453,6 @@
                     </StackPanel>
                 </Border>
             </StackPanel>
-        </Border>
-
-        <!-- BOTTOM: jedna duża ramka z „odnogami” pod filtrami i KPI -->
-        <Border Grid.Row="1"
-                Grid.ColumnSpan="3"
-                Background="{StaticResource Surface.Background}"
-                BorderBrush="{StaticResource Surface.Border}"
-                BorderThickness="1"
-                CornerRadius="6"
-                Margin="0,8,0,0">
-            <Grid Margin="12">
-                <!-- 3 kolumny: lewa odnoga, środek, prawa odnoga -->
-                <Grid.ColumnDefinitions>
-                    <!-- szerokości dopasowane do lewej i prawej kolumny głównego Grid-a -->
-                    <ColumnDefinition Width="260" />   <!-- pod filtrami -->
-                    <ColumnDefinition Width="*" />     <!-- środek -->
-                    <ColumnDefinition Width="320" />   <!-- pod KPI -->
-                </Grid.ColumnDefinitions>
-
-                <!-- lewa odnoga – pod filtrami, na razie pusta (tylko tło ramki) -->
-                <Border Grid.Column="0"
-                        Background="{StaticResource Surface.Background}"
-                        BorderThickness="0" />
-
-                <!-- prawa odnoga – pod KPI, też pusta -->
-                <Border Grid.Column="2"
-                        Background="{StaticResource Surface.Background}"
-                        BorderThickness="0" />
-
-                <!-- środkowa część: tutaj wstawiamy zawartość zakładek -->
-                <!-- Na start przenosimy donut z wcześniejszego miejsca (Przegląd) -->
-                <Border Grid.Column="1"
-                        Background="{StaticResource Surface.Background}"
-                        BorderThickness="0"
-                        Padding="12">
-                    <ctrls:DonutChartControl x:Name="MainChart"
-                                             HorizontalAlignment="Stretch"
-                                             VerticalAlignment="Stretch"
-                                             Background="Transparent" />
-                </Border>
-            </Grid>
         </Border>
     </Grid>
 </UserControl>

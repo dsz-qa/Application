@@ -30,9 +30,9 @@ namespace Finly.ViewModels
             _toDate = endOfMonth;
 
             // initialize collections to be filled dynamically
-            Accounts   = new ObservableCollection<string>();
+            Accounts = new ObservableCollection<string>();
             Categories = new ObservableCollection<string>();
-            Envelopes  = new ObservableCollection<string>();
+            Envelopes = new ObservableCollection<string>();
             Tags = new ObservableCollection<string> { "Brak", "Podró¿e", "Praca" };
             Currencies = new ObservableCollection<string> { "PLN", "EUR", "USD" };
             Templates = new ObservableCollection<string> { "Domyœlny", "Miesiêczny przegl¹d" };
@@ -57,15 +57,17 @@ namespace Finly.ViewModels
             // unified rows collection for KPI/exports
             Rows = new ObservableCollection<ReportsService.ReportItem>();
 
-            LoadAccountsAndEnvelopes();
+            // podsumowania dla zak³adki „Kategorie”
+            ExpenseCategoriesSummary = new ObservableCollection<CategoryAmount>();
+            IncomeCategoriesSummary = new ObservableCollection<CategoryAmount>();
 
-            // new: load money places for specific Konto/Koperta selection
+            LoadAccountsAndEnvelopes();
             LoadMoneyPlaces();
         }
 
         // Podsumowania kategorii dla zak³adki "Kategorie"
-        public ObservableCollection<CategoryAmount> ExpenseCategoriesSummary { get; } = new();
-        public ObservableCollection<CategoryAmount> IncomeCategoriesSummary  { get; } = new();
+        public ObservableCollection<CategoryAmount> ExpenseCategoriesSummary { get; }
+        public ObservableCollection<CategoryAmount> IncomeCategoriesSummary { get; }
 
         private void LoadAccountsAndEnvelopes()
         {
@@ -75,7 +77,13 @@ namespace Finly.ViewModels
 
                 // ===== Konta bankowe =====
                 BankAccounts = new ObservableCollection<BankAccountModel>();
-                BankAccounts.Add(new BankAccountModel { Id = 0, UserId = uid, AccountName = "Wszystkie konta bankowe", BankName = "" });
+                BankAccounts.Add(new BankAccountModel
+                {
+                    Id = 0,
+                    UserId = uid,
+                    AccountName = "Wszystkie konta bankowe",
+                    BankName = ""
+                });
                 foreach (var a in DatabaseService.GetAccounts(uid))
                     BankAccounts.Add(a);
 
@@ -219,6 +227,7 @@ namespace Finly.ViewModels
         // ========= zakres dat (powi¹zany z PeriodBarControl) =========
         private DateTime _fromDate;
         private DateTime _toDate;
+
         public DateTime FromDate
         {
             get => _fromDate;
@@ -231,6 +240,7 @@ namespace Finly.ViewModels
                 }
             }
         }
+
         public DateTime ToDate
         {
             get => _toDate;
@@ -264,7 +274,7 @@ namespace Finly.ViewModels
                 "Przychody"
             };
 
-        // keep single backing field, default "Wszystko"
+        // pojedyncze pole dla SelectedTransactionType
         private string _selectedTransactionType = "Wszystko";
         public string SelectedTransactionType
         {
@@ -282,8 +292,7 @@ namespace Finly.ViewModels
         }
 
         // Lista konkretnych miejsc: gotówka, koperty, konta bankowe
-        public ObservableCollection<string> MoneyPlaces { get; } =
-            new ObservableCollection<string>();
+        public ObservableCollection<string> MoneyPlaces { get; } = new();
 
         private string _selectedMoneyPlace = "Wszystko";
         public string SelectedMoneyPlace
@@ -298,7 +307,6 @@ namespace Finly.ViewModels
                         : value;
 
                     Raise(nameof(SelectedMoneyPlace));
-                    // auto-refresh on change; remove if you want only manual refresh
                     Refresh();
                 }
             }
@@ -331,32 +339,20 @@ namespace Finly.ViewModels
             try
             {
                 var uid = UserService.GetCurrentUserId();
-                // Koperty
                 var envs = DatabaseService.GetEnvelopesNames(uid) ?? new List<string>();
                 foreach (var env in envs)
-                {
                     MoneyPlaces.Add($"Koperta: {env}");
-                }
             }
-            catch
-            {
-                // jeœli coœ siê wywali – trudno, lista kopert po prostu bêdzie pusta
-            }
+            catch { }
 
             try
             {
                 var uid = UserService.GetCurrentUserId();
-                // Konta bankowe
                 var accs = DatabaseService.GetAccounts(uid) ?? new List<BankAccountModel>();
                 foreach (var acc in accs)
-                {
                     MoneyPlaces.Add($"Konto: {acc.AccountName}");
-                }
             }
-            catch
-            {
-                // jw.
-            }
+            catch { }
 
             SelectedMoneyPlace = MoneyPlaces.FirstOrDefault() ?? "Wszystko";
         }
@@ -416,26 +412,25 @@ namespace Finly.ViewModels
                     Raise(nameof(ShowBankSelector));
                     Raise(nameof(ShowEnvelopeSelector));
 
-                    // new: enable/disable money place filter depending on source
                     UpdateMoneyPlaceFilterState();
-
                     Refresh();
                 }
             }
         }
+
         public bool ShowBankSelector => SelectedSource == SourceType.BankAccounts;
         public bool ShowEnvelopeSelector => SelectedSource == SourceType.Envelopes;
 
         private void UpdateMoneyPlaceFilterState()
         {
-            if (SelectedSource == SourceType.BankAccounts || SelectedSource == SourceType.Envelopes)
+            if (SelectedSource == SourceType.BankAccounts ||
+                SelectedSource == SourceType.Envelopes)
             {
                 IsMoneyPlaceFilterEnabled = true;
             }
             else
             {
                 IsMoneyPlaceFilterEnabled = false;
-                // Reset na "Wszystko", ¿eby nie zosta³y stare wybory
                 SelectedMoneyPlace = MoneyPlaces.FirstOrDefault() ?? "Wszystko";
             }
         }
@@ -450,6 +445,7 @@ namespace Finly.ViewModels
                 Raise(nameof(BankAccounts));
             }
         }
+
         private BankAccountModel? _selectedBankAccount;
         public BankAccountModel? SelectedBankAccount
         {
@@ -485,15 +481,15 @@ namespace Finly.ViewModels
 
         public void ResetFilters()
         {
-            SelectedAccount  = Accounts.Count   > 0 ? Accounts[0]   : string.Empty;
+            SelectedAccount = Accounts.Count > 0 ? Accounts[0] : string.Empty;
             SelectedCategory = Categories.Count > 0 ? Categories[0] : string.Empty;
-            SelectedTemplate = Templates.Count  > 0 ? Templates[0]  : string.Empty;
+            SelectedTemplate = Templates.Count > 0 ? Templates[0] : string.Empty;
 
-            SelectedSource       = SourceType.All;
-            SelectedBankAccount  = BankAccounts.FirstOrDefault();
-            SelectedEnvelope     = Envelopes.Count > 0 ? Envelopes[0] : "Wszystkie koperty";
+            SelectedSource = SourceType.All;
+            SelectedBankAccount = BankAccounts.FirstOrDefault();
+            SelectedEnvelope = Envelopes.Count > 0 ? Envelopes[0] : "Wszystkie koperty";
             SelectedTransactionType = TransactionTypes.FirstOrDefault() ?? "Wszystko";
-            SelectedMoneyPlace      = MoneyPlaces.FirstOrDefault()      ?? "Wszystko";
+            SelectedMoneyPlace = MoneyPlaces.FirstOrDefault() ?? "Wszystko";
 
             UpdateMoneyPlaceFilterState();
         }
@@ -542,6 +538,45 @@ namespace Finly.ViewModels
             }
         }
 
+        // ====== opis œrodka wykresu (Przegl¹d) ======
+        private string _selectedSliceInfo = "Kliknij kategoriê na wykresie";
+        public string SelectedSliceInfo
+        {
+            get => _selectedSliceInfo;
+            set
+            {
+                if (_selectedSliceInfo != value)
+                {
+                    _selectedSliceInfo = value;
+                    Raise(nameof(SelectedSliceInfo));
+                }
+            }
+        }
+
+        // Metoda wo³ana z ReportsPage.xaml.cs przy najechaniu/klikniêciu na slice
+        public void UpdateSelectedSliceInfo(params object[] args)
+        {
+            if (args == null || args.Length == 0)
+            {
+                SelectedSliceInfo = "Kliknij kategoriê na wykresie";
+                return;
+            }
+
+            // Spróbujmy z³o¿yæ sensowny opis z przekazanych parametrów
+            // (np. kategoria, kwota, udzia³ %)
+            var parts = args
+                .Where(a => a != null)
+                .Select(a => a.ToString())
+                .Where(s => !string.IsNullOrWhiteSpace(s));
+
+            var text = string.Join(" • ", parts);
+            if (string.IsNullOrWhiteSpace(text))
+                text = "Kliknij kategoriê na wykresie";
+
+            SelectedSliceInfo = text;
+        }
+
+
         private bool _isDrilldown = false;
         public bool IsDrilldownActive
         {
@@ -554,6 +589,65 @@ namespace Finly.ViewModels
             }
         }
         public bool IsSummaryActive => !IsDrilldownActive;
+
+        // ======== PRZEGL¥D – œrodek donuta + mini-podsumowanie ========
+        private string _overviewCenterTitle = "Wszystkie transakcje";
+        public string OverviewCenterTitle
+        {
+            get => _overviewCenterTitle;
+            set
+            {
+                if (_overviewCenterTitle != value)
+                {
+                    _overviewCenterTitle = value;
+                    Raise(nameof(OverviewCenterTitle));
+                }
+            }
+        }
+
+        private string _overviewCenterSubtitle = string.Empty;
+        public string OverviewCenterSubtitle
+        {
+            get => _overviewCenterSubtitle;
+            set
+            {
+                if (_overviewCenterSubtitle != value)
+                {
+                    _overviewCenterSubtitle = value;
+                    Raise(nameof(OverviewCenterSubtitle));
+                }
+            }
+        }
+
+        public string OverviewTransactionsCountStr
+            => $"{_transactionsSnapshot.Count} transakcji";
+
+        public string OverviewTotalAmountStr
+        {
+            get
+            {
+                var total = _transactionsSnapshot.Sum(t => t.Amount);
+                return total.ToString("N2", CultureInfo.CurrentCulture) + " z³";
+            }
+        }
+
+        public string OverviewTopCategoryStr
+        {
+            get
+            {
+                if (_transactionsSnapshot.Count == 0) return "(brak danych)";
+
+                var top = _transactionsSnapshot
+                    .GroupBy(t => t.Category ?? "(brak)")
+                    .Select(g => new { Name = g.Key, Total = g.Sum(x => x.Amount) })
+                    .OrderByDescending(x => Math.Abs(x.Total))
+                    .FirstOrDefault();
+
+                if (top == null) return "(brak danych)";
+
+                return $"{top.Name} – {top.Total.ToString("N2", CultureInfo.CurrentCulture)} z³";
+            }
+        }
 
         // ========= prawa kolumna: sumy bie¿¹cego okresu =========
         private decimal _expensesTotal = 0m;
@@ -718,7 +812,11 @@ namespace Finly.ViewModels
             Details.Clear();
             var groups = dt.AsEnumerable()
                 .GroupBy(r => r.Field<string>("CategoryName") ?? "(brak)")
-                .Select(g => new { Name = g.Key, Total = g.Sum(r => Convert.ToDecimal(r.Field<object>("Amount"))) })
+                .Select(g => new
+                {
+                    Name = g.Key,
+                    Total = g.Sum(r => Convert.ToDecimal(r.Field<object>("Amount")))
+                })
                 .OrderByDescending(x => x.Total)
                 .ToList();
 
@@ -741,6 +839,7 @@ namespace Finly.ViewModels
         {
             if (string.IsNullOrWhiteSpace(category)) return;
             IsDrilldownActive = true;
+
             var list = _transactionsSnapshot
                 .Where(t => string.Equals(t.Category, category, StringComparison.OrdinalIgnoreCase))
                 .OrderByDescending(t => t.Date)
@@ -749,6 +848,15 @@ namespace Finly.ViewModels
             FilteredTransactions.Clear();
             foreach (var t in list)
                 FilteredTransactions.Add(t);
+
+            // Tekst w œrodku donuta – dla wybranej kategorii
+            var total = list.Sum(t => t.Amount);
+            OverviewCenterTitle = category;
+            OverviewCenterSubtitle = $"{list.Count} transakcji · {total.ToString("N2", CultureInfo.CurrentCulture)} z³";
+
+            Raise(nameof(OverviewTransactionsCountStr));
+            Raise(nameof(OverviewTotalAmountStr));
+            Raise(nameof(OverviewTopCategoryStr));
         }
 
         public void BackToSummary()
@@ -757,76 +865,17 @@ namespace Finly.ViewModels
             FilteredTransactions.Clear();
             foreach (var t in _transactionsSnapshot.OrderByDescending(t => t.Date))
                 FilteredTransactions.Add(t);
+
+            // Powrót do widoku wszystkich transakcji
+            OverviewCenterTitle = "Wszystkie transakcje";
+            OverviewCenterSubtitle = $"{_transactionsSnapshot.Count} transakcji w wybranym okresie";
+
+            Raise(nameof(OverviewTransactionsCountStr));
+            Raise(nameof(OverviewTotalAmountStr));
+            Raise(nameof(OverviewTopCategoryStr));
         }
 
-        private (DateTime PrevFrom, DateTime PrevTo) GetPreviousPeriod(DateTime currentFrom, DateTime currentTo)
-        {
-            var from = currentFrom.Date;
-            var to = currentTo.Date;
-            if (to < from)
-            {
-                var tmp = from;
-                from = to;
-                to = tmp;
-            }
-
-            int length = (to - from).Days + 1;
-            var prevTo = from.AddDays(-1);
-            var prevFrom = prevTo.AddDays(-length + 1);
-            return (prevFrom, prevTo);
-        }
-
-        private DataTable GetFilteredExpensesDataTable(int uid, DateTime from, DateTime to, int? accountId)
-        {
-            DataTable dt = DatabaseService.GetExpenses(uid, from, to, null, null, accountId);
-
-            IEnumerable<DataRow> rows = dt.AsEnumerable();
-            if (SelectedSource == SourceType.FreeCash)
-            {
-                rows = rows.Where(r => r.IsNull("AccountId"));
-            }
-            else if (SelectedSource == SourceType.SavedCash)
-            {
-                rows = rows.Where(r => r.IsNull("AccountId"));
-            }
-            else if (SelectedSource == SourceType.Envelopes)
-            {
-                if (!string.IsNullOrWhiteSpace(SelectedEnvelope) && SelectedEnvelope != "Wszystkie koperty")
-                    rows = rows.Where(r => (r.Field<string>("Description") ?? "").IndexOf(SelectedEnvelope, StringComparison.OrdinalIgnoreCase) >= 0);
-                else
-                    rows = rows.Where(r => r.IsNull("AccountId"));
-            }
-
-            return rows.CopyToDataTableOrEmpty();
-        }
-
-        private decimal SumAmount(DataTable dt, string columnName)
-        {
-            decimal total = 0m;
-            if (dt.Rows.Count > 0 && dt.Columns.Contains(columnName))
-            {
-                foreach (DataRow r in dt.Rows)
-                {
-                    if (r[columnName] != DBNull.Value)
-                        total += Convert.ToDecimal(r[columnName]);
-                }
-            }
-            return total;
-        }
-
-        private string FormatPercentChange(decimal previous, decimal current)
-        {
-            if (previous == 0m)
-            {
-                if (current == 0m) return "0% (bez zmian)";
-                return "n/d (brak danych)";
-            }
-
-            var diffPct = (current - previous) / previous * 100m;
-            var sign = diffPct > 0 ? "+" : "";
-            return sign + diffPct.ToString("N1", CultureInfo.CurrentCulture) + " %";
-        }
-
+        // ==================== G£ÓWNE ODŒWIE¯ANIE ====================
         private void Refresh()
         {
             try
@@ -834,14 +883,20 @@ namespace Finly.ViewModels
                 var uid = UserService.GetCurrentUserId();
                 if (uid <= 0)
                 {
-                    MessageBox.Show("Brak zalogowanego u¿ytkownika.", "B³¹d", MessageBoxButton.OK, MessageBoxImage.Warning);
+                    MessageBox.Show("Brak zalogowanego u¿ytkownika.", "B³¹d",
+                        MessageBoxButton.OK, MessageBoxImage.Warning);
                     return;
                 }
 
                 int? accountId = null;
-                if (SelectedSource == SourceType.BankAccounts && SelectedBankAccount != null && SelectedBankAccount.Id > 0)
+                if (SelectedSource == SourceType.BankAccounts &&
+                    SelectedBankAccount != null &&
+                    SelectedBankAccount.Id > 0)
+                {
                     accountId = SelectedBankAccount.Id;
+                }
 
+                // unified wiersze dla bie¿¹cego okresu
                 var currentRows = ReportsService.LoadReport(
                     uid,
                     GetSourceString(),
@@ -852,30 +907,27 @@ namespace Finly.ViewModels
                     ToDate
                 ).ToList();
 
-                // ====== aktualny okres ======
+                // ====== aktualny okres – DataTable z wydatków do wykresu ======
                 var currentDt = GetFilteredExpensesDataTable(uid, FromDate, ToDate, accountId);
 
                 Rows.Clear();
                 foreach (var row in currentRows)
                     Rows.Add(row);
 
-                // tu DODAJ:
                 RebuildCategorySummariesFromRows();
 
-                // KPI for current period based on unified rows
                 var totalExpenses = currentRows.Where(r => r.Amount < 0m).Sum(r => -r.Amount);
-                var totalIncomes  = currentRows.Where(r => r.Amount > 0m).Sum(r =>  r.Amount);
+                var totalIncomes = currentRows.Where(r => r.Amount > 0m).Sum(r => r.Amount);
 
                 ExpensesTotal = totalExpenses;
-                IncomesTotal  = totalIncomes;
-                BalanceTotal  = totalIncomes - totalExpenses;
+                IncomesTotal = totalIncomes;
+                BalanceTotal = totalIncomes - totalExpenses;
 
                 // ====== poprzedni okres o tej samej d³ugoœci ======
                 var prev = GetPreviousPeriod(FromDate, ToDate);
                 _previousFromDate = prev.PrevFrom;
                 _previousToDate = prev.PrevTo;
 
-                // previous period rows with same filters
                 var previousRows = ReportsService.LoadReport(
                     uid,
                     GetSourceString(),
@@ -887,10 +939,9 @@ namespace Finly.ViewModels
                 ).ToList();
 
                 PreviousExpensesTotal = previousRows.Where(r => r.Amount < 0m).Sum(r => -r.Amount);
-                PreviousIncomesTotal  = previousRows.Where(r => r.Amount > 0m).Sum(r =>  r.Amount);
-                PreviousBalanceTotal  = PreviousIncomesTotal - PreviousExpensesTotal;
+                PreviousIncomesTotal = previousRows.Where(r => r.Amount > 0m).Sum(r => r.Amount);
+                PreviousBalanceTotal = PreviousIncomesTotal - PreviousExpensesTotal;
 
-                // okresy nazwane
                 var kind = DetectPeriodKind(FromDate.Date, ToDate.Date, DateTime.Today);
                 var (currentName, previousName) = GetPeriodNames(kind);
                 CurrentPeriodName = currentName;
@@ -905,6 +956,7 @@ namespace Finly.ViewModels
                 BalanceChangePercentStr = FormatPercentChange(PreviousBalanceTotal, BalanceTotal);
 
                 IsDrilldownActive = false;
+                SelectedSliceInfo = "Kliknij kategoriê na wykresie";
 
                 // ====== KPI & insighty ======
                 KPIList.Clear();
@@ -927,7 +979,7 @@ namespace Finly.ViewModels
                 Insights.Add($"Wydajesz {ExpensesChangePercentStr} {(ExpensesTotal > PreviousExpensesTotal ? "wiêcej" : ExpensesTotal < PreviousExpensesTotal ? "mniej" : "(bez zmian)")} ni¿ w {PreviousPeriodName}.");
                 Insights.Add($"Twoje przychody s¹ {IncomesChangePercentStr} {(IncomesTotal > PreviousIncomesTotal ? "wy¿sze" : IncomesTotal < PreviousIncomesTotal ? "ni¿sze" : "(bez zmian)")} ni¿ w {PreviousPeriodName}.");
 
-                // ====== wykres i szczegó³y kategorii – nadal z wydatków (jak dot¹d)
+                // ====== wykres i szczegó³y kategorii – z wydatków ======
                 var currentExpensesDt = GetFilteredExpensesDataTable(uid, FromDate, ToDate, accountId);
                 FilteredTransactions.Clear();
                 Details.Clear();
@@ -939,37 +991,51 @@ namespace Finly.ViewModels
                     ChartTotalAll = 0m;
                 }
 
+                OverviewCenterTitle = "Wszystkie transakcje";
+                OverviewCenterSubtitle = $"{_transactionsSnapshot.Count} transakcji w wybranym okresie";
+
                 Raise(nameof(Details));
                 Raise(nameof(ChartTotals));
                 Raise(nameof(ChartTotalAll));
                 Raise(nameof(FilteredTransactions));
+                Raise(nameof(OverviewTransactionsCountStr));
+                Raise(nameof(OverviewTotalAmountStr));
+                Raise(nameof(OverviewTopCategoryStr));
             }
             catch (Exception ex)
             {
-                MessageBox.Show("B³¹d odczytu raportu: " + ex.Message, "B³¹d", MessageBoxButton.OK, MessageBoxImage.Error);
+                MessageBox.Show("B³¹d odczytu raportu: " + ex.Message,
+                    "B³¹d", MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
 
         private void SavePreset()
         {
-            MessageBox.Show($"Zapisano preset: {SelectedTemplate}", "Informacja", MessageBoxButton.OK, MessageBoxImage.Information);
+            MessageBox.Show($"Zapisano preset: {SelectedTemplate}",
+                "Informacja", MessageBoxButton.OK, MessageBoxImage.Information);
         }
 
         private void ExportCsv()
         {
             try
             {
-                var path = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory), "report_export.csv");
+                var path = Path.Combine(
+                    Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory),
+                    "report_export.csv");
+
                 var sb = new StringBuilder();
                 sb.AppendLine("Category,Amount,SharePercent");
                 foreach (var d in Details)
                     sb.AppendLine($"{d.Name},{d.Amount:N2},{d.SharePercent:N1}");
+
                 File.WriteAllText(path, sb.ToString(), Encoding.UTF8);
-                MessageBox.Show($"Eksport CSV zapisano na pulpicie: {path}", "Eksport", MessageBoxButton.OK, MessageBoxImage.Information);
+                MessageBox.Show($"Eksport CSV zapisano na pulpicie: {path}",
+                    "Eksport", MessageBoxButton.OK, MessageBoxImage.Information);
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"B³¹d eksportu CSV: {ex.Message}", "B³¹d", MessageBoxButton.OK, MessageBoxImage.Error);
+                MessageBox.Show($"B³¹d eksportu CSV: {ex.Message}",
+                    "B³¹d", MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
 
@@ -977,17 +1043,23 @@ namespace Finly.ViewModels
         {
             try
             {
-                var path = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory), "report_export.xlsx");
+                var path = Path.Combine(
+                    Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory),
+                    "report_export.xlsx");
+
                 var sb = new StringBuilder();
                 sb.AppendLine("Category\tAmount\tSharePercent");
                 foreach (var d in Details)
                     sb.AppendLine($"{d.Name}\t{d.Amount:N2}\t{d.SharePercent:N1}");
+
                 File.WriteAllText(path, sb.ToString(), Encoding.UTF8);
-                MessageBox.Show($"Eksport Excel (TSV) zapisano na pulpicie: {path}", "Eksport", MessageBoxButton.OK, MessageBoxImage.Information);
+                MessageBox.Show($"Eksport Excel (TSV) zapisano na pulpicie: {path}",
+                    "Eksport", MessageBoxButton.OK, MessageBoxImage.Information);
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"B³¹d eksportu Excel: {ex.Message}", "B³¹d", MessageBoxButton.OK, MessageBoxImage.Error);
+                MessageBox.Show($"B³¹d eksportu Excel: {ex.Message}",
+                    "B³¹d", MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
 
@@ -996,7 +1068,6 @@ namespace Finly.ViewModels
             try
             {
                 var path = PdfExportService.ExportReportsPdf(this);
-                // zamiast MessageBox ? lekki toast w rogu okna
                 ToastService.Success($"Raport PDF zapisano na pulpicie: {path}");
             }
             catch (Exception ex)
@@ -1005,6 +1076,7 @@ namespace Finly.ViewModels
             }
         }
 
+        // ======= pomocnicze: budowanie podsumowañ kategorii z Rows =======
         private void RebuildCategorySummariesFromRows()
         {
             ExpenseCategoriesSummary.Clear();
@@ -1013,7 +1085,7 @@ namespace Finly.ViewModels
             if (Rows == null || Rows.Count == 0)
                 return;
 
-            // ===== Wydatki wed³ug kategorii =====
+            // Wydatki wed³ug kategorii
             var expenseGroups = Rows
                 .Where(r => r.Amount < 0m)
                 .GroupBy(r => string.IsNullOrWhiteSpace(r.Category) ? "(brak kategorii)" : r.Category);
@@ -1033,7 +1105,7 @@ namespace Finly.ViewModels
                 });
             }
 
-            // ===== Przychody wed³ug kategorii =====
+            // Przychody wed³ug kategorii
             var incomeGroups = Rows
                 .Where(r => r.Amount > 0m)
                 .GroupBy(r => string.IsNullOrWhiteSpace(r.Category) ? "(brak kategorii)" : r.Category);
@@ -1053,12 +1125,76 @@ namespace Finly.ViewModels
                 });
             }
 
-            // powiadom widok na wszelki wypadek
             Raise(nameof(ExpenseCategoriesSummary));
             Raise(nameof(IncomeCategoriesSummary));
         }
 
-        // ====== Zak³adki raportów ======
+        // ====== poprzedni okres o tej samej d³ugoœci ======
+        private (DateTime PrevFrom, DateTime PrevTo) GetPreviousPeriod(DateTime currentFrom, DateTime currentTo)
+        {
+            var from = currentFrom.Date;
+            var to = currentTo.Date;
+
+            if (to < from)
+            {
+                var tmp = from;
+                from = to;
+                to = tmp;
+            }
+
+            int length = (to - from).Days + 1;
+            var prevTo = from.AddDays(-1);
+            var prevFrom = prevTo.AddDays(-length + 1);
+            return (prevFrom, prevTo);
+        }
+
+        // ====== filtrowanie wydatków do wykresu ======
+        private DataTable GetFilteredExpensesDataTable(int uid, DateTime from, DateTime to, int? accountId)
+        {
+            DataTable dt = DatabaseService.GetExpenses(uid, from, to, null, null, accountId);
+
+            IEnumerable<DataRow> rows = dt.AsEnumerable();
+
+            if (SelectedSource == SourceType.FreeCash)
+            {
+                rows = rows.Where(r => r.IsNull("AccountId"));
+            }
+            else if (SelectedSource == SourceType.SavedCash)
+            {
+                rows = rows.Where(r => r.IsNull("AccountId"));
+            }
+            else if (SelectedSource == SourceType.Envelopes)
+            {
+                if (!string.IsNullOrWhiteSpace(SelectedEnvelope) &&
+                    SelectedEnvelope != "Wszystkie koperty")
+                {
+                    rows = rows.Where(r =>
+                        (r.Field<string>("Description") ?? "")
+                        .IndexOf(SelectedEnvelope, StringComparison.OrdinalIgnoreCase) >= 0);
+                }
+                else
+                {
+                    rows = rows.Where(r => r.IsNull("AccountId"));
+                }
+            }
+
+            return rows.CopyToDataTableOrEmpty();
+        }
+
+        private string FormatPercentChange(decimal previous, decimal current)
+        {
+            if (previous == 0m)
+            {
+                if (current == 0m) return "0% (bez zmian)";
+                return "n/d (brak danych)";
+            }
+
+            var diffPct = (current - previous) / previous * 100m;
+            var sign = diffPct > 0 ? "+" : "";
+            return sign + diffPct.ToString("N1", CultureInfo.CurrentCulture) + " %";
+        }
+
+        // ====== Zak³adki raportów (indeks) ======
         private int _selectedTabIndex = 0;
         public int SelectedTabIndex
         {
@@ -1071,12 +1207,11 @@ namespace Finly.ViewModels
                     Raise(nameof(SelectedTabIndex));
                     Raise(nameof(IsOverviewTab));
                     Raise(nameof(IsCategoriesTab));
-                    // w przysz³oœci: IsTimeTab, IsBudgetsTab itd.
                 }
             }
         }
 
-        public bool IsOverviewTab   => SelectedTabIndex == 0;
+        public bool IsOverviewTab => SelectedTabIndex == 0;
         public bool IsCategoriesTab => SelectedTabIndex == 1;
     }
 

@@ -115,7 +115,7 @@ namespace Finly.ViewModels
 
  // zbuduj s³owniki pomocnicze
  try { _accountNameById = DatabaseService.GetAccounts(UserId).ToDictionary(a => a.Id, a => a.AccountName); } catch { _accountNameById = new(); }
- try { var envDt = DatabaseService.GetEnvelopesTable(UserId); _envelopeNameById = new(); if (envDt != null) foreach (DataRow rr in envDt.Rows) { try { var id = Convert.ToInt32(rr["Id"]); var nm = rr["Name"]?.ToString() ?? ""; if (id>0) _envelopeNameById[id] = nm; } catch { } } } catch { _envelopeNameById = new(); }
+ try { var envDt = DatabaseService.GetEnvelopesTable(UserId); _envelopeNameById = new(); if (envDt != null) foreach (DataRow rr in envDt.Rows) { try { var id = Convert.ToInt32(rr["Id"]); var nm = rr["Name"]?.ToString() ?? ""; if (id >0) _envelopeNameById[id] = nm; } catch { } } } catch { _envelopeNameById = new(); }
 
  DataTable expDt = null; try { expDt = DatabaseService.GetExpenses(UserId); } catch { }
  if (expDt != null) foreach (DataRow r in expDt.Rows) AddExpenseRow(r);
@@ -177,10 +177,38 @@ namespace Finly.ViewModels
  {
  int id = Convert.ToInt32(r["Id"]); decimal amt = Convert.ToDecimal(r["Amount"]);
  DateTime date = ParseDate(r["Date"]); string desc = r["Description"]?.ToString() ?? string.Empty;
- string source = r["Source"]?.ToString() ?? string.Empty; string catName = r.Table.Columns.Contains("CategoryName") ? (r["CategoryName"]?.ToString() ?? "") : "";
- bool planned = r.Table.Columns.Contains("IsPlanned") && r["IsPlanned"] != DBNull.Value && Convert.ToInt32(r["IsPlanned"]) ==1;
- // Na konto: jeœli pusta nazwa, za³ó¿my wolna gotówka
- var dest = string.IsNullOrWhiteSpace(source) ? "Wolna gotówka" : source;
+
+ string catName = r.Table.Columns.Contains("CategoryName")
+ ? (r["CategoryName"]?.ToString() ?? string.Empty)
+ : string.Empty;
+
+ bool planned = r.Table.Columns.Contains("IsPlanned")
+ && r["IsPlanned"] != DBNull.Value
+ && Convert.ToInt32(r["IsPlanned"]) ==1;
+
+ // --- NOWE: pobierz nazwê konta tak jak dla wydatków ---
+ string accountName = string.Empty;
+
+ //1) jeœli jest kolumna AccountId – u¿yj s³ownika _accountNameById
+ if (r.Table.Columns.Contains("AccountId") && r["AccountId"] != DBNull.Value)
+ {
+ var accId = Convert.ToInt32(r["AccountId"]);
+ if (_accountNameById.TryGetValue(accId, out var accName))
+ accountName = accName;
+ }
+
+ //2) wsteczna kompatybilnoœæ: jeœli jest kolumna Source z nazw¹ konta
+ if (string.IsNullOrWhiteSpace(accountName)
+ && r.Table.Columns.Contains("Source")
+ && r["Source"] != DBNull.Value)
+ {
+ accountName = r["Source"]?.ToString() ?? string.Empty;
+ }
+
+ //3) jeœli dalej pusto – traktuj jako woln¹ gotówkê
+ if (string.IsNullOrWhiteSpace(accountName))
+ accountName = "Wolna gotówka";
+
  AllTransactions.Add(new TransactionCardVm {
  Id = id,
  Kind = TransactionKind.Income,
@@ -191,9 +219,9 @@ namespace Finly.ViewModels
  IsPlanned = planned,
  IsFuture = date.Date > DateTime.Today,
  CategoryIcon = "+",
- AccountName = dest,
+ AccountName = accountName,
  SelectedCategory = string.IsNullOrWhiteSpace(catName) ? "Przychód" : catName,
- SelectedAccount = dest,
+ SelectedAccount = accountName,
  EditAmountText = amt.ToString("N2"),
  EditDescription = desc,
  EditDate = date
@@ -283,7 +311,7 @@ namespace Finly.ViewModels
  if (vm == null) return;
  try
  {
- // 1) parsowanie kwoty
+ //1) parsowanie kwoty
  var amount = ParseAmountInternal(vm.EditAmountText ?? string.Empty);
  var date = vm.EditDate == default ? DateTime.Today : vm.EditDate;
  var desc = vm.EditDescription ?? string.Empty;
@@ -305,9 +333,9 @@ namespace Finly.ViewModels
  int? cid = null;
  if (!string.IsNullOrWhiteSpace(selectedCat) && !string.Equals(selectedCat, "(brak)", StringComparison.CurrentCultureIgnoreCase))
  {
- try { var id = DatabaseService.GetOrCreateCategoryId(UserId, selectedCat!); if (id > 0) cid = id; } catch { cid = null; }
+ try { var id = DatabaseService.GetOrCreateCategoryId(UserId, selectedCat!); if (id >0) cid = id; } catch { cid = null; }
  }
- exp.CategoryId = cid ?? 0;
+ exp.CategoryId = cid ??0;
  DatabaseService.UpdateExpense(exp);
  }
  // odœwie¿ widok elementu
@@ -324,7 +352,7 @@ namespace Finly.ViewModels
  int? cid = null;
  if (!string.IsNullOrWhiteSpace(selectedCat) && !string.Equals(selectedCat, "Przychód", StringComparison.CurrentCultureIgnoreCase))
  {
- try { var id = DatabaseService.GetOrCreateCategoryId(UserId, selectedCat!); if (id > 0) cid = id; } catch { cid = null; }
+ try { var id = DatabaseService.GetOrCreateCategoryId(UserId, selectedCat!); if (id >0) cid = id; } catch { cid = null; }
  }
  string? source = string.IsNullOrWhiteSpace(selectedAcc) ? null : selectedAcc;
  DatabaseService.UpdateIncome(vm.Id, UserId, amount, desc, null, date, cid, source);
@@ -342,7 +370,7 @@ namespace Finly.ViewModels
  vm.AmountStr = amount.ToString("N2") + " z³"; // je¿eli UI pozwala edytowaæ kwotê
  vm.DateDisplay = date.ToString("yyyy-MM-dd");
  vm.Description = desc;
- // AccountName budowane z 2 stron – zostawiamy bez zmian
+ // AccountName budowane z2 stron – zostawiamy bez zmian
  break;
  }
  }
@@ -351,7 +379,7 @@ namespace Finly.ViewModels
  finally
  {
  vm.IsEditing = false;
- // Odswie¿ KPI i listy – wykonaj lokalnie bez pe³nego prze³adowania DB
+ // Odswierz KPI i listy – wykonaj lokalnie bez pe³nego prze³adowania DB
  ApplyFilters();
  }
  }
@@ -361,30 +389,44 @@ namespace Finly.ViewModels
  _isToday = _isYesterday = _isThisWeek = _isThisMonth = _isPrevMonth = _isThisYear = false;
  }
 
- private bool MatchesSelectedAccounts(TransactionCardVm t, System.Collections.Generic.List<string> selectedAccounts)
- {
- if (selectedAccounts.Count ==0) return true;
+ private bool MatchesSelectedAccounts(TransactionCardVm t, System.Collections.Generic.List<string> selectedAccounts, int totalAccounts)
+{
+ //1) Jeœli nic nie zaznaczone ? pokazujemy NIC
+ if (selectedAccounts.Count ==0)
+ return false;
+
+ //2) Je¿eli zaznaczone s¹ wszystkie konta ? brak filtra kont
+ if (selectedAccounts.Count == totalAccounts)
+ return true;
+
  string Normalize(string s) => (s ?? string.Empty).Trim();
- var set = selectedAccounts.Select(Normalize).ToHashSet(StringComparer.CurrentCultureIgnoreCase);
- // cash synonyms
- bool MatchesCash(string name) => name.IndexOf("gotówka", StringComparison.CurrentCultureIgnoreCase) >=0 && (set.Contains("Wolna gotówka") || set.Contains("Od³o¿ona gotówka"));
+ var set = selectedAccounts
+ .Select(Normalize)
+ .ToHashSet(StringComparer.CurrentCultureIgnoreCase);
+
+ // „gotówka” – traktuj woln¹ / od³o¿on¹ jako jedno logiczne konto
+ bool MatchesCash(string name) =>
+ name.IndexOf("gotówka", StringComparison.CurrentCultureIgnoreCase) >=0 &&
+ (set.Contains("Wolna gotówka") || set.Contains("Od³o¿ona gotówka"));
+
  if (t.Kind == TransactionKind.Transfer)
  {
  var raw = Normalize(t.AccountName);
  var parts = raw.Split('?');
  var from = parts.Length >0 ? Normalize(parts[0]) : string.Empty;
  var to = parts.Length >1 ? Normalize(parts[1]) : string.Empty;
- return set.Contains(from) || set.Contains(to) || MatchesCash(from) || MatchesCash(to);
+
+ return set.Contains(from) || set.Contains(to)
+ || MatchesCash(from) || MatchesCash(to);
  }
  else
  {
  var n = Normalize(t.AccountName);
  return set.Contains(n) || MatchesCash(n);
  }
- }
-
+}
  private void ApplyFilters()
- {
+{
  if (AllTransactions.Count ==0) return;
 
  DateTime? from = null, to = null; var today = DateTime.Today;
@@ -401,22 +443,71 @@ namespace Finly.ViewModels
  from = df.Date; to = dt.Date;
  }
 
- var typeSelected = new[] { (TransactionKind.Expense, ShowExpenses), (TransactionKind.Income, ShowIncomes), (TransactionKind.Transfer, ShowTransfers) }
- .Where(t => t.Item2).Select(t => t.Item1).ToList();
- bool typeFilterActive = typeSelected.Count >0;
-
  var selectedAccounts = Accounts.Where(a => a.IsSelected).Select(a => a.Name).ToList();
  var selectedCategories = Categories.Where(c => c.IsSelected).Select(c => c.Name).ToList();
+ int totalAccounts = Accounts.Count;
+ int totalCategories = Categories.Count;
 
  var q = (SearchQuery ?? string.Empty).Trim();
 
  bool PassCommonFilters(TransactionCardVm t)
  {
  bool dateOk = true; if (from.HasValue && to.HasValue && DateTime.TryParse(t.DateDisplay, out var d)) dateOk = d.Date >= from.Value.Date && d.Date <= to.Value.Date;
- bool typeOk = !typeFilterActive || typeSelected.Contains(t.Kind);
- bool accOk = MatchesSelectedAccounts(t, selectedAccounts);
- bool catOk = selectedCategories.Count ==0 || selectedCategories.Any(x => string.Equals(t.CategoryName, x, StringComparison.CurrentCultureIgnoreCase));
- bool textOk = string.IsNullOrEmpty(q) || (t.CategoryName?.IndexOf(q, StringComparison.CurrentCultureIgnoreCase) >=0) || (t.Description?.IndexOf(q, StringComparison.CurrentCultureIgnoreCase) >=0) || (t.AccountName?.IndexOf(q, StringComparison.CurrentCultureIgnoreCase) >=0);
+
+ // ===== TYP TRANSAKCJI =====
+ bool typeOk;
+ bool allTypesSelected = ShowExpenses && ShowIncomes && ShowTransfers;
+ bool noTypesSelected = !ShowExpenses && !ShowIncomes && !ShowTransfers;
+ if (noTypesSelected)
+ {
+ typeOk = false;
+ }
+ else if (allTypesSelected)
+ {
+ typeOk = true;
+ }
+ else
+ {
+ var typeSelected = new[]
+ {
+ (TransactionKind.Expense, ShowExpenses),
+ (TransactionKind.Income, ShowIncomes),
+ (TransactionKind.Transfer, ShowTransfers)
+ }
+ .Where(tpl => tpl.Item2)
+ .Select(tpl => tpl.Item1)
+ .ToList();
+ typeOk = typeSelected.Contains(t.Kind);
+ }
+
+ // ===== KONTA =====
+ bool accOk = MatchesSelectedAccounts(t, selectedAccounts, totalAccounts);
+
+ // ===== KATEGORIE =====
+ bool catOk;
+ if (totalCategories ==0)
+ {
+ catOk = true;
+ }
+ else if (selectedCategories.Count ==0)
+ {
+ catOk = false;
+ }
+ else if (selectedCategories.Count == totalCategories)
+ {
+ catOk = true;
+ }
+ else
+ {
+ catOk = selectedCategories.Any(x => string.Equals(t.CategoryName, x, StringComparison.CurrentCultureIgnoreCase));
+ }
+
+ // ===== WYSZUKIWARKA =====
+ bool textOk = string.IsNullOrEmpty(q)
+ || (t.CategoryName?.IndexOf(q, StringComparison.CurrentCultureIgnoreCase) >=0)
+ || (t.Description?.IndexOf(q, StringComparison.CurrentCultureIgnoreCase) >=0)
+ || (t.AccountName?.IndexOf(q, StringComparison.CurrentCultureIgnoreCase) >=0);
+
  return dateOk && typeOk && accOk && catOk && textOk;
  }
 
