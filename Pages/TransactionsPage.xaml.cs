@@ -135,7 +135,8 @@ namespace Finly.Pages
             }
 
             CollapseInside(FindName("RealizedItems") as ItemsControl);
-            CollapseInside(FindName("PlannedItems") as ItemsControl);
+            // Updated name to match XAML change
+            CollapseInside(FindName("PlannedItemsList") as ItemsControl);
         }
 
         private void ShowDeleteConfirm_Click(object sender, RoutedEventArgs e)
@@ -225,6 +226,15 @@ namespace Finly.Pages
             if (sender is FrameworkElement fe && fe.DataContext is TransactionCardVm vm)
             {
                 _vm.SaveEdit(vm);
+            }
+        }
+
+        private void CancelEdit_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is FrameworkElement fe && fe.DataContext is TransactionCardVm vm)
+            {
+                // Cancel inline edit without saving; return to read mode
+                vm.IsEditing = false;
             }
         }
 

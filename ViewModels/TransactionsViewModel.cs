@@ -555,7 +555,7 @@ namespace Finly.ViewModels
  }
 
  public enum TransactionKind { Expense, Income, Transfer }
- public class TransactionCardVm : INotifyPropertyChanged { 
+ public class TransactionCardVm : INotifyPropertyChanged {
  public int Id { get; set; }
  private string _categoryName = ""; public string CategoryName { get => _categoryName; set { _categoryName = value; PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(CategoryName))); } }
  private string _description = ""; public string Description { get => _description; set { _description = value; PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(Description))); } }
@@ -565,10 +565,13 @@ namespace Finly.ViewModels
  public bool IsFuture { get; set; }
  public string CategoryIcon { get; set; } = "";
  private string _accountName = ""; public string AccountName { get => _accountName; set { _accountName = value; PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(AccountName))); } }
- public TransactionKind Kind { get; set; } = TransactionKind.Expense; 
- // inline edit
+ public TransactionKind Kind { get; set; } = TransactionKind.Expense;
  private bool _isEditing; public bool IsEditing { get=>_isEditing; set { _isEditing=value; PropertyChanged?.Invoke(this,new PropertyChangedEventArgs(nameof(IsEditing))); } }
- public string EditAmountText { get; set; } = ""; public string EditDescription { get; set; } = ""; public DateTime EditDate { get; set; } = DateTime.Today; public string SelectedCategory { get; set; } = ""; public string SelectedAccount { get; set; } = ""; public event PropertyChangedEventHandler? PropertyChanged; }
- public sealed class AccountFilterItem : INotifyPropertyChanged { private bool _sel; public string Name { get; set; } = ""; public bool IsSelected { get => _sel; set { _sel = value; PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(IsSelected))); } } public event PropertyChangedEventHandler? PropertyChanged; }
- public sealed class CategoryFilterItem : INotifyPropertyChanged { private bool _sel; public string Name { get; set; } = ""; public bool IsSelected { get => _sel; set { _sel = value; PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(IsSelected))); } } public event PropertyChangedEventHandler? PropertyChanged; }
+ public string EditAmountText { get; set; } = "";
+ public string EditDescription { get; set; } = "";
+ public DateTime EditDate { get; set; } = DateTime.Today;
+ public string SelectedCategory { get; set; } = "";
+ public string SelectedAccount { get; set; } = "";
+ public event PropertyChangedEventHandler? PropertyChanged;
+ }
 }

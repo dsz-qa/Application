@@ -6,6 +6,7 @@
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:sys="clr-namespace:System;assembly=mscorlib"
              xmlns:local="clr-namespace:Finly.Pages"
+             xmlns:vm="clr-namespace:Finly.ViewModels"
              x:Name="Root"
              mc:Ignorable="d">
 
@@ -347,6 +348,171 @@
         <!-- listy do edycji -->
         <x:Array x:Key="CategoriesForEditRes" Type="{x:Type sys:String}"/>
         <x:Array x:Key="AccountsForEditRes" Type="{x:Type sys:String}"/>
+
+        <!-- Transaction card reusable template with Read/Edit modes -->
+        <DataTemplate x:Key="TransactionCardTemplate" DataType="{x:Type vm:TransactionCardVm}">
+            <Border Background="{DynamicResource Surface.Background}"
+                    BorderBrush="{DynamicResource Surface.Border}"
+                    BorderThickness="1"
+                    CornerRadius="10"
+                    Padding="12"
+                    Margin="0,0,16,12"
+                    SnapsToDevicePixels="True">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                    </Grid.RowDefinitions>
+
+                    <!-- Read mode layer -->
+                    <Grid x:Name="ReadMode" Grid.RowSpan="2">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+
+                        <!-- LEFT info -->
+                        <StackPanel Grid.Column="0" Orientation="Vertical" Margin="4,0,8,0">
+                            <!-- Header: type icon + category name -->
+                            <StackPanel Orientation="Horizontal" Margin="0,0,0,6">
+                                <Image Width="20" Height="20" Margin="0,0,6,0">
+                                    <Image.Style>
+                                        <Style TargetType="Image">
+                                            <Setter Property="Source" Value="/Assets/Icons/wydatki.png"/>
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding Kind}" Value="Expense">
+                                                    <Setter Property="Source" Value="/Assets/Icons/wydatki.png"/>
+                                                </DataTrigger>
+                                                <DataTrigger Binding="{Binding Kind}" Value="Income">
+                                                    <Setter Property="Source" Value="/Assets/Icons/przychody.png"/>
+                                                </DataTrigger>
+                                                <DataTrigger Binding="{Binding Kind}" Value="Transfer">
+                                                    <Setter Property="Source" Value="/Assets/Icons/transfer.png"/>
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </Image.Style>
+                                </Image>
+                                <TextBlock Text="{Binding CategoryName, TargetNullValue=Brak kategorii, FallbackValue=Brak kategorii}"
+                                           FontWeight="Bold"
+                                           FontSize="14"
+                                           Foreground="{DynamicResource App.Foreground}"/>
+                            </StackPanel>
+
+                            <!-- Description -->
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="Opis:" FontWeight="SemiBold" Foreground="{DynamicResource App.Foreground}" Margin="0,0,6,0"/>
+                                <TextBlock Text="{Binding Description, TargetNullValue=Brak danych, FallbackValue=Brak danych}"
+                                           Foreground="{DynamicResource App.Foreground}" TextTrimming="CharacterEllipsis"/>
+                            </StackPanel>
+
+                            <!-- Date -->
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="Data:" FontWeight="SemiBold" Foreground="{DynamicResource App.Foreground}" Margin="0,0,6,0"/>
+                                <TextBlock Foreground="{DynamicResource App.Foreground}">
+                                    <TextBlock.Text>
+                                        <Binding Path="DateDisplay" Converter="{StaticResource DateStringToPLConverter}"/>
+                                    </TextBlock.Text>
+                                </TextBlock>
+                            </StackPanel>
+
+                            <!-- Account name -->
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="Konto:" FontWeight="SemiBold" Foreground="{DynamicResource App.Foreground}" Margin="0,0,6,0"/>
+                                <TextBlock Text="{Binding AccountName, TargetNullValue=Nie dotyczy, FallbackValue=Nie dotyczy}" Foreground="{DynamicResource App.Foreground}"/>
+                            </StackPanel>
+
+                            <!-- Amount -->
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="Kwota:" FontWeight="SemiBold" Foreground="{DynamicResource App.Foreground}" Margin="0,0,6,0"/>
+                                <TextBlock Text="{Binding AmountStr}" Foreground="{DynamicResource App.Foreground}"/>
+                            </StackPanel>
+                        </StackPanel>
+
+                        <!-- RIGHT actions -->
+                        <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Top">
+                            <Button Style="{StaticResource IconButtonSmall}" ToolTip="Edytuj" Click="StartEdit_Click">
+                                <Path Data="M3,17 L7,21 L21,7 L17,3 Z M2,22 L8,22 L2,16 Z" Fill="{DynamicResource Brand.Blue}" Stretch="Uniform" Width="14" Height="14"/>
+                            </Button>
+                            <Button Style="{StaticResource IconButtonSmall}" ToolTip="Usuń" Click="ShowDeleteConfirm_Click" Margin="6,0,0,0">
+                                <Image Source="/Assets/Icons/delete.png" Width="14" Height="14" Stretch="Uniform"/>
+                            </Button>
+                        </StackPanel>
+                    </Grid>
+
+                    <!-- Edit mode layer -->
+                    <Grid x:Name="EditMode" Grid.RowSpan="2" Visibility="Collapsed">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+
+                        <!-- LEFT edit fields -->
+                        <StackPanel Grid.Column="0" Orientation="Vertical" Margin="4,0,8,0">
+                            <!-- Date editor with icon button -->
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="Data:" FontWeight="SemiBold" Foreground="{DynamicResource App.Foreground}" Margin="0,0,6,0"/>
+                                <Button x:Name="DateEditButton" Background="Transparent" BorderBrush="{x:Null}" Padding="2" Margin="0,0,6,0" Click="DateIcon_Click">
+                                    <Image Source="/Assets/Icons/kalendarz.png" Width="18" Height="18"/>
+                                </Button>
+                                <DatePicker x:Name="DateEditor" SelectedDate="{Binding EditDate, Mode=TwoWay}"/>
+                            </StackPanel>
+
+                            <!-- Amount edit -->
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="Kwota:" FontWeight="SemiBold" Foreground="{DynamicResource App.Foreground}" Margin="0,0,6,0"/>
+                                <TextBox x:Name="AmountBox" Style="{StaticResource EditTextBoxStyle}" Text="{Binding EditAmountText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" GotFocus="EditAmount_GotFocus"/>
+                            </StackPanel>
+
+                            <!-- Category edit -->
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="Kategoria:" FontWeight="SemiBold" Foreground="{DynamicResource App.Foreground}" Margin="0,0,6,0"/>
+                                <ComboBox x:Name="CategoryCombo" Style="{StaticResource EditComboStyle}" ItemsSource="{StaticResource CategoriesForEditRes}" SelectedItem="{Binding SelectedCategory, Mode=TwoWay}"/>
+                            </StackPanel>
+
+                            <!-- Account edit -->
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="Konto:" FontWeight="SemiBold" Foreground="{DynamicResource App.Foreground}" Margin="0,0,6,0"/>
+                                <ComboBox x:Name="AccountCombo" Style="{StaticResource EditComboStyle}" ItemsSource="{StaticResource AccountsForEditRes}" SelectedItem="{Binding SelectedAccount, Mode=TwoWay}"/>
+                            </StackPanel>
+
+                            <!-- Description edit -->
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="Opis:" FontWeight="SemiBold" Foreground="{DynamicResource App.Foreground}" Margin="0,0,6,0"/>
+                                <TextBox x:Name="DescriptionBox" Style="{StaticResource EditTextBoxStyle}" Width="260" Text="{Binding EditDescription, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" GotFocus="EditDescription_GotFocus"/>
+                            </StackPanel>
+                        </StackPanel>
+
+                        <!-- RIGHT actions -->
+                        <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Top">
+                            <Button x:Name="SaveButton" Style="{StaticResource IconButtonSmall}" ToolTip="Zapisz" Click="SaveEdit_Click">
+                                <Path Data="M2,10 L6,14 L14,4" Stroke="{DynamicResource Brand.Blue}" StrokeThickness="2.4" StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round" Width="14" Height="14"/>
+                            </Button>
+                            <Button Style="{StaticResource IconButtonSmall}" ToolTip="Anuluj" Click="CancelEdit_Click" Margin="6,0,0,0">
+                                <TextBlock Text="Anuluj" Foreground="{DynamicResource App.Foreground}"/>
+                            </Button>
+                        </StackPanel>
+                    </Grid>
+                </Grid>
+
+                <Border.Style>
+                    <Style TargetType="Border" BasedOn="{StaticResource TransactionCard}">
+                        <Style.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter Property="BorderBrush" Value="{DynamicResource Surface.Border}"/>
+                            </Trigger>
+                        </Style.Triggers>
+                    </Style>
+                </Border.Style>
+            </Border>
+
+            <DataTemplate.Triggers>
+                <DataTrigger Binding="{Binding IsEditing}" Value="True">
+                    <Setter TargetName="ReadMode" Property="Visibility" Value="Collapsed"/>
+                    <Setter TargetName="EditMode" Property="Visibility" Value="Visible"/>
+                </DataTrigger>
+            </DataTemplate.Triggers>
+        </DataTemplate>
     </UserControl.Resources>
 
     <!-- Główny scroll -->
@@ -587,6 +753,11 @@
                                     <TextBlock.Style>
                                         <Style TargetType="TextBlock">
                                             <Setter Property="Visibility" Value="Collapsed"/>
+                                            <Setter Property="Text">
+                                                <Setter.Value>
+                                                    <Binding ElementName="PlannedItems" Path="HasItems"/>
+                                                </Setter.Value>
+                                            </Setter>
                                             <Style.Triggers>
                                                 <DataTrigger Binding="{Binding ElementName=RealizedItems, Path=HasItems}"
                                                              Value="False">
@@ -600,384 +771,8 @@
 
                                 <!-- Lista -->
                                 <ItemsControl x:Name="RealizedItems"
-                                              ItemsSource="{Binding FilteredTransactions}">
-                                    <ItemsControl.ItemTemplate>
-                                        <DataTemplate>
-                                            <Border x:Name="RealizedCard"
-                                                    Style="{StaticResource TransactionCardPlanned}">
-                                                <Grid>
-                                                    <Grid.ColumnDefinitions>
-                                                        <ColumnDefinition Width="*"/>
-                                                        <ColumnDefinition Width="Auto"/>
-                                                    </Grid.ColumnDefinitions>
-
-                                                    <!-- LEWA: dane + edycja -->
-                                                    <StackPanel Grid.Column="0"
-                                                                Margin="4,0,8,0"
-                                                                Orientation="Vertical">
-
-                                                        <!-- TYP TRANSAKCJI: ikonka + nazwa -->
-                                                        <StackPanel Orientation="Horizontal"
-                                                                    Margin="0,0,0,4">
-                                                            <Image x:Name="TypeIcon"
-                                                                   Width="20"
-                                                                   Height="20"
-                                                                   Margin="0,0,6,0">
-                                                                <Image.Style>
-                                                                    <Style TargetType="Image">
-                                                                        <Setter Property="Source" Value="/Assets/Icons/wydatki.png"/>
-                                                                        <Style.Triggers>
-                                                                            <DataTrigger Binding="{Binding Kind}" Value="Expense">
-                                                                                <Setter Property="Source" Value="/Assets/Icons/wydatki.png"/>
-                                                                            </DataTrigger>
-                                                                            <DataTrigger Binding="{Binding Kind}" Value="Income">
-                                                                                <Setter Property="Source" Value="/Assets/Icons/przychody.png"/>
-                                                                            </DataTrigger>
-                                                                            <DataTrigger Binding="{Binding Kind}" Value="Transfer">
-                                                                                <Setter Property="Source" Value="/Assets/Icons/transfer.png"/>
-                                                                            </DataTrigger>
-                                                                        </Style.Triggers>
-                                                                    </Style>
-                                                                </Image.Style>
-                                                            </Image>
-                                                            <TextBlock x:Name="TypeLabel"
-                                                                       FontWeight="Bold"
-                                                                       FontSize="14"
-                                                                       Foreground="{DynamicResource App.Foreground}">
-                                                                <TextBlock.Style>
-                                                                    <Style TargetType="TextBlock">
-                                                                        <Setter Property="Text" Value="Transakcja"/>
-                                                                        <Style.Triggers>
-                                                                            <DataTrigger Binding="{Binding Kind}" Value="Expense">
-                                                                                <Setter Property="Text" Value="Wydatek"/>
-                                                                            </DataTrigger>
-                                                                            <DataTrigger Binding="{Binding Kind}" Value="Income">
-                                                                                <Setter Property="Text" Value="Przychód"/>
-                                                                            </DataTrigger>
-                                                                            <DataTrigger Binding="{Binding Kind}" Value="Transfer">
-                                                                                <Setter Property="Text" Value="Transfer"/>
-                                                                            </DataTrigger>
-                                                                        </Style.Triggers>
-                                                                    </Style>
-                                                                </TextBlock.Style>
-                                                            </TextBlock>
-                                                        </StackPanel>
-
-                                                        <!-- DATA -->
-                                                        <StackPanel Orientation="Horizontal"
-                                                                    x:Name="DateLine">
-                                                            <TextBlock Text="Data:"
-                                                                       FontWeight="SemiBold"
-                                                                       Foreground="{DynamicResource App.Foreground}"
-                                                                       Margin="0,0,6,0"/>
-                                                            <!-- One visible date text -->
-                                                            <TextBlock x:Name="DateDisplayText"
-                                                                       Foreground="{DynamicResource App.Foreground}"
-                                                                       VerticalAlignment="Center">
-                                                                <TextBlock.Style>
-                                                                    <Style TargetType="TextBlock">
-                                                                        <Setter Property="Visibility"
-                                                                                Value="Visible"/>
-                                                                        <Setter Property="Text">
-                                                                            <Setter.Value>
-                                                                                <Binding Path="DateDisplay"
-                                                                                         Converter="{StaticResource DateStringToPLConverter}"/>
-                                                                            </Setter.Value>
-                                                                        </Setter>
-                                                                        <Style.Triggers>
-                                                                            <DataTrigger Binding="{Binding IsEditing}"
-                                                                                         Value="True">
-                                                                                <Setter Property="Text"
-                                                                                        Value="{Binding EditDate, StringFormat={}{0:dd.MM.yyyy}}"/>
-                                                                            </DataTrigger>
-                                                                        </Style.Triggers>
-                                                                    </Style>
-                                                                </TextBlock.Style>
-                                                            </TextBlock>
-
-                                                            <Button x:Name="DateEditButton" Click="DateIcon_Click" Background="Transparent" BorderBrush="{x:Null}" Padding="2" Margin="6,0,0,0" Visibility="Collapsed">
-                                                                <Button.Style>
-                                                                    <Style TargetType="Button">
-                                                                        <Setter Property="Visibility" Value="Collapsed"/>
-                                                                        <Style.Triggers>
-                                                                            <DataTrigger Binding="{Binding IsEditing}" Value="True">
-                                                                                <Setter Property="Visibility" Value="Visible"/>
-                                                                            </DataTrigger>
-                                                                        </Style.Triggers>
-                                                                    </Style>
-                                                                </Button.Style>
-                                                                <Image Source="/Assets/Icons/kalendarz.png" Width="18" Height="18"/>
-                                                            </Button>
-                                                            <!-- Hidden DatePicker used for calendar popup only -->
-                                                            <DatePicker x:Name="DateEditor" SelectedDate="{Binding EditDate, Mode=TwoWay}" Opacity="0" Width="1" Height="1"/>
-                                                        </StackPanel>
-
-                                                        <!-- KWOTA -->
-                                                        <StackPanel Orientation="Horizontal">
-                                                            <TextBlock Text="Kwota:"
-                                                                      FontWeight="SemiBold"
-                                                                      Foreground="{DynamicResource App.Foreground}"
-                                                                      Margin="0,0,6,0"/>
-                                                            <TextBlock x:Name="AmountText"
-                                                                      Text="{Binding AmountStr}"
-                                                                      Foreground="{DynamicResource App.Foreground}">
-                                                                <TextBlock.Style>
-                                                                    <Style TargetType="TextBlock">
-                                                                        <Setter Property="Visibility" Value="Visible"/>
-                                                                        <Style.Triggers>
-                                                                            <DataTrigger Binding="{Binding IsEditing}" Value="True">
-                                                                                <Setter Property="Visibility" Value="Collapsed"/>
-                                                                            </DataTrigger>
-                                                                        </Style.Triggers>
-                                                                    </Style>
-                                                                </TextBlock.Style>
-                                                            </TextBlock>
-                                                            <Border x:Name="AmountEditPanel" Visibility="Collapsed" Background="{StaticResource Control.Background}" CornerRadius="6" Padding="6,4" Margin="4,0,0,0" VerticalAlignment="Center">
-                                                                <Border.Style>
-                                                                    <Style TargetType="Border" BasedOn="{StaticResource EditContainerBorder}">
-                                                                        <Style.Triggers>
-                                                                            <DataTrigger Binding="{Binding IsEditing}" Value="True">
-                                                                                <Setter Property="Visibility" Value="Visible"/>
-                                                                            </DataTrigger>
-                                                                        </Style.Triggers>
-                                                                    </Style>
-                                                                </Border.Style>
-                                                                <TextBox x:Name="AmountBox" Style="{StaticResource EditTextBoxStyle}" Text="{Binding EditAmountText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" GotFocus="EditAmount_GotFocus"/>
-                                                            </Border>
-                                                        </StackPanel>
-
-                                                        <!-- KATEGORIA -->
-                                                        <StackPanel Orientation="Horizontal">
-                                                            <TextBlock Text="Kategoria:"
-                                                                       FontWeight="SemiBold"
-                                                                       Foreground="{DynamicResource App.Foreground}"
-                                                                       Margin="0,0,6,0"/>
-                                                            <TextBlock x:Name="CategoryText"
-                                                                       Text="{Binding CategoryName, TargetNullValue=Brak kategorii, FallbackValue=Brak kategorii}"
-                                                                       Foreground="{DynamicResource App.Foreground}">
-                                                                <TextBlock.Style>
-                                                                    <Style TargetType="TextBlock">
-                                                                        <Setter Property="Visibility" Value="Visible"/>
-                                                                        <Style.Triggers>
-                                                                            <DataTrigger Binding="{Binding IsEditing}" Value="True">
-                                                                                <Setter Property="Visibility" Value="Collapsed"/>
-                                                                            </DataTrigger>
-                                                                        </Style.Triggers>
-                                                                    </Style>
-                                                                </TextBlock.Style>
-                                                            </TextBlock>
-                                                            <Border x:Name="CategoryEditPanel" Visibility="Collapsed">
-                                                                <Border.Style>
-                                                                    <Style TargetType="Border" BasedOn="{StaticResource EditContainerBorder}">
-                                                                        <Style.Triggers>
-                                                                            <DataTrigger Binding="{Binding IsEditing}" Value="True">
-                                                                                <Setter Property="Visibility" Value="Visible"/>
-                                                                            </DataTrigger>
-                                                                        </Style.Triggers>
-                                                                    </Style>
-                                                                </Border.Style>
-                                                                <ComboBox x:Name="CategoryCombo" Style="{StaticResource EditComboStyle}" ItemsSource="{Binding Source={StaticResource CategoriesForEditRes}}" SelectedItem="{Binding SelectedCategory, Mode=TwoWay}"/>
-                                                            </Border>
-                                                        </StackPanel>
-
-                                                        <!-- Z KONTA -->
-                                                        <StackPanel Orientation="Horizontal"
-                                                                    Visibility="Collapsed"
-                                                                    x:Name="FromLine">
-                                                            <TextBlock Text="Z konta:"
-                                                                       FontWeight="SemiBold"
-                                                                       Foreground="{DynamicResource App.Foreground}"
-                                                                       Margin="0,0,6,0"/>
-                                                            <TextBlock x:Name="FromAccountText"
-                                                                       Text="{Binding AccountName, TargetNullValue=Nie dotyczy, FallbackValue=Nie dotyczy}"
-                                                                       Foreground="{DynamicResource App.Foreground}">
-                                                                <TextBlock.Style>
-                                                                    <Style TargetType="TextBlock">
-                                                                        <Setter Property="Visibility" Value="Visible"/>
-                                                                        <Style.Triggers>
-                                                                            <DataTrigger Binding="{Binding IsEditing}" Value="True">
-                                                                                <Setter Property="Visibility" Value="Collapsed"/>
-                                                                            </DataTrigger>
-                                                                        </Style.Triggers>
-                                                                    </Style>
-                                                                </TextBlock.Style>
-                                                            </TextBlock>
-                                                            <Border x:Name="FromAccountEditPanel" Visibility="Collapsed">
-                                                                <Border.Style>
-                                                                    <Style TargetType="Border" BasedOn="{StaticResource EditContainerBorder}">
-                                                                        <Style.Triggers>
-                                                                            <DataTrigger Binding="{Binding IsEditing}" Value="True">
-                                                                                <Setter Property="Visibility" Value="Visible"/>
-                                                                            </DataTrigger>
-                                                                        </Style.Triggers>
-                                                                    </Style>
-                                                                </Border.Style>
-                                                                <ComboBox x:Name="FromAccountCombo" Style="{StaticResource EditComboStyle}" ItemsSource="{Binding Source={StaticResource AccountsForEditRes}}" SelectedItem="{Binding SelectedAccount, Mode=TwoWay}"/>
-                                                            </Border>
-                                                        </StackPanel>
-
-                                                        <!-- NA KONTO -->
-                                                        <StackPanel Orientation="Horizontal"
-                                                                    Visibility="Collapsed"
-                                                                    x:Name="ToLine">
-                                                            <TextBlock Text="Na konto:"
-                                                                       FontWeight="SemiBold"
-                                                                       Foreground="{DynamicResource App.Foreground}"
-                                                                       Margin="0,0,6,0"/>
-                                                            <TextBlock x:Name="ToAccountText"
-                                                                       Text="{Binding AccountName, TargetNullValue=Nie dotyczy, FallbackValue=Nie dotyczy}"
-                                                                       Foreground="{DynamicResource App.Foreground}">
-                                                                <TextBlock.Style>
-                                                                    <Style TargetType="TextBlock">
-                                                                        <Setter Property="Visibility" Value="Visible"/>
-                                                                        <Style.Triggers>
-                                                                            <DataTrigger Binding="{Binding IsEditing}" Value="True">
-                                                                                <Setter Property="Visibility" Value="Collapsed"/>
-                                                                            </DataTrigger>
-                                                                        </Style.Triggers>
-                                                                    </Style>
-                                                                </TextBlock.Style>
-                                                            </TextBlock>
-                                                            <Border x:Name="ToAccountEditPanel" Visibility="Collapsed">
-                                                                <Border.Style>
-                                                                    <Style TargetType="Border" BasedOn="{StaticResource EditContainerBorder}">
-                                                                        <Style.Triggers>
-                                                                            <DataTrigger Binding="{Binding IsEditing}" Value="True">
-                                                                                <Setter Property="Visibility" Value="Visible"/>
-                                                                            </DataTrigger>
-                                                                        </Style.Triggers>
-                                                                    </Style>
-                                                                </Border.Style>
-                                                                <ComboBox x:Name="ToAccountCombo" Style="{StaticResource EditComboStyle}" ItemsSource="{Binding Source={StaticResource AccountsForEditRes}}" SelectedItem="{Binding SelectedAccount, Mode=TwoWay}"/>
-                                                            </Border>
-                                                        </StackPanel>
-
-                                                        <!-- OPIS -->
-                                                        <StackPanel Orientation="Horizontal">
-                                                            <TextBlock Text="Opis:"
-                                                                       FontWeight="SemiBold"
-                                                                       Foreground="{DynamicResource App.Foreground}"
-                                                                       Margin="0,0,6,0"/>
-                                                            <TextBlock x:Name="DescriptionText"
-                                                                       Text="{Binding Description, TargetNullValue=Brak danych, FallbackValue=Brak danych}"
-                                                                       Foreground="{DynamicResource App.Foreground}"
-                                                                       TextTrimming="CharacterEllipsis">
-                                                                <TextBlock.Style>
-                                                                    <Style TargetType="TextBlock">
-                                                                        <Setter Property="Visibility" Value="Visible"/>
-                                                                        <Style.Triggers>
-                                                                            <DataTrigger Binding="{Binding IsEditing}" Value="True">
-                                                                                <Setter Property="Visibility" Value="Collapsed"/>
-                                                                            </DataTrigger>
-                                                                        </Style.Triggers>
-                                                                    </Style>
-                                                                </TextBlock.Style>
-                                                            </TextBlock>
-                                                            <!-- Edit description visible only when editing -->
-                                                            <Border x:Name="DescriptionEditPanel" Visibility="Collapsed">
-                                                                <Border.Style>
-                                                                    <Style TargetType="Border" BasedOn="{StaticResource EditContainerBorder}">
-                                                                        <Style.Triggers>
-                                                                            <DataTrigger Binding="{Binding IsEditing}" Value="True">
-                                                                                <Setter Property="Visibility" Value="Visible"/>
-                                                                            </DataTrigger>
-                                                                        </Style.Triggers>
-                                                                    </Style>
-                                                                </Border.Style>
-                                                                <TextBox x:Name="DescriptionBox" Style="{StaticResource EditTextBoxStyle}" Width="260" Text="{Binding EditDescription, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" GotFocus="EditDescription_GotFocus"/>
-                                                            </Border>
-                                                        </StackPanel>
-                                                    </StackPanel>
-
-                                                    <!-- PRAWA: akcje -->
-                                                    <StackPanel Grid.Column="1"
-                                                                Orientation="Vertical"
-                                                                HorizontalAlignment="Right"
-                                                                VerticalAlignment="Top">
-                                                        <StackPanel Orientation="Horizontal"
-                                                                    HorizontalAlignment="Right">
-                                                            <Button Style="{StaticResource IconButtonSmall}"
-                                                                    ToolTip="Edytuj"
-                                                                    Click="StartEdit_Click">
-                                                                <Path Data="M3,17 L7,21 L21,7 L17,3 Z M2,22 L8,22 L2,16 Z"
-                                                                      Fill="{DynamicResource Brand.Blue}"
-                                                                      Stretch="Uniform"
-                                                                      Width="14"
-                                                                      Height="14"/>
-                                                            </Button>
-                                                            <!-- Zapisz widoczny tylko w trybie edycji -->
-                                                            <Button x:Name="SaveButton"
-                                                                    Style="{StaticResource IconButtonSmall}"
-                                                                    ToolTip="Zapisz"
-                                                                    Click="SaveEdit_Click"
-                                                                    Margin="6,0,0,0"
-                                                                    Visibility="Collapsed">
-                                                                <Path Data="M2,10 L6,14 L14,4" Stroke="{DynamicResource Brand.Blue}" StrokeThickness="2.4" StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round" Width="14" Height="14"/>
-                                                            </Button>
-                                                            <Button Style="{StaticResource IconButtonSmall}"
-                                                                    ToolTip="Usuń"
-                                                                    Click="ShowDeleteConfirm_Click"
-                                                                    Margin="6,0,0,0">
-                                                                <Image Source="/Assets/Icons/delete.png"
-                                                                       Width="14"
-                                                                       Height="14"
-                                                                       Stretch="Uniform"/>
-                                                            </Button>
-                                                        </StackPanel>
-
-                                                        <Border x:Name="DeleteConfirmPanel"
-                                                                Visibility="Collapsed"
-                                                                Background="{DynamicResource Surface.Background}"
-                                                                BorderBrush="{DynamicResource Surface.Border}"
-                                                                BorderThickness="1"
-                                                                CornerRadius="6"
-                                                                Padding="8"
-                                                                Margin="0,6,0,0">
-                                                            <StackPanel Orientation="Horizontal"
-                                                                        VerticalAlignment="Center">
-                                                                <TextBlock Foreground="{DynamicResource App.Foreground}"
-                                                                           Margin="0,0,8,0"
-                                                                           Text="Czy na pewno chcesz usunąć transakcję?"/>
-                                                                <Button Content="Tak"
-                                                                        Width="60"
-                                                                        Margin="0,0,6,0"
-                                                                        Click="DeleteConfirmYes_Click"/>
-                                                                <Button Content="Nie"
-                                                                        Width="60"
-                                                                        Click="DeleteConfirmNo_Click"/>
-                                                            </StackPanel>
-                                                        </Border>
-                                                    </StackPanel>
-                                                </Grid>
-                                            </Border>
-
-                                            <DataTemplate.Triggers>
-                                                <DataTrigger Binding="{Binding Kind}" Value="Expense">
-                                                    <Setter TargetName="FromLine"
-                                                            Property="Visibility"
-                                                            Value="Visible"/>
-                                                </DataTrigger>
-                                                <DataTrigger Binding="{Binding Kind}" Value="Income">
-                                                    <Setter TargetName="ToLine"
-                                                            Property="Visibility"
-                                                            Value="Visible"/>
-                                                </DataTrigger>
-                                                <DataTrigger Binding="{Binding Kind}" Value="Transfer">
-                                                    <Setter TargetName="FromLine"
-                                                            Property="Visibility"
-                                                            Value="Visible"/>
-                                                    <Setter TargetName="ToLine"
-                                                            Property="Visibility"
-                                                            Value="Visible"/>
-                                                </DataTrigger>
-
-                                                <!-- Pokaż przycisk Zapisz tylko podczas edycji -->
-                                                <DataTrigger Binding="{Binding IsEditing}" Value="True">
-                                                    <Setter TargetName="SaveButton" Property="Visibility" Value="Visible"/>
-                                                </DataTrigger>
-                                            </DataTemplate.Triggers>
-                                        </DataTemplate>
-                                    </ItemsControl.ItemTemplate>
+                                              ItemsSource="{Binding FilteredTransactions}"
+                                              ItemTemplate="{StaticResource TransactionCardTemplate}">
                                 </ItemsControl>
                             </Grid>
                         </Grid>
@@ -1021,401 +816,8 @@
                                 </TextBlock>
 
                                 <ItemsControl x:Name="PlannedItems"
-                                              ItemsSource="{Binding PlannedTransactions}">
-                                    <ItemsControl.ItemTemplate>
-                                        <DataTemplate>
-                                            <Border x:Name="ScheduledCard"
-                                                    Style="{StaticResource TransactionCardPlanned}">
-                                                <Grid>
-                                                    <Grid.ColumnDefinitions>
-                                                        <ColumnDefinition Width="*"/>
-                                                        <ColumnDefinition Width="Auto"/>
-                                                    </Grid.ColumnDefinitions>
-
-                                                    <!-- LEFT: data + edit -->
-                                                    <StackPanel Grid.Column="0"
-                                                                Margin="4,0,8,0"
-                                                                Orientation="Vertical">
-                                                        <!-- TYPE LABEL simple -->
-                                                        <!--
-                                                        <TextBlock Margin="0,0,0,10"
-                                                                   FontSize="16"
-                                                                   FontWeight="Bold"
-                                                                   Foreground="{DynamicResource App.Foreground}">
-                                                            <TextBlock.Style>
-                                                                <Style TargetType="TextBlock">
-                                                                    <Setter Property="Text" Value="Transakcja"/>
-                                                                    <Style.Triggers>
-                                                                        <DataTrigger Binding="{Binding Kind}" Value="Expense">
-                                                                            <Setter Property="Text" Value="Wydatek"/>
-                                                                        </DataTrigger>
-                                                                        <DataTrigger Binding="{Binding Kind}" Value="Income">
-                                                                            <Setter Property="Text" Value="Przychód"/>
-                                                                        </DataTrigger>
-                                                                        <DataTrigger Binding="{Binding Kind}" Value="Transfer">
-                                                                            <Setter Property="Text" Value="Transfer"/>
-                                                                        </DataTrigger>
-                                                                    </Style.Triggers>
-                                                                </Style>
-                                                            </TextBlock.Style>
-                                                        </TextBlock>
-                                                         -->
-
-                                                        <!-- TYPE LABEL with icon -->
-                                                        <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
-                                                            <Image Width="18" Height="18" Margin="0,0,6,0">
-                                                              <Image.Style>
-                                                                <Style TargetType="Image">
-                                                                    <Setter Property="Source" Value="/Assets/Icons/wydatki.png"/>
-                                                                    <Style.Triggers>
-                                                                        <DataTrigger Binding="{Binding Kind}" Value="Expense">
-                                                                            <Setter Property="Source" Value="/Assets/Icons/wydatki.png"/>
-                                                                        </DataTrigger>
-                                                                        <DataTrigger Binding="{Binding Kind}" Value="Income">
-                                                                            <Setter Property="Source" Value="/Assets/Icons/przychody.png"/>
-                                                                        </DataTrigger>
-                                                                        <DataTrigger Binding="{Binding Kind}" Value="Transfer">
-                                                                            <Setter Property="Source" Value="/Assets/Icons/transfer.png"/>
-                                                                        </DataTrigger>
-                                                                    </Style.Triggers>
-                                                                </Style>
-                                                            </Image.Style>
-                                                            </Image>
-                                                            <TextBlock FontSize="16" FontWeight="Bold" Foreground="{DynamicResource App.Foreground}">
-                                                              <TextBlock.Style>
-                                                                <Style TargetType="TextBlock">
-                                                                    <Setter Property="Text" Value="Transakcja"/>
-                                                                    <Style.Triggers>
-                                                                        <DataTrigger Binding="{Binding Kind}" Value="Expense">
-                                                                            <Setter Property="Text" Value="Wydatek"/>
-                                                                        </DataTrigger>
-                                                                        <DataTrigger Binding="{Binding Kind}" Value="Income">
-                                                                            <Setter Property="Text" Value="Przychód"/>
-                                                                        </DataTrigger>
-                                                                        <DataTrigger Binding="{Binding Kind}" Value="Transfer">
-                                                                            <Setter Property="Text" Value="Transfer"/>
-                                                                        </DataTrigger>
-                                                                    </Style.Triggers>
-                                                                </Style>
-                                                            </TextBlock.Style>
-                                                            </TextBlock>
-                                                        </StackPanel>
-
-                                                        <!-- DATA -->
-                                                        <StackPanel Orientation="Horizontal"
-                                                                    x:Name="DateLine">
-                                                            <TextBlock Text="Data:"
-                                                                       FontWeight="SemiBold"
-                                                                       Foreground="{DynamicResource App.Foreground}"
-                                                                       Margin="0,0,6,0"/>
-                                                            <!-- One visible date text -->
-                                                            <TextBlock x:Name="DateDisplayText"
-                                                                       Foreground="{DynamicResource App.Foreground}"
-                                                                       VerticalAlignment="Center">
-                                                                <TextBlock.Style>
-                                                                    <Style TargetType="TextBlock">
-                                                                        <Setter Property="Visibility"
-                                                                                Value="Visible"/>
-                                                                        <Setter Property="Text">
-                                                                            <Setter.Value>
-                                                                                <Binding Path="DateDisplay"
-                                                                                         Converter="{StaticResource DateStringToPLConverter}"/>
-                                                                            </Setter.Value>
-                                                                        </Setter>
-                                                                        <Style.Triggers>
-                                                                            <DataTrigger Binding="{Binding IsEditing}"
-                                                                                         Value="True">
-                                                                                <Setter Property="Text"
-                                                                                        Value="{Binding EditDate, StringFormat={}{0:dd.MM.yyyy}}"/>
-                                                                            </DataTrigger>
-                                                                        </Style.Triggers>
-                                                                    </Style>
-                                                                </TextBlock.Style>
-                                                            </TextBlock>
-
-                                                            <Button x:Name="DateEditButton" Click="DateIcon_Click" Background="Transparent" BorderBrush="{x:Null}" Padding="2" Margin="6,0,0,0" Visibility="Collapsed">
-                                                                <Button.Style>
-                                                                    <Style TargetType="Button">
-                                                                        <Setter Property="Visibility" Value="Collapsed"/>
-                                                                        <Style.Triggers>
-                                                                            <DataTrigger Binding="{Binding IsEditing}" Value="True">
-                                                                                <Setter Property="Visibility" Value="Visible"/>
-                                                                            </DataTrigger>
-                                                                        </Style.Triggers>
-                                                                    </Style>
-                                                                </Button.Style>
-                                                                <Image Source="/Assets/Icons/kalendarz.png" Width="18" Height="18"/>
-                                                            </Button>
-                                                            <!-- Hidden DatePicker used for calendar popup only -->
-                                                            <DatePicker x:Name="DateEditor" SelectedDate="{Binding EditDate, Mode=TwoWay}" Opacity="0" Width="1" Height="1"/>
-                                                        </StackPanel>
-
-                                                        <!-- KWOTA -->
-                                                        <StackPanel Orientation="Horizontal">
-                                                            <TextBlock Text="Kwota:"
-                                                                      FontWeight="SemiBold"
-                                                                      Foreground="{DynamicResource App.Foreground}"
-                                                                      Margin="0,0,6,0"/>
-                                                            <TextBlock x:Name="AmountText"
-                                                                      Text="{Binding AmountStr}"
-                                                                      Foreground="{DynamicResource App.Foreground}">
-                                                                <TextBlock.Style>
-                                                                    <Style TargetType="TextBlock">
-                                                                        <Setter Property="Visibility" Value="Visible"/>
-                                                                        <Style.Triggers>
-                                                                            <DataTrigger Binding="{Binding IsEditing}" Value="True">
-                                                                                <Setter Property="Visibility" Value="Collapsed"/>
-                                                                            </DataTrigger>
-                                                                        </Style.Triggers>
-                                                                    </Style>
-                                                                </TextBlock.Style>
-                                                            </TextBlock>
-                                                            <Border x:Name="AmountEditPanel" Visibility="Collapsed" Background="{StaticResource Control.Background}" CornerRadius="6" Padding="6,4" Margin="4,0,0,0" VerticalAlignment="Center">
-                                                                <Border.Style>
-                                                                    <Style TargetType="Border" BasedOn="{StaticResource EditContainerBorder}">
-                                                                        <Style.Triggers>
-                                                                            <DataTrigger Binding="{Binding IsEditing}" Value="True">
-                                                                                <Setter Property="Visibility" Value="Visible"/>
-                                                                            </DataTrigger>
-                                                                        </Style.Triggers>
-                                                                    </Style>
-                                                                </Border.Style>
-                                                                <TextBox x:Name="AmountBox" Style="{StaticResource EditTextBoxStyle}" Text="{Binding EditAmountText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" GotFocus="EditAmount_GotFocus"/>
-                                                            </Border>
-                                                        </StackPanel>
-
-                                                        <!-- KATEGORIA -->
-                                                        <StackPanel Orientation="Horizontal">
-                                                            <TextBlock Text="Kategoria:"
-                                                                       FontWeight="SemiBold"
-                                                                       Foreground="{DynamicResource App.Foreground}"
-                                                                       Margin="0,0,6,0"/>
-                                                            <TextBlock x:Name="CategoryText"
-                                                                       Text="{Binding CategoryName, TargetNullValue=Brak kategorii, FallbackValue=Brak kategorii}"
-                                                                       Foreground="{DynamicResource App.Foreground}">
-                                                                <TextBlock.Style>
-                                                                    <Style TargetType="TextBlock">
-                                                                        <Setter Property="Visibility" Value="Visible"/>
-                                                                        <Style.Triggers>
-                                                                            <DataTrigger Binding="{Binding IsEditing}" Value="True">
-                                                                                <Setter Property="Visibility" Value="Collapsed"/>
-                                                                            </DataTrigger>
-                                                                        </Style.Triggers>
-                                                                    </Style>
-                                                                </TextBlock.Style>
-                                                            </TextBlock>
-                                                            <Border x:Name="CategoryEditPanel" Visibility="Collapsed">
-                                                                <Border.Style>
-                                                                    <Style TargetType="Border" BasedOn="{StaticResource EditContainerBorder}">
-                                                                        <Style.Triggers>
-                                                                            <DataTrigger Binding="{Binding IsEditing}" Value="True">
-                                                                                <Setter Property="Visibility" Value="Visible"/>
-                                                                            </DataTrigger>
-                                                                        </Style.Triggers>
-                                                                    </Style>
-                                                                </Border.Style>
-                                                                <ComboBox x:Name="CategoryCombo" Style="{StaticResource EditComboStyle}" ItemsSource="{Binding Source={StaticResource CategoriesForEditRes}}" SelectedItem="{Binding SelectedCategory, Mode=TwoWay}"/>
-                                                            </Border>
-                                                        </StackPanel>
-
-                                                        <!-- Z KONTA -->
-                                                        <StackPanel Orientation="Horizontal"
-                                                                    Visibility="Collapsed"
-                                                                    x:Name="FromLine">
-                                                            <TextBlock Text="Z konta:"
-                                                                       FontWeight="SemiBold"
-                                                                       Foreground="{DynamicResource App.Foreground}"
-                                                                       Margin="0,0,6,0"/>
-                                                            <TextBlock x:Name="FromAccountText"
-                                                                       Text="{Binding AccountName, TargetNullValue=Nie dotyczy, FallbackValue=Nie dotyczy}"
-                                                                       Foreground="{DynamicResource App.Foreground}">
-                                                                <TextBlock.Style>
-                                                                    <Style TargetType="TextBlock">
-                                                                        <Setter Property="Visibility" Value="Visible"/>
-                                                                        <Style.Triggers>
-                                                                            <DataTrigger Binding="{Binding IsEditing}" Value="True">
-                                                                                <Setter Property="Visibility" Value="Collapsed"/>
-                                                                            </DataTrigger>
-                                                                        </Style.Triggers>
-                                                                    </Style>
-                                                                </TextBlock.Style>
-                                                            </TextBlock>
-                                                            <Border x:Name="FromAccountEditPanel" Visibility="Collapsed">
-                                                                <Border.Style>
-                                                                    <Style TargetType="Border" BasedOn="{StaticResource EditContainerBorder}">
-                                                                        <Style.Triggers>
-                                                                            <DataTrigger Binding="{Binding IsEditing}" Value="True">
-                                                                                <Setter Property="Visibility" Value="Visible"/>
-                                                                            </DataTrigger>
-                                                                        </Style.Triggers>
-                                                                    </Style>
-                                                                </Border.Style>
-                                                                <ComboBox x:Name="FromAccountCombo" Style="{StaticResource EditComboStyle}" ItemsSource="{Binding Source={StaticResource AccountsForEditRes}}" SelectedItem="{Binding SelectedAccount, Mode=TwoWay}"/>
-                                                            </Border>
-                                                        </StackPanel>
-
-                                                        <!-- NA KONTO -->
-                                                        <StackPanel Orientation="Horizontal"
-                                                                    Visibility="Collapsed"
-                                                                    x:Name="ToLine">
-                                                            <TextBlock Text="Na konto:"
-                                                                       FontWeight="SemiBold"
-                                                                       Foreground="{DynamicResource App.Foreground}"
-                                                                       Margin="0,0,6,0"/>
-                                                            <TextBlock x:Name="ToAccountText"
-                                                                       Text="{Binding AccountName, TargetNullValue=Nie dotyczy, FallbackValue=Nie dotyczy}"
-                                                                       Foreground="{DynamicResource App.Foreground}">
-                                                                <TextBlock.Style>
-                                                                    <Style TargetType="TextBlock">
-                                                                        <Setter Property="Visibility" Value="Visible"/>
-                                                                        <Style.Triggers>
-                                                                            <DataTrigger Binding="{Binding IsEditing}" Value="True">
-                                                                                <Setter Property="Visibility" Value="Collapsed"/>
-                                                                            </DataTrigger>
-                                                                        </Style.Triggers>
-                                                                    </Style>
-                                                                </TextBlock.Style>
-                                                            </TextBlock>
-                                                            <Border x:Name="ToAccountEditPanel" Visibility="Collapsed">
-                                                                <Border.Style>
-                                                                    <Style TargetType="Border" BasedOn="{StaticResource EditContainerBorder}">
-                                                                        <Style.Triggers>
-                                                                            <DataTrigger Binding="{Binding IsEditing}" Value="True">
-                                                                                <Setter Property="Visibility" Value="Visible"/>
-                                                                            </DataTrigger>
-                                                                        </Style.Triggers>
-                                                                    </Style>
-                                                                </Border.Style>
-                                                                <ComboBox x:Name="ToAccountCombo" Style="{StaticResource EditComboStyle}" ItemsSource="{Binding Source={StaticResource AccountsForEditRes}}" SelectedItem="{Binding SelectedAccount, Mode=TwoWay}"/>
-                                                            </Border>
-                                                        </StackPanel>
-
-                                                        <!-- OPIS -->
-                                                        <StackPanel Orientation="Horizontal">
-                                                            <TextBlock Text="Opis:"
-                                                                       FontWeight="SemiBold"
-                                                                       Foreground="{DynamicResource App.Foreground}"
-                                                                       Margin="0,0,6,0"/>
-                                                            <TextBlock x:Name="DescriptionText"
-                                                                       Text="{Binding Description, TargetNullValue=Brak danych, FallbackValue=Brak danych}"
-                                                                       Foreground="{DynamicResource App.Foreground}"
-                                                                       TextTrimming="CharacterEllipsis">
-                                                                <TextBlock.Style>
-                                                                    <Style TargetType="TextBlock">
-                                                                        <Setter Property="Visibility" Value="Visible"/>
-                                                                        <Style.Triggers>
-                                                                            <DataTrigger Binding="{Binding IsEditing}" Value="True">
-                                                                                <Setter Property="Visibility" Value="Collapsed"/>
-                                                                            </DataTrigger>
-                                                                        </Style.Triggers>
-                                                                    </Style>
-                                                                </TextBlock.Style>
-                                                            </TextBlock>
-                                                            <!-- Edit description visible only when editing -->
-                                                            <Border x:Name="DescriptionEditPanel" Visibility="Collapsed">
-                                                                <Border.Style>
-                                                                    <Style TargetType="Border" BasedOn="{StaticResource EditContainerBorder}">
-                                                                        <Style.Triggers>
-                                                                            <DataTrigger Binding="{Binding IsEditing}" Value="True">
-                                                                                <Setter Property="Visibility" Value="Visible"/>
-                                                                            </DataTrigger>
-                                                                        </Style.Triggers>
-                                                                    </Style>
-                                                                </Border.Style>
-                                                                <TextBox x:Name="DescriptionBox" Style="{StaticResource EditTextBoxStyle}" Width="260" Text="{Binding EditDescription, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" GotFocus="EditDescription_GotFocus"/>
-                                                            </Border>
-                                                        </StackPanel>
-                                                    </StackPanel>
-
-                                                    <!-- PRAWA: akcje -->
-                                                    <StackPanel Grid.Column="1"
-                                                                Orientation="Vertical"
-                                                                HorizontalAlignment="Right"
-                                                                VerticalAlignment="Top">
-                                                        <StackPanel Orientation="Horizontal"
-                                                                    HorizontalAlignment="Right">
-                                                            <Button Style="{StaticResource IconButtonSmall}"
-                                                                    ToolTip="Edytuj"
-                                                                    Click="StartEdit_Click">
-                                                                <Path Data="M3,17 L7,21 L21,7 L17,3 Z M2,22 L8,22 L2,16 Z"
-                                                                      Fill="{DynamicResource Brand.Blue}"
-                                                                      Stretch="Uniform"
-                                                                      Width="14"
-                                                                      Height="14"/>
-                                                            </Button>
-                                                            <!-- Zapisz widoczny tylko w trybie edycji -->
-                                                            <Button x:Name="SaveButton"
-                                                                    Style="{StaticResource IconButtonSmall}"
-                                                                    ToolTip="Zapisz"
-                                                                    Click="SaveEdit_Click"
-                                                                    Margin="6,0,0,0"
-                                                                    Visibility="Collapsed">
-                                                                <Path Data="M2,10 L6,14 L14,4" Stroke="{DynamicResource Brand.Blue}" StrokeThickness="2.4" StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round" Width="14" Height="14"/>
-                                                            </Button>
-                                                            <Button Style="{StaticResource IconButtonSmall}"
-                                                                    ToolTip="Usuń"
-                                                                    Click="ShowDeleteConfirm_Click"
-                                                                    Margin="6,0,0,0">
-                                                                <Image Source="/Assets/Icons/delete.png"
-                                                                       Width="14"
-                                                                       Height="14"
-                                                                       Stretch="Uniform"/>
-                                                            </Button>
-                                                        </StackPanel>
-
-                                                        <Border x:Name="DeleteConfirmPanel"
-                                                                Visibility="Collapsed"
-                                                                Background="{DynamicResource Surface.Background}"
-                                                                BorderBrush="{DynamicResource Surface.Border}"
-                                                                BorderThickness="1"
-                                                                CornerRadius="6"
-                                                                Padding="8"
-                                                                Margin="0,6,0,0">
-                                                            <StackPanel Orientation="Horizontal"
-                                                                        VerticalAlignment="Center">
-                                                                <TextBlock Foreground="{DynamicResource App.Foreground}"
-                                                                           Margin="0,0,8,0"
-                                                                           Text="Czy na pewno chcesz usunąć transakcję?"/>
-                                                                <Button Content="Tak"
-                                                                        Width="60"
-                                                                        Margin="0,0,6,0"
-                                                                        Click="DeleteConfirmYes_Click"/>
-                                                                <Button Content="Nie"
-                                                                        Width="60"
-                                                                        Click="DeleteConfirmNo_Click"/>
-                                                            </StackPanel>
-                                                        </Border>
-                                                    </StackPanel>
-                                                </Grid>
-                                            </Border>
-
-                                            <DataTemplate.Triggers>
-                                                <DataTrigger Binding="{Binding Kind}" Value="Expense">
-                                                    <Setter TargetName="FromLine"
-                                                            Property="Visibility"
-                                                            Value="Visible"/>
-                                                </DataTrigger>
-                                                <DataTrigger Binding="{Binding Kind}" Value="Income">
-                                                    <Setter TargetName="ToLine"
-                                                            Property="Visibility"
-                                                            Value="Visible"/>
-                                                </DataTrigger>
-                                                <DataTrigger Binding="{Binding Kind}" Value="Transfer">
-                                                    <Setter TargetName="FromLine"
-                                                            Property="Visibility"
-                                                            Value="Visible"/>
-                                                    <Setter TargetName="ToLine"
-                                                            Property="Visibility"
-                                                            Value="Visible"/>
-                                                </DataTrigger>
-
-                                                <!-- Pokaż przycisk Zapisz tylko podczas edycji -->
-                                                <DataTrigger Binding="{Binding IsEditing}" Value="True">
-                                                    <Setter TargetName="SaveButton" Property="Visibility" Value="Visible"/>
-                                                </DataTrigger>
-                                            </DataTemplate.Triggers>
-                                        </DataTemplate>
-                                    </ItemsControl.ItemTemplate>
+                                              ItemsSource="{Binding PlannedTransactionsList}"
+                                              ItemTemplate="{StaticResource TransactionCardTemplate}">
                                 </ItemsControl>
                             </Grid>
                         </Grid>
