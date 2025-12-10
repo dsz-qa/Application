@@ -413,14 +413,8 @@
                                 </TextBlock>
                             </StackPanel>
 
-                            <!-- Description -->
-                            <StackPanel Orientation="Horizontal">
-                                <TextBlock Text="Opis:" FontWeight="SemiBold" Foreground="{DynamicResource App.Foreground}" Margin="0,0,6,0"/>
-                                <TextBlock Text="{Binding Description, TargetNullValue=Brak danych, FallbackValue=Brak danych}"
-                                           Foreground="{DynamicResource App.Foreground}" TextTrimming="CharacterEllipsis"/>
-                            </StackPanel>
-
-                            <!-- Date -->
+                            <!-- ORDER: Data, Kwota, Konto, Kategoria, Opis -->
+                            <!-- Data -->
                             <StackPanel Orientation="Horizontal">
                                 <TextBlock Text="Data:" FontWeight="SemiBold" Foreground="{DynamicResource App.Foreground}" Margin="0,0,6,0"/>
                                 <TextBlock Foreground="{DynamicResource App.Foreground}">
@@ -429,17 +423,26 @@
                                     </TextBlock.Text>
                                 </TextBlock>
                             </StackPanel>
-
-                            <!-- Account name -->
+                            <!-- Kwota -->
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="Kwota:" FontWeight="SemiBold" Foreground="{DynamicResource App.Foreground}" Margin="0,0,6,0"/>
+                                <TextBlock Text="{Binding AmountStr}" Foreground="{DynamicResource App.Foreground}"/>
+                            </StackPanel>
+                            <!-- Konto -->
                             <StackPanel Orientation="Horizontal">
                                 <TextBlock Text="Konto:" FontWeight="SemiBold" Foreground="{DynamicResource App.Foreground}" Margin="0,0,6,0"/>
                                 <TextBlock Text="{Binding AccountName, TargetNullValue=Nie dotyczy, FallbackValue=Nie dotyczy}" Foreground="{DynamicResource App.Foreground}"/>
                             </StackPanel>
-
-                            <!-- Amount -->
+                            <!-- Kategoria -->
                             <StackPanel Orientation="Horizontal">
-                                <TextBlock Text="Kwota:" FontWeight="SemiBold" Foreground="{DynamicResource App.Foreground}" Margin="0,0,6,0"/>
-                                <TextBlock Text="{Binding AmountStr}" Foreground="{DynamicResource App.Foreground}"/>
+                                <TextBlock Text="Kategoria:" FontWeight="SemiBold" Foreground="{DynamicResource App.Foreground}" Margin="0,0,6,0"/>
+                                <TextBlock Text="{Binding CategoryName, TargetNullValue=(brak), FallbackValue=(brak)}" Foreground="{DynamicResource App.Foreground}"/>
+                            </StackPanel>
+                            <!-- Opis -->
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="Opis:" FontWeight="SemiBold" Foreground="{DynamicResource App.Foreground}" Margin="0,0,6,0"/>
+                                <TextBlock Text="{Binding Description, TargetNullValue=Brak danych, FallbackValue=Brak danych}"
+                                           Foreground="{DynamicResource App.Foreground}" TextTrimming="CharacterEllipsis"/>
                             </StackPanel>
 
                             <!-- Delete confirmation panel -->
@@ -471,7 +474,7 @@
                             <ColumnDefinition Width="Auto"/>
                         </Grid.ColumnDefinitions>
 
-                        <!-- LEFT edit fields -->
+                        <!-- LEFT edit fields in requested order -->
                         <StackPanel Grid.Column="0" Orientation="Vertical" Margin="4,0,8,0">
                             <!-- EDIT HEADER: icon + type name -->
                             <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
@@ -513,41 +516,37 @@
                                 </TextBlock>
                             </StackPanel>
 
-                            <!-- Date editor with icon button -->
-                            <StackPanel Orientation="Horizontal">
+                            <!-- Data -->
+                            <StackPanel Orientation="Horizontal" Margin="0,0,0,0">
                                 <TextBlock Text="Data:" FontWeight="SemiBold" Foreground="{DynamicResource App.Foreground}" Margin="0,0,6,0"/>
                                 <Button x:Name="DateEditButton" Background="Transparent" BorderBrush="{x:Null}" Padding="2" Margin="0,0,6,0" Click="DateIcon_Click">
                                     <Image Source="/Assets/Icons/kalendarz.png" Width="18" Height="18"/>
                                 </Button>
                                 <DatePicker x:Name="DateEditor" SelectedDate="{Binding EditDate, Mode=TwoWay}"/>
                             </StackPanel>
-
-                            <!-- Amount edit -->
+                            <!-- Kwota -->
                             <StackPanel Orientation="Horizontal">
                                 <TextBlock Text="Kwota:" FontWeight="SemiBold" Foreground="{DynamicResource App.Foreground}" Margin="0,0,6,0"/>
                                 <TextBox x:Name="AmountBox" Style="{StaticResource EditTextBoxStyle}" Text="{Binding EditAmountText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" GotFocus="EditAmount_GotFocus"/>
                             </StackPanel>
-
-                            <!-- Category edit -->
-                            <StackPanel Orientation="Horizontal">
-                                <TextBlock Text="Kategoria:" FontWeight="SemiBold" Foreground="{DynamicResource App.Foreground}" Margin="0,0,6,0"/>
-                                <ComboBox x:Name="CategoryCombo" Style="{StaticResource EditComboStyle}" ItemsSource="{StaticResource CategoriesForEditRes}" SelectedItem="{Binding SelectedCategory, Mode=TwoWay}"/>
-                            </StackPanel>
-
-                            <!-- Account edit -->
+                            <!-- Konto -->
                             <StackPanel Orientation="Horizontal">
                                 <TextBlock Text="Konto:" FontWeight="SemiBold" Foreground="{DynamicResource App.Foreground}" Margin="0,0,6,0"/>
                                 <ComboBox x:Name="AccountCombo" Style="{StaticResource EditComboStyle}" ItemsSource="{StaticResource AccountsForEditRes}" SelectedItem="{Binding SelectedAccount, Mode=TwoWay}"/>
                             </StackPanel>
-
-                            <!-- Description edit -->
+                            <!-- Kategoria -->
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="Kategoria:" FontWeight="SemiBold" Foreground="{DynamicResource App.Foreground}" Margin="0,0,6,0"/>
+                                <ComboBox x:Name="CategoryCombo" Style="{StaticResource EditComboStyle}" ItemsSource="{StaticResource CategoriesForEditRes}" SelectedItem="{Binding SelectedCategory, Mode=TwoWay}"/>
+                            </StackPanel>
+                            <!-- Opis -->
                             <StackPanel Orientation="Horizontal">
                                 <TextBlock Text="Opis:" FontWeight="SemiBold" Foreground="{DynamicResource App.Foreground}" Margin="0,0,6,0"/>
                                 <TextBox x:Name="DescriptionBox" Style="{StaticResource EditTextBoxStyle}" Width="260" Text="{Binding EditDescription, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" GotFocus="EditDescription_GotFocus"/>
                             </StackPanel>
                         </StackPanel>
 
-                        <!-- RIGHT actions hidden -->
+                        <!-- RIGHT actions (hidden in our flow) -->
                         <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Top" Visibility="Collapsed"/>
                     </Grid>
 
