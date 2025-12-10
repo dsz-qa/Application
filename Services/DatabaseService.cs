@@ -2051,8 +2051,7 @@ LIMIT 1;";
 INSERT INTO CashOnHand(UserId, Amount, UpdatedAt)
 VALUES (@u, @a, CURRENT_TIMESTAMP)
 ON CONFLICT(UserId) DO UPDATE
-SET Amount = CashOnHand.Amount + excluded.Amount,
-    UpdatedAt = CURRENT_TIMESTAMP;";
+SET Amount = CashOnHand.Amount + excluded.Amount, UpdatedAt=CURRENT_TIMESTAMP;";
                 updCash.Parameters.AddWithValue("@u", userId);
                 updCash.Parameters.AddWithValue("@a", amount);
                 updCash.ExecuteNonQuery();
@@ -2364,6 +2363,211 @@ GROUP BY i.Source;";
             if (icon != null) cmd.Parameters.AddWithValue("@i", (object?)icon ?? DBNull.Value);
             cmd.ExecuteNonQuery();
             RaiseDataChanged();
+        }
+
+        public static void DeleteTransactionAndRevertBalance(int transactionId)
+        {
+            using var c = OpenAndEnsureSchema();
+
+            // 1) Spróbuj jako transfer
+            if (TableExists(c, "Transfers"))
+            {
+                using var getTr = c.CreateCommand();
+                getTr.CommandText = @"SELECT Id, UserId, Amount, FromKind, FromRefId, ToKind, ToRefId FROM Transfers WHERE Id=@id LIMIT 1;";
+                getTr.Parameters.AddWithValue("@id", transactionId);
+
+                using var rTr = getTr.ExecuteReader();
+                if (rTr.Read())
+                {
+                    var id = rTr.GetInt32(0);
+                    var userId = rTr.GetInt32(1);
+                    var amount = Convert.ToDecimal(rTr.GetValue(2));
+                    var fromKind = GetStringSafe(rTr, 3).ToLowerInvariant();
+                    var fromRefId = rTr.IsDBNull(4) ? (int?)null : rTr.GetInt32(4);
+                    var toKind = GetStringSafe(rTr, 5).ToLowerInvariant();
+                    var toRefId = rTr.IsDBNull(6) ? (int?)null : rTr.GetInt32(6);
+
+                    using var tx = c.BeginTransaction();
+
+                    // Odwróæ operacjê transferu
+                    void AddBank(int? accId, decimal a)
+                    {
+                        if (!accId.HasValue) return;
+                        using var cmd = c.CreateCommand();
+                        cmd.Transaction = tx;
+                        cmd.CommandText = @"UPDATE BankAccounts SET Balance = Balance + @a WHERE Id=@id AND UserId=@u;";
+                        cmd.Parameters.AddWithValue("@a", a);
+                        cmd.Parameters.AddWithValue("@id", accId.Value);
+                        cmd.Parameters.AddWithValue("@u", userId);
+                        cmd.ExecuteNonQuery();
+                    }
+
+                    void SubBank(int? accId, decimal a)
+                    {
+                        if (!accId.HasValue) return;
+                        using var cmd = c.CreateCommand();
+                        cmd.Transaction = tx;
+                        cmd.CommandText = @"UPDATE BankAccounts SET Balance = Balance - @a WHERE Id=@id AND UserId=@u;";
+                        cmd.Parameters.AddWithValue("@a", a);
+                        cmd.Parameters.AddWithValue("@id", accId.Value);
+                        cmd.Parameters.AddWithValue("@u", userId);
+                        cmd.ExecuteNonQuery();
+                    }
+
+                    void AddCash(decimal a)
+                    {
+                        using var cmd = c.CreateCommand();
+                        cmd.Transaction = tx;
+                        cmd.CommandText = @"INSERT INTO CashOnHand(UserId, Amount, UpdatedAt) VALUES (@u, @a, CURRENT_TIMESTAMP)
+ON CONFLICT(UserId) DO UPDATE SET Amount = CashOnHand.Amount + excluded.Amount, UpdatedAt=CURRENT_TIMESTAMP;";
+                        cmd.Parameters.AddWithValue("@u", userId);
+                        cmd.Parameters.AddWithValue("@a", a);
+                        cmd.ExecuteNonQuery();
+                    }
+
+                    void SubCash(decimal a)
+                    {
+                        using var cmd = c.CreateCommand();
+                        cmd.Transaction = tx;
+                        cmd.CommandText = @"UPDATE CashOnHand SET Amount = Amount - @a, UpdatedAt=CURRENT_TIMESTAMP WHERE UserId=@u;";
+                        cmd.Parameters.AddWithValue("@u", userId);
+                        cmd.Parameters.AddWithValue("@a", a);
+                        cmd.ExecuteNonQuery();
+                    }
+
+                    // bank->bank
+                    if (fromKind == "bank" && toKind == "bank")
+                    {
+                        AddBank(fromRefId, amount);
+                        SubBank(toRefId, amount);
+                    }
+                    // bank->cash
+                    else if (fromKind == "bank" && toKind == "cash")
+                    {
+                        AddBank(fromRefId, amount);
+                        SubCash(amount);
+                    }
+                    // cash->bank
+                    else if (fromKind == "cash" && toKind == "bank")
+                    {
+                        AddCash(amount);
+                        SubBank(toRefId, amount);
+                    }
+                    // inne typy – na razie brak obs³ugi szczegó³owej
+
+                    // usuñ transfer
+                    using (var del = c.CreateCommand())
+                    {
+                        del.Transaction = tx;
+                        del.CommandText = "DELETE FROM Transfers WHERE Id=@id;";
+                        del.Parameters.AddWithValue("@id", id);
+                        del.ExecuteNonQuery();
+                    }
+
+                    tx.Commit();
+                    RaiseDataChanged();
+                    return;
+                }
+            }
+
+            // 2) Spróbuj jako wydatek
+            if (TableExists(c, "Expenses"))
+            {
+                using var getEx = c.CreateCommand();
+                getEx.CommandText = @"SELECT Id, UserId, Amount, AccountId, IsPlanned FROM Expenses WHERE Id=@id LIMIT 1;";
+                getEx.Parameters.AddWithValue("@id", transactionId);
+
+                using var rEx = getEx.ExecuteReader();
+                if (rEx.Read())
+                {
+                    var id = rEx.GetInt32(0);
+                    var userId = rEx.GetInt32(1);
+                    var amount = Convert.ToDecimal(rEx.GetValue(2));
+                    var accountId = rEx.IsDBNull(3) ? (int?)null : rEx.GetInt32(3);
+                    var isPlanned = !rEx.IsDBNull(4) && Convert.ToInt32(rEx.GetValue(4)) == 1;
+
+                    using var tx = c.BeginTransaction();
+
+                    // Odwrócenie wydatku: saldo powinno siê zwiêkszyæ
+                    if (accountId.HasValue)
+                    {
+                        using var upd = c.CreateCommand();
+                        upd.Transaction = tx;
+                        upd.CommandText = @"UPDATE BankAccounts SET Balance = Balance + @a WHERE Id=@id AND UserId=@u;";
+                        upd.Parameters.AddWithValue("@a", amount);
+                        upd.Parameters.AddWithValue("@id", accountId.Value);
+                        upd.Parameters.AddWithValue("@u", userId);
+                        upd.ExecuteNonQuery();
+                    }
+                    else if (!isPlanned)
+                    {
+                        // Brak AccountId: potraktuj jako gotówkê – zwiêksz Amount w CashOnHand
+                        using var updCash = c.CreateCommand();
+                        updCash.Transaction = tx;
+                        updCash.CommandText = @"INSERT INTO CashOnHand(UserId, Amount, UpdatedAt) VALUES (@u, @a, CURRENT_TIMESTAMP)
+ON CONFLICT(UserId) DO UPDATE SET Amount = excluded.Amount + CashOnHand.Amount, UpdatedAt=CURRENT_TIMESTAMP;";
+                        updCash.Parameters.AddWithValue("@u", userId);
+                        updCash.Parameters.AddWithValue("@a", amount);
+                        updCash.ExecuteNonQuery();
+                    }
+
+                    using (var del = c.CreateCommand())
+                    {
+                        del.Transaction = tx;
+                        del.CommandText = "DELETE FROM Expenses WHERE Id=@id;";
+                        del.Parameters.AddWithValue("@id", id);
+                        del.ExecuteNonQuery();
+                    }
+
+                    tx.Commit();
+                    RaiseDataChanged();
+                    return;
+                }
+            }
+
+            // 3) Spróbuj jako przychód
+            if (TableExists(c, "Incomes"))
+            {
+                using var getInc = c.CreateCommand();
+                getInc.CommandText = @"SELECT Id, UserId, Amount, IsPlanned FROM Incomes WHERE Id=@id LIMIT 1;";
+                getInc.Parameters.AddWithValue("@id", transactionId);
+
+                using var rInc = getInc.ExecuteReader();
+                if (rInc.Read())
+                {
+                    var id = rInc.GetInt32(0);
+                    var userId = rInc.GetInt32(1);
+                    var amount = Convert.ToDecimal(rInc.GetValue(2));
+                    var isPlanned = !rInc.IsDBNull(3) && Convert.ToInt32(rInc.GetValue(3)) == 1;
+
+                    using var tx = c.BeginTransaction();
+
+                    // Odwrócenie przychodu: saldo powinno siê zmniejszyæ
+                    if (!isPlanned)
+                    {
+                        using var updCash = c.CreateCommand();
+                        updCash.Transaction = tx;
+                        updCash.CommandText = @"UPDATE CashOnHand SET Amount = Amount - @a, UpdatedAt=CURRENT_TIMESTAMP WHERE UserId=@u;";
+                        updCash.Parameters.AddWithValue("@u", userId);
+                        updCash.Parameters.AddWithValue("@a", amount);
+                        updCash.ExecuteNonQuery();
+                    }
+
+                    using (var del = c.CreateCommand())
+                    {
+                        del.Transaction = tx;
+                        del.CommandText = "DELETE FROM Incomes WHERE Id=@id;";
+                        del.Parameters.AddWithValue("@id", id);
+                        del.ExecuteNonQuery();
+                    }
+
+                    tx.Commit();
+                    RaiseDataChanged();
+                    return;
+                }
+            }
+
+            // Je¿eli nie znaleziono transakcji w ¿adnej tabeli – nic nie robimy
         }
     }
 }

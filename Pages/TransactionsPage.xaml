@@ -368,7 +368,6 @@
                     <Grid x:Name="ReadMode" Grid.RowSpan="2">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*"/>
-                            <ColumnDefinition Width="Auto"/>
                         </Grid.ColumnDefinitions>
 
                         <!-- LEFT info -->
@@ -427,16 +426,42 @@
                                 <TextBlock Text="Kwota:" FontWeight="SemiBold" Foreground="{DynamicResource App.Foreground}" Margin="0,0,6,0"/>
                                 <TextBlock Text="{Binding AmountStr}" Foreground="{DynamicResource App.Foreground}"/>
                             </StackPanel>
-                        </StackPanel>
 
-                        <!-- RIGHT actions -->
-                        <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Top">
-                            <Button Style="{StaticResource IconButtonSmall}" ToolTip="Edytuj" Click="StartEdit_Click">
-                                <Path Data="M3,17 L7,21 L21,7 L17,3 Z M2,22 L8,22 L2,16 Z" Fill="{DynamicResource Brand.Blue}" Stretch="Uniform" Width="14" Height="14"/>
-                            </Button>
-                            <Button Style="{StaticResource IconButtonSmall}" ToolTip="Usuń" Click="ShowDeleteConfirm_Click" Margin="6,0,0,0">
-                                <Image Source="/Assets/Icons/delete.png" Width="14" Height="14" Stretch="Uniform"/>
-                            </Button>
+                            <!-- ACTIONS: styled like envelopes (no grid layout changes) -->
+                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,8,0,0">
+                                <Button Margin="0,0,8,0" Padding="8,4" MinWidth="70" ToolTip="Edytuj" Click="StartEdit_Click">
+                                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                        <Image Source="/Assets/Icons/edit.png" Width="16" Height="16" Margin="0,0,6,0" OpacityMask="{DynamicResource Brand.Orange}"/>
+                                        <TextBlock Text="Edytuj" VerticalAlignment="Center"/>
+                                    </StackPanel>
+                                </Button>
+                                <Button Padding="8,4" MinWidth="70" ToolTip="Usuń" Command="{Binding ShowDeleteConfirmationCommand}">
+                                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                        <Image Source="/Assets/Icons/delete.png" Width="16" Height="16" Margin="0,0,6,0" OpacityMask="{DynamicResource Brand.Orange}"/>
+                                        <TextBlock Text="Usuń" VerticalAlignment="Center"/>
+                                    </StackPanel>
+                                </Button>
+                            </StackPanel>
+
+                            <!-- Delete confirmation panel -->
+                            <StackPanel Visibility="{Binding IsDeleteConfirmationVisible, Converter={StaticResource BoolToVisibilityConverter}}"
+                                        Margin="0,6,0,0">
+                                <TextBlock Text="Czy na pewno chcesz usunąć tę transakcję?"
+                                           Margin="0,0,0,6"
+                                           Foreground="{DynamicResource App.Foreground}"/>
+                                <StackPanel Orientation="Horizontal">
+                                    <Button Content="Tak"
+                                            Padding="8,4"
+                                            MinWidth="70"
+                                            Command="{Binding DataContext.DeleteTransactionCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                            CommandParameter="{Binding}"/>
+                                    <Button Content="Nie"
+                                            Padding="8,4"
+                                            MinWidth="70"
+                                            Margin="8,0,0,0"
+                                            Command="{Binding HideDeleteConfirmationCommand}"/>
+                                </StackPanel>
+                            </StackPanel>
                         </StackPanel>
                     </Grid>
 

@@ -7,6 +7,7 @@ using Finly.Services;
 using System.Data;
 using Finly.Models;
 using System.Collections.Generic;
+using System.Windows.Input;
 
 namespace Finly.ViewModels
 {
@@ -59,6 +60,21 @@ namespace Finly.ViewModels
  // lokalne s³owniki nazw kont/kopert do budowania nazw transferów i wydatków
  private Dictionary<int, string> _accountNameById = new();
  private Dictionary<int, string> _envelopeNameById = new();
+
+ // Command: delete transaction (used by confirmation panel)
+ public ICommand DeleteTransactionCommand { get; }
+
+ public TransactionsViewModel()
+ {
+     DeleteTransactionCommand = new DelegateCommand(obj =>
+     {
+         if (obj is TransactionCardVm vm)
+         {
+             DeleteTransaction(vm);
+             vm.IsDeleteConfirmationVisible = false;
+         }
+     });
+ }
 
  public void Initialize(int userId)
  {
@@ -189,7 +205,7 @@ namespace Finly.ViewModels
  // --- NOWE: pobierz nazwê konta tak jak dla wydatków ---
  string accountName = string.Empty;
 
- //1) jeœli jest kolumna AccountId – u¿yj s³ownika _accountNameById
+ //1) je¿eli jest kolumna AccountId – u¿yj s³ownika _accountNameById
  if (r.Table.Columns.Contains("AccountId") && r["AccountId"] != DBNull.Value)
  {
  var accId = Convert.ToInt32(r["AccountId"]);
@@ -197,7 +213,7 @@ namespace Finly.ViewModels
  accountName = accName;
  }
 
- //2) wsteczna kompatybilnoœæ: jeœli jest kolumna Source z nazw¹ konta
+ //2) wsteczna kompatybilnoœæ: je¿eli jest kolumna Source z nazw¹ konta
  if (string.IsNullOrWhiteSpace(accountName)
  && r.Table.Columns.Contains("Source")
  && r["Source"] != DBNull.Value)
@@ -205,7 +221,7 @@ namespace Finly.ViewModels
  accountName = r["Source"]?.ToString() ?? string.Empty;
  }
 
- //3) jeœli dalej pusto – traktuj jako woln¹ gotówkê
+ //3) je¿eli dalej pusto – traktuj jako woln¹ gotówkê
  if (string.IsNullOrWhiteSpace(accountName))
  accountName = "Wolna gotówka";
 
@@ -391,11 +407,11 @@ namespace Finly.ViewModels
 
  private bool MatchesSelectedAccounts(TransactionCardVm t, System.Collections.Generic.List<string> selectedAccounts, int totalAccounts)
 {
- //1) Jeœli nic nie zaznaczone ? pokazujemy NIC
+ //1) Je¿eli nic nie zaznaczone – pokazujemy NIC
  if (selectedAccounts.Count ==0)
  return false;
 
- //2) Je¿eli zaznaczone s¹ wszystkie konta ? brak filtra kont
+ //2) Je¿eli zaznaczone s¹ wszystkie konta – brak filtra kont
  if (selectedAccounts.Count == totalAccounts)
  return true;
 
@@ -555,6 +571,25 @@ namespace Finly.ViewModels
  }
 
  public enum TransactionKind { Expense, Income, Transfer }
+
+ public class DelegateCommand : ICommand
+ {
+     private readonly Action<object?> _execute;
+     private readonly Func<object?, bool>? _canExecute;
+     public DelegateCommand(Action<object?> execute, Func<object?, bool>? canExecute = null)
+     {
+         _execute = execute ?? throw new ArgumentNullException(nameof(execute));
+         _canExecute = canExecute;
+     }
+     public bool CanExecute(object? parameter) => _canExecute?.Invoke(parameter) ?? true;
+     public void Execute(object? parameter) => _execute(parameter);
+     public event EventHandler? CanExecuteChanged
+     {
+         add { CommandManager.RequerySuggested += value; }
+         remove { CommandManager.RequerySuggested -= value; }
+     }
+ }
+
  public class TransactionCardVm : INotifyPropertyChanged {
  public int Id { get; set; }
  private string _categoryName = ""; public string CategoryName { get => _categoryName; set { _categoryName = value; PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(CategoryName))); } }
@@ -572,6 +607,18 @@ namespace Finly.ViewModels
  public DateTime EditDate { get; set; } = DateTime.Today;
  public string SelectedCategory { get; set; } = "";
  public string SelectedAccount { get; set; } = "";
+
+ // Potwierdzenie usuwania
+ private bool _isDeleteConfirmationVisible; public bool IsDeleteConfirmationVisible { get => _isDeleteConfirmationVisible; set { _isDeleteConfirmationVisible = value; PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(IsDeleteConfirmationVisible))); } }
+ public ICommand ShowDeleteConfirmationCommand { get; }
+ public ICommand HideDeleteConfirmationCommand { get; }
+
+ public TransactionCardVm()
+ {
+     ShowDeleteConfirmationCommand = new DelegateCommand(_ => IsDeleteConfirmationVisible = true);
+     HideDeleteConfirmationCommand = new DelegateCommand(_ => IsDeleteConfirmationVisible = false);
+ }
+
  public event PropertyChangedEventHandler? PropertyChanged;
  }
 }
