@@ -11,9 +11,8 @@
              mc:Ignorable="d">
 
     <UserControl.Resources>
+        <!-- Usunięto dedykowane style edycji, korzystamy z tych samych ustawień co na AddExpensePage (proste pola 28px) -->
         <BooleanToVisibilityConverter x:Key="BoolToVisibilityConverter"/>
-
-        <!-- Converter for formatting DateDisplay string (yyyy-MM-dd) to dd.MM.yyyy -->
         <local:DateStringToPLConverter x:Key="DateStringToPLConverter"/>
 
         <!-- Styl kontenera edycji: ciemne tło, biała czcionka -->
@@ -24,65 +23,6 @@
             <Setter Property="Margin" Value="4,0,0,0"/>
             <Setter Property="VerticalAlignment" Value="Center"/>
             <Setter Property="Visibility" Value="Collapsed"/>
-        </Style>
-
-        <Style x:Key="EditTextBoxStyle" TargetType="TextBox">
-            <Setter Property="Background" Value="Transparent"/>
-            <Setter Property="BorderThickness" Value="0"/>
-            <Setter Property="Foreground" Value="{StaticResource Control.Foreground}"/>
-            <Setter Property="VerticalContentAlignment" Value="Center"/>
-            <Setter Property="Padding" Value="0"/>
-            <Setter Property="MinWidth" Value="120"/>
-        </Style>
-
-        <Style x:Key="EditComboStyle" TargetType="ComboBox">
-            <Style.Resources>
-                <!-- Wymuszenie czarnego tła w rozwijanej liście dla domyślnego ComboBox popup -->
-                <SolidColorBrush x:Key="{x:Static SystemColors.WindowBrushKey}" Color="#111"/>
-                <SolidColorBrush x:Key="{x:Static SystemColors.ControlBrushKey}" Color="#111"/>
-                <SolidColorBrush x:Key="{x:Static SystemColors.HighlightBrushKey}" Color="#222"/>
-                <SolidColorBrush x:Key="{x:Static SystemColors.HighlightTextBrushKey}" Color="White"/>
-                <SolidColorBrush x:Key="{x:Static SystemColors.ControlTextBrushKey}" Color="White"/>
-            </Style.Resources>
-            <Setter Property="Background" Value="#111"/>
-            <Setter Property="Foreground" Value="White"/>
-            <Setter Property="BorderBrush" Value="#333"/>
-            <Setter Property="BorderThickness" Value="1"/>
-            <Setter Property="Padding" Value="4,2"/>
-            <Setter Property="MinWidth" Value="160"/>
-            <Setter Property="ItemContainerStyle">
-                <Setter.Value>
-                    <Style TargetType="ComboBoxItem">
-                        <Setter Property="Foreground" Value="White"/>
-                        <Setter Property="Background" Value="#111"/>
-                        <Setter Property="Padding" Value="6,3"/>
-                        <Setter Property="HorizontalContentAlignment" Value="Left"/>
-                        <Setter Property="Template">
-                            <Setter.Value>
-                                <ControlTemplate TargetType="ComboBoxItem">
-                                    <Border x:Name="Bd"
-                                            Background="{TemplateBinding Background}"
-                                            Padding="{TemplateBinding Padding}">
-                                        <ContentPresenter/>
-                                    </Border>
-                                    <ControlTemplate.Triggers>
-                                        <Trigger Property="IsHighlighted" Value="True">
-                                            <Setter TargetName="Bd"
-                                                    Property="Background"
-                                                    Value="#222"/>
-                                        </Trigger>
-                                        <Trigger Property="IsSelected" Value="True">
-                                            <Setter TargetName="Bd"
-                                                    Property="Background"
-                                                    Value="{DynamicResource Brand.Blue}"/>
-                                        </Trigger>
-                                    </ControlTemplate.Triggers>
-                                </ControlTemplate>
-                            </Setter.Value>
-                        </Setter>
-                    </Style>
-                </Setter.Value>
-            </Setter>
         </Style>
 
         <!-- Mały przycisk ikonowy -->
@@ -474,7 +414,7 @@
                             <ColumnDefinition Width="Auto"/>
                         </Grid.ColumnDefinitions>
 
-                        <!-- LEFT edit fields in requested order -->
+                        <!-- LEFT edit fields in requested order, styled like AddExpense (Height=28) -->
                         <StackPanel Grid.Column="0" Orientation="Vertical" Margin="4,0,8,0">
                             <!-- EDIT HEADER: icon + type name -->
                             <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
@@ -522,27 +462,27 @@
                                 <Button x:Name="DateEditButton" Background="Transparent" BorderBrush="{x:Null}" Padding="2" Margin="0,0,6,0" Click="DateIcon_Click">
                                     <Image Source="/Assets/Icons/kalendarz.png" Width="18" Height="18"/>
                                 </Button>
-                                <DatePicker x:Name="DateEditor" SelectedDate="{Binding EditDate, Mode=TwoWay}"/>
+                                <DatePicker x:Name="DateEditor" SelectedDate="{Binding EditDate, Mode=TwoWay}" Height="28"/>
                             </StackPanel>
                             <!-- Kwota -->
                             <StackPanel Orientation="Horizontal">
                                 <TextBlock Text="Kwota:" FontWeight="SemiBold" Foreground="{DynamicResource App.Foreground}" Margin="0,0,6,0"/>
-                                <TextBox x:Name="AmountBox" Style="{StaticResource EditTextBoxStyle}" Text="{Binding EditAmountText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" GotFocus="EditAmount_GotFocus"/>
+                                <TextBox x:Name="AmountBox" Height="28" Text="{Binding EditAmountText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" GotFocus="EditAmount_GotFocus"/>
                             </StackPanel>
                             <!-- Konto -->
                             <StackPanel Orientation="Horizontal">
                                 <TextBlock Text="Konto:" FontWeight="SemiBold" Foreground="{DynamicResource App.Foreground}" Margin="0,0,6,0"/>
-                                <ComboBox x:Name="AccountCombo" Style="{StaticResource EditComboStyle}" ItemsSource="{StaticResource AccountsForEditRes}" SelectedItem="{Binding SelectedAccount, Mode=TwoWay}"/>
+                                <ComboBox x:Name="AccountCombo" Height="28" ItemsSource="{StaticResource AccountsForEditRes}" SelectedItem="{Binding SelectedAccount, Mode=TwoWay}"/>
                             </StackPanel>
                             <!-- Kategoria -->
                             <StackPanel Orientation="Horizontal">
                                 <TextBlock Text="Kategoria:" FontWeight="SemiBold" Foreground="{DynamicResource App.Foreground}" Margin="0,0,6,0"/>
-                                <ComboBox x:Name="CategoryCombo" Style="{StaticResource EditComboStyle}" ItemsSource="{StaticResource CategoriesForEditRes}" SelectedItem="{Binding SelectedCategory, Mode=TwoWay}"/>
+                                <ComboBox x:Name="CategoryCombo" Height="28" ItemsSource="{StaticResource CategoriesForEditRes}" SelectedItem="{Binding SelectedCategory, Mode=TwoWay}"/>
                             </StackPanel>
                             <!-- Opis -->
                             <StackPanel Orientation="Horizontal">
                                 <TextBlock Text="Opis:" FontWeight="SemiBold" Foreground="{DynamicResource App.Foreground}" Margin="0,0,6,0"/>
-                                <TextBox x:Name="DescriptionBox" Style="{StaticResource EditTextBoxStyle}" Width="260" Text="{Binding EditDescription, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" GotFocus="EditDescription_GotFocus"/>
+                                <TextBox x:Name="DescriptionBox" Height="28" Width="260" Text="{Binding EditDescription, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" GotFocus="EditDescription_GotFocus"/>
                             </StackPanel>
                         </StackPanel>
 
