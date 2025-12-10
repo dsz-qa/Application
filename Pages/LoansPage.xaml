@@ -87,8 +87,16 @@
         HorizontalAlignment="Right">
                 <StackPanel>
                     <TextBlock Text="Analizy finansowe" FontWeight="Bold"/>
-                    <ItemsControl x:Name="InsightsList" Margin="0,8,0,0" />
-                    <!-- UpcomingPaymentsList ukryta, używana tylko przez code-behind -->
+                    <ItemsControl x:Name="InsightsList" Margin="0,8,0,0">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <TextBlock Text="{Binding}"
+                       FontWeight="Bold"
+                       Foreground="{DynamicResource App.Foreground}" />
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+
                     <ItemsControl x:Name="UpcomingPaymentsList"
                                   Margin="0,8,0,0"
                                   Visibility="Collapsed">
@@ -221,12 +229,13 @@
                                                         Tag="{Binding}"/>
 
                                                 <Button Content="Symulacja"
-                                                        ToolTip="Symulacja nadpłaty"
-                                                        Width="100"
-                                                        Height="28"
-                                                        Margin="0,0,8,0"
-                                                        Click="ShowSimPanel_Click"
-                                                        Tag="{Binding}"/>
+        ToolTip="Symulacja nadpłaty"
+        Width="100"
+        Height="28"
+        Margin="0,0,8,0"
+        Click="ShowSimPanel_Click"
+        Tag="{Binding}"/>
+
 
                                                 <Button Width="36"
                                                         Height="28"

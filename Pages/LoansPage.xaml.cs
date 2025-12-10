@@ -1,6 +1,7 @@
 ﻿using Finly.Models;
 using Finly.ViewModels;
 using Finly.Services;
+using LoanScheduleRow = Finly.Services.LoanScheduleRow;
 using System;
 using System.Collections.ObjectModel;
 using System.Linq;
@@ -12,6 +13,8 @@ using System.Globalization;
 using Finly.Views;
 using System.Collections.Generic;
 using System.IO;
+
+
 
 namespace Finly.Pages
 {
@@ -275,9 +278,12 @@ namespace Finly.Pages
 
         private void ComputeAndShowMonthlyBreakdown()
         {
-            if (!decimal.TryParse((LoanPrincipalBox.Text ?? "").Replace(" ", ""), out var principal)) principal = 0m;
-            if (!decimal.TryParse((LoanInterestBox.Text ?? "").Replace(" ", ""), out var annualRate)) annualRate = 0m;
-            if (!int.TryParse((LoanTermBox.Text ?? "").Replace(" ", ""), out var months)) months = 0;
+            if (!decimal.TryParse((LoanPrincipalBox.Text ?? "").Replace(" ", ""), out var principal))
+                principal = 0m;
+            if (!decimal.TryParse((LoanInterestBox.Text ?? "").Replace(" ", ""), out var annualRate))
+                annualRate = 0m;
+            if (!int.TryParse((LoanTermBox.Text ?? "").Replace(" ", ""), out var months))
+                months = 0;
 
             if (principal <= 0 || months <= 0)
             {
@@ -287,24 +293,15 @@ namespace Finly.Pages
                 return;
             }
 
-            var r = annualRate / 100m / 12m;
-
-            decimal payment;
-            if (r == 0m)
-                payment = Math.Round(principal / months, 2);
-            else
-            {
-                var denom = 1m - (decimal)Math.Pow((double)(1m + r), -months);
-                payment = Math.Round(principal * r / denom, 2);
-            }
-
-            decimal firstInterest = Math.Round(principal * r, 2);
-            decimal firstPrincipal = Math.Round(payment - firstInterest, 2);
+            var payment = LoanService.CalculateMonthlyPayment(principal, annualRate, months);
+            var (interestFirst, capitalFirst) =
+                LoanService.CalculateFirstInstallmentBreakdown(principal, annualRate, months);
 
             MonthlyPaymentText.Text = payment.ToString("N2") + " zł";
-            FirstPrincipalText.Text = firstPrincipal.ToString("N2") + " zł";
-            FirstInterestText.Text = firstInterest.ToString("N2") + " zł";
+            FirstPrincipalText.Text = capitalFirst.ToString("N2") + " zł";
+            FirstInterestText.Text = interestFirst.ToString("N2") + " zł";
         }
+
 
         // Upload harmonogramu
         private void ChooseSchedule_Click(object sender, RoutedEventArgs e)
@@ -576,39 +573,6 @@ namespace Finly.Pages
             return null;
         }
 
-        private void ShowSimPanel_Click(object sender, RoutedEventArgs e)
-        {
-            if ((sender as FrameworkElement)?.Tag is LoanCardVm vm)
-            {
-                _selectedVm = vm;
-            }
-
-            if (SimExtraBox != null) SimExtraBox.Text = "";
-            if (SimResult != null) SimResult.Text = string.Empty;
-
-            ShowPanel(LoanPanel.Sim);
-        }
-
-        private void SimulateInline_Click(object sender, RoutedEventArgs e)
-        {
-            if (_selectedVm == null)
-            {
-                SimResult.Text = "Wybierz najpierw kredyt (kliknij kartę).";
-                return;
-            }
-
-            if (!decimal.TryParse((SimExtraBox.Text ?? "").Replace(" ", ""), out var extra) || extra <= 0)
-            {
-                SimResult.Text = "Podaj poprawną kwotę.";
-                return;
-            }
-
-            var saved = Math.Round(extra * 0.05m, 2);
-            var months = (int)(extra / Math.Max(1, _selectedVm.Principal));
-
-            SimResult.Text = $"Oszczędzisz ~{saved:N2} zł na odsetkach i skrócisz kredyt o ~{months} miesięcy (szac.).";
-        }
-
 
         private void OverpaySave_Click(object sender, RoutedEventArgs e)
         {
@@ -619,33 +583,153 @@ namespace Finly.Pages
                 return;
             }
 
-            if (!decimal.TryParse((OverpayAmountBox.Text ?? "").Replace(" ", ""), out var amt) || amt <= 0)
+            if (!decimal.TryParse((OverpayAmountBox.Text ?? "").Replace(" ", ""), out var amount) || amount <= 0)
             {
                 OverpayResult.Text = "Podaj poprawną kwotę nadpłaty.";
                 OverpayResult.Foreground = Brushes.IndianRed;
                 return;
             }
 
+            var vm = _selectedVm;
+            var today = DateTime.Today;
+
+            // 1) wyznaczamy „poprzedni termin raty” wg dnia płatności
+            var prevDue = GetPreviousDueDate(today, vm.PaymentDay, vm.StartDate);
+
+            // 2) liczymy odsetki dzienne między terminem raty a dniem nadpłaty
+            var extraInterest = LoanMathService.CalculateInterest(
+                vm.Principal,
+                vm.InterestRate,
+                prevDue,
+                today);
+
+            // 3) obniżamy kapitał o nadpłatę
+            var newPrincipal = vm.Principal - amount;
+            if (newPrincipal < 0m) newPrincipal = 0m;
+
             try
             {
-                // TODO: tutaj kiedyś zapiszesz nadpłatę w bazie kredytów
-                OverpayResult.Text = "Nadpłata zapisana (placeholder).";
-                OverpayResult.Foreground = Brushes.Green;
+                // aktualizujemy kredyt w bazie
+                var loan = new LoanModel
+                {
+                    Id = vm.Id,
+                    UserId = vm.UserId,
+                    Name = vm.Name,
+                    Principal = newPrincipal,
+                    InterestRate = vm.InterestRate,
+                    StartDate = vm.StartDate,
+                    TermMonths = vm.TermMonths,
+                    PaymentDay = vm.PaymentDay,
+                    // Note – jeśli będziesz chciała, możesz tu dopisać
+                };
 
-                // po poprawnej nadpłacie schowaj panel
-                ShowPanel(LoanPanel.None);
+                DatabaseService.UpdateLoan(loan);
+
+                OverpayResult.Foreground = Brushes.Green;
+                OverpayResult.Text =
+                    $"Nadpłata: {amount:N2} zł\n" +
+                    $"Szacunkowe odsetki za okres {prevDue:dd.MM.yyyy}–{today:dd.MM.yyyy}: {extraInterest:N2} zł\n" +
+                    $"Nowe saldo kapitału: {newPrincipal:N2} zł.";
+
+                ToastService.Success("Nadpłata zapisana – kredyt zaktualizowany.");
+
+                LoadLoans();
+                RefreshKpisAndLists();
             }
             catch (Exception ex)
             {
-                OverpayResult.Text = "Błąd: " + ex.Message;
                 OverpayResult.Foreground = Brushes.IndianRed;
+                OverpayResult.Text = "Błąd: " + ex.Message;
+                ToastService.Error("Błąd zapisu nadpłaty: " + ex.Message);
+            }
+        }
+
+
+        // kliknięcie przycisku "Symulacja" na karcie
+        private void ShowSimPanel_Click(object sender, RoutedEventArgs e)
+        {
+            if ((sender as FrameworkElement)?.Tag is LoanCardVm vm)
+            {
+                _selectedVm = vm;
+                SimExtraBox.Text = "";
+                SimResult.Text = "";
+                ShowPanel(LoanPanel.Sim);
+            }
+        }
+
+        // przycisk "Symuluj" w panelu na dole
+        private void SimulateInline_Click(object sender, RoutedEventArgs e)
+        {
+            if (_selectedVm == null)
+            {
+                SimResult.Text = "Najpierw wybierz kredyt (kliknij kartę).";
+                return;
             }
 
+            if (!decimal.TryParse((SimExtraBox.Text ?? "").Replace(" ", ""), out var extra) || extra <= 0)
+            {
+                SimResult.Text = "Podaj poprawną kwotę jednorazowej nadpłaty.";
+                return;
+            }
 
+            var vm = _selectedVm;
 
+            var before = LoanService.CalculateMonthlyPayment(vm.Principal, vm.InterestRate, vm.TermMonths);
+            var newPrincipal = Math.Max(0m, vm.Principal - extra);
+            var after = LoanService.CalculateMonthlyPayment(newPrincipal, vm.InterestRate, vm.TermMonths);
+
+            var diff = before - after;
+
+            SimResult.Text =
+                $"Przy jednorazowej nadpłacie {extra:N2} zł:\n" +
+                $"- obecna rata: {before:N2} zł\n" +
+                $"- nowa rata (ta sama liczba rat): {after:N2} zł\n" +
+                $"- różnica: {diff:N2} zł miesięcznie.";
         }
-    } 
+
+
+        /// <summary>
+        /// Poprzedni „umowny” termin raty:
+        /// - jeśli dziś jest po terminie z tego miesiąca -> zwracamy ten termin,
+        /// - jeśli przed -> idziemy miesiąc wstecz,
+        /// - nie cofamy się przed datę startu kredytu.
+        /// </summary>
+        private static DateTime GetPreviousDueDate(DateTime today, int paymentDay, DateTime startDate)
+        {
+            // jeśli nie ustawiono dnia – cofamy się po prostu o miesiąc
+            if (paymentDay <= 0)
+                return today.Date.AddMonths(-1);
+
+            // termin w bieżącym miesiącu
+            int daysInThisMonth = DateTime.DaysInMonth(today.Year, today.Month);
+            int day = Math.Min(paymentDay, daysInThisMonth);
+            var thisDue = new DateTime(today.Year, today.Month, day);
+
+            if (today.Date >= thisDue.Date)
+            {
+                // poprzedni termin to ten z bieżącego miesiąca
+                if (thisDue.Date < startDate.Date)
+                    return startDate.Date;
+                return thisDue.Date;
+            }
+
+            // inaczej – cofamy się miesiąc wstecz
+            var prevMonthFirst = new DateTime(today.Year, today.Month, 1).AddMonths(-1);
+            int daysInPrevMonth = DateTime.DaysInMonth(prevMonthFirst.Year, prevMonthFirst.Month);
+            day = Math.Min(paymentDay, daysInPrevMonth);
+            var prevDue = new DateTime(prevMonthFirst.Year, prevMonthFirst.Month, day);
+
+            if (prevDue.Date < startDate.Date)
+                return startDate.Date;
+
+            return prevDue.Date;
+        }
 
 
 
-}
+    }
+} 
+
+
+
+
