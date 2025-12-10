@@ -427,22 +427,6 @@
                                 <TextBlock Text="{Binding AmountStr}" Foreground="{DynamicResource App.Foreground}"/>
                             </StackPanel>
 
-                            <!-- ACTIONS: styled like envelopes (no grid layout changes) -->
-                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,8,0,0">
-                                <Button Margin="0,0,8,0" Padding="8,4" MinWidth="70" ToolTip="Edytuj" Click="StartEdit_Click">
-                                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                                        <Image Source="/Assets/Icons/edit.png" Width="16" Height="16" Margin="0,0,6,0" OpacityMask="{DynamicResource Brand.Orange}"/>
-                                        <TextBlock Text="Edytuj" VerticalAlignment="Center"/>
-                                    </StackPanel>
-                                </Button>
-                                <Button Padding="8,4" MinWidth="70" ToolTip="Usuń" Command="{Binding ShowDeleteConfirmationCommand}">
-                                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                                        <Image Source="/Assets/Icons/delete.png" Width="16" Height="16" Margin="0,0,6,0" OpacityMask="{DynamicResource Brand.Orange}"/>
-                                        <TextBlock Text="Usuń" VerticalAlignment="Center"/>
-                                    </StackPanel>
-                                </Button>
-                            </StackPanel>
-
                             <!-- Delete confirmation panel -->
                             <StackPanel Visibility="{Binding IsDeleteConfirmationVisible, Converter={StaticResource BoolToVisibilityConverter}}"
                                         Margin="0,6,0,0">
@@ -472,7 +456,7 @@
                             <ColumnDefinition Width="Auto"/>
                         </Grid.ColumnDefinitions>
 
-                        <!-- LEFT edit fields -->
+                        <!-- LEFT edit fields (unchanged) -->
                         <StackPanel Grid.Column="0" Orientation="Vertical" Margin="4,0,8,0">
                             <!-- Date editor with icon button -->
                             <StackPanel Orientation="Horizontal">
@@ -508,13 +492,40 @@
                             </StackPanel>
                         </StackPanel>
 
-                        <!-- RIGHT actions -->
-                        <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Top">
-                            <Button x:Name="SaveButton" Style="{StaticResource IconButtonSmall}" ToolTip="Zapisz" Click="SaveEdit_Click">
-                                <Path Data="M2,10 L6,14 L14,4" Stroke="{DynamicResource Brand.Blue}" StrokeThickness="2.4" StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round" Width="14" Height="14"/>
+                        <!-- RIGHT actions hidden -->
+                        <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Top" Visibility="Collapsed"/>
+                    </Grid>
+
+                    <!-- Bottom-right actions overlay (always in front) -->
+                    <Grid HorizontalAlignment="Right"
+                          VerticalAlignment="Bottom"
+                          Margin="0,8,0,0"
+                          Panel.ZIndex="10">
+                        <!-- Normal actions -->
+                        <StackPanel x:Name="NormalActions" Orientation="Horizontal">
+                            <Button Margin="0,0,8,0" Padding="8,4" MinWidth="70" ToolTip="Edytuj" Click="StartEdit_Click">
+                                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                    <Image Source="/Assets/Icons/edit.png" Width="16" Height="16" Margin="0,0,6,0" OpacityMask="{DynamicResource Brand.Orange}"/>
+                                    <TextBlock Text="Edytuj" VerticalAlignment="Center"/>
+                                </StackPanel>
                             </Button>
-                            <Button Style="{StaticResource IconButtonSmall}" ToolTip="Anuluj" Click="CancelEdit_Click" Margin="6,0,0,0">
-                                <TextBlock Text="Anuluj" Foreground="{DynamicResource App.Foreground}"/>
+                            <Button Padding="8,4" MinWidth="70" ToolTip="Usuń" Command="{Binding ShowDeleteConfirmationCommand}">
+                                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                    <Image Source="/Assets/Icons/delete.png" Width="16" Height="16" Margin="0,0,6,0" OpacityMask="{DynamicResource Brand.Orange}"/>
+                                    <TextBlock Text="Usuń" VerticalAlignment="Center"/>
+                                </StackPanel>
+                            </Button>
+                        </StackPanel>
+                        <!-- Edit actions -->
+                        <StackPanel x:Name="EditActions" Orientation="Horizontal" Visibility="Collapsed">
+                            <Button x:Name="SaveBottomButton" Padding="8,4" MinWidth="70" ToolTip="Zapisz" Click="SaveEdit_Click">
+                                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                    <Path Data="M2,10 L6,14 L14,4" Stroke="{DynamicResource Brand.Blue}" StrokeThickness="2.4" StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round" Width="16" Height="16"/>
+                                    <TextBlock Text="Zapisz" Margin="6,0,0,0" VerticalAlignment="Center"/>
+                                </StackPanel>
+                            </Button>
+                            <Button Padding="8,4" MinWidth="70" ToolTip="Anuluj" Click="CancelEdit_Click" Margin="8,0,0,0">
+                                <TextBlock Text="Anuluj" VerticalAlignment="Center"/>
                             </Button>
                         </StackPanel>
                     </Grid>
@@ -532,9 +543,16 @@
             </Border>
 
             <DataTemplate.Triggers>
+                <!-- Toggle action overlays based on IsEditing -->
                 <DataTrigger Binding="{Binding IsEditing}" Value="True">
-                    <Setter TargetName="ReadMode" Property="Visibility" Value="Collapsed"/>
+                    <Setter TargetName="NormalActions" Property="Visibility" Value="Collapsed"/>
+                    <Setter TargetName="EditActions" Property="Visibility" Value="Visible"/>
+                    <Setter TargetName="ReadMode" Property="Visibility" Value="Visible"/>
                     <Setter TargetName="EditMode" Property="Visibility" Value="Visible"/>
+                </DataTrigger>
+                <DataTrigger Binding="{Binding IsEditing}" Value="False">
+                    <Setter TargetName="NormalActions" Property="Visibility" Value="Visible"/>
+                    <Setter TargetName="EditActions" Property="Visibility" Value="Collapsed"/>
                 </DataTrigger>
             </DataTemplate.Triggers>
         </DataTemplate>
