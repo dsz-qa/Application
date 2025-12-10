@@ -1383,7 +1383,7 @@ ORDER BY e.Date DESC, e.Id DESC;";
             using var c = OpenAndEnsureSchema();
             using var cmd = c.CreateCommand();
             cmd.CommandText = @"
-SELECT Id, UserId, Amount, Date, Description, CategoryId, IsPlanned
+SELECT Id, UserId, Amount, Date, Description, CategoryId, Account, IsPlanned
 FROM Expenses 
 WHERE Id=@id 
 LIMIT 1;";
@@ -1402,7 +1402,8 @@ LIMIT 1;";
                 Date = GetDate(r, 3),
                 Description = GetNullableString(r, 4),
                 CategoryId = catId,
-                IsPlanned = !r.IsDBNull(6) && Convert.ToInt32(r.GetValue(6)) == 1
+                Account = GetStringSafe(r, 6),
+                IsPlanned = !r.IsDBNull(7) && Convert.ToInt32(r.GetValue(7)) == 1
             };
         }
 
@@ -1411,8 +1412,8 @@ LIMIT 1;";
             using var c = OpenAndEnsureSchema();
             using var cmd = c.CreateCommand();
             cmd.CommandText = @"
-INSERT INTO Expenses(UserId, Amount, Date, Description, CategoryId, IsPlanned)
-VALUES (@u,@a,@d,@desc,@c,@planned);
+INSERT INTO Expenses(UserId, Amount, Date, Description, CategoryId, Account, IsPlanned)
+VALUES (@u,@a,@d,@desc,@c,@acc,@planned);
 SELECT last_insert_rowid();";
 
             cmd.Parameters.AddWithValue("@u", e.UserId);
@@ -1425,6 +1426,7 @@ SELECT last_insert_rowid();";
             else
                 cmd.Parameters.AddWithValue("@c", DBNull.Value);
 
+            cmd.Parameters.AddWithValue("@acc", (object?)e.Account ?? DBNull.Value);
             cmd.Parameters.AddWithValue("@planned", e.IsPlanned ? 1 : 0);
 
             var rowId = (long)(cmd.ExecuteScalar() ?? 0L);
@@ -1446,6 +1448,7 @@ UPDATE Expenses SET
     Date=@d, 
     Description=@desc, 
     CategoryId=@c,
+    Account=@acc,
     IsPlanned=@planned
 WHERE Id=@id;";
 
@@ -1460,10 +1463,12 @@ WHERE Id=@id;";
             else
                 cmd.Parameters.AddWithValue("@c", DBNull.Value);
 
+            cmd.Parameters.AddWithValue("@acc", (object?)e.Account ?? DBNull.Value);
             cmd.Parameters.AddWithValue("@planned", e.IsPlanned ? 1 : 0);
 
             cmd.ExecuteNonQuery();
         }
+
 
         /// <summary>
         /// Historyczny alias – teraz po prostu wo³a InsertExpense i ignoruje zwracane Id.
@@ -2085,13 +2090,9 @@ LIMIT 1;";
             using (var updCash = c.CreateCommand())
             {
                 updCash.Transaction = tx;
-                updCash.CommandText = @"
-UPDATE CashOnHand
-   SET Amount = Amount - @a,
-       UpdatedAt = CURRENT_TIMESTAMP
- WHERE UserId=@u;";
-                updCash.Parameters.AddWithValue("@a", amount);
+                updCash.CommandText = @"UPDATE CashOnHand SET Amount = Amount - @a, UpdatedAt=CURRENT_TIMESTAMP WHERE UserId=@u;";
                 updCash.Parameters.AddWithValue("@u", userId);
+                updCash.Parameters.AddWithValue("@a", amount);
                 updCash.ExecuteNonQuery();
             }
 
@@ -2167,7 +2168,7 @@ UPDATE BankAccounts
             return dt;
         }
 
-        private static void InsertTransfer(int userId, DateTime date, decimal amount, string fromKind, int? fromRefId, string toKind, int? toRefId, string? description = null)
+        private static void InsertTransfer(int userId, DateTime date, decimal amount, string fromKind, int? fromRefId, String toKind, int? toRefId, string? description = null)
         {
             using var con = OpenAndEnsureSchema();
             using var cmd = con.CreateCommand();
@@ -2526,10 +2527,14 @@ ON CONFLICT(UserId) DO UPDATE SET Amount = excluded.Amount + CashOnHand.Amount, 
             }
 
             // 3) Spróbuj jako przychód
+            // 3) Spróbuj jako przychód
             if (TableExists(c, "Incomes"))
             {
                 using var getInc = c.CreateCommand();
-                getInc.CommandText = @"SELECT Id, UserId, Amount, IsPlanned FROM Incomes WHERE Id=@id LIMIT 1;";
+                getInc.CommandText = @"SELECT Id, UserId, Amount, Source, IsPlanned 
+FROM Incomes 
+WHERE Id=@id 
+LIMIT 1;";
                 getInc.Parameters.AddWithValue("@id", transactionId);
 
                 using var rInc = getInc.ExecuteReader();
@@ -2538,34 +2543,55 @@ ON CONFLICT(UserId) DO UPDATE SET Amount = excluded.Amount + CashOnHand.Amount, 
                     var id = rInc.GetInt32(0);
                     var userId = rInc.GetInt32(1);
                     var amount = Convert.ToDecimal(rInc.GetValue(2));
-                    var isPlanned = !rInc.IsDBNull(3) && Convert.ToInt32(rInc.GetValue(3)) == 1;
+                    var source = GetNullableString(rInc, 3) ?? string.Empty;
+                    var isPlanned = !rInc.IsDBNull(4) && Convert.ToInt32(rInc.GetValue(4)) == 1;
 
-                    using var tx = c.BeginTransaction();
-
-                    // Odwrócenie przychodu: saldo powinno siê zmniejszyæ
-                    if (!isPlanned)
+                    // Najpierw cofamy wp³yw na salda (TYLKO dla przychodów zrealizowanych)
+                    if (!isPlanned && !string.IsNullOrWhiteSpace(source))
                     {
-                        using var updCash = c.CreateCommand();
-                        updCash.Transaction = tx;
-                        updCash.CommandText = @"UPDATE CashOnHand SET Amount = Amount - @a, UpdatedAt=CURRENT_TIMESTAMP WHERE UserId=@u;";
-                        updCash.Parameters.AddWithValue("@u", userId);
-                        updCash.Parameters.AddWithValue("@a", amount);
-                        updCash.ExecuteNonQuery();
+                        var src = source.Trim();
+
+                        // 1) Przy usuwaniu przychodu z konta bankowego
+                        //    ("Konto: mBank" itd.) – zmniejszamy saldo tego konta
+                        if (src.StartsWith("Konto:", StringComparison.OrdinalIgnoreCase))
+                        {
+                            var accountName = src.Substring("Konto:".Length).Trim();
+
+                            using var cAcc = OpenAndEnsureSchema();
+                            using var cmdAcc = cAcc.CreateCommand();
+                            cmdAcc.CommandText = @"
+UPDATE BankAccounts
+   SET Balance = Balance - @a
+ WHERE UserId=@u AND AccountName=@n;";
+                            cmdAcc.Parameters.AddWithValue("@a", amount);
+                            cmdAcc.Parameters.AddWithValue("@u", userId);
+                            cmdAcc.Parameters.AddWithValue("@n", accountName);
+                            cmdAcc.ExecuteNonQuery();
+                        }
+                        // 2) "Wolna gotówka" – odejmujemy z CashOnHand
+                        else if (src.Equals("Wolna gotówka", StringComparison.OrdinalIgnoreCase))
+                        {
+                            var cash = GetCashOnHand(userId);
+                            SetCashOnHand(userId, cash - amount);
+                        }
+                        // 3) "Od³o¿ona gotówka" – odejmujemy z SavedCash i z CashOnHand
+                        else if (src.Equals("Od³o¿ona gotówka", StringComparison.OrdinalIgnoreCase))
+                        {
+                            var saved = GetSavedCash(userId);
+                            var cash = GetCashOnHand(userId);
+
+                            SetSavedCash(userId, saved - amount);
+                            SetCashOnHand(userId, cash - amount);
+                        }
+                        // inne Ÿród³a – na razie ignorujemy (brak efektu ubocznego)
                     }
 
-                    using (var del = c.CreateCommand())
-                    {
-                        del.Transaction = tx;
-                        del.CommandText = "DELETE FROM Incomes WHERE Id=@id;";
-                        del.Parameters.AddWithValue("@id", id);
-                        del.ExecuteNonQuery();
-                    }
-
-                    tx.Commit();
-                    RaiseDataChanged();
+                    // Potem usuwamy rekord przychodu z bazy
+                    DeleteIncome(id); // ta metoda sama zrobi RaiseDataChanged()
                     return;
                 }
             }
+
 
             // Je¿eli nie znaleziono transakcji w ¿adnej tabeli – nic nie robimy
         }
