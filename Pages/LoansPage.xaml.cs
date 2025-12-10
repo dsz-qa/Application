@@ -8,7 +8,6 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
-using Microsoft.Win32;
 
 namespace Finly.Pages
 {
@@ -17,6 +16,16 @@ namespace Finly.Pages
         private readonly ObservableCollection<object> _loans = new();
         private readonly int _userId;
         private LoanCardVm? _selectedVm;
+
+        // Typ aktualnie pokazywanego panelu na dole
+        private enum LoanPanel
+        {
+            None,
+            AddEdit,
+            Schedule,
+            Overpay,
+            Sim
+        }
 
         public LoansPage() : this(UserService.GetCurrentUserId()) { }
 
@@ -117,14 +126,31 @@ namespace Finly.Pages
             foreach (var l in loans)
             {
                 if (l.TermMonths > 0)
-                    monthly += l.Principal / l.TermMonths; // simplistic monthly cost (principal only)
+                    monthly += l.Principal / l.TermMonths; // uproszczony koszt miesięczny (sam kapitał)
             }
 
-            // update UI
             if (FindName("TotalLoansTileAmount") is TextBlock tbTotal)
                 tbTotal.Text = total.ToString("N2") + " zł";
             if (FindName("MonthlyLoansTileAmount") is TextBlock tbMonthly)
                 tbMonthly.Text = monthly.ToString("N2") + " zł";
+        }
+
+        // ====== Panel dolny – przełączanie widoku ======
+
+        private void ShowPanel(LoanPanel panel)
+        {
+            if (FormBorder == null) return;
+
+            FormBorder.Visibility = panel == LoanPanel.None ? Visibility.Collapsed : Visibility.Visible;
+
+            if (AddEditPanel != null)
+                AddEditPanel.Visibility = panel == LoanPanel.AddEdit ? Visibility.Visible : Visibility.Collapsed;
+            if (SchedulePanel != null)
+                SchedulePanel.Visibility = panel == LoanPanel.Schedule ? Visibility.Visible : Visibility.Collapsed;
+            if (OverpayPanel != null)
+                OverpayPanel.Visibility = panel == LoanPanel.Overpay ? Visibility.Visible : Visibility.Collapsed;
+            if (SimPanel != null)
+                SimPanel.Visibility = panel == LoanPanel.Sim ? Visibility.Visible : Visibility.Collapsed;
         }
 
         private void ShowAddForm()
@@ -144,19 +170,12 @@ namespace Finly.Pages
             }
             catch { }
 
-            // show only Add tab
-            try { AddTab.Visibility = Visibility.Visible; } catch { }
-            try { ScheduleTab.Visibility = Visibility.Collapsed; } catch { }
-            try { OverpayTab.Visibility = Visibility.Collapsed; } catch { }
-            try { SimTab.Visibility = Visibility.Collapsed; } catch { }
+            ComputeAndShowMonthlyBreakdown();
 
-            try { FormTabs.SelectedItem = AddTab; } catch { }
-            try { FormBorder.Visibility = Visibility.Visible; } catch { }
+            ShowPanel(LoanPanel.AddEdit);
         }
 
-        // Header button - show add form
-        private void ShowAddLoan_Click(object sender, RoutedEventArgs e) => ShowAddForm();
-
+        // wywoływane z kafelka "Dodaj kredyt"
         private void AddLoanCard_Click(object sender, MouseButtonEventArgs e)
         {
             if (e.ChangedButton != MouseButton.Left) return;
@@ -202,7 +221,6 @@ namespace Finly.Pages
 
                 if (_selectedVm != null)
                 {
-                    // update existing
                     loan.Id = _selectedVm.Id;
                     DatabaseService.UpdateLoan(loan);
                     ToastService.Success("Kredyt zaktualizowany.");
@@ -223,17 +241,17 @@ namespace Finly.Pages
             }
             finally
             {
-                try { FormBorder.Visibility = Visibility.Collapsed; } catch { }
+                ShowPanel(LoanPanel.None);
                 _selectedVm = null;
             }
         }
 
         private void CancelLoan_Click(object sender, RoutedEventArgs e)
         {
-            try { FormBorder.Visibility = Visibility.Collapsed; } catch { }
+            ShowPanel(LoanPanel.None);
         }
 
-        // New: respond to changes in loan form to compute monthly payment
+        // reaguje na zmiany pól w formularzu
         private void LoanFormField_Changed(object sender, TextChangedEventArgs e)
         {
             ComputeAndShowMonthlyBreakdown();
@@ -253,10 +271,8 @@ namespace Finly.Pages
                 return;
             }
 
-            // monthly interest rate
             var r = annualRate / 100m / 12m;
 
-            // annuity payment formula: A = P * r / (1 - (1+r)^-n)
             decimal payment;
             if (r == 0m)
                 payment = Math.Round(principal / months, 2);
@@ -266,7 +282,6 @@ namespace Finly.Pages
                 payment = Math.Round(principal * r / denom, 2);
             }
 
-            // first payment breakdown
             decimal firstInterest = Math.Round(principal * r, 2);
             decimal firstPrincipal = Math.Round(payment - firstInterest, 2);
 
@@ -275,18 +290,21 @@ namespace Finly.Pages
             FirstInterestText.Text = firstInterest.ToString("N2") + " zł";
         }
 
-        // File chooser for schedule
+        // Upload harmonogramu
         private void ChooseSchedule_Click(object sender, RoutedEventArgs e)
         {
-            var dlg = new OpenFileDialog();
-            dlg.Filter = "PDF Files|*.pdf|All Files|*.*";
+            var dlg = new Microsoft.Win32.OpenFileDialog
+            {
+                Filter = "PDF Files|*.pdf|All Files|*.*"
+            };
             var ok = dlg.ShowDialog();
             if (ok == true)
             {
                 ScheduleFileNameText.Text = System.IO.Path.GetFileName(dlg.FileName);
-                // store path or upload as needed
             }
         }
+
+        // ====== Akcje z karty kredytu – przełączają dolny panel ======
 
         private void CardDetails_Click(object sender, RoutedEventArgs e)
         {
@@ -299,13 +317,12 @@ namespace Finly.Pages
                 LoanTermBox.Text = vm.TermMonths.ToString();
                 LoanStartDatePicker.SelectedDate = vm.StartDate;
 
-                // set payment day selector
+                // dzień pobrania raty
                 try
                 {
                     if (LoanPaymentDayBox != null)
                     {
                         int pd = vm.PaymentDay;
-                        // find item with matching Tag
                         for (int i = 0; i < LoanPaymentDayBox.Items.Count; i++)
                         {
                             if (LoanPaymentDayBox.Items[i] is ComboBoxItem ci)
@@ -321,18 +338,15 @@ namespace Finly.Pages
                 }
                 catch { }
 
-                FormTabs.SelectedIndex = 0;
-                FormBorder.Visibility = Visibility.Visible;
-
-                // show only details (AddTab reused for edit/details) - hide other tabs
-                AddTab.Visibility = Visibility.Visible;
-                ScheduleTab.Visibility = Visibility.Collapsed;
-                OverpayTab.Visibility = Visibility.Collapsed;
-                SimTab.Visibility = Visibility.Collapsed;
-                FormTabs.SelectedItem = AddTab;
-
                 ComputeAndShowMonthlyBreakdown();
+                ShowPanel(LoanPanel.AddEdit);
             }
+        }
+
+        private void EditLoan_Click(object sender, RoutedEventArgs e)
+        {
+            // Edycja działa identycznie jak Szczegóły – otwieramy panel Add/Edit z uzupełnionymi polami
+            CardDetails_Click(sender, e);
         }
 
         private void CardAddPayment_Click(object sender, RoutedEventArgs e)
@@ -342,15 +356,7 @@ namespace Finly.Pages
                 _selectedVm = vm;
                 OverpayAmountBox.Text = "";
                 OverpayResult.Text = string.Empty;
-                FormTabs.SelectedIndex = 2;
-                FormBorder.Visibility = Visibility.Visible;
-
-                // show only Overpay tab
-                AddTab.Visibility = Visibility.Collapsed;
-                ScheduleTab.Visibility = Visibility.Collapsed;
-                OverpayTab.Visibility = Visibility.Visible;
-                SimTab.Visibility = Visibility.Collapsed;
-                try { FormTabs.SelectedItem = OverpayTab; } catch { }
+                ShowPanel(LoanPanel.Overpay);
             }
         }
 
@@ -370,18 +376,23 @@ namespace Finly.Pages
                     }
                 }
                 else
-                    schedule.Add("Brak harmonogramu (okres =0)");
+                {
+                    schedule.Add("Brak harmonogramu (okres = 0).");
+                }
 
                 ScheduleList.ItemsSource = schedule;
-                FormTabs.SelectedIndex = 1;
-                FormBorder.Visibility = Visibility.Visible;
+                ShowPanel(LoanPanel.Schedule);
+            }
+        }
 
-                // show only Schedule tab
-                AddTab.Visibility = Visibility.Collapsed;
-                ScheduleTab.Visibility = Visibility.Visible;
-                OverpayTab.Visibility = Visibility.Collapsed;
-                SimTab.Visibility = Visibility.Collapsed;
-                try { FormTabs.SelectedItem = ScheduleTab; } catch { }
+        private void ShowSimPanel_Click(object sender, RoutedEventArgs e)
+        {
+            if ((sender as FrameworkElement)?.Tag is LoanCardVm vm)
+            {
+                _selectedVm = vm;
+                SimExtraBox.Text = "";
+                SimResult.Text = "";
+                ShowPanel(LoanPanel.Sim);
             }
         }
 
@@ -391,20 +402,20 @@ namespace Finly.Pages
             if (!decimal.TryParse((OverpayAmountBox.Text ?? "").Replace(" ", ""), out var amt) || amt <= 0)
             {
                 OverpayResult.Text = "Podaj poprawną kwotę nadpłaty.";
-                OverpayResult.Foreground = System.Windows.Media.Brushes.IndianRed;
+                OverpayResult.Foreground = Brushes.IndianRed;
                 return;
             }
 
             try
             {
-                // Placeholder implementation
+                // TODO: faktyczna logika nadpłaty w bazie (osobny serwis, jak będziesz chciała)
                 OverpayResult.Text = "Nadpłata zapisana (placeholder).";
-                OverpayResult.Foreground = System.Windows.Media.Brushes.Green;
+                OverpayResult.Foreground = Brushes.Green;
             }
             catch (Exception ex)
             {
                 OverpayResult.Text = "Błąd: " + ex.Message;
-                OverpayResult.Foreground = System.Windows.Media.Brushes.IndianRed;
+                OverpayResult.Foreground = Brushes.IndianRed;
             }
         }
 
@@ -412,79 +423,29 @@ namespace Finly.Pages
         {
             if (_selectedVm == null)
             {
-                SimResult.Text = "Wybierz najpierw kredyt (Kliknij kartę).";
+                SimResult.Text = "Wybierz najpierw kredyt (kliknij kartę).";
                 return;
             }
 
             if (!decimal.TryParse((SimExtraBox.Text ?? "").Replace(" ", ""), out var extra) || extra <= 0)
             {
-                SimResult.Text = "Podaj poprawna kwote.";
+                SimResult.Text = "Podaj poprawną kwotę.";
                 return;
             }
 
             var saved = Math.Round(extra * 0.05m, 2);
             var months = (int)(extra / Math.Max(1, _selectedVm.Principal));
-            SimResult.Text = $"Oszczedzisz ~{saved:N2} zl na odsetkach i skrocisz kredyt o ~{months} miesiecy (szac.).";
+            SimResult.Text = $"Oszczędzisz ~{saved:N2} zł na odsetkach i skrócisz kredyt o ~{months} mies. (szac.).";
         }
 
-        // New handlers: Edit and Delete
-        // Edit/Delete handlers referenced in XAML
-        private void EditLoan_Click(object sender, RoutedEventArgs e)
-        {
-            if ((sender as FrameworkElement)?.Tag is LoanCardVm vm)
-            {
-                _selectedVm = vm;
-                LoanNameBox.Text = vm.Name;
-                LoanPrincipalBox.Text = vm.Principal.ToString();
-                LoanInterestBox.Text = vm.InterestRate.ToString();
-                LoanTermBox.Text = vm.TermMonths.ToString();
-                LoanStartDatePicker.SelectedDate = vm.StartDate;
-                FormTabs.SelectedIndex = 0;
-
-                // set payment day selector
-                try
-                {
-                    if (LoanPaymentDayBox != null)
-                    {
-                        int pd = vm.PaymentDay;
-                        for (int i = 0; i < LoanPaymentDayBox.Items.Count; i++)
-                        {
-                            if (LoanPaymentDayBox.Items[i] is ComboBoxItem ci)
-                            {
-                                if (ci.Tag != null && int.TryParse(ci.Tag.ToString(), out var tagVal) && tagVal == pd)
-                                {
-                                    LoanPaymentDayBox.SelectedIndex = i;
-                                    break;
-                                }
-                            }
-                        }
-                    }
-                }
-                catch { }
-
-                // show only Add/Edit tab
-                AddTab.Visibility = Visibility.Visible;
-                ScheduleTab.Visibility = Visibility.Collapsed;
-                OverpayTab.Visibility = Visibility.Collapsed;
-                SimTab.Visibility = Visibility.Collapsed;
-                FormTabs.SelectedItem = AddTab;
-                FormBorder.Visibility = Visibility.Visible;
-
-                ComputeAndShowMonthlyBreakdown();
-            }
-        }
+        // ====== Usuwanie kredytu ======
 
         private void DeleteLoan_Click(object sender, RoutedEventArgs e)
         {
-            // Instead of deleting immediately, toggle inline confirmation panel for this card
             if (sender is not FrameworkElement fe) return;
 
-            // Hide other panels first
-            // hide other confirm panels
             HideAllDeletePanels();
 
-            // find nearest container (ContentPresenter or Border)
-            // find nearest card container
             FrameworkElement? container = fe;
             while (container != null && container is not ContentPresenter && container is not Border)
             {
@@ -516,20 +477,18 @@ namespace Finly.Pages
                 }
             }
 
-            // hide all confirm panels
             HideAllDeletePanels();
+            ShowPanel(LoanPanel.None);
         }
 
         private void DeleteCancel_Click(object sender, RoutedEventArgs e)
         {
-            // Find parent card and hide its DeleteConfirmPanel
             var btn = sender as FrameworkElement;
             if (btn == null) return;
 
             var card = FindVisualParent<Border>(btn);
             if (card == null)
             {
-                // fallback: hide all
                 HideAllDeletePanels();
                 return;
             }

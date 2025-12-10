@@ -57,7 +57,36 @@ namespace Finly.ViewModels
             }
         }
 
-        public decimal NextPayment => Math.Round(Principal > 0 ? Principal / Math.Max(1, TermMonths) : 0m, 0);
+        // NextPayment should include interest — use annuity formula on remaining term
+        public decimal NextPayment
+        {
+            get
+            {
+                if (Principal <= 0) return 0m;
+                if (TermMonths <= 0) return Math.Round(Principal, 0);
+
+                // months elapsed since start
+                var today = DateTime.Today;
+                var monthsElapsed = (today.Year - StartDate.Year) * 12 + today.Month - StartDate.Month;
+                var monthsLeft = Math.Max(1, TermMonths - monthsElapsed);
+
+                // monthly interest rate
+                var r = InterestRate / 100m / 12m;
+
+                if (r == 0m)
+                {
+                    return Math.Round(Principal / monthsLeft, 0);
+                }
+
+                // annuity payment for remaining months: A = P * r / (1 - (1+r)^-n)
+                var denom = 1m - (decimal)Math.Pow((double)(1m + r), -monthsLeft);
+                if (denom == 0m) return Math.Round(Principal / monthsLeft, 0);
+
+                var payment = Principal * r / denom;
+                return Math.Round(payment, 0);
+            }
+        }
+
         public string NextPaymentInfo => NextPayment.ToString("N0") + " zł · " + NextPaymentDate.ToString("dd.MM.yyyy");
 
         public string RemainingTermStr
