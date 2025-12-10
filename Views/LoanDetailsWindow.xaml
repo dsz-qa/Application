@@ -30,8 +30,19 @@
             <TabItem Header="Harmonogram">
                 <ScrollViewer>
                     <StackPanel Margin="6">
-                        <TextBlock Text="(Tabela rat - w budowie)" Foreground="Gray"/>
-                        <Button Content="Eksport do PDF/Excel" Margin="0,8,0,0"/>
+                        <TextBlock Text="Harmonogram spłat" FontWeight="Bold" Margin="0,0,0,8"/>
+
+                        <!-- Lista rat -->
+                        <ItemsControl Name="ScheduleItems">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <TextBlock Text="{Binding Display}" />
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+
+                        <!-- Jeśli kiedyś zechcesz: przyciski eksportu -->
+                        <!--<Button Content="Eksport do PDF/Excel" Margin="0,8,0,0"/>-->
                     </StackPanel>
                 </ScrollViewer>
             </TabItem>

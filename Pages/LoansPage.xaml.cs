@@ -8,6 +8,10 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
+using System.Globalization;
+using Finly.Views;
+using System.Collections.Generic;
+using System.IO;
 
 namespace Finly.Pages
 {
@@ -16,6 +20,10 @@ namespace Finly.Pages
         private readonly ObservableCollection<object> _loans = new();
         private readonly int _userId;
         private LoanCardVm? _selectedVm;
+
+        // mapowanie loanId -> ścieżka pliku harmonogramu (RAM)
+        private readonly Dictionary<int, string> _loanScheduleFiles = new();
+        private string? _lastChosenSchedulePath;
 
         // Typ aktualnie pokazywanego panelu na dole
         private enum LoanPanel
@@ -232,6 +240,14 @@ namespace Finly.Pages
                     ToastService.Success("Kredyt dodany.");
                 }
 
+                // jeśli użytkownik w tym formularzu wybrał plik harmonogramu – przypisz go do tego kredytu
+                if (!string.IsNullOrWhiteSpace(_lastChosenSchedulePath))
+                {
+                    _loanScheduleFiles[loan.Id] = _lastChosenSchedulePath;
+                    // opcjonalnie wyczyść ostatnio wybraną ścieżkę, aby nie przypisywać jej kolejnym kredytom
+                    _lastChosenSchedulePath = null;
+                }
+
                 LoadLoans();
                 RefreshKpisAndLists();
             }
@@ -295,11 +311,12 @@ namespace Finly.Pages
         {
             var dlg = new Microsoft.Win32.OpenFileDialog
             {
-                Filter = "PDF Files|*.pdf|All Files|*.*"
+                Filter = "Pliki CSV|*.csv|Pliki PDF|*.pdf|Wszystkie pliki|*.*"
             };
             var ok = dlg.ShowDialog();
             if (ok == true)
             {
+                _lastChosenSchedulePath = dlg.FileName;
                 ScheduleFileNameText.Text = System.IO.Path.GetFileName(dlg.FileName);
             }
         }
@@ -365,77 +382,100 @@ namespace Finly.Pages
             if ((sender as FrameworkElement)?.Tag is LoanCardVm vm)
             {
                 _selectedVm = vm;
-                var schedule = new ObservableCollection<string>();
-                if (vm.TermMonths > 0)
+
+                var detailsVm = new LoanDetailsWindow.DetailsVm
                 {
-                    var per = Math.Round(vm.Principal / Math.Max(1, vm.TermMonths), 2);
-                    for (int i = 1; i <= vm.TermMonths; i++)
-                    {
-                        var d = vm.StartDate.AddMonths(i);
-                        schedule.Add($"{d:dd.MM.yyyy} — {per:N2} zł");
-                    }
+                    Name = vm.Name,
+                    Principal = vm.Principal,
+                    InterestRate = vm.InterestRate,
+                    StartDate = vm.StartDate,
+                    TermMonths = vm.TermMonths
+                };
+
+                List<LoanDetailsWindow.ScheduleRow> schedule;
+
+                if (_loanScheduleFiles.TryGetValue(vm.Id, out var path) &&
+                    !string.IsNullOrWhiteSpace(path) &&
+                    string.Equals(System.IO.Path.GetExtension(path), ".csv", StringComparison.OrdinalIgnoreCase))
+                {
+                    schedule = ParseScheduleCsv(path);
                 }
                 else
                 {
-                    schedule.Add("Brak harmonogramu (okres = 0).");
+                    // brak pliku lub nie-CSV – generujemy prosty harmonogram
+                    schedule = GenerateSimpleSchedule(vm);
                 }
 
-                ScheduleList.ItemsSource = schedule;
-                ShowPanel(LoanPanel.Schedule);
+                detailsVm.Schedule = schedule;
+
+                var win = new LoanDetailsWindow(detailsVm)
+                {
+                    Owner = Window.GetWindow(this)
+                };
+                win.ShowDialog();
             }
         }
 
-        private void ShowSimPanel_Click(object sender, RoutedEventArgs e)
+        private static List<LoanDetailsWindow.ScheduleRow> ParseScheduleCsv(string path)
         {
-            if ((sender as FrameworkElement)?.Tag is LoanCardVm vm)
+            var result = new List<LoanDetailsWindow.ScheduleRow>();
+            if (!File.Exists(path)) return result;
+
+            var culture = new CultureInfo("pl-PL");
+
+            foreach (var rawLine in File.ReadLines(path))
             {
-                _selectedVm = vm;
-                SimExtraBox.Text = "";
-                SimResult.Text = "";
-                ShowPanel(LoanPanel.Sim);
+                var line = rawLine.Trim();
+                if (string.IsNullOrWhiteSpace(line)) continue;
+
+                // pomiń nagłówki
+                if (line.StartsWith("Data", StringComparison.OrdinalIgnoreCase))
+                    continue;
+
+                string[] parts = line.Split(';');
+                if (parts.Length < 2)
+                    parts = line.Split(',');              
+
+                if (parts.Length < 2) continue;
+
+                if (!DateTime.TryParse(parts[0], culture, DateTimeStyles.None, out var date))
+                    continue;
+
+                var amountStr = parts[1]
+                    .Replace("zł", "", StringComparison.OrdinalIgnoreCase)
+                    .Replace(" ", "");
+
+                if (!decimal.TryParse(amountStr, NumberStyles.Any, culture, out var amount))
+                    continue;
+
+                result.Add(new LoanDetailsWindow.ScheduleRow
+                {
+                    Date = date,
+                    Amount = amount
+                });
             }
+
+            return result;
         }
 
-        private void OverpaySave_Click(object sender, RoutedEventArgs e)
+        private static List<LoanDetailsWindow.ScheduleRow> GenerateSimpleSchedule(LoanCardVm vm)
         {
-            if (_selectedVm == null) return;
-            if (!decimal.TryParse((OverpayAmountBox.Text ?? "").Replace(" ", ""), out var amt) || amt <= 0)
+            var list = new List<LoanDetailsWindow.ScheduleRow>();
+            if (vm.TermMonths <= 0 || vm.Principal <= 0) return list;
+
+            var per = Math.Round(vm.Principal / Math.Max(1, vm.TermMonths), 2);
+
+            for (int i = 1; i <= vm.TermMonths; i++)
             {
-                OverpayResult.Text = "Podaj poprawną kwotę nadpłaty.";
-                OverpayResult.Foreground = Brushes.IndianRed;
-                return;
+                var d = vm.StartDate.AddMonths(i);
+                list.Add(new LoanDetailsWindow.ScheduleRow
+                {
+                    Date = d,
+                    Amount = per
+                });
             }
 
-            try
-            {
-                // TODO: faktyczna logika nadpłaty w bazie (osobny serwis, jak będziesz chciała)
-                OverpayResult.Text = "Nadpłata zapisana (placeholder).";
-                OverpayResult.Foreground = Brushes.Green;
-            }
-            catch (Exception ex)
-            {
-                OverpayResult.Text = "Błąd: " + ex.Message;
-                OverpayResult.Foreground = Brushes.IndianRed;
-            }
-        }
-
-        private void SimulateInline_Click(object sender, RoutedEventArgs e)
-        {
-            if (_selectedVm == null)
-            {
-                SimResult.Text = "Wybierz najpierw kredyt (kliknij kartę).";
-                return;
-            }
-
-            if (!decimal.TryParse((SimExtraBox.Text ?? "").Replace(" ", ""), out var extra) || extra <= 0)
-            {
-                SimResult.Text = "Podaj poprawną kwotę.";
-                return;
-            }
-
-            var saved = Math.Round(extra * 0.05m, 2);
-            var months = (int)(extra / Math.Max(1, _selectedVm.Principal));
-            SimResult.Text = $"Oszczędzisz ~{saved:N2} zł na odsetkach i skrócisz kredyt o ~{months} mies. (szac.).";
+            return list;
         }
 
         // ====== Usuwanie kredytu ======
@@ -535,5 +575,77 @@ namespace Finly.Pages
             }
             return null;
         }
-    }
+
+        private void ShowSimPanel_Click(object sender, RoutedEventArgs e)
+        {
+            if ((sender as FrameworkElement)?.Tag is LoanCardVm vm)
+            {
+                _selectedVm = vm;
+            }
+
+            if (SimExtraBox != null) SimExtraBox.Text = "";
+            if (SimResult != null) SimResult.Text = string.Empty;
+
+            ShowPanel(LoanPanel.Sim);
+        }
+
+        private void SimulateInline_Click(object sender, RoutedEventArgs e)
+        {
+            if (_selectedVm == null)
+            {
+                SimResult.Text = "Wybierz najpierw kredyt (kliknij kartę).";
+                return;
+            }
+
+            if (!decimal.TryParse((SimExtraBox.Text ?? "").Replace(" ", ""), out var extra) || extra <= 0)
+            {
+                SimResult.Text = "Podaj poprawną kwotę.";
+                return;
+            }
+
+            var saved = Math.Round(extra * 0.05m, 2);
+            var months = (int)(extra / Math.Max(1, _selectedVm.Principal));
+
+            SimResult.Text = $"Oszczędzisz ~{saved:N2} zł na odsetkach i skrócisz kredyt o ~{months} miesięcy (szac.).";
+        }
+
+
+        private void OverpaySave_Click(object sender, RoutedEventArgs e)
+        {
+            if (_selectedVm == null)
+            {
+                OverpayResult.Text = "Najpierw wybierz kredyt (kliknij kartę).";
+                OverpayResult.Foreground = Brushes.IndianRed;
+                return;
+            }
+
+            if (!decimal.TryParse((OverpayAmountBox.Text ?? "").Replace(" ", ""), out var amt) || amt <= 0)
+            {
+                OverpayResult.Text = "Podaj poprawną kwotę nadpłaty.";
+                OverpayResult.Foreground = Brushes.IndianRed;
+                return;
+            }
+
+            try
+            {
+                // TODO: tutaj kiedyś zapiszesz nadpłatę w bazie kredytów
+                OverpayResult.Text = "Nadpłata zapisana (placeholder).";
+                OverpayResult.Foreground = Brushes.Green;
+
+                // po poprawnej nadpłacie schowaj panel
+                ShowPanel(LoanPanel.None);
+            }
+            catch (Exception ex)
+            {
+                OverpayResult.Text = "Błąd: " + ex.Message;
+                OverpayResult.Foreground = Brushes.IndianRed;
+            }
+
+
+
+        }
+    } 
+
+
+
 }

@@ -16,20 +16,20 @@
             <!-- pojedyncza ramka funkcji -->
         </Grid.RowDefinitions>
 
-        <!-- Nagłówek -->
-        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-            <TextBlock Text="Kredyty"
-                       FontSize="20"
-                       FontWeight="Bold"
-                       Foreground="{DynamicResource App.Foreground}"/>
-        </StackPanel>
-
         <!-- KPI + Smart-insighty -->
         <Grid Grid.Row="1" Margin="0,12,0,0">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="*" />
                 <ColumnDefinition Width="320" />
             </Grid.ColumnDefinitions>
+
+            <!-- Nagłówek -->
+            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                <TextBlock Text="Kredyty"
+                       FontSize="20"
+                       FontWeight="Bold"
+                       Foreground="{DynamicResource App.Foreground}"/>
+            </StackPanel>
 
             <!-- Left: KPI tiles -->
             <StackPanel Grid.Column="0"
@@ -79,12 +79,12 @@
 
             <!-- Right: Smart-insighty -->
             <Border Grid.Column="1"
-                    Background="{DynamicResource Surface.Background}"
-                    BorderBrush="Orange"
-                    BorderThickness="2"
-                    CornerRadius="8"
-                    Padding="12"
-                    HorizontalAlignment="Right">
+        Background="{DynamicResource Surface.Background}"
+        BorderBrush="Orange"
+        BorderThickness="2"
+        CornerRadius="8"
+        Padding="12"
+        HorizontalAlignment="Right">
                 <StackPanel>
                     <TextBlock Text="Analizy finansowe" FontWeight="Bold"/>
                     <ItemsControl x:Name="InsightsList" Margin="0,8,0,0" />
@@ -94,7 +94,9 @@
                                   Visibility="Collapsed">
                         <ItemsControl.ItemTemplate>
                             <DataTemplate>
-                                <TextBlock Text="{Binding DateStr}"/>
+                                <TextBlock Text="{Binding}"
+                       FontWeight="Bold"
+                       Foreground="{DynamicResource App.Foreground}" />
                             </DataTemplate>
                         </ItemsControl.ItemTemplate>
                     </ItemsControl>
@@ -489,6 +491,7 @@
                     <TextBlock Text="Harmonogram spłat"
                                FontWeight="Bold"
                                Margin="0,0,0,8"/>
+
                     <ItemsControl x:Name="ScheduleList">
                         <ItemsControl.ItemTemplate>
                             <DataTemplate>
@@ -496,16 +499,35 @@
                             </DataTemplate>
                         </ItemsControl.ItemTemplate>
                     </ItemsControl>
+
+                    <!-- Przyciski zamykania -->
+                    <StackPanel Orientation="Horizontal"
+                                HorizontalAlignment="Right"
+                                Margin="0,8,0,0">
+                        <Button Content="Zamknij"
+                                Width="90"
+                                Click="CancelLoan_Click"/>
+                    </StackPanel>
                 </StackPanel>
 
                 <!-- Panel Nadpłata -->
                 <StackPanel x:Name="OverpayPanel" Visibility="Collapsed">
                     <TextBlock Text="Wprowadź kwotę nadpłaty:"/>
                     <TextBox x:Name="OverpayAmountBox" />
-                    <Button Content="Zatwierdź nadpłatę"
-                            Width="140"
-                            Margin="0,8,0,0"
-                            Click="OverpaySave_Click"/>
+
+                    <StackPanel Orientation="Horizontal"
+                                HorizontalAlignment="Right"
+                                Margin="0,8,0,0">
+                        <Button x:Name="OverpaySaveBtn"
+                                Content="Zatwierdź nadpłatę"
+                                Width="140"
+                                Click="OverpaySave_Click"/>
+                        <Button Content="Anuluj"
+                                Width="90"
+                                Margin="8,0,0,0"
+                                Click="CancelLoan_Click"/>
+                    </StackPanel>
+
                     <TextBlock x:Name="OverpayResult"
                                Foreground="Green"
                                Margin="0,8,0,0"/>
@@ -515,10 +537,19 @@
                 <StackPanel x:Name="SimPanel" Visibility="Collapsed">
                     <TextBlock Text="Podaj dodatkową wpłatę (jednorazowo):"/>
                     <TextBox x:Name="SimExtraBox" />
-                    <Button Content="Symuluj"
-                            Width="120"
-                            Margin="0,8,0,0"
-                            Click="SimulateInline_Click"/>
+
+                    <StackPanel Orientation="Horizontal"
+                                HorizontalAlignment="Right"
+                                Margin="0,8,0,0">
+                        <Button Content="Symuluj"
+                                Width="120"
+                                Click="SimulateInline_Click"/>
+                        <Button Content="Zamknij"
+                                Width="90"
+                                Margin="8,0,0,0"
+                                Click="CancelLoan_Click"/>
+                    </StackPanel>
+
                     <TextBlock x:Name="SimResult"
                                Margin="0,8,0,0"/>
                 </StackPanel>
