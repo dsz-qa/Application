@@ -368,11 +368,12 @@
                     <Grid x:Name="ReadMode" Grid.RowSpan="2">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
                         </Grid.ColumnDefinitions>
 
                         <!-- LEFT info -->
                         <StackPanel Grid.Column="0" Orientation="Vertical" Margin="4,0,8,0">
-                            <!-- Header: type icon + type label + category name -->
+                            <!-- Header: type icon + type label ONLY -->
                             <StackPanel Orientation="Horizontal" Margin="0,0,0,6" VerticalAlignment="Center">
                                 <Image Width="20" Height="20" Margin="0,0,6,0">
                                     <Image.Style>
@@ -392,7 +393,7 @@
                                         </Style>
                                     </Image.Style>
                                 </Image>
-                                <TextBlock FontWeight="Bold" FontSize="14" Foreground="{DynamicResource App.Foreground}" Margin="0,0,8,0">
+                                <TextBlock FontWeight="Bold" FontSize="14" Foreground="{DynamicResource App.Foreground}">
                                     <TextBlock.Style>
                                         <Style TargetType="TextBlock">
                                             <Setter Property="Text" Value="Wydatek"/>
@@ -410,10 +411,6 @@
                                         </Style>
                                     </TextBlock.Style>
                                 </TextBlock>
-                                <TextBlock Text="{Binding CategoryName, TargetNullValue=Brak kategorii, FallbackValue=Brak kategorii}"
-                                           FontWeight="Bold"
-                                           FontSize="14"
-                                           Foreground="{DynamicResource App.Foreground}"/>
                             </StackPanel>
 
                             <!-- Description -->
