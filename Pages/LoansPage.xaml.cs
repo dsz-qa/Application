@@ -1,17 +1,17 @@
-﻿using Finly.Models;
-using Finly.ViewModels;
-using Finly.Services;
-using System;
+﻿using System;
+using System.Collections.Generic;
 using System.Collections.ObjectModel;
+using System.Globalization;
+using System.IO;
 using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
-using System.Globalization;
+using Finly.Models;
+using Finly.Services;
+using Finly.ViewModels;
 using Finly.Views;
-using System.Collections.Generic;
-using System.IO;
 
 namespace Finly.Pages
 {
@@ -25,7 +25,7 @@ namespace Finly.Pages
         private readonly Dictionary<int, string> _loanScheduleFiles = new();
         private string? _lastChosenSchedulePath;
 
-        // konta bankowe (z bazy)
+        // konta bankowe użytkownika (z bazy)
         private List<BankAccountModel> _accounts = new();
 
         // mapowanie loanId -> accountId (z którego spłacany jest kredyt)
@@ -41,11 +41,15 @@ namespace Finly.Pages
             Sim
         }
 
-        public LoansPage() : this(UserService.GetCurrentUserId()) { }
+        public LoansPage()
+            : this(UserService.GetCurrentUserId())
+        {
+        }
 
         public LoansPage(int userId)
         {
             InitializeComponent();
+
             _userId = userId <= 0 ? UserService.GetCurrentUserId() : userId;
 
             LoansGrid.ItemsSource = _loans;
@@ -81,6 +85,7 @@ namespace Finly.Pages
         private void LoadLoans()
         {
             _loans.Clear();
+
             var list = DatabaseService.GetLoans(_userId) ?? new List<LoanModel>();
 
             foreach (var l in list)
@@ -95,10 +100,10 @@ namespace Finly.Pages
                     StartDate = l.StartDate,
                     TermMonths = l.TermMonths,
                     PaymentDay = l.PaymentDay
-                    // konto spłaty przechowujemy na razie tylko w słowniku _loanAccounts
                 });
             }
 
+            // kafelek "Dodaj kredyt"
             _loans.Add(new AddLoanTile());
 
             UpdateKpiTiles();
@@ -108,32 +113,38 @@ namespace Finly.Pages
         {
             UpdateKpiTiles();
 
-            decimal totalDebt = _loans.OfType<LoanCardVm>().Sum(x => x.Principal);
-            var totalDebtTb = FindName("TotalDebtText") as TextBlock;
-            if (totalDebtTb != null) totalDebtTb.Text = totalDebt.ToString("N0") + " zł";
+            var loans = _loans.OfType<LoanCardVm>().ToList();
 
-            // Szacunkowy miesięczny koszt (bardzo uproszczony)
+            decimal totalDebt = loans.Sum(x => x.Principal);
+            var totalDebtTb = FindName("TotalDebtText") as TextBlock;
+            if (totalDebtTb != null)
+                totalDebtTb.Text = totalDebt.ToString("N0") + " zł";
+
+            // Szacunkowa miesięczna rata – suma prawdziwych rat dla wszystkich kredytów
             decimal monthly = 0m;
-            foreach (var l in _loans.OfType<LoanCardVm>())
+            foreach (var l in loans)
             {
-                var monthsElapsed = (DateTime.Today.Year - l.StartDate.Year) * 12
-                                    + DateTime.Today.Month - l.StartDate.Month;
-                var monthsLeft = Math.Max(1, l.TermMonths - monthsElapsed);
-                monthly += monthsLeft > 0 ? Math.Round(l.Principal / monthsLeft, 2) : l.Principal;
+                if (l.Principal > 0 && l.TermMonths > 0)
+                {
+                    monthly += LoanService.CalculateMonthlyPayment(
+                        l.Principal,
+                        l.InterestRate,
+                        l.TermMonths);
+                }
             }
 
-            // Średni miesięczny koszt w skali 12 miesięcy
-            var avg12 = _loans.OfType<LoanCardVm>().Sum(x => x.Principal) / 12m;
+            // Łączny koszt rat w skali 12 miesięcy (przy założeniu stałej raty)
+            var annual = monthly * 12m;
 
             // Procent kredytów spłaconych (Principal == 0)
-            var loanCount = _loans.OfType<LoanCardVm>().Count();
+            var loanCount = loans.Count;
             var paidPct = loanCount == 0
                 ? 0
-                : (double)_loans.OfType<LoanCardVm>().Count(x => x.Principal <= 0) / loanCount * 100.0;
+                : (double)loans.Count(x => x.Principal <= 0) / loanCount * 100.0;
 
-            // Nadchodzące raty – uproszczone dane
+            // Nadchodzące raty – bierzemy kwoty z VM (tam też możesz mieć obliczoną „prawdziwą” ratę)
             var upcoming = new ObservableCollection<object>();
-            foreach (var l in _loans.OfType<LoanCardVm>().OrderBy(x => x.NextPaymentDate))
+            foreach (var l in loans.OrderBy(x => x.NextPaymentDate))
             {
                 upcoming.Add(new
                 {
@@ -144,13 +155,13 @@ namespace Finly.Pages
             }
             UpcomingPaymentsList.ItemsSource = upcoming;
 
-            // Insights
+            // Insights – spójne z KPI
             var insights = new ObservableCollection<string>();
             if (totalDebt > 0)
             {
                 insights.Add($"Suma zadłużenia: {totalDebt:N0} zł");
                 insights.Add($"Szacunkowa miesięczna rata (suma): {monthly:N0} zł");
-                insights.Add($"Średnia miesięczna (12m): {avg12:N0} zł");
+                insights.Add($"Prognozowana łączna kwota rat w 12 mies.: {annual:N0} zł");
                 insights.Add($"Pozytywny / negatywny wskaźnik spłat: {((int)paidPct)}% spłacone (uproszczone)");
             }
             else
@@ -161,23 +172,33 @@ namespace Finly.Pages
             InsightsList.ItemsSource = insights;
         }
 
+
         private void UpdateKpiTiles()
         {
             var loans = _loans.OfType<LoanCardVm>().ToList();
+
             decimal total = loans.Sum(x => x.Principal);
             decimal monthly = 0m;
 
             foreach (var l in loans)
             {
-                if (l.TermMonths > 0)
-                    monthly += l.Principal / l.TermMonths; // uproszczony koszt miesięczny (sam kapitał)
+                if (l.Principal > 0 && l.TermMonths > 0)
+                {
+                    // realna rata wg tej samej logiki co w kartach kredytu
+                    monthly += LoanService.CalculateMonthlyPayment(
+                        l.Principal,
+                        l.InterestRate,
+                        l.TermMonths);
+                }
             }
 
             if (FindName("TotalLoansTileAmount") is TextBlock tbTotal)
                 tbTotal.Text = total.ToString("N2") + " zł";
+
             if (FindName("MonthlyLoansTileAmount") is TextBlock tbMonthly)
                 tbMonthly.Text = monthly.ToString("N2") + " zł";
         }
+
 
         // ====== Panel dolny – przełączanie widoku ======
 
@@ -185,7 +206,9 @@ namespace Finly.Pages
         {
             if (FormBorder == null) return;
 
-            FormBorder.Visibility = panel == LoanPanel.None ? Visibility.Collapsed : Visibility.Visible;
+            FormBorder.Visibility = panel == LoanPanel.None
+                ? Visibility.Collapsed
+                : Visibility.Visible;
 
             if (AddEditPanel != null)
                 AddEditPanel.Visibility = panel == LoanPanel.AddEdit ? Visibility.Visible : Visibility.Collapsed;
@@ -200,18 +223,23 @@ namespace Finly.Pages
         private void ShowAddForm()
         {
             _selectedVm = null;
+
             try { LoanFormMessage.Text = string.Empty; } catch { }
             try { LoanNameBox.Text = ""; } catch { }
             try { LoanPrincipalBox.Text = ""; } catch { }
             try { LoanInterestBox.Text = ""; } catch { }
             try { LoanTermBox.Text = ""; } catch { }
             try { LoanStartDatePicker.SelectedDate = DateTime.Today; } catch { }
+
             try
             {
                 if (LoanPaymentDayBox != null) LoanPaymentDayBox.SelectedIndex = 0;
                 if (LoanAccountBox != null) LoanAccountBox.SelectedIndex = -1;
             }
-            catch { }
+            catch
+            {
+                // ignorujemy ewentualne wyjątki UI
+            }
 
             ComputeAndShowMonthlyBreakdown();
             ShowPanel(LoanPanel.AddEdit);
@@ -233,9 +261,13 @@ namespace Finly.Pages
                 return;
             }
 
-            if (!decimal.TryParse((LoanPrincipalBox.Text ?? "").Trim(), out var principal)) principal = 0m;
-            if (!decimal.TryParse((LoanInterestBox.Text ?? "").Trim(), out var interest)) interest = 0m;
-            if (!int.TryParse((LoanTermBox.Text ?? "").Trim(), out var term)) term = 0;
+            if (!decimal.TryParse((LoanPrincipalBox.Text ?? "").Trim(), out var principal))
+                principal = 0m;
+            if (!decimal.TryParse((LoanInterestBox.Text ?? "").Trim(), out var interest))
+                interest = 0m;
+            if (!int.TryParse((LoanTermBox.Text ?? "").Trim(), out var term))
+                term = 0;
+
             var start = LoanStartDatePicker.SelectedDate ?? DateTime.Today;
 
             int paymentDay = 0;
@@ -243,14 +275,20 @@ namespace Finly.Pages
             {
                 if (LoanPaymentDayBox?.SelectedItem is ComboBoxItem ci && ci.Tag != null)
                 {
-                    if (!int.TryParse(ci.Tag.ToString(), out paymentDay)) paymentDay = 0;
+                    if (!int.TryParse(ci.Tag.ToString(), out paymentDay))
+                        paymentDay = 0;
                 }
             }
-            catch { paymentDay = 0; }
+            catch
+            {
+                paymentDay = 0;
+            }
 
             int? selectedAccountId = null;
             if (LoanAccountBox?.SelectedItem is BankAccountModel acc)
+            {
                 selectedAccountId = acc.Id;
+            }
 
             try
             {
@@ -349,6 +387,7 @@ namespace Finly.Pages
             {
                 Filter = "Pliki CSV|*.csv|Pliki PDF|*.pdf|Wszystkie pliki|*.*"
             };
+
             var ok = dlg.ShowDialog();
             if (ok == true)
             {
@@ -361,57 +400,64 @@ namespace Finly.Pages
 
         private void CardDetails_Click(object sender, RoutedEventArgs e)
         {
-            if ((sender as FrameworkElement)?.Tag is LoanCardVm vm)
+            if ((sender as FrameworkElement)?.Tag is not LoanCardVm vm)
+                return;
+
+            _selectedVm = vm;
+
+            LoanNameBox.Text = vm.Name;
+            LoanPrincipalBox.Text = vm.Principal.ToString(CultureInfo.InvariantCulture);
+            LoanInterestBox.Text = vm.InterestRate.ToString(CultureInfo.InvariantCulture);
+            LoanTermBox.Text = vm.TermMonths.ToString(CultureInfo.InvariantCulture);
+            LoanStartDatePicker.SelectedDate = vm.StartDate;
+
+            // dzień pobrania raty
+            try
             {
-                _selectedVm = vm;
-                LoanNameBox.Text = vm.Name;
-                LoanPrincipalBox.Text = vm.Principal.ToString();
-                LoanInterestBox.Text = vm.InterestRate.ToString();
-                LoanTermBox.Text = vm.TermMonths.ToString();
-                LoanStartDatePicker.SelectedDate = vm.StartDate;
-
-                // dzień pobrania raty
-                try
+                if (LoanPaymentDayBox != null)
                 {
-                    if (LoanPaymentDayBox != null)
+                    int pd = vm.PaymentDay;
+                    for (int i = 0; i < LoanPaymentDayBox.Items.Count; i++)
                     {
-                        int pd = vm.PaymentDay;
-                        for (int i = 0; i < LoanPaymentDayBox.Items.Count; i++)
+                        if (LoanPaymentDayBox.Items[i] is ComboBoxItem ci &&
+                            ci.Tag != null &&
+                            int.TryParse(ci.Tag.ToString(), out var tagVal) &&
+                            tagVal == pd)
                         {
-                            if (LoanPaymentDayBox.Items[i] is ComboBoxItem ci &&
-                                ci.Tag != null &&
-                                int.TryParse(ci.Tag.ToString(), out var tagVal) &&
-                                tagVal == pd)
-                            {
-                                LoanPaymentDayBox.SelectedIndex = i;
-                                break;
-                            }
+                            LoanPaymentDayBox.SelectedIndex = i;
+                            break;
                         }
                     }
                 }
-                catch { }
-
-                // konto spłaty – jeśli mamy w słowniku, ustaw w ComboBoxie
-                try
-                {
-                    if (LoanAccountBox != null)
-                    {
-                        if (_loanAccounts.TryGetValue(vm.Id, out var accId))
-                        {
-                            var acc = _accounts.FirstOrDefault(a => a.Id == accId);
-                            LoanAccountBox.SelectedItem = acc;
-                        }
-                        else
-                        {
-                            LoanAccountBox.SelectedIndex = -1;
-                        }
-                    }
-                }
-                catch { }
-
-                ComputeAndShowMonthlyBreakdown();
-                ShowPanel(LoanPanel.AddEdit);
             }
+            catch
+            {
+                // ignorujemy błędy UI
+            }
+
+            // konto spłaty – jeśli mamy w słowniku, ustaw w ComboBoxie
+            try
+            {
+                if (LoanAccountBox != null)
+                {
+                    if (_loanAccounts.TryGetValue(vm.Id, out var accId))
+                    {
+                        var acc = _accounts.FirstOrDefault(a => a.Id == accId);
+                        LoanAccountBox.SelectedItem = acc;
+                    }
+                    else
+                    {
+                        LoanAccountBox.SelectedIndex = -1;
+                    }
+                }
+            }
+            catch
+            {
+                // ignorujemy błędy UI
+            }
+
+            ComputeAndShowMonthlyBreakdown();
+            ShowPanel(LoanPanel.AddEdit);
         }
 
         private void EditLoan_Click(object sender, RoutedEventArgs e)
@@ -421,51 +467,51 @@ namespace Finly.Pages
 
         private void CardAddPayment_Click(object sender, RoutedEventArgs e)
         {
-            if ((sender as FrameworkElement)?.Tag is LoanCardVm vm)
-            {
-                _selectedVm = vm;
-                OverpayAmountBox.Text = "";
-                OverpayResult.Text = string.Empty;
-                ShowPanel(LoanPanel.Overpay);
-            }
+            if ((sender as FrameworkElement)?.Tag is not LoanCardVm vm)
+                return;
+
+            _selectedVm = vm;
+            OverpayAmountBox.Text = "";
+            OverpayResult.Text = string.Empty;
+            ShowPanel(LoanPanel.Overpay);
         }
 
         private void CardSchedule_Click(object sender, RoutedEventArgs e)
         {
-            if ((sender as FrameworkElement)?.Tag is LoanCardVm vm)
+            if ((sender as FrameworkElement)?.Tag is not LoanCardVm vm)
+                return;
+
+            _selectedVm = vm;
+
+            var detailsVm = new LoanDetailsWindow.DetailsVm
             {
-                _selectedVm = vm;
+                Name = vm.Name,
+                Principal = vm.Principal,
+                InterestRate = vm.InterestRate,
+                StartDate = vm.StartDate,
+                TermMonths = vm.TermMonths
+            };
 
-                var detailsVm = new LoanDetailsWindow.DetailsVm
-                {
-                    Name = vm.Name,
-                    Principal = vm.Principal,
-                    InterestRate = vm.InterestRate,
-                    StartDate = vm.StartDate,
-                    TermMonths = vm.TermMonths
-                };
+            List<LoanDetailsWindow.ScheduleRow> schedule;
 
-                List<LoanDetailsWindow.ScheduleRow> schedule;
-
-                if (_loanScheduleFiles.TryGetValue(vm.Id, out var path) &&
-                    !string.IsNullOrWhiteSpace(path) &&
-                    string.Equals(Path.GetExtension(path), ".csv", StringComparison.OrdinalIgnoreCase))
-                {
-                    schedule = ParseScheduleCsv(path);
-                }
-                else
-                {
-                    schedule = GenerateSimpleSchedule(vm);
-                }
-
-                detailsVm.Schedule = schedule;
-
-                var win = new LoanDetailsWindow(detailsVm)
-                {
-                    Owner = Window.GetWindow(this)
-                };
-                win.ShowDialog();
+            if (_loanScheduleFiles.TryGetValue(vm.Id, out var path) &&
+                !string.IsNullOrWhiteSpace(path) &&
+                string.Equals(Path.GetExtension(path), ".csv", StringComparison.OrdinalIgnoreCase))
+            {
+                schedule = ParseScheduleCsv(path);
             }
+            else
+            {
+                schedule = GenerateSimpleSchedule(vm);
+            }
+
+            detailsVm.Schedule = schedule;
+
+            var win = new LoanDetailsWindow(detailsVm)
+            {
+                Owner = Window.GetWindow(this)
+            };
+            win.ShowDialog();
         }
 
         private static List<LoanDetailsWindow.ScheduleRow> ParseScheduleCsv(string path)
@@ -480,6 +526,7 @@ namespace Finly.Pages
                 var line = rawLine.Trim();
                 if (string.IsNullOrWhiteSpace(line)) continue;
 
+                // pomiń nagłówki
                 if (line.StartsWith("Data", StringComparison.OrdinalIgnoreCase))
                     continue;
 
@@ -538,7 +585,9 @@ namespace Finly.Pages
             HideAllDeletePanels();
 
             FrameworkElement? container = fe;
-            while (container != null && container is not ContentPresenter && container is not Border)
+            while (container != null &&
+                   container is not ContentPresenter &&
+                   container is not Border)
             {
                 container = VisualTreeHelper.GetParent(container) as FrameworkElement;
             }
@@ -561,7 +610,9 @@ namespace Finly.Pages
                 {
                     DatabaseService.DeleteLoan(vm.Id, _userId);
                     ToastService.Success("Kredyt usunięty.");
+
                     _loanAccounts.Remove(vm.Id);
+
                     LoadLoans();
                     RefreshKpisAndLists();
                 }
@@ -577,8 +628,7 @@ namespace Finly.Pages
 
         private void DeleteCancel_Click(object sender, RoutedEventArgs e)
         {
-            var btn = sender as FrameworkElement;
-            if (btn == null) return;
+            if (sender is not FrameworkElement btn) return;
 
             var card = FindVisualParent<Border>(btn);
             if (card == null)
@@ -588,7 +638,8 @@ namespace Finly.Pages
             }
 
             var panel = FindDescendantByName<FrameworkElement>(card, "DeleteConfirmPanel");
-            if (panel != null) panel.Visibility = Visibility.Collapsed;
+            if (panel != null)
+                panel.Visibility = Visibility.Collapsed;
         }
 
         private void HideAllDeletePanels()
@@ -597,6 +648,7 @@ namespace Finly.Pages
             {
                 var container = LoansGrid.ItemContainerGenerator.ContainerFromItem(item) as FrameworkElement;
                 if (container == null) continue;
+
                 var panel = FindDescendantByName<FrameworkElement>(container, "DeleteConfirmPanel");
                 if (panel != null)
                     panel.Visibility = Visibility.Collapsed;
@@ -607,26 +659,34 @@ namespace Finly.Pages
         private static T? FindVisualParent<T>(DependencyObject? child) where T : DependencyObject
         {
             if (child == null) return null;
+
             DependencyObject? parent = VisualTreeHelper.GetParent(child);
             while (parent != null && parent is not T)
             {
                 parent = VisualTreeHelper.GetParent(parent);
             }
+
             return parent as T;
         }
 
-        private static T? FindDescendantByName<T>(DependencyObject? start, string name) where T : FrameworkElement
+        private static T? FindDescendantByName<T>(DependencyObject? start, string name)
+            where T : FrameworkElement
         {
             if (start == null) return null;
+
             int cnt = VisualTreeHelper.GetChildrenCount(start);
             for (int i = 0; i < cnt; i++)
             {
                 var ch = VisualTreeHelper.GetChild(start, i) as FrameworkElement;
                 if (ch == null) continue;
-                if (ch is T fe && fe.Name == name) return fe;
+
+                if (ch is T fe && fe.Name == name)
+                    return fe;
+
                 var deeper = FindDescendantByName<T>(ch, name);
                 if (deeper != null) return deeper;
             }
+
             return null;
         }
 
@@ -639,7 +699,8 @@ namespace Finly.Pages
                 return;
             }
 
-            if (!decimal.TryParse((OverpayAmountBox.Text ?? "").Replace(" ", ""), out var amt) || amt <= 0)
+            if (!decimal.TryParse((OverpayAmountBox.Text ?? "").Replace(" ", ""),
+                    out var amt) || amt <= 0)
             {
                 OverpayResult.Text = "Podaj poprawną kwotę nadpłaty.";
                 OverpayResult.Foreground = Brushes.IndianRed;
@@ -659,11 +720,14 @@ namespace Finly.Pages
             {
                 var today = DateTime.Today;
 
-                var lastDue = new DateTime(
-                    today.Year,
-                    today.Month,
-                    _selectedVm.PaymentDay > 0 ? _selectedVm.PaymentDay : today.Day);
+                var paymentDay = _selectedVm.PaymentDay > 0
+                    ? _selectedVm.PaymentDay
+                    : today.Day;
 
+                var daysInMonth = DateTime.DaysInMonth(today.Year, today.Month);
+                paymentDay = Math.Min(paymentDay, daysInMonth);
+
+                var lastDue = new DateTime(today.Year, today.Month, paymentDay);
                 if (lastDue > today)
                     lastDue = lastDue.AddMonths(-1);
 
@@ -713,13 +777,13 @@ namespace Finly.Pages
         // kliknięcie przycisku "Symulacja" na karcie
         private void ShowSimPanel_Click(object sender, RoutedEventArgs e)
         {
-            if ((sender as FrameworkElement)?.Tag is LoanCardVm vm)
-            {
-                _selectedVm = vm;
-                SimExtraBox.Text = "";
-                SimResult.Text = "";
-                ShowPanel(LoanPanel.Sim);
-            }
+            if ((sender as FrameworkElement)?.Tag is not LoanCardVm vm)
+                return;
+
+            _selectedVm = vm;
+            SimExtraBox.Text = "";
+            SimResult.Text = "";
+            ShowPanel(LoanPanel.Sim);
         }
 
         // przycisk "Symuluj" w panelu na dole
@@ -731,7 +795,8 @@ namespace Finly.Pages
                 return;
             }
 
-            if (!decimal.TryParse((SimExtraBox.Text ?? "").Replace(" ", ""), out var extra) || extra <= 0)
+            if (!decimal.TryParse((SimExtraBox.Text ?? "").Replace(" ", ""),
+                    out var extra) || extra <= 0)
             {
                 SimResult.Text = "Podaj poprawną kwotę jednorazowej nadpłaty.";
                 return;
@@ -768,6 +833,7 @@ namespace Finly.Pages
             {
                 if (thisDue.Date < startDate.Date)
                     return startDate.Date;
+
                 return thisDue.Date;
             }
 
