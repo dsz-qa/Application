@@ -472,12 +472,11 @@
                                 <ComboBox x:Name="AccountCombo" Height="28"
                                           ItemsSource="{Binding DataContext.AvailableAccounts, RelativeSource={RelativeSource AncestorType=UserControl}}"
                                           SelectedItem="{Binding SelectedAccount, Mode=TwoWay}"
-                                          IsEditable="True"
-                                          IsTextSearchEnabled="True"
-                                          StaysOpenOnEdit="True"
+                                          IsEditable="False"
                                           Width="260"
                                           MinWidth="220"
-                                          MaxDropDownHeight="240"/>
+                                          MaxDropDownHeight="240"
+                                          HorizontalContentAlignment="Left"/>
                             </StackPanel>
                             <!-- Kategoria -->
                             <StackPanel Orientation="Horizontal">
@@ -485,12 +484,11 @@
                                 <ComboBox x:Name="CategoryCombo" Height="28"
                                           ItemsSource="{Binding DataContext.AvailableCategories, RelativeSource={RelativeSource AncestorType=UserControl}}"
                                           SelectedItem="{Binding SelectedCategory, Mode=TwoWay}"
-                                          IsEditable="True"
-                                          IsTextSearchEnabled="True"
-                                          StaysOpenOnEdit="True"
+                                          IsEditable="False"
                                           Width="260"
                                           MinWidth="220"
-                                          MaxDropDownHeight="240"/>
+                                          MaxDropDownHeight="240"
+                                          HorizontalContentAlignment="Left"/>
                             </StackPanel>
                             <!-- Opis -->
                             <StackPanel Orientation="Horizontal">
