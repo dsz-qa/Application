@@ -471,14 +471,26 @@
                                 <TextBlock Text="Konto:" FontWeight="SemiBold" Foreground="{DynamicResource App.Foreground}" Margin="0,0,6,0"/>
                                 <ComboBox x:Name="AccountCombo" Height="28"
                                           ItemsSource="{Binding DataContext.AvailableAccounts, RelativeSource={RelativeSource AncestorType=UserControl}}"
-                                          SelectedItem="{Binding SelectedAccount, Mode=TwoWay}"/>
+                                          SelectedItem="{Binding SelectedAccount, Mode=TwoWay}"
+                                          IsEditable="True"
+                                          IsTextSearchEnabled="True"
+                                          StaysOpenOnEdit="True"
+                                          Width="260"
+                                          MinWidth="220"
+                                          MaxDropDownHeight="240"/>
                             </StackPanel>
                             <!-- Kategoria -->
                             <StackPanel Orientation="Horizontal">
                                 <TextBlock Text="Kategoria:" FontWeight="SemiBold" Foreground="{DynamicResource App.Foreground}" Margin="0,0,6,0"/>
                                 <ComboBox x:Name="CategoryCombo" Height="28"
                                           ItemsSource="{Binding DataContext.AvailableCategories, RelativeSource={RelativeSource AncestorType=UserControl}}"
-                                          SelectedItem="{Binding SelectedCategory, Mode=TwoWay}"/>
+                                          SelectedItem="{Binding SelectedCategory, Mode=TwoWay}"
+                                          IsEditable="True"
+                                          IsTextSearchEnabled="True"
+                                          StaysOpenOnEdit="True"
+                                          Width="260"
+                                          MinWidth="220"
+                                          MaxDropDownHeight="240"/>
                             </StackPanel>
                             <!-- Opis -->
                             <StackPanel Orientation="Horizontal">
