@@ -372,8 +372,8 @@
 
                         <!-- LEFT info -->
                         <StackPanel Grid.Column="0" Orientation="Vertical" Margin="4,0,8,0">
-                            <!-- Header: type icon + category name -->
-                            <StackPanel Orientation="Horizontal" Margin="0,0,0,6">
+                            <!-- Header: type icon + type label + category name -->
+                            <StackPanel Orientation="Horizontal" Margin="0,0,0,6" VerticalAlignment="Center">
                                 <Image Width="20" Height="20" Margin="0,0,6,0">
                                     <Image.Style>
                                         <Style TargetType="Image">
@@ -392,6 +392,24 @@
                                         </Style>
                                     </Image.Style>
                                 </Image>
+                                <TextBlock FontWeight="Bold" FontSize="14" Foreground="{DynamicResource App.Foreground}" Margin="0,0,8,0">
+                                    <TextBlock.Style>
+                                        <Style TargetType="TextBlock">
+                                            <Setter Property="Text" Value="Wydatek"/>
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding Kind}" Value="Expense">
+                                                    <Setter Property="Text" Value="Wydatek"/>
+                                                </DataTrigger>
+                                                <DataTrigger Binding="{Binding Kind}" Value="Income">
+                                                    <Setter Property="Text" Value="Przychód"/>
+                                                </DataTrigger>
+                                                <DataTrigger Binding="{Binding Kind}" Value="Transfer">
+                                                    <Setter Property="Text" Value="Transfer"/>
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </TextBlock.Style>
+                                </TextBlock>
                                 <TextBlock Text="{Binding CategoryName, TargetNullValue=Brak kategorii, FallbackValue=Brak kategorii}"
                                            FontWeight="Bold"
                                            FontSize="14"
@@ -456,8 +474,48 @@
                             <ColumnDefinition Width="Auto"/>
                         </Grid.ColumnDefinitions>
 
-                        <!-- LEFT edit fields (unchanged) -->
+                        <!-- LEFT edit fields -->
                         <StackPanel Grid.Column="0" Orientation="Vertical" Margin="4,0,8,0">
+                            <!-- EDIT HEADER: icon + type name -->
+                            <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
+                                <Image Width="20" Height="20" Margin="0,0,6,0">
+                                    <Image.Style>
+                                        <Style TargetType="Image">
+                                            <Setter Property="Source" Value="/Assets/Icons/wydatki.png"/>
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding Kind}" Value="Expense">
+                                                    <Setter Property="Source" Value="/Assets/Icons/wydatki.png"/>
+                                                </DataTrigger>
+                                                <DataTrigger Binding="{Binding Kind}" Value="Income">
+                                                    <Setter Property="Source" Value="/Assets/Icons/przychody.png"/>
+                                                </DataTrigger>
+                                                <DataTrigger Binding="{Binding Kind}" Value="Transfer">
+                                                    <Setter Property="Source" Value="/Assets/Icons/transfer.png"/>
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </Image.Style>
+                                </Image>
+                                <TextBlock FontWeight="Bold" FontSize="14" Foreground="{DynamicResource App.Foreground}">
+                                    <TextBlock.Style>
+                                        <Style TargetType="TextBlock">
+                                            <Setter Property="Text" Value="Wydatek"/>
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding Kind}" Value="Expense">
+                                                    <Setter Property="Text" Value="Wydatek"/>
+                                                </DataTrigger>
+                                                <DataTrigger Binding="{Binding Kind}" Value="Income">
+                                                    <Setter Property="Text" Value="Przychód"/>
+                                                </DataTrigger>
+                                                <DataTrigger Binding="{Binding Kind}" Value="Transfer">
+                                                    <Setter Property="Text" Value="Transfer"/>
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </TextBlock.Style>
+                                </TextBlock>
+                            </StackPanel>
+
                             <!-- Date editor with icon button -->
                             <StackPanel Orientation="Horizontal">
                                 <TextBlock Text="Data:" FontWeight="SemiBold" Foreground="{DynamicResource App.Foreground}" Margin="0,0,6,0"/>
