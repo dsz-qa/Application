@@ -26,9 +26,9 @@
             <!-- Nagłówek -->
             <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                 <TextBlock Text="Kredyty"
-                       FontSize="20"
-                       FontWeight="Bold"
-                       Foreground="{DynamicResource App.Foreground}"/>
+                           FontSize="20"
+                           FontWeight="Bold"
+                           Foreground="{DynamicResource App.Foreground}"/>
             </StackPanel>
 
             <!-- Left: KPI tiles -->
@@ -79,20 +79,20 @@
 
             <!-- Right: Smart-insighty -->
             <Border Grid.Column="1"
-        Background="{DynamicResource Surface.Background}"
-        BorderBrush="Orange"
-        BorderThickness="2"
-        CornerRadius="8"
-        Padding="12"
-        HorizontalAlignment="Right">
+                    Background="{DynamicResource Surface.Background}"
+                    BorderBrush="Orange"
+                    BorderThickness="2"
+                    CornerRadius="8"
+                    Padding="12"
+                    HorizontalAlignment="Right">
                 <StackPanel>
                     <TextBlock Text="Analizy finansowe" FontWeight="Bold"/>
                     <ItemsControl x:Name="InsightsList" Margin="0,8,0,0">
                         <ItemsControl.ItemTemplate>
                             <DataTemplate>
                                 <TextBlock Text="{Binding}"
-                       FontWeight="Bold"
-                       Foreground="{DynamicResource App.Foreground}" />
+                                           FontWeight="Bold"
+                                           Foreground="{DynamicResource App.Foreground}" />
                             </DataTemplate>
                         </ItemsControl.ItemTemplate>
                     </ItemsControl>
@@ -103,8 +103,8 @@
                         <ItemsControl.ItemTemplate>
                             <DataTemplate>
                                 <TextBlock Text="{Binding}"
-                       FontWeight="Bold"
-                       Foreground="{DynamicResource App.Foreground}" />
+                                           FontWeight="Bold"
+                                           Foreground="{DynamicResource App.Foreground}" />
                             </DataTemplate>
                         </ItemsControl.ItemTemplate>
                     </ItemsControl>
@@ -229,13 +229,12 @@
                                                         Tag="{Binding}"/>
 
                                                 <Button Content="Symulacja"
-        ToolTip="Symulacja nadpłaty"
-        Width="100"
-        Height="28"
-        Margin="0,0,8,0"
-        Click="ShowSimPanel_Click"
-        Tag="{Binding}"/>
-
+                                                        ToolTip="Symulacja nadpłaty"
+                                                        Width="100"
+                                                        Height="28"
+                                                        Margin="0,0,8,0"
+                                                        Click="ShowSimPanel_Click"
+                                                        Tag="{Binding}"/>
 
                                                 <Button Width="36"
                                                         Height="28"
@@ -378,6 +377,20 @@
                             <TextBlock Text="Okres (mies.):"/>
                             <TextBox x:Name="LoanTermBox"
                                      TextChanged="LoanFormField_Changed" />
+                        </StackPanel>
+                    </StackPanel>
+
+                    <!-- Konto spłaty kredytu -->
+                    <StackPanel Orientation="Horizontal"
+                                Margin="0,8,0,0">
+                        <StackPanel Width="220">
+                            <TextBlock Text="Konto, z którego spłacasz kredyt:"
+                                       FontSize="12"
+                                       Foreground="Gray"/>
+                            <ComboBox x:Name="LoanAccountBox"
+                                      Width="200"
+                                      DisplayMemberPath="AccountName"
+                                      SelectedValuePath="Id"/>
                         </StackPanel>
                     </StackPanel>
 
