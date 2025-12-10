@@ -459,9 +459,6 @@
                             <!-- Data -->
                             <StackPanel Orientation="Horizontal" Margin="0,0,0,0">
                                 <TextBlock Text="Data:" FontWeight="SemiBold" Foreground="{DynamicResource App.Foreground}" Margin="0,0,6,0"/>
-                                <Button x:Name="DateEditButton" Background="Transparent" BorderBrush="{x:Null}" Padding="2" Margin="0,0,6,0" Click="DateIcon_Click">
-                                    <Image Source="/Assets/Icons/kalendarz.png" Width="18" Height="18"/>
-                                </Button>
                                 <DatePicker x:Name="DateEditor" SelectedDate="{Binding EditDate, Mode=TwoWay}" Height="28"/>
                             </StackPanel>
                             <!-- Kwota -->
@@ -472,12 +469,16 @@
                             <!-- Konto -->
                             <StackPanel Orientation="Horizontal">
                                 <TextBlock Text="Konto:" FontWeight="SemiBold" Foreground="{DynamicResource App.Foreground}" Margin="0,0,6,0"/>
-                                <ComboBox x:Name="AccountCombo" Height="28" ItemsSource="{StaticResource AccountsForEditRes}" SelectedItem="{Binding SelectedAccount, Mode=TwoWay}"/>
+                                <ComboBox x:Name="AccountCombo" Height="28"
+                                          ItemsSource="{Binding DataContext.AvailableAccounts, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                          SelectedItem="{Binding SelectedAccount, Mode=TwoWay}"/>
                             </StackPanel>
                             <!-- Kategoria -->
                             <StackPanel Orientation="Horizontal">
                                 <TextBlock Text="Kategoria:" FontWeight="SemiBold" Foreground="{DynamicResource App.Foreground}" Margin="0,0,6,0"/>
-                                <ComboBox x:Name="CategoryCombo" Height="28" ItemsSource="{StaticResource CategoriesForEditRes}" SelectedItem="{Binding SelectedCategory, Mode=TwoWay}"/>
+                                <ComboBox x:Name="CategoryCombo" Height="28"
+                                          ItemsSource="{Binding DataContext.AvailableCategories, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                          SelectedItem="{Binding SelectedCategory, Mode=TwoWay}"/>
                             </StackPanel>
                             <!-- Opis -->
                             <StackPanel Orientation="Horizontal">

@@ -32,6 +32,10 @@ namespace Finly.ViewModels
  // Zachowane istniej¹ce: nadal u¿ywane przez starszy XAML (alias do lewej listy)
  public ObservableCollection<TransactionCardVm> FilteredTransactions => TransactionsList;
 
+ // Dostêpne listy dla ComboBoxów w trybie edycji
+ public ObservableCollection<string> AvailableCategories { get; } = new();
+ public ObservableCollection<string> AvailableAccounts { get; } = new();
+
  private decimal _totalExpenses; public decimal TotalExpenses { get => _totalExpenses; private set { _totalExpenses = value; OnPropertyChanged(); OnPropertyChanged(nameof(Balance)); } }
  private decimal _totalIncomes; public decimal TotalIncomes { get => _totalIncomes; private set { _totalIncomes = value; OnPropertyChanged(); OnPropertyChanged(nameof(Balance)); } }
  public decimal Balance => TotalIncomes - TotalExpenses;
@@ -80,12 +84,13 @@ namespace Finly.ViewModels
  {
  UserId = userId;
  LoadLookupData();
+ LoadAvailableLists();
  LoadFromDatabase();
  if (!_isToday && !_isYesterday && !_isThisWeek && !_isThisMonth && !_isPrevMonth && !_isThisYear)
  {
  IsThisMonth = true; // domyœlny okres
  }
- DatabaseService.DataChanged += (_, __) => LoadFromDatabase();
+ DatabaseService.DataChanged += (_, __) => { LoadAvailableLists(); LoadFromDatabase(); };
  }
 
  private void LoadLookupData()
@@ -122,6 +127,35 @@ namespace Finly.ViewModels
  ApplyFilters();
  };
  foreach (var ai in Accounts) ai.PropertyChanged += (_, __) => ApplyFilters();
+ }
+
+ // Nowe: ³adowanie kolekcji do ComboBoxów edycji
+ private void LoadAvailableLists()
+ {
+ AvailableCategories.Clear();
+ try
+ {
+ var cats = DatabaseService.GetCategoriesByUser(UserId) ?? new List<string>();
+ foreach (var c in cats) AvailableCategories.Add(c);
+ // specjalne etykiety
+ if (!AvailableCategories.Contains("(brak)")) AvailableCategories.Add("(brak)");
+ if (!AvailableCategories.Contains("Przychód")) AvailableCategories.Add("Przychód");
+ if (!AvailableCategories.Contains("Transfer")) AvailableCategories.Add("Transfer");
+ }
+ catch { }
+
+ AvailableAccounts.Clear();
+ try
+ {
+ var accs = DatabaseService.GetAccounts(UserId) ?? new List<BankAccountModel>();
+ foreach (var a in accs) AvailableAccounts.Add(a.AccountName);
+ var envs = DatabaseService.GetEnvelopesNames(UserId) ?? new List<string>();
+ foreach (var e in envs) AvailableAccounts.Add($"Koperta: {e}");
+ // gotówka
+ if (!AvailableAccounts.Contains("Wolna gotówka")) AvailableAccounts.Add("Wolna gotówka");
+ if (!AvailableAccounts.Contains("Od³o¿ona gotówka")) AvailableAccounts.Add("Od³o¿ona gotówka");
+ }
+ catch { }
  }
 
  public void LoadFromDatabase()
@@ -313,6 +347,8 @@ namespace Finly.ViewModels
  public void StartEdit(TransactionCardVm vm)
  {
  if (vm == null) return;
+ // odœwie¿ listy dla ComboBoxów
+ LoadAvailableLists();
  // kopiuj aktualne dane do pól edycyjnych i w³¹cz tryb edycji
  vm.EditDescription = vm.Description ?? string.Empty;
  vm.EditAmountText = ParseAmountInternal(vm.AmountStr).ToString("N2");
