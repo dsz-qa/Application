@@ -77,39 +77,51 @@
             </StackPanel>
 
             <!-- Right: Smart-insighty -->
+            <!-- Right: Smart-insighty -->
             <Border Grid.Column="1"
-                    Background="{DynamicResource Surface.Background}"
-                    BorderBrush="Orange"
-                    BorderThickness="2"
-                    CornerRadius="8"
-                    Padding="12"
-                    HorizontalAlignment="Right">
+        Background="{DynamicResource Surface.Background}"
+        BorderBrush="Orange"
+        BorderThickness="2"
+        CornerRadius="8"
+        Padding="12"
+        HorizontalAlignment="Right">
                 <StackPanel>
-                    <TextBlock Text="Analizy finansowe" FontWeight="Bold"/>
+                    <TextBlock Text="Analizy finansowe"
+                   FontWeight="Bold"
+                   Foreground="{DynamicResource App.Foreground}"/>
 
+                    <!-- Lista insightów – tekst zawijany -->
                     <ItemsControl x:Name="InsightsList" Margin="0,8,0,0">
                         <ItemsControl.ItemTemplate>
                             <DataTemplate>
                                 <TextBlock Text="{Binding}"
-                                           FontWeight="Bold"
-                                           Foreground="{DynamicResource App.Foreground}" />
+                               FontWeight="Bold"
+                               Foreground="{DynamicResource App.Foreground}"
+                               TextWrapping="Wrap"
+                               TextTrimming="None"
+                               MaxWidth="280"/>
                             </DataTemplate>
                         </ItemsControl.ItemTemplate>
                     </ItemsControl>
 
+                    <!-- (opcjonalnie) nadchodzące płatności też z zawijaniem -->
                     <ItemsControl x:Name="UpcomingPaymentsList"
-                                  Margin="0,8,0,0"
-                                  Visibility="Collapsed">
+                      Margin="0,8,0,0"
+                      Visibility="Collapsed">
                         <ItemsControl.ItemTemplate>
                             <DataTemplate>
                                 <TextBlock Text="{Binding}"
-                                           FontWeight="Bold"
-                                           Foreground="{DynamicResource App.Foreground}" />
+                               FontWeight="Bold"
+                               Foreground="{DynamicResource App.Foreground}"
+                               TextWrapping="Wrap"
+                               TextTrimming="None"
+                               MaxWidth="280"/>
                             </DataTemplate>
                         </ItemsControl.ItemTemplate>
                     </ItemsControl>
                 </StackPanel>
             </Border>
+
         </Grid>
 
         <!-- Karty kredytów (Row 2) -->

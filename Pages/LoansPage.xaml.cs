@@ -699,8 +699,7 @@ namespace Finly.Pages
                 return;
             }
 
-            if (!decimal.TryParse((OverpayAmountBox.Text ?? "").Replace(" ", ""),
-                    out var amt) || amt <= 0)
+            if (!decimal.TryParse((OverpayAmountBox.Text ?? "").Replace(" ", ""), out var amt) || amt <= 0)
             {
                 OverpayResult.Text = "Podaj poprawną kwotę nadpłaty.";
                 OverpayResult.Foreground = Brushes.IndianRed;
@@ -720,26 +719,23 @@ namespace Finly.Pages
             {
                 var today = DateTime.Today;
 
-                var paymentDay = _selectedVm.PaymentDay > 0
-                    ? _selectedVm.PaymentDay
-                    : today.Day;
+                // 1) Poprzedni „termin raty” – od tej daty naliczamy odsetki do dnia nadpłaty
+                var lastDue = GetPreviousDueDate(today, _selectedVm.PaymentDay, _selectedVm.StartDate);
 
-                var daysInMonth = DateTime.DaysInMonth(today.Year, today.Month);
-                paymentDay = Math.Min(paymentDay, daysInMonth);
-
-                var lastDue = new DateTime(today.Year, today.Month, paymentDay);
-                if (lastDue > today)
-                    lastDue = lastDue.AddMonths(-1);
-
+                // 2) Odsetki narosłe od poprzedniego terminu raty do dziś
                 var interest = LoanMathService.CalculateInterest(
                     _selectedVm.Principal,
                     _selectedVm.InterestRate,
                     lastDue,
                     today);
 
+                if (interest < 0) interest = 0;
+
+                // 3) Najpierw spłacamy odsetki, dopiero reszta idzie w kapitał
                 var principalPart = amt - interest;
                 if (principalPart < 0) principalPart = 0;
 
+                // 4) Aktualizujemy stan kapitału
                 var newPrincipal = _selectedVm.Principal - principalPart;
                 if (newPrincipal < 0) newPrincipal = 0;
 
@@ -757,13 +753,22 @@ namespace Finly.Pages
 
                 DatabaseService.UpdateLoan(loanToUpdate);
 
+                // (opcjonalnie) nowa rata po nadpłacie, żeby pokazać efekt na przyszłość
+                var newMonthly = LoanService.CalculateMonthlyPayment(
+                    newPrincipal,
+                    _selectedVm.InterestRate,
+                    _selectedVm.TermMonths);
+
                 var accInfo = accountName != null ? $" z konta \"{accountName}\"" : "";
                 OverpayResult.Text =
                     $"Nadpłata: {amt:N2} zł{accInfo}.\n" +
-                    $"Z tego odsetki: {interest:N2} zł, kapitał: {principalPart:N2} zł.\n" +
-                    $"Nowy stan kapitału: {newPrincipal:N2} zł.";
+                    $"Odsetki narosłe od poprzedniego terminu raty ({lastDue:dd.MM.yyyy}) do dziś: {interest:N2} zł.\n" +
+                    $"Część kapitałowa nadpłaty: {principalPart:N2} zł.\n" +
+                    $"Nowy stan kapitału: {newPrincipal:N2} zł.\n" +
+                    $"Szacowana nowa rata (przy tej samej liczbie rat): {newMonthly:N2} zł.";
                 OverpayResult.Foreground = Brushes.Green;
 
+                // odśwież kafelki, analizy, itp.
                 LoadLoans();
                 RefreshKpisAndLists();
             }
@@ -773,6 +778,7 @@ namespace Finly.Pages
                 OverpayResult.Foreground = Brushes.IndianRed;
             }
         }
+
 
         // kliknięcie przycisku "Symulacja" na karcie
         private void ShowSimPanel_Click(object sender, RoutedEventArgs e)
@@ -820,6 +826,12 @@ namespace Finly.Pages
         /// <summary>
         /// Helper do liczenia poprzedniego terminu raty (zostawiony na przyszłość).
         /// </summary>
+        /// <summary>
+        /// Poprzedni „umowny” termin raty:
+        /// - jeśli dziś jest po terminie z tego miesiąca -> zwracamy ten termin,
+        /// - jeśli przed -> idziemy miesiąc wstecz,
+        /// - nie cofamy się przed datę startu kredytu.
+        /// </summary>
         private static DateTime GetPreviousDueDate(DateTime today, int paymentDay, DateTime startDate)
         {
             if (paymentDay <= 0)
@@ -833,7 +845,6 @@ namespace Finly.Pages
             {
                 if (thisDue.Date < startDate.Date)
                     return startDate.Date;
-
                 return thisDue.Date;
             }
 
@@ -847,5 +858,6 @@ namespace Finly.Pages
 
             return prevDue.Date;
         }
+
     }
 }
