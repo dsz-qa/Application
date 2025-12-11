@@ -6,35 +6,38 @@
     <Grid Margin="16" ShowGridLines="False">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
-            <!-- nagłówek -->
+            <!-- nagłówek (rezerwowe) -->
             <RowDefinition Height="Auto"/>
-            <!-- KPI + Smart-insighty -->
+            <!-- KPI + Analizy finansowe -->
             <RowDefinition Height="*"/>
             <!-- karty kredytów -->
             <RowDefinition Height="Auto"/>
-            <!-- pojedyncza ramka funkcji -->
+            <!-- panel dolny -->
         </Grid.RowDefinitions>
 
-        <!-- KPI + Smart-insighty -->
+        <!-- Wiersz 1: KPI + Analizy finansowe -->
         <Grid Grid.Row="1" Margin="0,12,0,0">
             <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="*" />
-                <ColumnDefinition Width="320" />
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="420"/>
             </Grid.ColumnDefinitions>
 
-            <!-- Nagłówek -->
-            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+            <!-- Nagłówek strony -->
+            <StackPanel Orientation="Horizontal"
+                        VerticalAlignment="Center">
                 <TextBlock Text="Kredyty"
                            FontSize="20"
                            FontWeight="Bold"
                            Foreground="{DynamicResource App.Foreground}"/>
             </StackPanel>
 
-            <!-- Left: KPI tiles -->
+            <!-- Lewa część: kafelki KPI -->
             <StackPanel Grid.Column="0"
                         Orientation="Horizontal"
-                        HorizontalAlignment="Left">
-                <!-- Total loans tile -->
+                        HorizontalAlignment="Left"
+                        Margin="0,32,0,0">
+
+                <!-- Kafelek: całkowita kwota kredytów -->
                 <Border Background="{DynamicResource Surface.Background}"
                         BorderBrush="Red"
                         BorderThickness="2"
@@ -55,7 +58,7 @@
                     </StackPanel>
                 </Border>
 
-                <!-- Monthly cost tile -->
+                <!-- Kafelek: miesięczny koszt rat -->
                 <Border Background="{DynamicResource Surface.Background}"
                         BorderBrush="Red"
                         BorderThickness="2"
@@ -76,55 +79,56 @@
                 </Border>
             </StackPanel>
 
-            <!-- Right: Smart-insighty -->
-            <!-- Right: Smart-insighty -->
+            <!-- Prawa część: Analizy finansowe -->
             <Border Grid.Column="1"
-        Background="{DynamicResource Surface.Background}"
-        BorderBrush="Orange"
-        BorderThickness="2"
-        CornerRadius="8"
-        Padding="12"
-        HorizontalAlignment="Right">
-                <StackPanel>
+                    Background="{DynamicResource Surface.Background}"
+                    BorderBrush="Orange"
+                    BorderThickness="2"
+                    CornerRadius="10"
+                    Padding="20"
+                    Margin="12,0,0,0"
+                    VerticalAlignment="Top"
+                    HorizontalAlignment="Right">
+
+                <StackPanel Orientation="Vertical">
+
+                    <!-- Duży nagłówek panelu -->
                     <TextBlock Text="Analizy finansowe"
-                   FontWeight="Bold"
-                   Foreground="{DynamicResource App.Foreground}"/>
-
-                    <!-- Lista insightów – tekst zawijany -->
-                    <ItemsControl x:Name="InsightsList" Margin="0,8,0,0">
-                        <ItemsControl.ItemTemplate>
-                            <DataTemplate>
-                                <TextBlock Text="{Binding}"
+                               FontSize="22"
                                FontWeight="Bold"
                                Foreground="{DynamicResource App.Foreground}"
-                               TextWrapping="Wrap"
-                               TextTrimming="None"
-                               MaxWidth="280"/>
+                               Margin="0,0,0,12"/>
+
+                    <!-- Lista insightów (LoanInsightVm: Label + Value) -->
+                    <ItemsControl x:Name="InsightsList">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate DataType="{x:Type vm:LoanInsightVm}">
+                                <StackPanel Margin="0,0,0,10">
+                                    <!-- opis (niepogrubiony, większy niż domyślny) -->
+                                    <TextBlock Text="{Binding Label}"
+                                               FontSize="14"
+                                               Foreground="{DynamicResource App.Foreground}"
+                                               TextWrapping="Wrap"/>
+                                    <!-- wartość - pod spodem, pogrubiona -->
+                                    <TextBlock Text="{Binding Value}"
+                                               FontSize="18"
+                                               FontWeight="Bold"
+                                               Margin="0,2,0,0"
+                                               Foreground="{DynamicResource App.Foreground}"
+                                               TextWrapping="Wrap"/>
+                                </StackPanel>
                             </DataTemplate>
                         </ItemsControl.ItemTemplate>
                     </ItemsControl>
 
-                    <!-- (opcjonalnie) nadchodzące płatności też z zawijaniem -->
+                    <!-- Placeholder na przyszłe „nadchodzące raty” -->
                     <ItemsControl x:Name="UpcomingPaymentsList"
-                      Margin="0,8,0,0"
-                      Visibility="Collapsed">
-                        <ItemsControl.ItemTemplate>
-                            <DataTemplate>
-                                <TextBlock Text="{Binding}"
-                               FontWeight="Bold"
-                               Foreground="{DynamicResource App.Foreground}"
-                               TextWrapping="Wrap"
-                               TextTrimming="None"
-                               MaxWidth="280"/>
-                            </DataTemplate>
-                        </ItemsControl.ItemTemplate>
-                    </ItemsControl>
+                                  Visibility="Collapsed"/>
                 </StackPanel>
             </Border>
-
         </Grid>
 
-        <!-- Karty kredytów (Row 2) -->
+        <!-- Wiersz 2: karty kredytów -->
         <ScrollViewer Grid.Row="2"
                       VerticalScrollBarVisibility="Auto"
                       Margin="0,12,0,0">
@@ -132,7 +136,7 @@
                 <ItemsControl x:Name="LoansGrid">
                     <ItemsControl.Resources>
 
-                        <!-- Karta kredytu -->
+                        <!-- Szablon karty kredytu -->
                         <DataTemplate DataType="{x:Type vm:LoanCardVm}">
                             <Border Margin="8"
                                     Padding="12"
@@ -160,8 +164,9 @@
                                                    VerticalAlignment="Center"/>
                                     </StackPanel>
 
-                                    <!-- Środek: kwota, oprocentowanie, postęp -->
-                                    <StackPanel Grid.Row="1" Margin="0,8,0,8">
+                                    <!-- Środek: kwota, oprocentowanie, progress -->
+                                    <StackPanel Grid.Row="1"
+                                                Margin="0,8,0,8">
                                         <TextBlock Text="Pozostało:"
                                                    Foreground="Gray"
                                                    FontSize="12"/>
@@ -170,7 +175,7 @@
                                                    FontWeight="Bold"
                                                    Foreground="OrangeRed"/>
 
-                                        <!-- oprocentowanie + kolejna rata -->
+                                        <!-- Oprocentowanie + kolejna rata -->
                                         <StackPanel Orientation="Horizontal"
                                                     Margin="0,6,0,0"
                                                     HorizontalAlignment="Left">
@@ -196,9 +201,10 @@
 
                                         <Grid Margin="0,8,0,0">
                                             <Grid.ColumnDefinitions>
-                                                <ColumnDefinition Width="*" />
-                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="*"/>
                                             </Grid.ColumnDefinitions>
+
                                             <StackPanel Grid.Column="0">
                                                 <TextBlock Text="Następna rata:"
                                                            Foreground="Gray"
@@ -206,6 +212,7 @@
                                                 <TextBlock Text="{Binding NextPayment, StringFormat={}{0}}"
                                                            FontSize="12"/>
                                             </StackPanel>
+
                                             <StackPanel Grid.Column="1">
                                                 <TextBlock Text="Do końca:"
                                                            Foreground="Gray"
@@ -216,7 +223,7 @@
                                         </Grid>
                                     </StackPanel>
 
-                                    <!-- Dół: przyciski + inline potwierdzenie usunięcia -->
+                                    <!-- Dół: przyciski + potwierdzenie usunięcia -->
                                     <DockPanel Grid.Row="2"
                                                LastChildFill="False"
                                                Margin="0,4,0,0">
@@ -224,8 +231,8 @@
                                         <!-- Górny rząd przycisków -->
                                         <Grid DockPanel.Dock="Top">
                                             <Grid.ColumnDefinitions>
-                                                <ColumnDefinition Width="*" />
-                                                <ColumnDefinition Width="Auto" />
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="Auto"/>
                                             </Grid.ColumnDefinitions>
 
                                             <!-- Lewa strona: Nadpłać, Symulacja, Edytuj, Usuń -->
@@ -258,6 +265,7 @@
                                                            Width="18"
                                                            Height="18"/>
                                                 </Button>
+
                                                 <Button x:Name="DeleteLoanBtn"
                                                         Width="36"
                                                         Height="28"
@@ -320,7 +328,7 @@
                             </Border>
                         </DataTemplate>
 
-                        <!-- Add tile -->
+                        <!-- Kafelek „Dodaj kredyt” -->
                         <DataTemplate DataType="{x:Type vm:AddLoanTile}">
                             <Border Margin="8"
                                     Padding="24"
@@ -345,14 +353,14 @@
 
                     <ItemsControl.ItemsPanel>
                         <ItemsPanelTemplate>
-                            <UniformGrid Columns="2" />
+                            <UniformGrid Columns="2"/>
                         </ItemsPanelTemplate>
                     </ItemsControl.ItemsPanel>
                 </ItemsControl>
             </StackPanel>
         </ScrollViewer>
 
-        <!-- Pojedyncza ramka funkcjonalności na dole (Row 3) -->
+        <!-- Wiersz 3: dolny panel (Dodaj / Edytuj / Nadpłata / Symulacja / Harmonogram) -->
         <Border x:Name="FormBorder"
                 Grid.Row="3"
                 Background="{DynamicResource Surface.Background}"
@@ -365,30 +373,35 @@
 
             <Grid>
                 <!-- Panel Dodaj / Edytuj -->
-                <StackPanel x:Name="AddEditPanel" Visibility="Collapsed">
+                <StackPanel x:Name="AddEditPanel"
+                            Visibility="Collapsed">
                     <TextBlock x:Name="LoanFormMessage"
                                Foreground="OrangeRed"
                                Margin="0,0,0,8"/>
 
                     <TextBlock Text="Nazwa kredytu:"/>
-                    <TextBox x:Name="LoanNameBox" />
+                    <TextBox x:Name="LoanNameBox"/>
 
                     <StackPanel Orientation="Horizontal"
                                 Margin="0,8,0,0">
                         <StackPanel Width="160">
                             <TextBlock Text="Kwota:"/>
                             <TextBox x:Name="LoanPrincipalBox"
-                                     TextChanged="LoanFormField_Changed" />
+                                     TextChanged="LoanFormField_Changed"/>
                         </StackPanel>
-                        <StackPanel Width="120" Margin="8,0,0,0">
+
+                        <StackPanel Width="120"
+                                    Margin="8,0,0,0">
                             <TextBlock Text="Oprocentowanie (%):"/>
                             <TextBox x:Name="LoanInterestBox"
-                                     TextChanged="LoanFormField_Changed" />
+                                     TextChanged="LoanFormField_Changed"/>
                         </StackPanel>
-                        <StackPanel Width="120" Margin="8,0,0,0">
+
+                        <StackPanel Width="120"
+                                    Margin="8,0,0,0">
                             <TextBlock Text="Okres (mies.):"/>
                             <TextBox x:Name="LoanTermBox"
-                                     TextChanged="LoanFormField_Changed" />
+                                     TextChanged="LoanFormField_Changed"/>
                         </StackPanel>
                     </StackPanel>
 
@@ -413,13 +426,15 @@
                             <TextBlock Text="Data rozpoczęcia kredytu:"
                                        FontSize="12"
                                        Foreground="Gray"/>
-                            <DatePicker x:Name="LoanStartDatePicker" />
+                            <DatePicker x:Name="LoanStartDatePicker"/>
                         </StackPanel>
-                        <StackPanel Width="200" Margin="12,0,0,0">
+
+                        <StackPanel Width="200"
+                                    Margin="12,0,0,0">
                             <TextBlock Text="Liczba spłaconych rat:"
                                        FontSize="12"
                                        Foreground="Gray"/>
-                            <TextBox x:Name="PaidInstallmentsBox" />
+                            <TextBox x:Name="PaidInstallmentsBox"/>
                         </StackPanel>
                     </StackPanel>
 
@@ -434,21 +449,27 @@
                                        Text="0,00 zł"
                                        FontWeight="Bold"/>
                         </StackPanel>
-                        <StackPanel Width="200" Margin="12,0,0,0">
+
+                        <StackPanel Width="200"
+                                    Margin="12,0,0,0">
                             <TextBlock Text="Część kapitałowa (pierwsza rata):"
                                        Foreground="Gray"
                                        FontSize="12"/>
                             <TextBlock x:Name="FirstPrincipalText"
                                        Text="0,00 zł"/>
                         </StackPanel>
-                        <StackPanel Width="200" Margin="12,0,0,0">
+
+                        <StackPanel Width="200"
+                                    Margin="12,0,0,0">
                             <TextBlock Text="Część odsetkowa (pierwsza rata):"
                                        Foreground="Gray"
                                        FontSize="12"/>
                             <TextBlock x:Name="FirstInterestText"
                                        Text="0,00 zł"/>
                         </StackPanel>
-                        <StackPanel Width="220" Margin="12,0,0,0">
+
+                        <StackPanel Width="220"
+                                    Margin="12,0,0,0">
                             <TextBlock Text="Dzień pobrania raty kredytu:"
                                        FontSize="12"
                                        Foreground="Gray"/>
@@ -497,14 +518,14 @@
                                 HorizontalAlignment="Left"
                                 Margin="0,8,0,0">
                         <Button Content="Załącz harmonogram spłat rat z Twojego banku."
-                                Click="ChooseSchedule_Click" />
+                                Click="ChooseSchedule_Click"/>
                         <TextBlock x:Name="ScheduleFileNameText"
                                    Text="Brak pliku"
                                    Margin="12,4,0,0"
                                    VerticalAlignment="Center"/>
                     </StackPanel>
 
-                    <!-- Przyciski Zapisz/Anuluj -->
+                    <!-- Przyciski Zapisz / Anuluj -->
                     <StackPanel Orientation="Horizontal"
                                 HorizontalAlignment="Right"
                                 Margin="0,8,0,0">
@@ -520,8 +541,9 @@
                     </StackPanel>
                 </StackPanel>
 
-                <!-- Panel Harmonogram -->
-                <StackPanel x:Name="SchedulePanel" Visibility="Collapsed">
+                <!-- Panel Harmonogram (na przyszłość, prosty) -->
+                <StackPanel x:Name="SchedulePanel"
+                            Visibility="Collapsed">
                     <TextBlock Text="Harmonogram spłat"
                                FontWeight="Bold"
                                Margin="0,0,0,8"/>
@@ -534,7 +556,6 @@
                         </ItemsControl.ItemTemplate>
                     </ItemsControl>
 
-                    <!-- Przyciski zamykania -->
                     <StackPanel Orientation="Horizontal"
                                 HorizontalAlignment="Right"
                                 Margin="0,8,0,0">
@@ -545,9 +566,10 @@
                 </StackPanel>
 
                 <!-- Panel Nadpłata -->
-                <StackPanel x:Name="OverpayPanel" Visibility="Collapsed">
+                <StackPanel x:Name="OverpayPanel"
+                            Visibility="Collapsed">
                     <TextBlock Text="Wprowadź kwotę nadpłaty:"/>
-                    <TextBox x:Name="OverpayAmountBox" />
+                    <TextBox x:Name="OverpayAmountBox"/>
 
                     <StackPanel Orientation="Horizontal"
                                 HorizontalAlignment="Right"
@@ -568,9 +590,10 @@
                 </StackPanel>
 
                 <!-- Panel Symulacja -->
-                <StackPanel x:Name="SimPanel" Visibility="Collapsed">
+                <StackPanel x:Name="SimPanel"
+                            Visibility="Collapsed">
                     <TextBlock Text="Podaj dodatkową wpłatę (jednorazowo):"/>
-                    <TextBox x:Name="SimExtraBox" />
+                    <TextBox x:Name="SimExtraBox"/>
 
                     <StackPanel Orientation="Horizontal"
                                 HorizontalAlignment="Right"

@@ -63,6 +63,23 @@ namespace Finly.Pages
             RefreshKpisAndLists();
         }
 
+        private static string FormatMonths(int months)
+        {
+            if (months <= 0)
+                return "0 mies.";
+
+            int years = months / 12;
+            int monthsLeft = months % 12;
+
+            if (years > 0 && monthsLeft > 0)
+                return $"{years} lat {monthsLeft} mies.";
+            if (years > 0)
+                return $"{years} lat";
+
+            return $"{monthsLeft} mies.";
+        }
+
+
         private void LoadAccountsForLoanForm()
         {
             try
@@ -111,81 +128,98 @@ namespace Finly.Pages
 
         private void RefreshKpisAndLists()
         {
-            UpdateKpiTiles();
-
             var loans = _loans.OfType<LoanCardVm>().ToList();
 
-            decimal totalDebt = loans.Sum(x => x.Principal);
-            var totalDebtTb = FindName("TotalDebtText") as TextBlock;
-            if (totalDebtTb != null)
-                totalDebtTb.Text = totalDebt.ToString("N0") + " zł";
+            // Najpierw KPI u góry
+            UpdateKpiTiles();
 
-            // Szacunkowa miesięczna rata – suma prawdziwych rat dla wszystkich kredytów
-            decimal monthly = 0m;
-            foreach (var l in loans)
+            // Kolekcja dla panelu "Analizy finansowe"
+            var insights = new ObservableCollection<LoanInsightVm>();
+
+            if (loans.Any())
             {
-                if (l.Principal > 0 && l.TermMonths > 0)
+                // 1) Całkowita suma zadłużenia (wszystkie kredyty)
+                decimal totalDebt = loans.Sum(x => x.Principal);
+
+                // 2) Suma szacunkowych miesięcznych rat
+                decimal monthlySum = 0m;
+                foreach (var l in loans)
                 {
-                    monthly += LoanService.CalculateMonthlyPayment(
-                        l.Principal,
-                        l.InterestRate,
-                        l.TermMonths);
+                    if (l.TermMonths > 0)
+                    {
+                        monthlySum += LoanService.CalculateMonthlyPayment(
+                            l.Principal,
+                            l.InterestRate,
+                            l.TermMonths);
+                    }
                 }
-            }
 
-            // Łączny koszt rat w skali 12 miesięcy (przy założeniu stałej raty)
-            var annual = monthly * 12m;
+                // 3) Prognozowana łączna kwota rat w ciągu roku
+                decimal yearlySum = monthlySum * 12m;
 
-            // Procent kredytów spłaconych (Principal == 0)
-            var loanCount = loans.Count;
-            var paidPct = loanCount == 0
-                ? 0
-                : (double)loans.Count(x => x.Principal <= 0) / loanCount * 100.0;
+                // 4) Średni deklarowany okres kredytowania (bez odejmowania już minionych lat)
+                int avgDeclaredMonths = (int)Math.Round(
+                    loans.Average(l => (double)l.TermMonths));
 
-            // Nadchodzące raty – bierzemy kwoty z VM (tam też możesz mieć obliczoną „prawdziwą” ratę)
-            var upcoming = new ObservableCollection<object>();
-            foreach (var l in loans.OrderBy(x => x.NextPaymentDate))
-            {
-                upcoming.Add(new
+                string avgDeclaredDesc = FormatMonths(avgDeclaredMonths);
+
+                // Wiersze do panelu
+                insights.Add(new LoanInsightVm
                 {
-                    DateStr = l.NextPaymentDate.ToString("dd.MM"),
-                    LoanName = l.Name,
-                    AmountStr = l.NextPayment.ToString("N0") + " zł"
+                    Label = "Całkowita suma zadłużenia (wszystkie kredyty):",
+                    Value = $"{totalDebt:N2} zł"
                 });
-            }
-            UpcomingPaymentsList.ItemsSource = upcoming;
 
-            // Insights – spójne z KPI
-            var insights = new ObservableCollection<string>();
-            if (totalDebt > 0)
-            {
-                insights.Add($"Suma zadłużenia: {totalDebt:N0} zł");
-                insights.Add($"Szacunkowa miesięczna rata (suma): {monthly:N0} zł");
-                insights.Add($"Prognozowana łączna kwota rat w 12 mies.: {annual:N0} zł");
-                insights.Add($"Pozytywny / negatywny wskaźnik spłat: {((int)paidPct)}% spłacone (uproszczone)");
+                insights.Add(new LoanInsightVm
+                {
+                    Label = "Suma szacunkowych miesięcznych rat:",
+                    Value = $"{monthlySum:N2} zł"
+                });
+
+                insights.Add(new LoanInsightVm
+                {
+                    Label = "Prognozowana łączna kwota rat w ciągu roku:",
+                    Value = $"{yearlySum:N2} zł"
+                });
+
+                insights.Add(new LoanInsightVm
+                {
+                    Label = "Średni zadeklarowany okres kredytowania:",
+                    Value = avgDeclaredDesc
+                });
             }
             else
             {
-                insights.Add("Brak aktywnych kredytów.");
+                insights.Add(new LoanInsightVm
+                {
+                    Label = "",
+                    Value = "Brak aktywnych kredytów."
+                });
             }
 
             InsightsList.ItemsSource = insights;
+
+            // Nadchodzące raty – na razie pusta lista / prosty placeholder
+            var upcoming = new ObservableCollection<object>();
+            UpcomingPaymentsList.ItemsSource = upcoming;
         }
+
 
 
         private void UpdateKpiTiles()
         {
             var loans = _loans.OfType<LoanCardVm>().ToList();
 
-            decimal total = loans.Sum(x => x.Principal);
-            decimal monthly = 0m;
+            // 1) Całkowita suma zadłużenia
+            decimal totalDebt = loans.Sum(x => x.Principal);
 
+            // 2) Suma szacunkowych miesięcznych rat (wszystkie kredyty)
+            decimal monthlySum = 0m;
             foreach (var l in loans)
             {
-                if (l.Principal > 0 && l.TermMonths > 0)
+                if (l.TermMonths > 0)
                 {
-                    // realna rata wg tej samej logiki co w kartach kredytu
-                    monthly += LoanService.CalculateMonthlyPayment(
+                    monthlySum += LoanService.CalculateMonthlyPayment(
                         l.Principal,
                         l.InterestRate,
                         l.TermMonths);
@@ -193,11 +227,13 @@ namespace Finly.Pages
             }
 
             if (FindName("TotalLoansTileAmount") is TextBlock tbTotal)
-                tbTotal.Text = total.ToString("N2") + " zł";
+                tbTotal.Text = totalDebt.ToString("N2") + " zł";
 
             if (FindName("MonthlyLoansTileAmount") is TextBlock tbMonthly)
-                tbMonthly.Text = monthly.ToString("N2") + " zł";
+                tbMonthly.Text = monthlySum.ToString("N2") + " zł";
         }
+
+
 
 
         // ====== Panel dolny – przełączanie widoku ======
