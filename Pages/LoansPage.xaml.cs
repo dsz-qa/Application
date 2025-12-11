@@ -510,6 +510,33 @@ namespace Finly.Pages
             }
         }
 
+        private void CardAttachSchedule_Click(object sender, RoutedEventArgs e)
+        {
+            if ((sender as FrameworkElement)?.Tag is not LoanCardVm vm)
+                return;
+
+            var dlg = new Microsoft.Win32.OpenFileDialog
+            {
+                Filter = "Pliki CSV|*.csv|Wszystkie pliki|*.*"
+            };
+
+            var ok = dlg.ShowDialog();
+            if (ok == true)
+            {
+                var path = dlg.FileName;
+
+                // zapamiętujemy ścieżkę harmonogramu dla konkretnego kredytu
+                _loanScheduleFiles[vm.Id] = path;
+
+                ToastService.Success(
+                    $"Załączono harmonogram spłat rat dla kredytu \"{vm.Name}\".");
+
+                // ewentualnie odśwież (żeby przyszłe wyliczenia brały to pod uwagę)
+                RefreshKpisAndLists();
+            }
+        }
+
+
         // ====== Akcje z karty kredytu – przełączają dolny panel ======
 
         private void CardDetails_Click(object sender, RoutedEventArgs e)
