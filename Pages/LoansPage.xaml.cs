@@ -79,7 +79,6 @@ namespace Finly.Pages
             return $"{monthsLeft} mies.";
         }
 
-
         private void LoadAccountsForLoanForm()
         {
             try
@@ -126,6 +125,128 @@ namespace Finly.Pages
             UpdateKpiTiles();
         }
 
+        /// <summary>
+        /// Wylicza statystyki portfela kredytów,
+        /// korzystając z harmonogramu CSV, jeśli istnieje.
+        /// </summary>
+        private (decimal totalDebt, decimal monthlySum, decimal yearlySum, int maxRemainingMonths) CalculatePortfolioStats(List<LoanCardVm> loans)
+        {
+            decimal totalDebt = loans.Sum(x => x.Principal);
+            decimal monthlySum = 0m;
+            decimal yearlySum = 0m;
+            int maxRemainingMonths = 0;
+
+            foreach (var vm in loans)
+            {
+                decimal loanMonthly;
+                decimal loanYearly;
+                int remainingMonths;
+
+                if (TryGetScheduleStats(vm,
+                        out var nextAmount,
+                        out _,
+                        out remainingMonths,
+                        out var yearSumFromSchedule))
+                {
+                    // harmonogram CSV – traktujemy najbliższą ratę jako
+                    // rzeczywisty miesięczny koszt kredytu
+                    loanMonthly = nextAmount;
+                    loanYearly = yearSumFromSchedule;
+                }
+                else
+                {
+                    // fallback – stara logika na podstawie kwoty/oprocentowania/okresu
+                    if (vm.TermMonths > 0)
+                    {
+                        loanMonthly = LoanService.CalculateMonthlyPayment(
+                            vm.Principal,
+                            vm.InterestRate,
+                            vm.TermMonths);
+                        loanYearly = loanMonthly * 12m;
+                    }
+                    else
+                    {
+                        loanMonthly = 0m;
+                        loanYearly = 0m;
+                    }
+
+                    var monthsElapsed =
+                        (DateTime.Today.Year - vm.StartDate.Year) * 12 +
+                        DateTime.Today.Month - vm.StartDate.Month;
+
+                    remainingMonths = Math.Max(0, vm.TermMonths - monthsElapsed);
+                }
+
+                monthlySum += loanMonthly;
+                yearlySum += loanYearly;
+                if (remainingMonths > maxRemainingMonths)
+                    maxRemainingMonths = remainingMonths;
+            }
+
+            return (totalDebt, monthlySum, yearlySum, maxRemainingMonths);
+        }
+
+        /// <summary>
+        /// Na podstawie podpiętego harmonogramu CSV dla danego kredytu
+        /// wylicza:
+        /// - najbliższą ratę,
+        /// - datę najbliższej raty,
+        /// - pozostałą liczbę rat (miesięcy),
+        /// - sumę rat w ciągu najbliższego roku.
+        /// Zwraca false, jeśli nie ma harmonogramu lub jest pusty.
+        /// </summary>
+        private bool TryGetScheduleStats(
+            LoanCardVm vm,
+            out decimal nextAmount,
+            out DateTime? nextDate,
+            out int remainingMonths,
+            out decimal yearSum)
+        {
+            nextAmount = 0m;
+            nextDate = null;
+            remainingMonths = 0;
+            yearSum = 0m;
+
+            if (!_loanScheduleFiles.TryGetValue(vm.Id, out var path) ||
+                string.IsNullOrWhiteSpace(path) ||
+                !string.Equals(Path.GetExtension(path), ".csv", StringComparison.OrdinalIgnoreCase) ||
+                !File.Exists(path))
+            {
+                return false;
+            }
+
+            var schedule = ParseScheduleCsv(path);
+            if (schedule.Count == 0)
+                return false;
+
+            var today = DateTime.Today;
+
+            var upcoming = schedule
+                .Where(r => r.Date >= today)
+                .OrderBy(r => r.Date)
+                .ToList();
+
+            if (upcoming.Count > 0)
+            {
+                var next = upcoming.First();
+                nextAmount = next.Amount;
+                nextDate = next.Date;
+                remainingMonths = upcoming.Count;
+            }
+            else
+            {
+                // wszystkie raty w przeszłości – kredyt spłacony
+                remainingMonths = 0;
+            }
+
+            var yearLimit = today.AddYears(1);
+            yearSum = schedule
+                .Where(r => r.Date > today && r.Date <= yearLimit)
+                .Sum(r => r.Amount);
+
+            return true;
+        }
+
         private void RefreshKpisAndLists()
         {
             var loans = _loans.OfType<LoanCardVm>().ToList();
@@ -138,32 +259,9 @@ namespace Finly.Pages
 
             if (loans.Any())
             {
-                // 1) Całkowita suma zadłużenia (wszystkie kredyty)
-                decimal totalDebt = loans.Sum(x => x.Principal);
+                var (totalDebt, monthlySum, yearlySum, maxRemainingMonths)
+                    = CalculatePortfolioStats(loans);
 
-                // 2) Suma szacunkowych miesięcznych rat
-                decimal monthlySum = 0m;
-                foreach (var l in loans)
-                {
-                    if (l.TermMonths > 0)
-                    {
-                        monthlySum += LoanService.CalculateMonthlyPayment(
-                            l.Principal,
-                            l.InterestRate,
-                            l.TermMonths);
-                    }
-                }
-
-                // 3) Prognozowana łączna kwota rat w ciągu roku
-                decimal yearlySum = monthlySum * 12m;
-
-                // 4) Średni deklarowany okres kredytowania (bez odejmowania już minionych lat)
-                int avgDeclaredMonths = (int)Math.Round(
-                    loans.Average(l => (double)l.TermMonths));
-
-                string avgDeclaredDesc = FormatMonths(avgDeclaredMonths);
-
-                // Wiersze do panelu
                 insights.Add(new LoanInsightVm
                 {
                     Label = "Całkowita suma zadłużenia (wszystkie kredyty):",
@@ -184,8 +282,8 @@ namespace Finly.Pages
 
                 insights.Add(new LoanInsightVm
                 {
-                    Label = "Średni zadeklarowany okres kredytowania:",
-                    Value = avgDeclaredDesc
+                    Label = "Całkowity czas spłaty kredytów:",
+                    Value = FormatMonths(maxRemainingMonths)
                 });
             }
             else
@@ -204,27 +302,10 @@ namespace Finly.Pages
             UpcomingPaymentsList.ItemsSource = upcoming;
         }
 
-
-
         private void UpdateKpiTiles()
         {
             var loans = _loans.OfType<LoanCardVm>().ToList();
-
-            // 1) Całkowita suma zadłużenia
-            decimal totalDebt = loans.Sum(x => x.Principal);
-
-            // 2) Suma szacunkowych miesięcznych rat (wszystkie kredyty)
-            decimal monthlySum = 0m;
-            foreach (var l in loans)
-            {
-                if (l.TermMonths > 0)
-                {
-                    monthlySum += LoanService.CalculateMonthlyPayment(
-                        l.Principal,
-                        l.InterestRate,
-                        l.TermMonths);
-                }
-            }
+            var (totalDebt, monthlySum, _, _) = CalculatePortfolioStats(loans);
 
             if (FindName("TotalLoansTileAmount") is TextBlock tbTotal)
                 tbTotal.Text = totalDebt.ToString("N2") + " zł";
@@ -232,9 +313,6 @@ namespace Finly.Pages
             if (FindName("MonthlyLoansTileAmount") is TextBlock tbMonthly)
                 tbMonthly.Text = monthlySum.ToString("N2") + " zł";
         }
-
-
-
 
         // ====== Panel dolny – przełączanie widoku ======
 
@@ -421,7 +499,7 @@ namespace Finly.Pages
         {
             var dlg = new Microsoft.Win32.OpenFileDialog
             {
-                Filter = "Pliki CSV|*.csv|Pliki PDF|*.pdf|Wszystkie pliki|*.*"
+                Filter = "Pliki CSV|*.csv|Wszystkie pliki|*.*"
             };
 
             var ok = dlg.ShowDialog();
@@ -815,8 +893,7 @@ namespace Finly.Pages
             }
         }
 
-
-        // kliknięcie przycisku "Symulacja" na karcie
+        // kliknięcie przycisku "Symulacja nadpłaty" na karcie
         private void ShowSimPanel_Click(object sender, RoutedEventArgs e)
         {
             if ((sender as FrameworkElement)?.Tag is not LoanCardVm vm)
@@ -860,9 +937,6 @@ namespace Finly.Pages
         }
 
         /// <summary>
-        /// Helper do liczenia poprzedniego terminu raty (zostawiony na przyszłość).
-        /// </summary>
-        /// <summary>
         /// Poprzedni „umowny” termin raty:
         /// - jeśli dziś jest po terminie z tego miesiąca -> zwracamy ten termin,
         /// - jeśli przed -> idziemy miesiąc wstecz,
@@ -894,6 +968,5 @@ namespace Finly.Pages
 
             return prevDue.Date;
         }
-
     }
 }
