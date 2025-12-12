@@ -537,6 +537,7 @@ namespace Finly.Pages
         }
 
 
+
         // ====== Akcje z karty kredytu – przełączają dolny panel ======
 
         private void CardDetails_Click(object sender, RoutedEventArgs e)
