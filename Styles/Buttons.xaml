@@ -51,6 +51,9 @@
         <Setter Property="Height" Value="30"/>
         <Setter Property="MinWidth" Value="72"/>
         <Setter Property="Padding" Value="14,6"/>
+        <Setter Property="VerticalContentAlignment" Value="Center"/>
+        <Setter Property="HorizontalContentAlignment" Value="Center"/>
+        <Setter Property="FontSize" Value="13"/>
     </Style>
 
     <!-- Primary = niebieski akcent -->

@@ -98,11 +98,7 @@
 
                 <!-- Panel „Analizy finansowe” po prawej -->
                 <Border Grid.Column="1"
-                        Background="{DynamicResource Surface.Background}"
-                        BorderBrush="Orange"
-                        BorderThickness="2"
-                        CornerRadius="10"
-                        Padding="16"
+                        Style="{StaticResource FinancialAnalysisCardBorderStyle}"
                         HorizontalAlignment="Right"
                         MinWidth="280"
                         MaxWidth="360"
@@ -110,9 +106,7 @@
                     <StackPanel Orientation="Vertical">
 
                         <TextBlock Text="Analizy finansowe"
-                                   FontSize="18"
-                                   FontWeight="Bold"
-                                   Foreground="{DynamicResource App.Foreground}"
+                                   Style="{StaticResource FinancialAnalysisCardTitleStyle}"
                                    Margin="0,0,0,10"/>
                         <ItemsControl x:Name="InsightsList">
                             <ItemsControl.ItemsPanel>
@@ -279,32 +273,19 @@
                                                 Click="EditLoan_Click"
                                                 Tag="{Binding}"
                                                 ToolTip="Edytuj kredyt">
-                                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
-                                                <Image Source="pack://application:,,,/Assets/Icons/edit.png"
-                                                       Width="16" Height="16" Margin="0,0,4,0"/>
-                                                <TextBlock Text="Edytuj"/>
-                                            </StackPanel>
                                         </Button>
 
                                         <!-- Usuń + panel potwierdzenia POD przyciskiem -->
                                         <StackPanel Margin="0,0,8,8">
-                                            <Button MinWidth="80"
-                                                    Height="28"
-                                                    Padding="8,0"
-                                                    Click="DeleteLoan_Click"
-                                                    Tag="{Binding}"
-                                                    ToolTip="Usuń kredyt">
-                                                <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
-                                                    <Image Source="pack://application:,,,/Assets/Icons/delete.png"
-                                                           Width="16" Height="16" Margin="0,0,4,0"/>
-                                                    <TextBlock Text="Usuń"/>
-                                                </StackPanel>
-                                            </Button>
+                                            <Button MinWidth="80" Height="28" Padding="8,0" Click="DeleteLoan_Click" Tag="{Binding}" ToolTip="Usuń kredyt" Style="{StaticResource DeleteIconButton}"/>
 
-                                            <Border x:Name="DeleteConfirmPanel"
-                                                    Background="Transparent"
-                                                    Visibility="Collapsed"
-                                                    Margin="0,6,0,0">
+                                            <!-- Edit button moved next to delete for consistent icon style -->
+                                            <Button MinWidth="90" Height="28" Padding="8,0" Margin="0,0,8,0" Click="EditLoan_Click" Tag="{Binding}" ToolTip="Edytuj kredyt" Style="{StaticResource EditIconButton}"/>
+
+                                             <Border x:Name="DeleteConfirmPanel"
+                                                     Background="Transparent"
+                                                     Visibility="Collapsed"
+                                                     Margin="0,6,0,0">
                                                 <StackPanel>
                                                     <TextBlock Text="Czy na pewno chcesz usunąć ten kredyt?"
                                                                Foreground="OrangeRed"

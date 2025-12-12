@@ -159,9 +159,9 @@
                 </Grid.ColumnDefinitions>
 
                 <!-- Analizy -->
-                <Border Grid.Column="0" Style="{StaticResource AccentOrangeCard}" Margin="0,0,12,0">
+                <Border Grid.Column="0" Style="{StaticResource FinancialAnalysisCardBorderStyle}" Margin="0,0,12,0">
                     <StackPanel>
-                        <TextBlock Text="Analizy finansowe" Style="{StaticResource CardHeader}" Margin="0,0,0,10"/>
+                        <TextBlock Text="Analizy finansowe" Style="{StaticResource FinancialAnalysisCardHeaderStyle}" Margin="0,0,0,10"/>
 
                         <ItemsControl ItemsSource="{Binding DataContext.Insights, ElementName=Root}">
                             <ItemsControl.ItemTemplate>
@@ -177,9 +177,9 @@
                 </Border>
 
                 <!-- Alerty -->
-                <Border Grid.Column="1" Style="{StaticResource AccentOrangeCard}" Margin="0,0,12,0">
+                <Border Grid.Column="1" Style="{StaticResource FinancialAnalysisCardBorderStyle}" Margin="0,0,12,0">
                     <StackPanel>
-                        <TextBlock Text="Alerty budżetowe" Style="{StaticResource CardHeader}" Margin="0,0,0,10"/>
+                        <TextBlock Text="Alerty budżetowe" Style="{StaticResource FinancialAnalysisCardHeaderStyle}" Margin="0,0,0,10"/>
 
                         <ItemsControl ItemsSource="{Binding DataContext.Alerts, ElementName=Root}">
                             <ItemsControl.ItemTemplate>
@@ -195,9 +195,9 @@
                 </Border>
 
                 <!-- Prognoza -->
-                <Border Grid.Column="2" Style="{StaticResource AccentOrangeCard}">
+                <Border Grid.Column="2" Style="{StaticResource FinancialAnalysisCardBorderStyle}">
                     <StackPanel>
-                        <TextBlock Text="Prognoza końca miesiąca" Style="{StaticResource CardHeader}" Margin="0,0,0,10"/>
+                        <TextBlock Text="Prognoza końca miesiąca" Style="{StaticResource FinancialAnalysisCardHeaderStyle}" Margin="0,0,0,10"/>
 
                         <Grid>
                             <Grid.ColumnDefinitions>
@@ -533,10 +533,10 @@
                         </Grid.RowDefinitions>
 
                         <!-- Trend -->
-                        <Border Grid.Row="0" Grid.Column="0" Style="{StaticResource Card}" Margin="0,0,8,8">
+                        <Border Grid.Row="0" Grid.Column="0" Style="{StaticResource FinancialAnalysisCardBorderStyle}" Margin="0,0,8,8">
                             <StackPanel>
                                 <TextBlock Text="Trend wydatków — bieżący okres"
-                                           Style="{StaticResource CardHeader}"
+                                           Style="{StaticResource FinancialAnalysisCardHeaderStyle}"
                                            Margin="0,0,0,8"/>
                                 <Canvas x:Name="ExpenseTrendCanvas" Height="180" Margin="0,0,0,4"/>
                                 <ItemsControl x:Name="ExpenseTrendLabels" Visibility="Collapsed" Margin="0,4,0,0">

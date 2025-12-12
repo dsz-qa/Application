@@ -437,14 +437,16 @@
                         </StackPanel>
                         <!-- Edit actions -->
                         <StackPanel x:Name="EditActions" Orientation="Horizontal" Visibility="Collapsed">
-                            <Button x:Name="SaveBottomButton" Padding="8,4" MinWidth="70" ToolTip="Zapisz" Click="SaveEdit_Click">
+                            <Button x:Name="SaveBottomButton" Padding="8,4" MinWidth="70" Width="92" ToolTip="Zapisz" Click="SaveEdit_Click" Style="{StaticResource PrimaryButton}">
                                 <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                                     <Path Data="M2,10 L6,14 L14,4" Stroke="{DynamicResource Brand.Blue}" StrokeThickness="2.4" StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round" Width="16" Height="16"/>
                                     <TextBlock Text="Zapisz" Margin="6,0,0,0" VerticalAlignment="Center"/>
                                 </StackPanel>
                             </Button>
-                            <Button Padding="8,4" MinWidth="70" ToolTip="Anuluj" Click="CancelEdit_Click" Margin="8,0,0,0">
-                                <TextBlock Text="Anuluj" VerticalAlignment="Center"/>
+                            <Button x:Name="CancelEditButton" Padding="8,4" MinWidth="70" Width="92" ToolTip="Anuluj" Click="CancelEdit_Click" Margin="8,0,0,0" Style="{StaticResource SecondaryButton}">
+                                <StackPanel Orientation="Horizontal" VerticalAlignment="Center" HorizontalAlignment="Center">
+                                    <TextBlock Text="Anuluj" VerticalAlignment="Center"/>
+                                </StackPanel>
                             </Button>
                         </StackPanel>
                     </Grid>

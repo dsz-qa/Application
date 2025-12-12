@@ -215,15 +215,9 @@
                                         <DataGridTemplateColumn Header="Akcje" Width="150">
                                             <DataGridTemplateColumn.CellTemplate>
                                                 <DataTemplate>
-                                                    <StackPanel Orientation="Horizontal"
-                                                                HorizontalAlignment="Center">
-                                                        <Button Content="Edytuj"
-                                                                Margin="0,0,8,0"
-                                                                Padding="6,2"
-                                                                Click="EditBudget_Click"/>
-                                                        <Button Content="Usuń"
-                                                                Padding="6,2"
-                                                                Click="DeleteBudget_Click"/>
+                                                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                                                        <Button Click="EditBudget_Click" ToolTip="Edytuj budżet" Style="{StaticResource EditIconButton}" Margin="0,0,8,0"/>
+                                                        <Button Click="DeleteBudget_Click" ToolTip="Usuń budżet" Style="{StaticResource DeleteIconButton}"/>
                                                     </StackPanel>
                                                 </DataTemplate>
                                             </DataGridTemplateColumn.CellTemplate>

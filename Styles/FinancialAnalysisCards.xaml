@@ -1,0 +1,68 @@
+﻿<!-- Styles/FinancialAnalysisCards.xaml -->
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+    <!-- ===============================
+         KAFEL ANALIZY – RAMKA
+         =============================== -->
+    <Style x:Key="FinancialAnalysisCardBorderStyle" TargetType="Border">
+        <Setter Property="Background" Value="Transparent"/>
+        <Setter Property="CornerRadius" Value="6"/>
+        <Setter Property="Padding" Value="12"/>
+        <Setter Property="Margin" Value="0,0,0,8"/>
+        <Setter Property="BorderBrush" Value="#FFA500"/>
+        <Setter Property="BorderThickness" Value="2"/>
+    </Style>
+
+    <!-- ===============================
+         NAGŁÓWEK KAFELKA
+         (np. Analizy finansowe / Bieżący okres)
+         =============================== -->
+    <Style x:Key="FinancialAnalysisCardTitleStyle" TargetType="TextBlock">
+        <Setter Property="FontSize" Value="18"/>
+        <Setter Property="FontWeight" Value="Bold"/>
+        <Setter Property="Foreground" Value="{DynamicResource App.Foreground}"/>
+        <Setter Property="Margin" Value="0,0,0,8"/>
+        <Setter Property="TextWrapping" Value="Wrap"/>
+    </Style>
+
+    <!-- ===============================
+         PODNAGŁÓWEK (np. „Bieżący okres – Ten miesiąc”)
+         =============================== -->
+    <Style x:Key="FinancialAnalysisCardHeaderStyle" TargetType="TextBlock">
+        <Setter Property="FontSize" Value="15"/>
+        <Setter Property="FontWeight" Value="SemiBold"/>
+        <Setter Property="Foreground" Value="{DynamicResource App.Foreground}"/>
+        <Setter Property="Margin" Value="0,0,0,6"/>
+        <Setter Property="TextWrapping" Value="Wrap"/>
+    </Style>
+
+    <!-- ===============================
+         WIERSZ (label + value)
+         =============================== -->
+    <Style x:Key="FinancialAnalysisRowGridStyle" TargetType="Grid">
+        <Setter Property="Margin" Value="0,4"/>
+    </Style>
+
+    <!-- ===============================
+         ETYKIETA (LEWA KOLUMNA)
+         =============================== -->
+    <Style x:Key="FinancialAnalysisRowLabelStyle" TargetType="TextBlock">
+        <Setter Property="FontSize" Value="14"/>
+        <Setter Property="FontWeight" Value="Bold"/>
+        <Setter Property="Width" Value="170"/>
+        <Setter Property="Foreground" Value="{DynamicResource App.Foreground}"/>
+    </Style>
+
+    <!-- ===============================
+         WARTOŚĆ (PRAWA KOLUMNA)
+         =============================== -->
+    <Style x:Key="FinancialAnalysisRowValueStyle" TargetType="TextBlock">
+        <Setter Property="FontSize" Value="14"/>
+        <Setter Property="FontWeight" Value="SemiBold"/>
+        <Setter Property="Foreground" Value="{DynamicResource App.Foreground}"/>
+        <Setter Property="HorizontalAlignment" Value="Right"/>
+    </Style>
+
+</ResourceDictionary>
+

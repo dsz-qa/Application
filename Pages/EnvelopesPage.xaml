@@ -87,18 +87,8 @@
  <!-- Przyciski + potwierdzenie -->
  <StackPanel Grid.Row="1" Margin="0,10,0,0" HorizontalAlignment="Right">
  <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
- <Button Margin="0,0,8,0" Padding="8,4" MinWidth="70" Tag="{Binding}" Click="EditEnvelope_Click">
- <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
- <Image Source="/Assets/Icons/edit.png" Width="16" Height="16" Margin="0,0,6,0" OpacityMask="{DynamicResource Brand.Orange}"/>
- <TextBlock Text="Edytuj" VerticalAlignment="Center"/>
- </StackPanel>
- </Button>
- <Button Padding="8,4" MinWidth="70" Tag="{Binding}" Click="DeleteEnvelope_Click">
- <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
- <Image Source="/Assets/Icons/delete.png" Width="16" Height="16" Margin="0,0,6,0" OpacityMask="{DynamicResource Brand.Orange}"/>
- <TextBlock Text="Usuń" VerticalAlignment="Center"/>
- </StackPanel>
- </Button>
+ <Button Margin="0,0,8,0" Tag="{Binding}" Click="EditEnvelope_Click" Style="{StaticResource EditIconButton}" ToolTip="Edytuj kopertę"/>
+ <Button Tag="{Binding}" Click="DeleteEnvelope_Click" Style="{StaticResource DeleteIconButton}" ToolTip="Usuń kopertę"/>
  </StackPanel>
 
  <StackPanel x:Name="DeleteConfirmPanel" Visibility="Collapsed" HorizontalAlignment="Stretch" Margin="0,8,0,0">
