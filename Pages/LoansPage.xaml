@@ -58,6 +58,35 @@
 			<Setter Property="MinWidth" Value="120"/>
 		</Style>
 
+		<!-- Local small primary variant to preserve primary look but avoid text clipping -->
+		<Style x:Key="LoansPrimarySmallButton" TargetType="Button" BasedOn="{StaticResource PrimaryButton}">
+			<Setter Property="MinHeight" Value="30"/>
+			<Setter Property="Padding" Value="12,4"/>
+			<Setter Property="MinWidth" Value="120"/>
+			<Setter Property="HorizontalContentAlignment" Value="Center"/>
+			<Setter Property="VerticalContentAlignment" Value="Center"/>
+			<!-- Ensure content wraps instead of being clipped -->
+			<Setter Property="ContentTemplate">
+				<Setter.Value>
+					<DataTemplate>
+						<TextBlock Text="{Binding}" TextWrapping="Wrap" TextAlignment="Center"/>
+					</DataTemplate>
+				</Setter.Value>
+			</Setter>
+		</Style>
+
+		<!-- No-wrap variant so text stays on one line; wider min width to fit full text -->
+		<Style x:Key="LoansPrimarySmallButtonNoWrap" TargetType="Button" BasedOn="{StaticResource LoansPrimarySmallButton}">
+			<Setter Property="MinWidth" Value="150"/>
+			<Setter Property="ContentTemplate">
+				<Setter.Value>
+					<DataTemplate>
+						<TextBlock Text="{Binding}" TextWrapping="NoWrap" TextAlignment="Center"/>
+					</DataTemplate>
+				</Setter.Value>
+			</Setter>
+		</Style>
+
 	</UserControl.Resources>
 
 	<ScrollViewer VerticalScrollBarVisibility="Auto"
@@ -278,14 +307,8 @@
 
 										<!-- main actions -->
 										<UniformGrid Columns="2" Margin="0,0,0,8">
-											<Button Content="Nadpłać kredyt"
-                                                    Style="{StaticResource LoansSmallButton}"
-                                                    Margin="0,0,8,0"
-                                                    Click="CardAddPayment_Click"
-                                                    Tag="{Binding}"/>
-
 											<Button Content="Symulacja nadpłaty"
-                                                    Style="{StaticResource LoansSmallButton}"
+                                                    Style="{StaticResource LoansPrimarySmallButton}"
                                                     Click="ShowSimPanel_Click"
                                                     Tag="{Binding}"/>
 										</UniformGrid>
@@ -306,6 +329,14 @@
                                                     Tag="{Binding}"
                                                     ToolTip="Usuń kredyt"
                                                     Style="{StaticResource DeleteIconButton}"/>
++
++							<!-- Nadpłać button moved next to Delete; no-wrap variant to keep text on one line -->
++							<Button Content="Nadpłać kredyt"
++								Style="{StaticResource LoansPrimarySmallButtonNoWrap}"
++								Margin="8,0,0,0"
++								Click="CardAddPayment_Click"
++								Tag="{Binding}"/>
+
 										</StackPanel>
 
 										<!-- delete confirm under the buttons -->
@@ -346,7 +377,6 @@
                                                 Tag="{Binding}"
                                                 ToolTip="Załącz harmonogram spłat rat kredytu">
 											<StackPanel Orientation="Horizontal">
-												<TextBlock Text="+" FontSize="16" Margin="0,0,6,0"/>
 												<TextBlock Text="Załącz harmonogram"/>
 											</StackPanel>
 										</Button>
