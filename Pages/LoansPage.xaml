@@ -3,13 +3,11 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="clr-namespace:Finly.ViewModels">
 
-    <!-- JEDEN GLOBALNY SCROLL NA CAŁĄ STRONĘ -->
     <ScrollViewer VerticalScrollBarVisibility="Auto"
                   HorizontalScrollBarVisibility="Disabled"
                   Padding="0"
                   Background="Transparent">
 
-        <!-- ZAMIANA GRID+wewnętrzne scrolle na prosty układ pionowy -->
         <StackPanel Margin="16">
 
             <!-- ===== Nagłówek ===== -->
@@ -29,13 +27,12 @@
                     <ColumnDefinition Width="Auto" MinWidth="280" />
                 </Grid.ColumnDefinitions>
 
-                <!-- KPI po lewej (zawijane na mniejszych ekranach) -->
+                <!-- KPI po lewej -->
                 <WrapPanel Grid.Column="0"
                            HorizontalAlignment="Left"
                            VerticalAlignment="Top"
                            Margin="0,0,12,0">
 
-                    <!-- Całkowita kwota wszystkich kredytów -->
                     <Border Background="{DynamicResource Surface.Background}"
                             BorderBrush="Red"
                             BorderThickness="2"
@@ -56,7 +53,6 @@
                         </StackPanel>
                     </Border>
 
-                    <!-- Miesięczny koszt rat -->
                     <Border Background="{DynamicResource Surface.Background}"
                             BorderBrush="Red"
                             BorderThickness="2"
@@ -74,6 +70,28 @@
                                        FontSize="26"
                                        FontWeight="Bold"
                                        Foreground="{DynamicResource App.Foreground}"/>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- Add loan tile moved here under KPI -->
+                    <Border Margin="0,0,12,12"
+                            Padding="18"
+                            Background="{DynamicResource Surface.Background}"
+                            BorderBrush="{DynamicResource Surface.Border}"
+                            BorderThickness="0"
+                            CornerRadius="8"
+                            Cursor="Hand"
+                            MinWidth="260"
+                            MaxWidth="360"
+                            MouseDown="AddLoanCard_Click">
+                        <StackPanel HorizontalAlignment="Center"
+                                    VerticalAlignment="Center">
+                            <TextBlock Text="➕"
+                                       FontSize="22"
+                                       HorizontalAlignment="Center"/>
+                            <TextBlock Text="Dodaj kredyt"
+                                       FontWeight="SemiBold"
+                                       HorizontalAlignment="Center"/>
                         </StackPanel>
                     </Border>
                 </WrapPanel>
@@ -96,51 +114,42 @@
                                    FontWeight="Bold"
                                    Foreground="{DynamicResource App.Foreground}"
                                    Margin="0,0,0,10"/>
-
                         <ItemsControl x:Name="InsightsList">
+                            <ItemsControl.ItemsPanel>
+                                <ItemsPanelTemplate>
+                                    <UniformGrid Columns="2" />
+                                </ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
+
                             <ItemsControl.ItemTemplate>
                                 <DataTemplate DataType="{x:Type vm:LoanInsightVm}">
-                                    <StackPanel Margin="0,0,0,8">
-                                        <TextBlock Text="{Binding Label}"
-                                                   FontSize="12"
-                                                   Foreground="{DynamicResource App.Foreground}"
-                                                   TextWrapping="Wrap"/>
-                                        <TextBlock Text="{Binding Value}"
-                                                   FontSize="14"
-                                                   FontWeight="Bold"
-                                                   Foreground="{DynamicResource App.Foreground}"
-                                                   Margin="0,1,0,0"
-                                                   TextWrapping="Wrap"/>
-                                    </StackPanel>
+                                    <Border Background="#1F1F1F"
+                    CornerRadius="8"
+                    Padding="10"
+                    Margin="0,0,10,10">
+                                        <StackPanel>
+                                            <TextBlock Text="{Binding Label}"
+                               FontSize="12"
+                               Foreground="{DynamicResource App.Foreground}"
+                               TextWrapping="Wrap"/>
+                                            <TextBlock Text="{Binding Value}"
+                               FontSize="14"
+                               FontWeight="Bold"
+                               Foreground="{DynamicResource App.Foreground}"
+                               Margin="0,2,0,0"
+                               TextWrapping="Wrap"/>
+                                        </StackPanel>
+                                    </Border>
                                 </DataTemplate>
                             </ItemsControl.ItemTemplate>
                         </ItemsControl>
 
-                        <TextBlock Text="Nadchodzące raty"
-                                   FontSize="12"
-                                   FontWeight="Bold"
-                                   Margin="0,10,0,4"/>
-
-                        <ItemsControl x:Name="UpcomingPaymentsList">
-                            <ItemsControl.ItemTemplate>
-                                <DataTemplate>
-                                    <StackPanel Orientation="Horizontal">
-                                        <TextBlock Text="{Binding DateStr}" Width="70"/>
-                                        <TextBlock Text="{Binding LoanName}" Margin="4,0,0,0"/>
-                                        <TextBlock Text="{Binding AmountStr}"
-                                                   Margin="8,0,0,0"
-                                                   FontWeight="Bold"/>
-                                    </StackPanel>
-                                </DataTemplate>
-                            </ItemsControl.ItemTemplate>
-                        </ItemsControl>
 
                     </StackPanel>
                 </Border>
             </Grid>
 
             <!-- ===== Karty kredytów ===== -->
-            <!-- USUNIĘTY ScrollViewer w środku: karty są częścią GLOBALNEGO SCROLLA -->
             <ItemsControl x:Name="LoansGrid">
 
                 <ItemsControl.Resources>
@@ -153,8 +162,8 @@
                                 BorderBrush="{DynamicResource Surface.Border}"
                                 BorderThickness="0"
                                 CornerRadius="8"
-                                MinWidth="360"
-                                MaxWidth="720">
+                                MinWidth="420"
+                                MaxWidth="420">
 
                             <Grid>
                                 <Grid.RowDefinitions>
@@ -176,7 +185,7 @@
                                                VerticalAlignment="Center"/>
                                 </StackPanel>
 
-                                <!-- Środek: kwota, oprocentowanie, pasek postępu -->
+                                <!-- Środek -->
                                 <StackPanel Grid.Row="1" Margin="0,8,0,8">
                                     <TextBlock Text="Pozostało:"
                                                Foreground="Gray"
@@ -236,8 +245,8 @@
                                 <!-- Dół: przyciski -->
                                 <Grid Grid.Row="2" Margin="0,6,0,0">
                                     <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="2*" />
                                         <ColumnDefinition Width="*" />
-                                        <ColumnDefinition Width="Auto" />
                                     </Grid.ColumnDefinitions>
 
                                     <!-- Lewa strona -->
@@ -277,25 +286,50 @@
                                             </StackPanel>
                                         </Button>
 
-                                        <Button MinWidth="80"
-                                                Height="28"
-                                                Padding="8,0"
-                                                Margin="0,0,8,8"
-                                                Click="DeleteLoan_Click"
-                                                Tag="{Binding}"
-                                                ToolTip="Usuń kredyt">
-                                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
-                                                <Image Source="pack://application:,,,/Assets/Icons/delete.png"
-                                                       Width="16" Height="16" Margin="0,0,4,0"/>
-                                                <TextBlock Text="Usuń"/>
-                                            </StackPanel>
-                                        </Button>
+                                        <!-- Usuń + panel potwierdzenia POD przyciskiem -->
+                                        <StackPanel Margin="0,0,8,8">
+                                            <Button MinWidth="80"
+                                                    Height="28"
+                                                    Padding="8,0"
+                                                    Click="DeleteLoan_Click"
+                                                    Tag="{Binding}"
+                                                    ToolTip="Usuń kredyt">
+                                                <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                                                    <Image Source="pack://application:,,,/Assets/Icons/delete.png"
+                                                           Width="16" Height="16" Margin="0,0,4,0"/>
+                                                    <TextBlock Text="Usuń"/>
+                                                </StackPanel>
+                                            </Button>
+
+                                            <Border x:Name="DeleteConfirmPanel"
+                                                    Background="Transparent"
+                                                    Visibility="Collapsed"
+                                                    Margin="0,6,0,0">
+                                                <StackPanel>
+                                                    <TextBlock Text="Czy na pewno chcesz usunąć ten kredyt?"
+                                                               Foreground="OrangeRed"
+                                                               FontWeight="Bold"
+                                                               Margin="0,0,0,6"/>
+                                                    <StackPanel Orientation="Horizontal">
+                                                        <Button Content="Tak, usuń"
+                                                                Width="100"
+                                                                Margin="0,0,8,0"
+                                                                Click="ConfirmDeleteLoan_Click"
+                                                                Tag="{Binding}"/>
+                                                        <Button Content="Nie, nie usuwaj"
+                                                                Width="120"
+                                                                Click="DeleteCancel_Click"/>
+                                                    </StackPanel>
+                                                </StackPanel>
+                                            </Border>
+                                        </StackPanel>
                                     </WrapPanel>
 
                                     <!-- Prawa strona -->
                                     <WrapPanel Grid.Column="1"
                                                HorizontalAlignment="Right"
-                                               VerticalAlignment="Center">
+                                               VerticalAlignment="Center"
+                                               MaxWidth="200">
 
                                         <Button Height="28"
                                                 Padding="10,0"
@@ -319,29 +353,6 @@
                                         </Button>
                                     </WrapPanel>
                                 </Grid>
-
-                                <!-- Panel potwierdzenia usunięcia -->
-                                <Border x:Name="DeleteConfirmPanel"
-                                        Background="Transparent"
-                                        Visibility="Collapsed"
-                                        Margin="0,8,0,0">
-                                    <StackPanel Orientation="Vertical">
-                                        <TextBlock Text="Czy na pewno chcesz usunąć ten kredyt?"
-                                                   Foreground="OrangeRed"
-                                                   FontWeight="Bold"
-                                                   Margin="0,0,0,6"/>
-                                        <StackPanel Orientation="Horizontal">
-                                            <Button Content="Tak, usuń"
-                                                    Width="100"
-                                                    Margin="0,0,8,0"
-                                                    Click="ConfirmDeleteLoan_Click"
-                                                    Tag="{Binding}"/>
-                                            <Button Content="Nie, nie usuwaj"
-                                                    Width="120"
-                                                    Click="DeleteCancel_Click"/>
-                                        </StackPanel>
-                                    </StackPanel>
-                                </Border>
 
                             </Grid>
                         </Border>
@@ -375,14 +386,14 @@
 
                 <ItemsControl.ItemsPanel>
                     <ItemsPanelTemplate>
-                        <!-- WrapPanel = responsywne zawijanie kart -->
-                        <WrapPanel IsItemsHost="True" />
+                        <WrapPanel IsItemsHost="True"
+                                   ItemWidth="440"
+                                   ItemHeight="Auto"/>
                     </ItemsPanelTemplate>
                 </ItemsControl.ItemsPanel>
             </ItemsControl>
 
-            <!-- ===== Panel dolny – zawsze POD kartami, nigdy nie zasłania ===== -->
-            <!-- USUNIĘTY ScrollViewer w środku (scroll jest globalny) -->
+            <!-- ===== Panel dolny ===== -->
             <Border x:Name="FormBorder"
                     Background="{DynamicResource Surface.Background}"
                     BorderBrush="{DynamicResource Surface.Border}"
@@ -395,6 +406,13 @@
                 <Grid>
                     <!-- Panel Dodaj / Edytuj kredyt -->
                     <StackPanel x:Name="AddEditPanel" Visibility="Collapsed">
+                        <TextBlock x:Name="AddEditHeaderText"
+                                   FontSize="16"
+                                   FontWeight="Bold"
+                                   Foreground="{DynamicResource App.Foreground}"
+                                   Margin="0,0,0,8"
+                                   Text="Dodaj kredyt"/>
+
                         <TextBlock x:Name="LoanFormMessage"
                                    Foreground="OrangeRed"
                                    Margin="0,0,0,8"/>

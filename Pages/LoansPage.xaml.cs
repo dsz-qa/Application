@@ -21,17 +21,12 @@ namespace Finly.Pages
         private readonly int _userId;
         private LoanCardVm? _selectedVm;
 
-        // mapowanie loanId -> ścieżka pliku harmonogramu (RAM)
         private readonly Dictionary<int, string> _loanScheduleFiles = new();
         private string? _lastChosenSchedulePath;
 
-        // konta bankowe użytkownika (z bazy)
         private List<BankAccountModel> _accounts = new();
-
-        // mapowanie loanId -> accountId (z którego spłacany jest kredyt)
         private readonly Dictionary<int, int> _loanAccounts = new();
 
-        // Typ aktualnie pokazywanego panelu na dole
         private enum LoanPanel
         {
             None,
@@ -119,16 +114,9 @@ namespace Finly.Pages
                 });
             }
 
-            // kafelek "Dodaj kredyt"
-            _loans.Add(new AddLoanTile());
-
             UpdateKpiTiles();
         }
 
-        /// <summary>
-        /// Wylicza statystyki portfela kredytów,
-        /// korzystając z harmonogramu CSV, jeśli istnieje.
-        /// </summary>
         private (decimal totalDebt, decimal monthlySum, decimal yearlySum, int maxRemainingMonths) CalculatePortfolioStats(List<LoanCardVm> loans)
         {
             decimal totalDebt = loans.Sum(x => x.Principal);
@@ -148,14 +136,11 @@ namespace Finly.Pages
                         out remainingMonths,
                         out var yearSumFromSchedule))
                 {
-                    // harmonogram CSV – traktujemy najbliższą ratę jako
-                    // rzeczywisty miesięczny koszt kredytu
                     loanMonthly = nextAmount;
                     loanYearly = yearSumFromSchedule;
                 }
                 else
                 {
-                    // fallback – stara logika na podstawie kwoty/oprocentowania/okresu
                     if (vm.TermMonths > 0)
                     {
                         loanMonthly = LoanService.CalculateMonthlyPayment(
@@ -186,15 +171,6 @@ namespace Finly.Pages
             return (totalDebt, monthlySum, yearlySum, maxRemainingMonths);
         }
 
-        /// <summary>
-        /// Na podstawie podpiętego harmonogramu CSV dla danego kredytu
-        /// wylicza:
-        /// - najbliższą ratę,
-        /// - datę najbliższej raty,
-        /// - pozostałą liczbę rat (miesięcy),
-        /// - sumę rat w ciągu najbliższego roku.
-        /// Zwraca false, jeśli nie ma harmonogramu lub jest pusty.
-        /// </summary>
         private bool TryGetScheduleStats(
             LoanCardVm vm,
             out decimal nextAmount,
@@ -235,7 +211,6 @@ namespace Finly.Pages
             }
             else
             {
-                // wszystkie raty w przeszłości – kredyt spłacony
                 remainingMonths = 0;
             }
 
@@ -251,27 +226,36 @@ namespace Finly.Pages
         {
             var loans = _loans.OfType<LoanCardVm>().ToList();
 
-            // Najpierw KPI u góry
             UpdateKpiTiles();
 
-            // Kolekcja dla panelu "Analizy finansowe"
             var insights = new ObservableCollection<LoanInsightVm>();
 
             if (loans.Any())
             {
-                var (totalDebt, monthlySum, yearlySum, maxRemainingMonths)
-                    = CalculatePortfolioStats(loans);
+                var (totalDebt, _, yearlySum, maxRemainingMonths) = CalculatePortfolioStats(loans);
+
+                // 1) Średnie oprocentowanie portfela (ważone saldem)
+                decimal weightedRate = 0m;
+                if (totalDebt > 0m)
+                    weightedRate = loans.Sum(l => l.Principal * l.InterestRate) / totalDebt;
+
+                // 2) Szacowane odsetki w 30 dni (dla obecnych sald)
+                var today = DateTime.Today;
+                var in30 = today.AddDays(30);
+                decimal interest30 = 0m;
+                foreach (var l in loans)
+                    interest30 += LoanMathService.CalculateInterest(l.Principal, l.InterestRate, today, in30);
 
                 insights.Add(new LoanInsightVm
                 {
-                    Label = "Całkowita suma zadłużenia (wszystkie kredyty):",
-                    Value = $"{totalDebt:N2} zł"
+                    Label = "Średnie oprocentowanie portfela (ważone saldem):",
+                    Value = $"{weightedRate:N2} %"
                 });
 
                 insights.Add(new LoanInsightVm
                 {
-                    Label = "Suma szacunkowych miesięcznych rat:",
-                    Value = $"{monthlySum:N2} zł"
+                    Label = "Szacowane odsetki w kolejne 30 dni (dla obecnych sald):",
+                    Value = $"{interest30:N2} zł"
                 });
 
                 insights.Add(new LoanInsightVm
@@ -286,20 +270,9 @@ namespace Finly.Pages
                     Value = FormatMonths(maxRemainingMonths)
                 });
             }
-            else
-            {
-                insights.Add(new LoanInsightVm
-                {
-                    Label = "",
-                    Value = "Brak aktywnych kredytów."
-                });
-            }
+
 
             InsightsList.ItemsSource = insights;
-
-            // Nadchodzące raty – na razie pusta lista / prosty placeholder
-            var upcoming = new ObservableCollection<object>();
-            UpcomingPaymentsList.ItemsSource = upcoming;
         }
 
         private void UpdateKpiTiles()
@@ -313,8 +286,6 @@ namespace Finly.Pages
             if (FindName("MonthlyLoansTileAmount") is TextBlock tbMonthly)
                 tbMonthly.Text = monthlySum.ToString("N2") + " zł";
         }
-
-        // ====== Panel dolny – przełączanie widoku ======
 
         private void ShowPanel(LoanPanel panel)
         {
@@ -338,6 +309,7 @@ namespace Finly.Pages
         {
             _selectedVm = null;
 
+            try { if (AddEditHeaderText != null) AddEditHeaderText.Text = "Dodaj kredyt"; } catch { }
             try { LoanFormMessage.Text = string.Empty; } catch { }
             try { LoanNameBox.Text = ""; } catch { }
             try { LoanPrincipalBox.Text = ""; } catch { }
@@ -352,14 +324,12 @@ namespace Finly.Pages
             }
             catch
             {
-                // ignorujemy ewentualne wyjątki UI
             }
 
             ComputeAndShowMonthlyBreakdown();
             ShowPanel(LoanPanel.AddEdit);
         }
 
-        // wywoływane z kafelka "Dodaj kredyt"
         private void AddLoanCard_Click(object sender, MouseButtonEventArgs e)
         {
             if (e.ChangedButton != MouseButton.Left) return;
@@ -430,13 +400,11 @@ namespace Finly.Pages
                     ToastService.Success("Kredyt dodany.");
                 }
 
-                // przypisz konto spłaty w słowniku (na razie tylko w pamięci)
                 if (selectedAccountId.HasValue)
                     _loanAccounts[loan.Id] = selectedAccountId.Value;
                 else
                     _loanAccounts.Remove(loan.Id);
 
-                // jeśli użytkownik w tym formularzu wybrał plik harmonogramu – przypisz go do tego kredytu
                 if (!string.IsNullOrWhiteSpace(_lastChosenSchedulePath))
                 {
                     _loanScheduleFiles[loan.Id] = _lastChosenSchedulePath;
@@ -462,7 +430,6 @@ namespace Finly.Pages
             ShowPanel(LoanPanel.None);
         }
 
-        // reaguje na zmiany pól w formularzu
         private void LoanFormField_Changed(object sender, TextChangedEventArgs e)
         {
             ComputeAndShowMonthlyBreakdown();
@@ -494,7 +461,6 @@ namespace Finly.Pages
             FirstInterestText.Text = interestFirst.ToString("N2") + " zł";
         }
 
-        // Upload harmonogramu
         private void ChooseSchedule_Click(object sender, RoutedEventArgs e)
         {
             var dlg = new Microsoft.Win32.OpenFileDialog
@@ -524,21 +490,13 @@ namespace Finly.Pages
             if (ok != true) return;
 
             var path = dlg.FileName;
-
-            // przypisz plik do tego konkretnego kredytu
             _loanScheduleFiles[vm.Id] = path;
 
             ToastService.Success("Harmonogram spłat został załączony do kredytu: " + vm.Name);
 
-            // jeżeli chcesz od razu przeliczać NextPaymentInfo z harmonogramu, zrobimy to w następnym kroku
             LoadLoans();
             RefreshKpisAndLists();
         }
-
-
-
-
-        // ====== Akcje z karty kredytu – przełączają dolny panel ======
 
         private void CardDetails_Click(object sender, RoutedEventArgs e)
         {
@@ -547,13 +505,14 @@ namespace Finly.Pages
 
             _selectedVm = vm;
 
+            try { if (AddEditHeaderText != null) AddEditHeaderText.Text = $"Edycja kredytu \"{vm.Name}\""; } catch { }
+
             LoanNameBox.Text = vm.Name;
             LoanPrincipalBox.Text = vm.Principal.ToString(CultureInfo.InvariantCulture);
             LoanInterestBox.Text = vm.InterestRate.ToString(CultureInfo.InvariantCulture);
             LoanTermBox.Text = vm.TermMonths.ToString(CultureInfo.InvariantCulture);
             LoanStartDatePicker.SelectedDate = vm.StartDate;
 
-            // dzień pobrania raty
             try
             {
                 if (LoanPaymentDayBox != null)
@@ -574,10 +533,8 @@ namespace Finly.Pages
             }
             catch
             {
-                // ignorujemy błędy UI
             }
 
-            // konto spłaty – jeśli mamy w słowniku, ustaw w ComboBoxie
             try
             {
                 if (LoanAccountBox != null)
@@ -595,7 +552,6 @@ namespace Finly.Pages
             }
             catch
             {
-                // ignorujemy błędy UI
             }
 
             ComputeAndShowMonthlyBreakdown();
@@ -625,7 +581,6 @@ namespace Finly.Pages
 
             _selectedVm = vm;
 
-            // 1) JEŚLI NIE MA ZAŁĄCZONEGO HARMONOGRAMU -> TOAST I STOP
             if (!_loanScheduleFiles.TryGetValue(vm.Id, out var path) || string.IsNullOrWhiteSpace(path))
             {
                 ToastService.Error("Nie załączyłaś jeszcze harmonogramu spłaty rat Twojego kredytu.");
@@ -639,7 +594,6 @@ namespace Finly.Pages
                 return;
             }
 
-            // 2) Wczytanie harmonogramu użytkownika (CSV) i otwarcie okna
             List<LoanDetailsWindow.ScheduleRow> schedule;
 
             try
@@ -652,7 +606,6 @@ namespace Finly.Pages
                 }
                 else
                 {
-                    // PDF (Opcja A) – jeżeli nie masz jeszcze parsera PDF, to uczciwie blokujemy
                     ToastService.Error("Aktualnie aplikacja analizuje harmonogram tylko z pliku CSV. PDF dodamy w kolejnym kroku.");
                     return;
                 }
@@ -687,7 +640,6 @@ namespace Finly.Pages
             win.ShowDialog();
         }
 
-
         private static List<LoanDetailsWindow.ScheduleRow> ParseScheduleCsv(string path)
         {
             var result = new List<LoanDetailsWindow.ScheduleRow>();
@@ -700,7 +652,6 @@ namespace Finly.Pages
                 var line = rawLine.Trim();
                 if (string.IsNullOrWhiteSpace(line)) continue;
 
-                // pomiń nagłówki
                 if (line.StartsWith("Data", StringComparison.OrdinalIgnoreCase))
                     continue;
 
@@ -735,7 +686,6 @@ namespace Finly.Pages
             var result = new List<LoanDetailsWindow.ScheduleRow>();
             if (!File.Exists(path)) return result;
 
-            // PL kultura: 5,87 i daty dd.MM.yyyy / dd-MM-yyyy etc.
             var pl = new CultureInfo("pl-PL");
 
             foreach (var raw in File.ReadLines(path))
@@ -743,12 +693,10 @@ namespace Finly.Pages
                 var line = (raw ?? "").Trim();
                 if (string.IsNullOrWhiteSpace(line)) continue;
 
-                // pomiń oczywiste nagłówki
                 var lower = line.ToLowerInvariant();
                 if (lower.Contains("data") && (lower.Contains("rata") || lower.Contains("kwota") || lower.Contains("amount")))
                     continue;
 
-                // separator ; lub , lub tab
                 string[] parts = line.Split(';');
                 if (parts.Length < 2) parts = line.Split(',');
                 if (parts.Length < 2) parts = line.Split('\t');
@@ -757,22 +705,19 @@ namespace Finly.Pages
                 var dateStr = parts[0].Trim();
                 var amountStr = parts[1].Trim();
 
-                // data (obsłuż kilka typowych formatów)
                 if (!DateTime.TryParse(dateStr, pl, DateTimeStyles.None, out var date) &&
                     !DateTime.TryParse(dateStr, CultureInfo.InvariantCulture, DateTimeStyles.None, out date))
                 {
                     continue;
                 }
 
-                // kwota: usuń walutę, spacje, NBSP
                 amountStr = amountStr
                     .Replace("zł", "", StringComparison.OrdinalIgnoreCase)
                     .Replace("pln", "", StringComparison.OrdinalIgnoreCase)
-                    .Replace("\u00A0", "") // nbsp
+                    .Replace("\u00A0", "")
                     .Replace(" ", "")
                     .Trim();
 
-                // czasem bywa "5,87-" lub "5,87 zł" -> sprzątamy końcówki
                 amountStr = amountStr.TrimEnd('-', ';', ',');
 
                 if (!decimal.TryParse(amountStr, NumberStyles.Any, pl, out var amount) &&
@@ -788,33 +733,9 @@ namespace Finly.Pages
                 });
             }
 
-            // sortowanie po dacie – zawsze
             result = result.OrderBy(x => x.Date).ToList();
             return result;
         }
-
-
-        private static List<LoanDetailsWindow.ScheduleRow> GenerateSimpleSchedule(LoanCardVm vm)
-        {
-            var list = new List<LoanDetailsWindow.ScheduleRow>();
-            if (vm.TermMonths <= 0 || vm.Principal <= 0) return list;
-
-            var per = Math.Round(vm.Principal / Math.Max(1, vm.TermMonths), 2);
-
-            for (int i = 1; i <= vm.TermMonths; i++)
-            {
-                var d = vm.StartDate.AddMonths(i);
-                list.Add(new LoanDetailsWindow.ScheduleRow
-                {
-                    Date = d,
-                    Amount = per
-                });
-            }
-
-            return list;
-        }
-
-        // ====== Usuwanie kredytu ======
 
         private void DeleteLoan_Click(object sender, RoutedEventArgs e)
         {
@@ -868,16 +789,16 @@ namespace Finly.Pages
         {
             if (sender is not FrameworkElement btn) return;
 
-            var card = FindVisualParent<Border>(btn);
-            if (card == null)
+            // Najpierw spróbuj zamknąć NAJBLIŻSZY panel potwierdzenia (ten pod przyciskiem)
+            var parentBorder = FindVisualParent<Border>(btn);
+            if (parentBorder != null && parentBorder.Name == "DeleteConfirmPanel")
             {
-                HideAllDeletePanels();
+                parentBorder.Visibility = Visibility.Collapsed;
                 return;
             }
 
-            var panel = FindDescendantByName<FrameworkElement>(card, "DeleteConfirmPanel");
-            if (panel != null)
-                panel.Visibility = Visibility.Collapsed;
+            // Fallback: schowaj wszystkie
+            HideAllDeletePanels();
         }
 
         private void HideAllDeletePanels()
@@ -893,7 +814,6 @@ namespace Finly.Pages
             }
         }
 
-        // Visual tree helpers
         private static T? FindVisualParent<T>(DependencyObject? child) where T : DependencyObject
         {
             if (child == null) return null;
@@ -944,7 +864,6 @@ namespace Finly.Pages
                 return;
             }
 
-            // Konto przypisane do kredytu (jeśli jest)
             int? accountId = null;
             string? accountName = null;
             if (_loanAccounts.TryGetValue(_selectedVm.Id, out var accId))
@@ -957,10 +876,8 @@ namespace Finly.Pages
             {
                 var today = DateTime.Today;
 
-                // 1) Poprzedni „termin raty” – od tej daty naliczamy odsetki do dnia nadpłaty
                 var lastDue = GetPreviousDueDate(today, _selectedVm.PaymentDay, _selectedVm.StartDate);
 
-                // 2) Odsetki narosłe od poprzedniego terminu raty do dziś
                 var interest = LoanMathService.CalculateInterest(
                     _selectedVm.Principal,
                     _selectedVm.InterestRate,
@@ -969,11 +886,9 @@ namespace Finly.Pages
 
                 if (interest < 0) interest = 0;
 
-                // 3) Najpierw spłacamy odsetki, dopiero reszta idzie w kapitał
                 var principalPart = amt - interest;
                 if (principalPart < 0) principalPart = 0;
 
-                // 4) Aktualizujemy stan kapitału
                 var newPrincipal = _selectedVm.Principal - principalPart;
                 if (newPrincipal < 0) newPrincipal = 0;
 
@@ -991,7 +906,6 @@ namespace Finly.Pages
 
                 DatabaseService.UpdateLoan(loanToUpdate);
 
-                // (opcjonalnie) nowa rata po nadpłacie, żeby pokazać efekt na przyszłość
                 var newMonthly = LoanService.CalculateMonthlyPayment(
                     newPrincipal,
                     _selectedVm.InterestRate,
@@ -1006,7 +920,6 @@ namespace Finly.Pages
                     $"Szacowana nowa rata (przy tej samej liczbie rat): {newMonthly:N2} zł.";
                 OverpayResult.Foreground = Brushes.Green;
 
-                // odśwież kafelki, analizy, itp.
                 LoadLoans();
                 RefreshKpisAndLists();
             }
@@ -1017,7 +930,6 @@ namespace Finly.Pages
             }
         }
 
-        // kliknięcie przycisku "Symulacja nadpłaty" na karcie
         private void ShowSimPanel_Click(object sender, RoutedEventArgs e)
         {
             if ((sender as FrameworkElement)?.Tag is not LoanCardVm vm)
@@ -1029,7 +941,6 @@ namespace Finly.Pages
             ShowPanel(LoanPanel.Sim);
         }
 
-        // przycisk "Symuluj" w panelu na dole
         private void SimulateInline_Click(object sender, RoutedEventArgs e)
         {
             if (_selectedVm == null)
@@ -1060,12 +971,6 @@ namespace Finly.Pages
                 $"- różnica: {diff:N2} zł miesięcznie.";
         }
 
-        /// <summary>
-        /// Poprzedni „umowny” termin raty:
-        /// - jeśli dziś jest po terminie z tego miesiąca -> zwracamy ten termin,
-        /// - jeśli przed -> idziemy miesiąc wstecz,
-        /// - nie cofamy się przed datę startu kredytu.
-        /// </summary>
         private static DateTime GetPreviousDueDate(DateTime today, int paymentDay, DateTime startDate)
         {
             if (paymentDay <= 0)

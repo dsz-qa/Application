@@ -769,10 +769,67 @@
                                 Margin="0,0,0,12">
                         <ctrls:PeriodBarControl x:Name="PeriodBar"
                                                 RangeChanged="PeriodBar_RangeChanged"/>
+
+                        <!-- WYSZUKIWARKA (pod paskiem okresu) -->
+                        <Grid Margin="0,10,0,0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+
+                            <Grid Grid.Column="0">
+                                <TextBox x:Name="SearchBox"
+                                         Style="{StaticResource SearchBoxStyle}"
+                                         Text="{Binding SearchQuery, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                         ToolTip="Szukaj po opisie, kategorii lub koncie"
+                                         KeyDown="SearchBox_KeyDown"/>
+
+                                <!-- Prosty placeholder (znika gdy jest tekst) -->
+                                <TextBlock Text="Szukaj: opis, kategoria, konto…"
+                                           Margin="14,0,0,0"
+                                           VerticalAlignment="Center"
+                                           Foreground="{DynamicResource App.Foreground}"
+                                           Opacity="0.45"
+                                           IsHitTestVisible="False">
+                                    <TextBlock.Style>
+                                        <Style TargetType="TextBlock">
+                                            <Setter Property="Visibility" Value="Collapsed"/>
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding ElementName=SearchBox, Path=Text.Length}" Value="0">
+                                                    <Setter Property="Visibility" Value="Visible"/>
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </TextBlock.Style>
+                                </TextBlock>
+
+                                <!-- Ikona lupy po lewej (opcjonalnie) -->
+                                <TextBlock Text="🔎"
+                                           Margin="10,0,0,0"
+                                           VerticalAlignment="Center"
+                                           Foreground="{DynamicResource App.Foreground}"
+                                           Opacity="0.55"
+                                           IsHitTestVisible="False"/>
+                            </Grid>
+
+                            <!-- Wyczyść -->
+                            <Button Grid.Column="1"
+                                    Style="{StaticResource SearchClearButtonStyle}"
+                                    Margin="8,0,0,0"
+                                    VerticalAlignment="Center"
+                                    ToolTip="Wyczyść"
+                                    Click="ClearSearch_Click">
+                                <TextBlock Text="✕"
+                                           FontSize="14"
+                                           Foreground="{DynamicResource App.Foreground}"
+                                           Opacity="0.8"/>
+                            </Button>
+                        </Grid>
+
                         <Border Height="3"
                                 Background="{DynamicResource Brand.Blue}"
                                 CornerRadius="0,0,8,8"
-                                Margin="0,6,0,0"/>
+                                Margin="0,10,0,0"/>
                     </StackPanel>
 
                     <!-- TRANS. ZREALIZOWANE (lewa) -->

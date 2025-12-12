@@ -5,6 +5,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Data;
 using System.Windows.Media;
+using System.Windows.Input; // added for KeyEventArgs
 using Finly.Models;
 using Finly.Services;
 using Finly.ViewModels;
@@ -304,6 +305,32 @@ namespace Finly.Pages
                 a.IsSelected = true;
 
             _vm.RefreshData();
+        }
+
+        // ================== WYSZUKIWARKA ==================
+
+        private void ClearSearch_Click(object sender, RoutedEventArgs e)
+        {
+            _vm.SearchQuery = string.Empty;
+            // opcjonalnie: focus wraca do pola
+            if (FindName("SearchBox") is TextBox tb) tb.Focus();
+        }
+
+        private void SearchBox_KeyDown(object sender, System.Windows.Input.KeyEventArgs e)
+        {
+            if (e.Key == System.Windows.Input.Key.Escape)
+            {
+                _vm.SearchQuery = string.Empty;
+                e.Handled = true;
+                return;
+            }
+
+            // Enter nic nie musi robić (filtrujesz live), ale można zostawić dla UX
+            if (e.Key == System.Windows.Input.Key.Enter)
+            {
+                _vm.RefreshData();
+                e.Handled = true;
+            }
         }
     }
 
