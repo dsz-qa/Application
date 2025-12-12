@@ -777,53 +777,21 @@
                                 <ColumnDefinition Width="Auto"/>
                             </Grid.ColumnDefinitions>
 
-                            <Grid Grid.Column="0">
-                                <TextBox x:Name="SearchBox"
-                                         Style="{StaticResource SearchBoxStyle}"
-                                         Text="{Binding SearchQuery, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                                         ToolTip="Szukaj po opisie, kategorii lub koncie"
-                                         KeyDown="SearchBox_KeyDown"/>
-
-                                <!-- Prosty placeholder (znika gdy jest tekst) -->
-                                <TextBlock Text="Szukaj: opis, kategoria, konto…"
-                                           Margin="14,0,0,0"
-                                           VerticalAlignment="Center"
-                                           Foreground="{DynamicResource App.Foreground}"
-                                           Opacity="0.45"
-                                           IsHitTestVisible="False">
-                                    <TextBlock.Style>
-                                        <Style TargetType="TextBlock">
-                                            <Setter Property="Visibility" Value="Collapsed"/>
-                                            <Style.Triggers>
-                                                <DataTrigger Binding="{Binding ElementName=SearchBox, Path=Text.Length}" Value="0">
-                                                    <Setter Property="Visibility" Value="Visible"/>
-                                                </DataTrigger>
-                                            </Style.Triggers>
-                                        </Style>
-                                    </TextBlock.Style>
-                                </TextBlock>
-
-                                <!-- Ikona lupy po lewej (opcjonalnie) -->
-                                <TextBlock Text="🔎"
-                                           Margin="10,0,0,0"
-                                           VerticalAlignment="Center"
-                                           Foreground="{DynamicResource App.Foreground}"
-                                           Opacity="0.55"
-                                           IsHitTestVisible="False"/>
-                            </Grid>
+                            <!-- TextBox z watermarkiem (Twój globalny styl) -->
+                            <TextBox x:Name="SearchBox"
+                                     Grid.Column="0"
+                                     Style="{StaticResource WatermarkTextBox}"
+                                     Tag="Szukaj: opis, kategoria, konto…"
+                                     Text="{Binding SearchQuery, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                     Height="34"
+                                     KeyDown="SearchBox_KeyDown"/>
 
                             <!-- Wyczyść -->
                             <Button Grid.Column="1"
-                                    Style="{StaticResource SearchClearButtonStyle}"
-                                    Margin="8,0,0,0"
-                                    VerticalAlignment="Center"
-                                    ToolTip="Wyczyść"
-                                    Click="ClearSearch_Click">
-                                <TextBlock Text="✕"
-                                           FontSize="14"
-                                           Foreground="{DynamicResource App.Foreground}"
-                                           Opacity="0.8"/>
-                            </Button>
+                                    Content="Wyczyść"
+                                    Margin="10,0,0,0"
+                                    Padding="14,6"
+                                    Click="ClearSearch_Click"/>
                         </Grid>
 
                         <Border Height="3"

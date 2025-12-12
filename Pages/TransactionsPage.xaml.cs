@@ -312,8 +312,9 @@ namespace Finly.Pages
         private void ClearSearch_Click(object sender, RoutedEventArgs e)
         {
             _vm.SearchQuery = string.Empty;
-            // opcjonalnie: focus wraca do pola
-            if (FindName("SearchBox") is TextBox tb) tb.Focus();
+
+            if (FindName("SearchBox") is TextBox tb)
+                tb.Focus();
         }
 
         private void SearchBox_KeyDown(object sender, System.Windows.Input.KeyEventArgs e)
@@ -321,14 +322,6 @@ namespace Finly.Pages
             if (e.Key == System.Windows.Input.Key.Escape)
             {
                 _vm.SearchQuery = string.Empty;
-                e.Handled = true;
-                return;
-            }
-
-            // Enter nic nie musi robić (filtrujesz live), ale można zostawić dla UX
-            if (e.Key == System.Windows.Input.Key.Enter)
-            {
-                _vm.RefreshData();
                 e.Handled = true;
             }
         }
