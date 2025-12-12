@@ -538,7 +538,7 @@
 
                         <!-- 1: Dodaj -->
                         <ToggleButton Grid.Row="1" x:Name="NavAdd" Style="{StaticResource NavItemCentered}"
-                  Content="Dodaj"
+                  Content="Dodaj transakcję"
                   Tag="pack://application:,,,/Assets/Icons/dodaj.png"
                   Click="Nav_Add_Click"/>
 
