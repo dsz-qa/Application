@@ -121,9 +121,16 @@
                 </Border>
 
                 <Border Grid.Column="4" Style="{StaticResource KpiCard}">
-                    <StackPanel>
-                        <TextBlock Text="Gotówka w kopertach" Style="{StaticResource KpiHeader}"/>
-                        <TextBlock x:Name="EnvelopesDashboardText" Style="{StaticResource KpiValueStyle}" Text="0,00 zł"/>
+                    <StackPanel HorizontalAlignment="Left">
+                        <TextBlock Text="Gotówka w kopertach"
+                                   Style="{StaticResource KpiHeader}"
+                                   TextWrapping="Wrap"
+                                   TextAlignment="Left"/>
+                        <TextBlock x:Name="EnvelopesDashboardText"
+                                   Style="{StaticResource KpiValueStyle}"
+                                   Text="0,00 zł"
+                                   TextWrapping="Wrap"
+                                   TextAlignment="Left"/>
                     </StackPanel>
                 </Border>
 
