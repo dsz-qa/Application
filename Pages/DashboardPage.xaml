@@ -533,7 +533,7 @@
                         </Grid.RowDefinitions>
 
                         <!-- Trend -->
-                        <Border Grid.Row="0" Grid.Column="0" Style="{StaticResource FinancialAnalysisCardBorderStyle}" Margin="0,0,8,8">
+                        <Border Grid.Row="0" Grid.Column="0" Style="{StaticResource Card}" Margin="0,0,8,8">
                             <StackPanel>
                                 <TextBlock Text="Trend wydatków — bieżący okres"
                                            Style="{StaticResource FinancialAnalysisCardHeaderStyle}"
