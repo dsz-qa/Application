@@ -3,16 +3,14 @@
 namespace Finly.Services
 {
     /// <summary>
-    /// Pomocniczy serwis matematyczny do obliczeń kredytowych:
-    /// - odsetki dzienne,
-    /// - symulacje,
-    /// - przeliczenia rat.
+    /// Pomocniczy serwis matematyczny do obliczeń kredytowych.
+    /// Jedno źródło prawdy dla odsetek dziennych.
     /// </summary>
     public static class LoanMathService
     {
         /// <summary>
-        /// Oblicza odsetki należne między dwiema datami wg oprocentowania rocznego.
-        /// Metoda liczy jak banki: odsetki = kapitał * (oprocentowanie/365) * liczba dni.
+        /// Odsetki: kapitał * (oprocentowanie/365) * liczba dni.
+        /// annualRate podajesz w % (np. 6.28).
         /// </summary>
         public static decimal CalculateInterest(
             decimal principal,
@@ -20,14 +18,13 @@ namespace Finly.Services
             DateTime from,
             DateTime to)
         {
-            if (to <= from || principal <= 0 || annualRate <= 0)
+            if (to <= from || principal <= 0m || annualRate <= 0m)
                 return 0m;
 
             int days = (to.Date - from.Date).Days;
+            if (days <= 0) return 0m;
 
-            // Oprocentowanie dzienne wg zasady: nominal / 365
             decimal dailyRate = annualRate / 100m / 365m;
-
             return Math.Round(principal * dailyRate * days, 2);
         }
     }

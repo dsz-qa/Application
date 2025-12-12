@@ -4,12 +4,11 @@ using System.Collections.Generic;
 namespace Finly.Services
 {
     /// <summary>
-    /// Logika kredytów: wyliczanie rat, odsetek dziennych, harmonogramu.
+    /// Logika kredytów: wyliczanie rat annuitetowych i terminów płatności.
+    /// Harmonogram CSV jest parsowany osobno w LoanScheduleCsvParser.
     /// </summary>
     public static class LoanService
     {
-        private const int DaysInYear = 365; // uproszczenie – wystarczy do analiz
-
         /// <summary>
         /// Standardowa rata annuitetowa.
         /// </summary>
@@ -36,7 +35,7 @@ namespace Finly.Services
         }
 
         /// <summary>
-        /// Rozbij pierwszą ratę na część odsetkową i kapitałową.
+        /// Rozbija pierwszą ratę na część odsetkową i kapitałową.
         /// </summary>
         public static (decimal InterestPart, decimal PrincipalPart)
             CalculateFirstInstallmentBreakdown(
@@ -57,102 +56,37 @@ namespace Finly.Services
         }
 
         /// <summary>
-        /// Odsetki dzienne w uproszczeniu: prosto po liczbie dni.
-        /// </summary>
-        public static decimal CalculateDailyInterest(
-            decimal principal,
-            decimal annualRatePercent,
-            DateTime fromDate,
-            DateTime toDate)
-        {
-            if (principal <= 0m || annualRatePercent <= 0m)
-                return 0m;
-
-            if (toDate <= fromDate)
-                return 0m;
-
-            var days = (toDate - fromDate).Days;
-            var dailyRate = annualRatePercent / 100m / DaysInYear;
-
-            var interest = principal * dailyRate * days;
-            return Math.Round(interest, 2);
-        }
-
-        /// <summary>
         /// Poprzedni „umowny” termin raty względem podanej daty.
-        /// Używamy go do liczenia odsetek między ratą a nadpłatą.
+        /// Uwzględnia PaymentDay oraz start kredytu (nie cofamy się przed start).
         /// </summary>
-        public static DateTime GetPreviousDueDate(DateTime today, int paymentDay)
+        public static DateTime GetPreviousDueDate(DateTime today, int paymentDay, DateTime startDate)
         {
             if (paymentDay <= 0)
-                return today.Date;
-
-            // termin w bieżącym miesiącu
-            var thisMonthDays = DateTime.DaysInMonth(today.Year, today.Month);
-            var thisDay = Math.Min(paymentDay, thisMonthDays);
-            var thisDue = new DateTime(today.Year, today.Month, thisDay);
-
-            if (today.Date >= thisDue.Date)
-                return thisDue;
-
-            // wstecz – miesiąc wcześniej
-            var prevMonthFirst = new DateTime(today.Year, today.Month, 1).AddMonths(-1);
-            var prevMonthDays = DateTime.DaysInMonth(prevMonthFirst.Year, prevMonthFirst.Month);
-            var prevDay = Math.Min(paymentDay, prevMonthDays);
-            return new DateTime(prevMonthFirst.Year, prevMonthFirst.Month, prevDay);
-        }
-
-        /// <summary>
-        /// Prosty harmonogram równych rat – bez nadpłat.
-        /// </summary>
-        public static List<LoanScheduleRow> GenerateSimpleSchedule(
-            decimal principal,
-            decimal annualRatePercent,
-            int termMonths,
-            DateTime startDate,
-            int paymentDay)
-        {
-            var result = new List<LoanScheduleRow>();
-            if (principal <= 0m || termMonths <= 0)
-                return result;
-
-            var payment = CalculateMonthlyPayment(principal, annualRatePercent, termMonths);
-            var monthlyRate = annualRatePercent / 100m / 12m;
-            var remaining = principal;
-            var dueDate = startDate;
-
-            for (int i = 1; i <= termMonths; i++)
             {
-                // kolejne terminy liczymy na podstawie dnia płatności
-                dueDate = GetNextDueDate(dueDate, paymentDay);
-
-                var interest = Math.Round(remaining * monthlyRate, 2);
-                var capital = Math.Round(payment - interest, 2);
-                if (capital < 0m) capital = 0m;
-
-                if (capital > remaining)
-                {
-                    capital = remaining;
-                    payment = capital + interest;
-                }
-
-                remaining = Math.Max(0m, remaining - capital);
-
-                result.Add(new LoanScheduleRow
-                {
-                    DueDate = dueDate,
-                    Total = payment,
-                    PrincipalPart = capital,
-                    InterestPart = interest,
-                    RemainingPrincipal = remaining
-                });
+                // przy braku PaymentDay liczymy "miesiąc wstecz", ale nie przed start
+                var d = today.Date.AddMonths(-1);
+                return d < startDate.Date ? startDate.Date : d;
             }
 
-            return result;
+            int dim = DateTime.DaysInMonth(today.Year, today.Month);
+            int day = Math.Min(paymentDay, dim);
+            var thisDue = new DateTime(today.Year, today.Month, day);
+
+            if (today.Date >= thisDue.Date)
+            {
+                return thisDue.Date < startDate.Date ? startDate.Date : thisDue.Date;
+            }
+
+            var prevMonthFirst = new DateTime(today.Year, today.Month, 1).AddMonths(-1);
+            int dimPrev = DateTime.DaysInMonth(prevMonthFirst.Year, prevMonthFirst.Month);
+            day = Math.Min(paymentDay, dimPrev);
+            var prevDue = new DateTime(prevMonthFirst.Year, prevMonthFirst.Month, day);
+
+            return prevDue.Date < startDate.Date ? startDate.Date : prevDue.Date;
         }
 
         /// <summary>
-        /// Kolejny termin raty – płatności 15-tego z korektą weekendową.
+        /// Kolejny termin raty – płatności danego dnia miesiąca z korektą weekendową.
         /// </summary>
         public static DateTime GetNextDueDate(DateTime previousDueDate, int paymentDay)
         {
@@ -174,17 +108,5 @@ namespace Finly.Services
 
             return due;
         }
-    }
-
-    public class LoanScheduleRow
-    {
-        public DateTime DueDate { get; set; }
-        public decimal Total { get; set; }
-        public decimal PrincipalPart { get; set; }
-        public decimal InterestPart { get; set; }
-        public decimal RemainingPrincipal { get; set; }
-
-        public string Display =>
-            $"{DueDate:dd.MM.yyyy} — {Total:N2} zł (kapitał {PrincipalPart:N2}, odsetki {InterestPart:N2})";
     }
 }

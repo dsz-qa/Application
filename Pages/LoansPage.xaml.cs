@@ -22,6 +22,7 @@ namespace Finly.Pages
         private LoanCardVm? _selectedVm;
 
         private readonly Dictionary<int, string> _loanScheduleFiles = new();
+        private readonly Dictionary<int, List<LoanInstallmentRow>> _parsedSchedules = new();
         private string? _lastChosenSchedulePath;
 
         private List<BankAccountModel> _accounts = new();
@@ -60,17 +61,13 @@ namespace Finly.Pages
 
         private static string FormatMonths(int months)
         {
-            if (months <= 0)
-                return "0 mies.";
+            if (months <= 0) return "0 mies.";
 
             int years = months / 12;
             int monthsLeft = months % 12;
 
-            if (years > 0 && monthsLeft > 0)
-                return $"{years} lat {monthsLeft} mies.";
-            if (years > 0)
-                return $"{years} lat";
-
+            if (years > 0 && monthsLeft > 0) return $"{years} lat {monthsLeft} mies.";
+            if (years > 0) return $"{years} lat";
             return $"{monthsLeft} mies.";
         }
 
@@ -143,10 +140,7 @@ namespace Finly.Pages
                 {
                     if (vm.TermMonths > 0)
                     {
-                        loanMonthly = LoanService.CalculateMonthlyPayment(
-                            vm.Principal,
-                            vm.InterestRate,
-                            vm.TermMonths);
+                        loanMonthly = LoanService.CalculateMonthlyPayment(vm.Principal, vm.InterestRate, vm.TermMonths);
                         loanYearly = loanMonthly * 12m;
                     }
                     else
@@ -164,6 +158,7 @@ namespace Finly.Pages
 
                 monthlySum += loanMonthly;
                 yearlySum += loanYearly;
+
                 if (remainingMonths > maxRemainingMonths)
                     maxRemainingMonths = remainingMonths;
             }
@@ -191,7 +186,28 @@ namespace Finly.Pages
                 return false;
             }
 
-            var schedule = ParseScheduleCsv(path);
+            List<LoanInstallmentRow> schedule;
+
+            // Prefer cache
+            if (_parsedSchedules.TryGetValue(vm.Id, out var cached) && cached != null && cached.Count > 0)
+            {
+                schedule = cached;
+            }
+            else
+            {
+                try
+                {
+                    var parser = new LoanScheduleCsvParser();
+                    schedule = parser.Parse(path).ToList();
+                    _parsedSchedules[vm.Id] = schedule;
+                }
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Debug.WriteLine($"TryGetScheduleStats parse error: {ex}");
+                    return false;
+                }
+            }
+
             if (schedule.Count == 0)
                 return false;
 
@@ -205,7 +221,7 @@ namespace Finly.Pages
             if (upcoming.Count > 0)
             {
                 var next = upcoming.First();
-                nextAmount = next.Amount;
+                nextAmount = next.Total;
                 nextDate = next.Date;
                 remainingMonths = upcoming.Count;
             }
@@ -217,7 +233,7 @@ namespace Finly.Pages
             var yearLimit = today.AddYears(1);
             yearSum = schedule
                 .Where(r => r.Date > today && r.Date <= yearLimit)
-                .Sum(r => r.Amount);
+                .Sum(r => r.Total);
 
             return true;
         }
@@ -234,14 +250,13 @@ namespace Finly.Pages
             {
                 var (totalDebt, _, yearlySum, maxRemainingMonths) = CalculatePortfolioStats(loans);
 
-                // 1) Średnie oprocentowanie portfela (ważone saldem)
                 decimal weightedRate = 0m;
                 if (totalDebt > 0m)
                     weightedRate = loans.Sum(l => l.Principal * l.InterestRate) / totalDebt;
 
-                // 2) Szacowane odsetki w 30 dni (dla obecnych sald)
                 var today = DateTime.Today;
                 var in30 = today.AddDays(30);
+
                 decimal interest30 = 0m;
                 foreach (var l in loans)
                     interest30 += LoanMathService.CalculateInterest(l.Principal, l.InterestRate, today, in30);
@@ -270,7 +285,6 @@ namespace Finly.Pages
                     Value = FormatMonths(maxRemainingMonths)
                 });
             }
-
 
             InsightsList.ItemsSource = insights;
         }
@@ -322,9 +336,7 @@ namespace Finly.Pages
                 if (LoanPaymentDayBox != null) LoanPaymentDayBox.SelectedIndex = 0;
                 if (LoanAccountBox != null) LoanAccountBox.SelectedIndex = -1;
             }
-            catch
-            {
-            }
+            catch { }
 
             ComputeAndShowMonthlyBreakdown();
             ShowPanel(LoanPanel.AddEdit);
@@ -363,16 +375,11 @@ namespace Finly.Pages
                         paymentDay = 0;
                 }
             }
-            catch
-            {
-                paymentDay = 0;
-            }
+            catch { paymentDay = 0; }
 
             int? selectedAccountId = null;
             if (LoanAccountBox?.SelectedItem is BankAccountModel acc)
-            {
                 selectedAccountId = acc.Id;
-            }
 
             try
             {
@@ -400,10 +407,8 @@ namespace Finly.Pages
                     ToastService.Success("Kredyt dodany.");
                 }
 
-                if (selectedAccountId.HasValue)
-                    _loanAccounts[loan.Id] = selectedAccountId.Value;
-                else
-                    _loanAccounts.Remove(loan.Id);
+                if (selectedAccountId.HasValue) _loanAccounts[loan.Id] = selectedAccountId.Value;
+                else _loanAccounts.Remove(loan.Id);
 
                 if (!string.IsNullOrWhiteSpace(_lastChosenSchedulePath))
                 {
@@ -490,8 +495,36 @@ namespace Finly.Pages
             if (ok != true) return;
 
             var path = dlg.FileName;
-            _loanScheduleFiles[vm.Id] = path;
 
+            if (string.Equals(Path.GetExtension(path), ".csv", StringComparison.OrdinalIgnoreCase))
+            {
+                try
+                {
+                    var parser = new LoanScheduleCsvParser();
+                    var rows = parser.Parse(path);
+
+                    _loanScheduleFiles[vm.Id] = path;
+                    _parsedSchedules[vm.Id] = rows.ToList();
+
+                    ScheduleList.ItemsSource = rows.Select(r => r.ToString()).ToList();
+                    _selectedVm = vm;
+                    ShowPanel(LoanPanel.Schedule);
+
+                    ToastService.Success("Harmonogram spłat został załączony i odczytany dla kredytu: " + vm.Name);
+
+                    LoadLoans();
+                    RefreshKpisAndLists();
+                }
+                catch (Exception ex)
+                {
+                    ToastService.Error("Nie udało się odczytać harmonogramu. Sprawdź format pliku CSV.");
+                    System.Diagnostics.Debug.WriteLine("LoanScheduleCsvParser error: " + ex);
+                }
+
+                return;
+            }
+
+            _loanScheduleFiles[vm.Id] = path;
             ToastService.Success("Harmonogram spłat został załączony do kredytu: " + vm.Name);
 
             LoadLoans();
@@ -531,37 +564,25 @@ namespace Finly.Pages
                     }
                 }
             }
-            catch
-            {
-            }
+            catch { }
 
             try
             {
                 if (LoanAccountBox != null)
                 {
                     if (_loanAccounts.TryGetValue(vm.Id, out var accId))
-                    {
-                        var acc = _accounts.FirstOrDefault(a => a.Id == accId);
-                        LoanAccountBox.SelectedItem = acc;
-                    }
+                        LoanAccountBox.SelectedItem = _accounts.FirstOrDefault(a => a.Id == accId);
                     else
-                    {
                         LoanAccountBox.SelectedIndex = -1;
-                    }
                 }
             }
-            catch
-            {
-            }
+            catch { }
 
             ComputeAndShowMonthlyBreakdown();
             ShowPanel(LoanPanel.AddEdit);
         }
 
-        private void EditLoan_Click(object sender, RoutedEventArgs e)
-        {
-            CardDetails_Click(sender, e);
-        }
+        private void EditLoan_Click(object sender, RoutedEventArgs e) => CardDetails_Click(sender, e);
 
         private void CardAddPayment_Click(object sender, RoutedEventArgs e)
         {
@@ -591,150 +612,38 @@ namespace Finly.Pages
             {
                 ToastService.Error("Nie znaleziono pliku harmonogramu. Załącz go ponownie.");
                 _loanScheduleFiles.Remove(vm.Id);
+                _parsedSchedules.Remove(vm.Id);
                 return;
             }
-
-            List<LoanDetailsWindow.ScheduleRow> schedule;
 
             try
             {
                 var ext = Path.GetExtension(path);
-
-                if (string.Equals(ext, ".csv", StringComparison.OrdinalIgnoreCase))
-                {
-                    schedule = ParseScheduleCsvRobust(path);
-                }
-                else
+                if (!string.Equals(ext, ".csv", StringComparison.OrdinalIgnoreCase))
                 {
                     ToastService.Error("Aktualnie aplikacja analizuje harmonogram tylko z pliku CSV. PDF dodamy w kolejnym kroku.");
                     return;
                 }
 
-                if (schedule == null || schedule.Count == 0)
+                if (_parsedSchedules.TryGetValue(vm.Id, out var cached) && cached != null && cached.Count > 0)
                 {
-                    ToastService.Error("Nie udało się odczytać harmonogramu. Sprawdź format pliku CSV.");
+                    ScheduleList.ItemsSource = cached.Select(r => r.ToString()).ToList();
+                    ShowPanel(LoanPanel.Schedule);
                     return;
                 }
+
+                var parser = new LoanScheduleCsvParser();
+                var rows = parser.Parse(path).ToList();
+                _parsedSchedules[vm.Id] = rows;
+
+                ScheduleList.ItemsSource = rows.Select(r => r.ToString()).ToList();
+                ShowPanel(LoanPanel.Schedule);
             }
             catch (Exception ex)
             {
-                ToastService.Error("Błąd analizy harmonogramu: " + ex.Message);
-                return;
+                ToastService.Error("Nie udało się odczytać harmonogramu. Sprawdź format pliku CSV.");
+                System.Diagnostics.Debug.WriteLine("LoanScheduleCsvParser error: " + ex);
             }
-
-            var detailsVm = new LoanDetailsWindow.DetailsVm
-            {
-                Name = vm.Name,
-                Principal = vm.Principal,
-                InterestRate = vm.InterestRate,
-                StartDate = vm.StartDate,
-                TermMonths = vm.TermMonths,
-                Schedule = schedule
-            };
-
-            var win = new LoanDetailsWindow(detailsVm)
-            {
-                Owner = Window.GetWindow(this)
-            };
-
-            win.ShowDialog();
-        }
-
-        private static List<LoanDetailsWindow.ScheduleRow> ParseScheduleCsv(string path)
-        {
-            var result = new List<LoanDetailsWindow.ScheduleRow>();
-            if (!File.Exists(path)) return result;
-
-            var culture = new CultureInfo("pl-PL");
-
-            foreach (var rawLine in File.ReadLines(path))
-            {
-                var line = rawLine.Trim();
-                if (string.IsNullOrWhiteSpace(line)) continue;
-
-                if (line.StartsWith("Data", StringComparison.OrdinalIgnoreCase))
-                    continue;
-
-                string[] parts = line.Split(';');
-                if (parts.Length < 2)
-                    parts = line.Split(',');
-
-                if (parts.Length < 2) continue;
-
-                if (!DateTime.TryParse(parts[0], culture, DateTimeStyles.None, out var date))
-                    continue;
-
-                var amountStr = parts[1]
-                    .Replace("zł", "", StringComparison.OrdinalIgnoreCase)
-                    .Replace(" ", "");
-
-                if (!decimal.TryParse(amountStr, NumberStyles.Any, culture, out var amount))
-                    continue;
-
-                result.Add(new LoanDetailsWindow.ScheduleRow
-                {
-                    Date = date,
-                    Amount = amount
-                });
-            }
-
-            return result;
-        }
-
-        private static List<LoanDetailsWindow.ScheduleRow> ParseScheduleCsvRobust(string path)
-        {
-            var result = new List<LoanDetailsWindow.ScheduleRow>();
-            if (!File.Exists(path)) return result;
-
-            var pl = new CultureInfo("pl-PL");
-
-            foreach (var raw in File.ReadLines(path))
-            {
-                var line = (raw ?? "").Trim();
-                if (string.IsNullOrWhiteSpace(line)) continue;
-
-                var lower = line.ToLowerInvariant();
-                if (lower.Contains("data") && (lower.Contains("rata") || lower.Contains("kwota") || lower.Contains("amount")))
-                    continue;
-
-                string[] parts = line.Split(';');
-                if (parts.Length < 2) parts = line.Split(',');
-                if (parts.Length < 2) parts = line.Split('\t');
-                if (parts.Length < 2) continue;
-
-                var dateStr = parts[0].Trim();
-                var amountStr = parts[1].Trim();
-
-                if (!DateTime.TryParse(dateStr, pl, DateTimeStyles.None, out var date) &&
-                    !DateTime.TryParse(dateStr, CultureInfo.InvariantCulture, DateTimeStyles.None, out date))
-                {
-                    continue;
-                }
-
-                amountStr = amountStr
-                    .Replace("zł", "", StringComparison.OrdinalIgnoreCase)
-                    .Replace("pln", "", StringComparison.OrdinalIgnoreCase)
-                    .Replace("\u00A0", "")
-                    .Replace(" ", "")
-                    .Trim();
-
-                amountStr = amountStr.TrimEnd('-', ';', ',');
-
-                if (!decimal.TryParse(amountStr, NumberStyles.Any, pl, out var amount) &&
-                    !decimal.TryParse(amountStr, NumberStyles.Any, CultureInfo.InvariantCulture, out amount))
-                {
-                    continue;
-                }
-
-                result.Add(new LoanDetailsWindow.ScheduleRow
-                {
-                    Date = date,
-                    Amount = amount
-                });
-            }
-
-            result = result.OrderBy(x => x.Date).ToList();
-            return result;
         }
 
         private void DeleteLoan_Click(object sender, RoutedEventArgs e)
@@ -744,12 +653,8 @@ namespace Finly.Pages
             HideAllDeletePanels();
 
             FrameworkElement? container = fe;
-            while (container != null &&
-                   container is not ContentPresenter &&
-                   container is not Border)
-            {
+            while (container != null && container is not ContentPresenter && container is not Border)
                 container = VisualTreeHelper.GetParent(container) as FrameworkElement;
-            }
 
             if (container == null) return;
 
@@ -771,6 +676,8 @@ namespace Finly.Pages
                     ToastService.Success("Kredyt usunięty.");
 
                     _loanAccounts.Remove(vm.Id);
+                    _loanScheduleFiles.Remove(vm.Id);
+                    _parsedSchedules.Remove(vm.Id);
 
                     LoadLoans();
                     RefreshKpisAndLists();
@@ -789,7 +696,6 @@ namespace Finly.Pages
         {
             if (sender is not FrameworkElement btn) return;
 
-            // Najpierw spróbuj zamknąć NAJBLIŻSZY panel potwierdzenia (ten pod przyciskiem)
             var parentBorder = FindVisualParent<Border>(btn);
             if (parentBorder != null && parentBorder.Name == "DeleteConfirmPanel")
             {
@@ -797,7 +703,6 @@ namespace Finly.Pages
                 return;
             }
 
-            // Fallback: schowaj wszystkie
             HideAllDeletePanels();
         }
 
@@ -820,15 +725,12 @@ namespace Finly.Pages
 
             DependencyObject? parent = VisualTreeHelper.GetParent(child);
             while (parent != null && parent is not T)
-            {
                 parent = VisualTreeHelper.GetParent(parent);
-            }
 
             return parent as T;
         }
 
-        private static T? FindDescendantByName<T>(DependencyObject? start, string name)
-            where T : FrameworkElement
+        private static T? FindDescendantByName<T>(DependencyObject? start, string name) where T : FrameworkElement
         {
             if (start == null) return null;
 
@@ -949,8 +851,7 @@ namespace Finly.Pages
                 return;
             }
 
-            if (!decimal.TryParse((SimExtraBox.Text ?? "").Replace(" ", ""),
-                    out var extra) || extra <= 0)
+            if (!decimal.TryParse((SimExtraBox.Text ?? "").Replace(" ", ""), out var extra) || extra <= 0)
             {
                 SimResult.Text = "Podaj poprawną kwotę jednorazowej nadpłaty.";
                 return;

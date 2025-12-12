@@ -329,13 +329,13 @@
                                                     Tag="{Binding}"
                                                     ToolTip="Usuń kredyt"
                                                     Style="{StaticResource DeleteIconButton}"/>
-+
-+							<!-- Nadpłać button moved next to Delete; no-wrap variant to keep text on one line -->
-+							<Button Content="Nadpłać kredyt"
-+								Style="{StaticResource LoansPrimarySmallButtonNoWrap}"
-+								Margin="8,0,0,0"
-+								Click="CardAddPayment_Click"
-+								Tag="{Binding}"/>
+
+							<!-- Nadpłać button moved next to Delete; no-wrap variant to keep text on one line -->
+							<Button Content="Nadpłać kredyt"
+								Style="{StaticResource LoansPrimarySmallButtonNoWrap}"
+								Margin="8,0,0,0"
+								Click="CardAddPayment_Click"
+								Tag="{Binding}"/>
 
 										</StackPanel>
 

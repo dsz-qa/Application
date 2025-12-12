@@ -1,12 +1,13 @@
 ﻿using System;
-using System.Windows;
 using System.Collections.Generic;
+using System.Windows;
+using Finly.Models;
 
 namespace Finly.Views
 {
     public partial class LoanDetailsWindow : Window
     {
-        public LoanDetailsWindow.DetailsVm Vm { get; }
+        public DetailsVm Vm { get; }
 
         public LoanDetailsWindow(DetailsVm vm)
         {
@@ -14,14 +15,16 @@ namespace Finly.Views
             Vm = vm ?? throw new ArgumentNullException(nameof(vm));
 
             LoanTitle.Text = Vm.Name;
-            ParamsText.Text = $"Kwota poczatkowa: {Vm.Principal:N0} zl\nOprocentowanie: {Vm.InterestRate}%\nOkres: {Vm.TermMonths} mies.";
-            PayoffInfo.Text = $"Jesli bedziesz placic normalnie, splacisz do: {Vm.StartDate.AddMonths(Vm.TermMonths):dd.MM.yyyy}";
+            ParamsText.Text =
+                $"Kwota: {Vm.Principal:N0} zł\n" +
+                $"Oprocentowanie: {Vm.InterestRate:N2}%\n" +
+                $"Okres: {Vm.TermMonths} mies.";
 
-            // Harmonogram – jeśli przyszedł z VM, pokaż go
+            PayoffInfo.Text =
+                $"Jeśli będziesz płacić normalnie, spłacisz do: {Vm.StartDate.AddMonths(Vm.TermMonths):dd.MM.yyyy}";
+
             if (Vm.Schedule != null && Vm.Schedule.Count > 0)
-            {
                 ScheduleItems.ItemsSource = Vm.Schedule;
-            }
         }
 
         private void Close_Click(object sender, RoutedEventArgs e) => Close();
@@ -30,21 +33,13 @@ namespace Finly.Views
         {
             if (!decimal.TryParse(ExtraAmountBox.Text, out var extra) || extra <= 0)
             {
-                SimResult.Text = "Podaj poprawna kwote.";
+                SimResult.Text = "Podaj poprawną kwotę.";
                 return;
             }
 
             var saved = Math.Round(extra * 0.05m, 2);
             var months = (int)(extra / Math.Max(1, Vm.Principal));
-            SimResult.Text = $"Oszczedzisz ~{saved:N2} zl na odsetkach i skrocisz kredyt o ~{months} miesiecy (szac.).";
-        }
-
-        public class ScheduleRow
-        {
-            public DateTime Date { get; set; }
-            public decimal Amount { get; set; }
-
-            public string Display => $"{Date:dd.MM.yyyy} — {Amount:N2} zł";
+            SimResult.Text = $"Oszczędzisz ~{saved:N2} zł na odsetkach i skrócisz kredyt o ~{months} miesięcy (szac.).";
         }
 
         public class DetailsVm
@@ -55,9 +50,7 @@ namespace Finly.Views
             public DateTime StartDate { get; set; }
             public int TermMonths { get; set; }
 
-            // nowość: harmonogram
-            public System.Collections.Generic.List<ScheduleRow> Schedule { get; set; }
-                = new System.Collections.Generic.List<ScheduleRow>();
+            public List<LoanInstallmentRow> Schedule { get; set; } = new();
         }
     }
 }
