@@ -517,24 +517,24 @@ namespace Finly.Pages
 
             var dlg = new Microsoft.Win32.OpenFileDialog
             {
-                Filter = "Pliki CSV|*.csv|Wszystkie pliki|*.*"
+                Filter = "Pliki CSV|*.csv|Pliki PDF|*.pdf|Wszystkie pliki|*.*"
             };
 
             var ok = dlg.ShowDialog();
-            if (ok == true)
-            {
-                var path = dlg.FileName;
+            if (ok != true) return;
 
-                // zapamiętujemy ścieżkę harmonogramu dla konkretnego kredytu
-                _loanScheduleFiles[vm.Id] = path;
+            var path = dlg.FileName;
 
-                ToastService.Success(
-                    $"Załączono harmonogram spłat rat dla kredytu \"{vm.Name}\".");
+            // przypisz plik do tego konkretnego kredytu
+            _loanScheduleFiles[vm.Id] = path;
 
-                // ewentualnie odśwież (żeby przyszłe wyliczenia brały to pod uwagę)
-                RefreshKpisAndLists();
-            }
+            ToastService.Success("Harmonogram spłat został załączony do kredytu: " + vm.Name);
+
+            // jeżeli chcesz od razu przeliczać NextPaymentInfo z harmonogramu, zrobimy to w następnym kroku
+            LoadLoans();
+            RefreshKpisAndLists();
         }
+
 
 
 
@@ -625,36 +625,68 @@ namespace Finly.Pages
 
             _selectedVm = vm;
 
+            // 1) JEŚLI NIE MA ZAŁĄCZONEGO HARMONOGRAMU -> TOAST I STOP
+            if (!_loanScheduleFiles.TryGetValue(vm.Id, out var path) || string.IsNullOrWhiteSpace(path))
+            {
+                ToastService.Error("Nie załączyłaś jeszcze harmonogramu spłaty rat Twojego kredytu.");
+                return;
+            }
+
+            if (!File.Exists(path))
+            {
+                ToastService.Error("Nie znaleziono pliku harmonogramu. Załącz go ponownie.");
+                _loanScheduleFiles.Remove(vm.Id);
+                return;
+            }
+
+            // 2) Wczytanie harmonogramu użytkownika (CSV) i otwarcie okna
+            List<LoanDetailsWindow.ScheduleRow> schedule;
+
+            try
+            {
+                var ext = Path.GetExtension(path);
+
+                if (string.Equals(ext, ".csv", StringComparison.OrdinalIgnoreCase))
+                {
+                    schedule = ParseScheduleCsvRobust(path);
+                }
+                else
+                {
+                    // PDF (Opcja A) – jeżeli nie masz jeszcze parsera PDF, to uczciwie blokujemy
+                    ToastService.Error("Aktualnie aplikacja analizuje harmonogram tylko z pliku CSV. PDF dodamy w kolejnym kroku.");
+                    return;
+                }
+
+                if (schedule == null || schedule.Count == 0)
+                {
+                    ToastService.Error("Nie udało się odczytać harmonogramu. Sprawdź format pliku CSV.");
+                    return;
+                }
+            }
+            catch (Exception ex)
+            {
+                ToastService.Error("Błąd analizy harmonogramu: " + ex.Message);
+                return;
+            }
+
             var detailsVm = new LoanDetailsWindow.DetailsVm
             {
                 Name = vm.Name,
                 Principal = vm.Principal,
                 InterestRate = vm.InterestRate,
                 StartDate = vm.StartDate,
-                TermMonths = vm.TermMonths
+                TermMonths = vm.TermMonths,
+                Schedule = schedule
             };
-
-            List<LoanDetailsWindow.ScheduleRow> schedule;
-
-            if (_loanScheduleFiles.TryGetValue(vm.Id, out var path) &&
-                !string.IsNullOrWhiteSpace(path) &&
-                string.Equals(Path.GetExtension(path), ".csv", StringComparison.OrdinalIgnoreCase))
-            {
-                schedule = ParseScheduleCsv(path);
-            }
-            else
-            {
-                schedule = GenerateSimpleSchedule(vm);
-            }
-
-            detailsVm.Schedule = schedule;
 
             var win = new LoanDetailsWindow(detailsVm)
             {
                 Owner = Window.GetWindow(this)
             };
+
             win.ShowDialog();
         }
+
 
         private static List<LoanDetailsWindow.ScheduleRow> ParseScheduleCsv(string path)
         {
@@ -697,6 +729,70 @@ namespace Finly.Pages
 
             return result;
         }
+
+        private static List<LoanDetailsWindow.ScheduleRow> ParseScheduleCsvRobust(string path)
+        {
+            var result = new List<LoanDetailsWindow.ScheduleRow>();
+            if (!File.Exists(path)) return result;
+
+            // PL kultura: 5,87 i daty dd.MM.yyyy / dd-MM-yyyy etc.
+            var pl = new CultureInfo("pl-PL");
+
+            foreach (var raw in File.ReadLines(path))
+            {
+                var line = (raw ?? "").Trim();
+                if (string.IsNullOrWhiteSpace(line)) continue;
+
+                // pomiń oczywiste nagłówki
+                var lower = line.ToLowerInvariant();
+                if (lower.Contains("data") && (lower.Contains("rata") || lower.Contains("kwota") || lower.Contains("amount")))
+                    continue;
+
+                // separator ; lub , lub tab
+                string[] parts = line.Split(';');
+                if (parts.Length < 2) parts = line.Split(',');
+                if (parts.Length < 2) parts = line.Split('\t');
+                if (parts.Length < 2) continue;
+
+                var dateStr = parts[0].Trim();
+                var amountStr = parts[1].Trim();
+
+                // data (obsłuż kilka typowych formatów)
+                if (!DateTime.TryParse(dateStr, pl, DateTimeStyles.None, out var date) &&
+                    !DateTime.TryParse(dateStr, CultureInfo.InvariantCulture, DateTimeStyles.None, out date))
+                {
+                    continue;
+                }
+
+                // kwota: usuń walutę, spacje, NBSP
+                amountStr = amountStr
+                    .Replace("zł", "", StringComparison.OrdinalIgnoreCase)
+                    .Replace("pln", "", StringComparison.OrdinalIgnoreCase)
+                    .Replace("\u00A0", "") // nbsp
+                    .Replace(" ", "")
+                    .Trim();
+
+                // czasem bywa "5,87-" lub "5,87 zł" -> sprzątamy końcówki
+                amountStr = amountStr.TrimEnd('-', ';', ',');
+
+                if (!decimal.TryParse(amountStr, NumberStyles.Any, pl, out var amount) &&
+                    !decimal.TryParse(amountStr, NumberStyles.Any, CultureInfo.InvariantCulture, out amount))
+                {
+                    continue;
+                }
+
+                result.Add(new LoanDetailsWindow.ScheduleRow
+                {
+                    Date = date,
+                    Amount = amount
+                });
+            }
+
+            // sortowanie po dacie – zawsze
+            result = result.OrderBy(x => x.Date).ToList();
+            return result;
+        }
+
 
         private static List<LoanDetailsWindow.ScheduleRow> GenerateSimpleSchedule(LoanCardVm vm)
         {
