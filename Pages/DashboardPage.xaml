@@ -3,9 +3,12 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:controls="clr-namespace:Finly.Views.Controls"
              xmlns:lvc="clr-namespace:LiveChartsCore.SkiaSharpView.WPF;assembly=LiveChartsCore.SkiaSharpView.WPF"
-             x:Name="Root">
+             x:Name="Root"
+             Background="{DynamicResource App.Background}">
 
     <UserControl.Resources>
+
+        <!-- ===== DASHBOARD-ONLY STYLES (bez globalnych Button/TextBox) ===== -->
 
         <!-- Karty -->
         <Style x:Key="Card" TargetType="Border">
@@ -14,33 +17,34 @@
             <Setter Property="BorderThickness" Value="1"/>
             <Setter Property="CornerRadius" Value="10"/>
             <Setter Property="Padding" Value="12"/>
-            <Setter Property="Margin" Value="0,0,12,0"/>
-        </Style>
-
-        <Style x:Key="AccentCard" TargetType="Border" BasedOn="{StaticResource Card}">
-            <Setter Property="BorderBrush" Value="{DynamicResource Brand.Blue}"/>
-            <Setter Property="BorderThickness" Value="1.5"/>
         </Style>
 
         <Style x:Key="AccentOrangeCard" TargetType="Border" BasedOn="{StaticResource Card}">
             <Setter Property="BorderBrush" Value="{DynamicResource Brand.Orange}"/>
-            <Setter Property="BorderThickness" Value="1.5"/>
+            <Setter Property="BorderThickness" Value="2"/>
         </Style>
 
         <!-- Nagłówki kart -->
         <Style x:Key="CardHeader" TargetType="TextBlock">
             <Setter Property="FontSize" Value="16"/>
             <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="Foreground" Value="{DynamicResource App.Foreground}"/>
             <Setter Property="Opacity" Value="1"/>
-            <Setter Property="Foreground" Value="White"/>
         </Style>
 
-        <!-- KPI -->
+        <!-- KPI (górne kafle) -->
         <Style x:Key="KpiValueStyle" TargetType="TextBlock">
             <Setter Property="FontSize" Value="18"/>
             <Setter Property="FontWeight" Value="Bold"/>
             <Setter Property="Margin" Value="0,2,0,0"/>
             <Setter Property="Foreground" Value="{DynamicResource App.Foreground}"/>
+        </Style>
+
+        <Style x:Key="KpiHeader" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="20"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="Foreground" Value="{DynamicResource App.Foreground}"/>
+            <Setter Property="Opacity" Value="1"/>
         </Style>
 
         <Style x:Key="KpiCard" TargetType="Border">
@@ -52,20 +56,24 @@
             <Setter Property="Margin" Value="0,0,16,0"/>
         </Style>
 
-        <!-- DatePicker (neutralize blue borders) -->
-        <Style TargetType="{x:Type DatePickerTextBox}">
+        <!-- Mniejsze etykiety w sekcjach (jak KPI w Reports) -->
+        <Style x:Key="MiniLabel" TargetType="TextBlock">
             <Setter Property="Foreground" Value="{DynamicResource App.Foreground}"/>
-            <Setter Property="Background" Value="{DynamicResource Surface.Background}"/>
-            <Setter Property="BorderBrush" Value="{DynamicResource Surface.Border}"/>
-            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Opacity" Value="0.85"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
         </Style>
 
-        <!-- Nagłówek KPI -->
-        <Style x:Key="KpiHeader" TargetType="TextBlock">
-            <Setter Property="FontSize" Value="20"/>
+        <Style x:Key="MiniValue" TargetType="TextBlock">
+            <Setter Property="Foreground" Value="{DynamicResource App.Foreground}"/>
             <Setter Property="FontWeight" Value="Bold"/>
-            <Setter Property="Foreground" Value="White"/>
-            <Setter Property="Opacity" Value="1"/>
+        </Style>
+
+        <!-- Nagłówek tabeli/listy -->
+        <Style x:Key="TableHeaderText" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="11"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Foreground" Value="{DynamicResource App.Foreground}"/>
+            <Setter Property="Opacity" Value="0.8"/>
         </Style>
 
     </UserControl.Resources>
@@ -81,7 +89,7 @@
                 <RowDefinition Height="*"/>
             </Grid.RowDefinitions>
 
-            <!-- KPI -->
+            <!-- ================= KPI ================= -->
             <Grid Grid.Row="0" Margin="0,0,0,12">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*"/>
@@ -134,7 +142,7 @@
                     </StackPanel>
                 </Border>
 
-                <Border Grid.Column="5" Style="{StaticResource KpiCard}">
+                <Border Grid.Column="5" Style="{StaticResource KpiCard}" Margin="0">
                     <StackPanel>
                         <TextBlock Text="Inwestycje" Style="{StaticResource KpiHeader}"/>
                         <TextBlock x:Name="InvestmentsText" Style="{StaticResource KpiValueStyle}" Text="0,00 zł"/>
@@ -142,80 +150,79 @@
                 </Border>
             </Grid>
 
-            <!-- Analizy / Alerty / Prognoza with orange separators top & bottom -->
-            <StackPanel Grid.Row="1" Margin="0,0,0,12" Orientation="Vertical">
-                <Border Height="2" Background="{DynamicResource Brand.Orange}" CornerRadius="8,8,0,0" Margin="0,0,0,8"/>
-                <Grid>
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="*"/>
-                        <ColumnDefinition Width="*"/>
-                        <ColumnDefinition Width="*"/>
-                    </Grid.ColumnDefinitions>
+            <!-- ================= Analizy / Alerty / Prognoza ================= -->
+            <Grid Grid.Row="1" Margin="0,0,0,12">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
 
-                    <!-- Restore orange accent frames -->
-                    <Border Grid.Column="0" Style="{StaticResource AccentOrangeCard}" Padding="12">
-                        <StackPanel>
-                            <TextBlock Text="Analizy finansowe" Style="{StaticResource CardHeader}" Margin="0,0,0,8"/>
-                            <ItemsControl ItemsSource="{Binding DataContext.Insights, ElementName=Root}">
-                                <ItemsControl.ItemTemplate>
-                                    <DataTemplate>
-                                        <TextBlock Text="{Binding}"
-                                                   Foreground="{DynamicResource App.Foreground}"
-                                                   Margin="0,2,0,2"
-                                                   TextWrapping="Wrap"/>
-                                    </DataTemplate>
-                                </ItemsControl.ItemTemplate>
-                            </ItemsControl>
-                        </StackPanel>
-                    </Border>
+                <!-- Analizy -->
+                <Border Grid.Column="0" Style="{StaticResource AccentOrangeCard}" Margin="0,0,12,0">
+                    <StackPanel>
+                        <TextBlock Text="Analizy finansowe" Style="{StaticResource CardHeader}" Margin="0,0,0,10"/>
 
-                    <Border Grid.Column="1" Style="{StaticResource AccentOrangeCard}" Padding="12">
-                        <StackPanel>
-                            <TextBlock Text="Alerty budżetowe" Style="{StaticResource CardHeader}" Margin="0,0,0,8"/>
-                            <ItemsControl ItemsSource="{Binding DataContext.Alerts, ElementName=Root}">
-                                <ItemsControl.ItemTemplate>
-                                    <DataTemplate>
-                                        <TextBlock Text="{Binding}"
-                                                   Foreground="{DynamicResource App.Foreground}"
-                                                   Margin="0,2,0,2"
-                                                   TextWrapping="Wrap"/>
-                                    </DataTemplate>
-                                </ItemsControl.ItemTemplate>
-                            </ItemsControl>
-                        </StackPanel>
-                    </Border>
-
-                    <Border Grid.Column="2" Style="{StaticResource AccentOrangeCard}" Padding="12">
-                        <StackPanel>
-                            <TextBlock Text="Prognoza końca miesiąca" Style="{StaticResource CardHeader}" Margin="0,0,0,8"/>
-                            <Grid>
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*"/>
-                                    <ColumnDefinition Width="*"/>
-                                </Grid.ColumnDefinitions>
-
-                                <StackPanel Grid.Column="0">
-                                    <TextBlock Text="Przew. wydatki" Style="{StaticResource CardHeader}"/>
-                                    <TextBlock Text="{Binding DataContext.Forecast.PredictedSpending, ElementName=Root, StringFormat={}{0:N2} zł}"
+                        <ItemsControl ItemsSource="{Binding DataContext.Insights, ElementName=Root}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <TextBlock Text="{Binding}"
                                                Foreground="{DynamicResource App.Foreground}"
-                                               FontWeight="Bold"/>
-                                </StackPanel>
+                                               Margin="0,2,0,2"
+                                               TextWrapping="Wrap"/>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </StackPanel>
+                </Border>
 
-                                <StackPanel Grid.Column="1">
-                                    <TextBlock Text="Przew. wolne środki" Style="{StaticResource CardHeader}"/>
-                                    <TextBlock Text="{Binding DataContext.Forecast.PredictedFreeCash, ElementName=Root, StringFormat={}{0:N2} zł}"
+                <!-- Alerty -->
+                <Border Grid.Column="1" Style="{StaticResource AccentOrangeCard}" Margin="0,0,12,0">
+                    <StackPanel>
+                        <TextBlock Text="Alerty budżetowe" Style="{StaticResource CardHeader}" Margin="0,0,0,10"/>
+
+                        <ItemsControl ItemsSource="{Binding DataContext.Alerts, ElementName=Root}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <TextBlock Text="{Binding}"
                                                Foreground="{DynamicResource App.Foreground}"
-                                               FontWeight="Bold"/>
-                                </StackPanel>
-                            </Grid>
-                        </StackPanel>
-                    </Border>
-                </Grid>
-                <Border Height="2" Background="{DynamicResource Brand.Orange}" CornerRadius="0,0,8,8" Margin="0,8,0,0"/>
-            </StackPanel>
+                                               Margin="0,2,0,2"
+                                               TextWrapping="Wrap"/>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </StackPanel>
+                </Border>
 
-            <!-- Główna część (neutral wrapper, no blue border) -->
-            <Border Grid.Row="2" Style="{StaticResource Card}" Padding="16" HorizontalAlignment="Stretch">
+                <!-- Prognoza -->
+                <Border Grid.Column="2" Style="{StaticResource AccentOrangeCard}">
+                    <StackPanel>
+                        <TextBlock Text="Prognoza końca miesiąca" Style="{StaticResource CardHeader}" Margin="0,0,0,10"/>
+
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+
+                            <StackPanel Grid.Column="0" Margin="0,0,12,0">
+                                <TextBlock Text="Przew. wydatki" Style="{StaticResource MiniLabel}"/>
+                                <TextBlock Text="{Binding DataContext.Forecast.PredictedSpending, ElementName=Root, StringFormat={}{0:N2} zł}"
+                                           Style="{StaticResource MiniValue}"/>
+                            </StackPanel>
+
+                            <StackPanel Grid.Column="1">
+                                <TextBlock Text="Przew. wolne środki" Style="{StaticResource MiniLabel}"/>
+                                <TextBlock Text="{Binding DataContext.Forecast.PredictedFreeCash, ElementName=Root, StringFormat={}{0:N2} zł}"
+                                           Style="{StaticResource MiniValue}"/>
+                            </StackPanel>
+                        </Grid>
+                    </StackPanel>
+                </Border>
+            </Grid>
+
+            <!-- ================= Główna część ================= -->
+            <Border Grid.Row="2" Style="{StaticResource Card}" Padding="16">
                 <Grid>
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto"/>
@@ -229,37 +236,67 @@
                         <ColumnDefinition Width="*"/>
                     </Grid.ColumnDefinitions>
 
-                    <!-- Pasek okresu + BLUE separator below -->
-                    <StackPanel Grid.Row="0" Grid.ColumnSpan="2" HorizontalAlignment="Center" Margin="0,0,0,8">
+                    <!-- Pasek okresu -->
+                    <StackPanel Grid.Row="0" Grid.ColumnSpan="2" HorizontalAlignment="Center" Margin="0,0,0,10">
                         <controls:PeriodBarControl x:Name="PeriodBar"
                                                    RangeChanged="PeriodBar_RangeChanged"
                                                    SearchClicked="PeriodBar_SearchClicked"
                                                    ClearClicked="PeriodBar_ClearClicked"/>
-                        <Border Height="3" Background="{DynamicResource Brand.Blue}" CornerRadius="0,0,8,8" Margin="0,6,0,0"/>
+                        <Border Height="3"
+                                Background="{DynamicResource Brand.Blue}"
+                                CornerRadius="0,0,8,8"
+                                Margin="0,8,0,0"/>
                     </StackPanel>
 
-                    <!-- PRZYCHODY -->
+                    <!-- ================= PRZYCHODY ================= -->
                     <Border Grid.Row="1" Grid.Column="0" Style="{StaticResource Card}" Margin="0,0,8,0">
                         <StackPanel>
+
                             <!-- Header + delete button -->
-                            <Grid Margin="0,0,0,4">
+                            <Grid Margin="0,0,0,6">
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="*"/>
                                     <ColumnDefinition Width="Auto"/>
                                 </Grid.ColumnDefinitions>
-                                <TextBlock Text="Przychody — bieżący okres" Style="{StaticResource CardHeader}" VerticalAlignment="Center"/>
-                                <Button Grid.Column="1" Width="28" Height="28" ToolTip="Usuń zaznaczony" Click="ShowIncomeDeleteConfirm_Click">
-                                    <Image Source="/Assets/Icons/delete.png" Width="16" Height="16"/>
-                                </Button>
+
+                                <TextBlock Text="Przychody — bieżący okres"
+                                           Style="{StaticResource CardHeader}"
+                                           VerticalAlignment="Center"/>
+
+                                <Button Grid.Column="1"
+                                        Style="{StaticResource DeleteIconButton}"
+                                        Width="34" Height="34"
+                                        HorizontalAlignment="Right"
+                                        VerticalAlignment="Center"
+                                        Panel.ZIndex="10"
+                                        ToolTip="Usuń zaznaczony"
+                                        Click="ShowIncomeDeleteConfirm_Click"/>
                             </Grid>
-                            <!-- Confirmation row shown below header so it is not overlapped -->
-                            <StackPanel x:Name="IncomeDeleteConfirmPanel" Orientation="Horizontal" Visibility="Collapsed" Margin="0,0,0,8" HorizontalAlignment="Left">
-                                <TextBlock Text="Czy na pewno chcesz usunąć przychód?" Foreground="{DynamicResource App.Foreground}" Margin="0,0,8,0"/>
-                                <Button Content="Tak" Width="60" Margin="0,0,6,0" Click="IncomeDeleteConfirmYes_Click"/>
-                                <Button Content="Nie" Width="60" Click="IncomeDeleteConfirmNo_Click"/>
+
+                            <!-- Confirmation row -->
+                            <StackPanel x:Name="IncomeDeleteConfirmPanel"
+                                        Orientation="Horizontal"
+                                        Visibility="Collapsed"
+                                        Margin="0,0,0,8"
+                                        HorizontalAlignment="Left">
+                                <TextBlock Text="Czy na pewno chcesz usunąć przychód?"
+                                           Foreground="{DynamicResource App.Foreground}"
+                                           Margin="0,0,8,0"/>
+                                <Button Content="Tak"
+                                        Width="60"
+                                        Margin="0,0,6,0"
+                                        Click="IncomeDeleteConfirmYes_Click"
+                                        Style="{StaticResource PrimaryButton}"/>
+                                <Button Content="Nie"
+                                        Width="60"
+                                        Click="IncomeDeleteConfirmNo_Click"
+                                        Style="{StaticResource SecondaryButton}"/>
                             </StackPanel>
-                            <!-- nagłówki kolumn: Data | Kwota | Kategoria | Z/Na konto | Opis -->
-                            <Border Margin="0,0,0,4" Background="{DynamicResource Surface.Background}" Padding="6,4,6,4">
+
+                            <!-- Nagłówki -->
+                            <Border Margin="0,0,0,4"
+                                    Background="{DynamicResource Surface.Background}"
+                                    Padding="6,4">
                                 <Grid>
                                     <Grid.ColumnDefinitions>
                                         <ColumnDefinition Width="120"/>
@@ -268,18 +305,23 @@
                                         <ColumnDefinition Width="140"/>
                                         <ColumnDefinition Width="2*"/>
                                     </Grid.ColumnDefinitions>
-                                    <TextBlock Grid.Column="0" Text="Data" FontSize="11" FontWeight="SemiBold" Foreground="{DynamicResource App.Foreground}" Opacity="0.8"/>
-                                    <TextBlock Grid.Column="1" Text="Kwota" FontSize="11" FontWeight="SemiBold" Foreground="{DynamicResource App.Foreground}" Opacity="0.8" HorizontalAlignment="Right"/>
-                                    <TextBlock Grid.Column="2" Text="Kategoria" FontSize="11" FontWeight="SemiBold" Foreground="{DynamicResource App.Foreground}" Opacity="0.8"/>
-                                    <TextBlock Grid.Column="3" Text="Z/Na konto" FontSize="11" FontWeight="SemiBold" Foreground="{DynamicResource App.Foreground}" Opacity="0.8"/>
-                                    <TextBlock Grid.Column="4" Text="Opis" FontSize="11" FontWeight="SemiBold" Foreground="{DynamicResource App.Foreground}" Opacity="0.8"/>
+
+                                    <TextBlock Grid.Column="0" Text="Data" Style="{StaticResource TableHeaderText}"/>
+                                    <TextBlock Grid.Column="1" Text="Kwota" Style="{StaticResource TableHeaderText}" HorizontalAlignment="Right"/>
+                                    <TextBlock Grid.Column="2" Text="Kategoria" Style="{StaticResource TableHeaderText}"/>
+                                    <TextBlock Grid.Column="3" Text="Z/Na konto" Style="{StaticResource TableHeaderText}"/>
+                                    <TextBlock Grid.Column="4" Text="Opis" Style="{StaticResource TableHeaderText}"/>
                                 </Grid>
                             </Border>
-                            <!-- wiersze -->
-                            <ListBox x:Name="IncomeTable" ItemsSource="{Binding DataContext.Incomes, ElementName=Root}" Background="Transparent" BorderThickness="0">
+
+                            <!-- Wiersze -->
+                            <ListBox x:Name="IncomeTable"
+                                     ItemsSource="{Binding DataContext.Incomes, ElementName=Root}"
+                                     Background="Transparent"
+                                     BorderThickness="0">
                                 <ListBox.ItemTemplate>
                                     <DataTemplate>
-                                        <Grid Margin="0,2,0,2">
+                                        <Grid Margin="0,2">
                                             <Grid.ColumnDefinitions>
                                                 <ColumnDefinition Width="120"/>
                                                 <ColumnDefinition Width="90"/>
@@ -287,6 +329,7 @@
                                                 <ColumnDefinition Width="140"/>
                                                 <ColumnDefinition Width="2*"/>
                                             </Grid.ColumnDefinitions>
+
                                             <TextBlock Grid.Column="0" Text="{Binding DateDisplay}" Foreground="{DynamicResource App.Foreground}"/>
                                             <TextBlock Grid.Column="1" Text="{Binding AmountStr}" HorizontalAlignment="Right" Foreground="{DynamicResource App.Foreground}"/>
                                             <TextBlock Grid.Column="2" Text="{Binding Category}" Foreground="{DynamicResource App.Foreground}" TextTrimming="CharacterEllipsis"/>
@@ -307,26 +350,50 @@
                         </StackPanel>
                     </Border>
 
-                    <!-- WYDATKI -->
+                    <!-- ================= WYDATKI ================= -->
                     <Border Grid.Row="1" Grid.Column="1" Style="{StaticResource Card}" Margin="8,0,0,0">
                         <StackPanel>
+
                             <!-- Header + delete button -->
-                            <Grid Margin="0,0,0,4">
+                            <Grid Margin="0,0,0,6">
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="*"/>
                                     <ColumnDefinition Width="Auto"/>
                                 </Grid.ColumnDefinitions>
-                                <TextBlock Text="Wydatki — bieżący okres" Style="{StaticResource CardHeader}" VerticalAlignment="Center"/>
-                                <Button Grid.Column="1" Width="28" Height="28" ToolTip="Usuń zaznaczony" Click="ShowExpenseDeleteConfirm_Click">
-                                    <Image Source="/Assets/Icons/delete.png" Width="16" Height="16"/>
-                                </Button>
+
+                                <TextBlock Text="Wydatki — bieżący okres"
+                                           Style="{StaticResource CardHeader}"
+                                           VerticalAlignment="Center"/>
+
+                                <Button Grid.Column="1"
+                                        Style="{StaticResource DeleteIconButton}"
+                                        Width="34" Height="34"
+                                        HorizontalAlignment="Right"
+                                        VerticalAlignment="Center"
+                                        Panel.ZIndex="10"
+                                        ToolTip="Usuń zaznaczony"
+                                        Click="ShowExpenseDeleteConfirm_Click"/>
                             </Grid>
-                            <StackPanel x:Name="ExpenseDeleteConfirmPanel" Orientation="Horizontal" Visibility="Collapsed" Margin="0,0,0,8" HorizontalAlignment="Left">
-                                <TextBlock Text="Czy na pewno chcesz usunąć wydatek?" Foreground="{DynamicResource App.Foreground}" Margin="0,0,8,0"/>
-                                <Button Content="Tak" Width="60" Margin="0,0,6,0" Click="ExpenseDeleteConfirmYes_Click"/>
-                                <Button Content="Nie" Width="60" Click="ExpenseDeleteConfirmNo_Click"/>
+
+                            <StackPanel x:Name="ExpenseDeleteConfirmPanel"
+                                        Orientation="Horizontal"
+                                        Visibility="Collapsed"
+                                        Margin="0,0,0,8"
+                                        HorizontalAlignment="Left">
+                                <TextBlock Text="Czy na pewno chcesz usunąć wydatek?"
+                                           Foreground="{DynamicResource App.Foreground}"
+                                           Margin="0,0,8,0"/>
+                                <Button Content="Tak" Width="60" Margin="0,0,6,0"
+                                        Click="ExpenseDeleteConfirmYes_Click"
+                                        Style="{StaticResource PrimaryButton}"/>
+                                <Button Content="Nie" Width="60"
+                                        Click="ExpenseDeleteConfirmNo_Click"
+                                        Style="{StaticResource SecondaryButton}"/>
                             </StackPanel>
-                            <Border Margin="0,0,0,4" Background="{DynamicResource Surface.Background}" Padding="6,4,6,4">
+
+                            <Border Margin="0,0,0,4"
+                                    Background="{DynamicResource Surface.Background}"
+                                    Padding="6,4">
                                 <Grid>
                                     <Grid.ColumnDefinitions>
                                         <ColumnDefinition Width="120"/>
@@ -336,18 +403,21 @@
                                         <ColumnDefinition Width="2*"/>
                                     </Grid.ColumnDefinitions>
 
-                                    <TextBlock Grid.Column="0" Text="Data" FontSize="11" FontWeight="SemiBold" Foreground="{DynamicResource App.Foreground}" Opacity="0.8"/>
-                                    <TextBlock Grid.Column="1" Text="Kwota" FontSize="11" FontWeight="SemiBold" Foreground="{DynamicResource App.Foreground}" Opacity="0.8" HorizontalAlignment="Right"/>
-                                    <TextBlock Grid.Column="2" Text="Kategoria" FontSize="11" FontWeight="SemiBold" Foreground="{DynamicResource App.Foreground}" Opacity="0.8"/>
-                                    <TextBlock Grid.Column="3" Text="Z/Na konto" FontSize="11" FontWeight="SemiBold" Foreground="{DynamicResource App.Foreground}" Opacity="0.8"/>
-                                    <TextBlock Grid.Column="4" Text="Opis" FontSize="11" FontWeight="SemiBold" Foreground="{DynamicResource App.Foreground}" Opacity="0.8"/>
+                                    <TextBlock Grid.Column="0" Text="Data" Style="{StaticResource TableHeaderText}"/>
+                                    <TextBlock Grid.Column="1" Text="Kwota" Style="{StaticResource TableHeaderText}" HorizontalAlignment="Right"/>
+                                    <TextBlock Grid.Column="2" Text="Kategoria" Style="{StaticResource TableHeaderText}"/>
+                                    <TextBlock Grid.Column="3" Text="Z/Na konto" Style="{StaticResource TableHeaderText}"/>
+                                    <TextBlock Grid.Column="4" Text="Opis" Style="{StaticResource TableHeaderText}"/>
                                 </Grid>
                             </Border>
 
-                            <ListBox x:Name="ExpenseTable" ItemsSource="{Binding DataContext.Expenses, ElementName=Root}" Background="Transparent" BorderThickness="0">
+                            <ListBox x:Name="ExpenseTable"
+                                     ItemsSource="{Binding DataContext.Expenses, ElementName=Root}"
+                                     Background="Transparent"
+                                     BorderThickness="0">
                                 <ListBox.ItemTemplate>
                                     <DataTemplate>
-                                        <Grid Margin="0,2,0,2">
+                                        <Grid Margin="0,2">
                                             <Grid.ColumnDefinitions>
                                                 <ColumnDefinition Width="120"/>
                                                 <ColumnDefinition Width="90"/>
@@ -376,26 +446,30 @@
                         </StackPanel>
                     </Border>
 
-                    <!-- WYKRESY KOŁOWE -->
+                    <!-- ================= WYKRESY KOŁOWE ================= -->
                     <Border Grid.Row="2" Grid.Column="0" Style="{StaticResource Card}" Margin="0,12,8,0">
                         <StackPanel>
                             <TextBlock Text="Źródła przychodu — bieżący okres"
                                        Style="{StaticResource CardHeader}"
                                        Margin="0,0,0,8"/>
 
-                            <lvc:PieChart
-                                x:Name="IncomePieChart"
-                                Series="{Binding DataContext.IncomeBySourceSeries, ElementName=Root}"
-                                Height="220"
-                                LegendPosition="Right"
-                                Background="Transparent"
-                                Foreground="{DynamicResource App.Foreground}"
-                                DrawMargin="0">
+                            <lvc:PieChart x:Name="IncomePieChart"
+                                          Series="{Binding DataContext.IncomeBySourceSeries, ElementName=Root}"
+                                          Height="220"
+                                          LegendPosition="Right"
+                                          Background="Transparent"
+                                          Foreground="{DynamicResource App.Foreground}"
+                                          DrawMargin="0">
                                 <lvc:PieChart.LegendTextPaint>
                                     <lvc:SolidColorPaint Color="#FFFFFFFF"/>
                                 </lvc:PieChart.LegendTextPaint>
                             </lvc:PieChart>
-                            <TextBlock Text="Brak danych w tym okresie" Foreground="{DynamicResource App.Foreground}" FontStyle="Italic" HorizontalAlignment="Center" Margin="0,6,0,0">
+
+                            <TextBlock Text="Brak danych w tym okresie"
+                                       Foreground="{DynamicResource App.Foreground}"
+                                       FontStyle="Italic"
+                                       HorizontalAlignment="Center"
+                                       Margin="0,6,0,0">
                                 <TextBlock.Style>
                                     <Style TargetType="TextBlock">
                                         <Setter Property="Visibility" Value="Collapsed"/>
@@ -416,19 +490,23 @@
                                        Style="{StaticResource CardHeader}"
                                        Margin="0,0,0,8"/>
 
-                            <lvc:PieChart
-                                x:Name="ExpensePieChart"
-                                Series="{Binding DataContext.ExpensesByCategorySeries, ElementName=Root}"
-                                Height="220"
-                                LegendPosition="Right"
-                                Background="Transparent"
-                                Foreground="{DynamicResource App.Foreground}"
-                                DrawMargin="0">
+                            <lvc:PieChart x:Name="ExpensePieChart"
+                                          Series="{Binding DataContext.ExpensesByCategorySeries, ElementName=Root}"
+                                          Height="220"
+                                          LegendPosition="Right"
+                                          Background="Transparent"
+                                          Foreground="{DynamicResource App.Foreground}"
+                                          DrawMargin="0">
                                 <lvc:PieChart.LegendTextPaint>
                                     <lvc:SolidColorPaint Color="#FFFFFFFF"/>
                                 </lvc:PieChart.LegendTextPaint>
                             </lvc:PieChart>
-                            <TextBlock Text="Brak danych w tym okresie" Foreground="{DynamicResource App.Foreground}" FontStyle="Italic" HorizontalAlignment="Center" Margin="0,6,0,0">
+
+                            <TextBlock Text="Brak danych w tym okresie"
+                                       Foreground="{DynamicResource App.Foreground}"
+                                       FontStyle="Italic"
+                                       HorizontalAlignment="Center"
+                                       Margin="0,6,0,0">
                                 <TextBlock.Style>
                                     <Style TargetType="TextBlock">
                                         <Setter Property="Visibility" Value="Collapsed"/>
@@ -443,18 +521,7 @@
                         </StackPanel>
                     </Border>
 
-                    <!-- TREND + NAJWYŻSZE + ZAPLANOWANE -->
-                    <!-- TREND -->
-                    <Border Grid.Row="3" Grid.Column="0" Style="{StaticResource Card}" Margin="0,12,8,0">
-                        <StackPanel>
-                            <TextBlock Text="Trend wydatków — bieżący okres"
-                                       Style="{StaticResource CardHeader}"
-                                       Margin="0,0,0,8"/>
-                            <!-- tu zostaje Twój wykres liniowy trendu -->
-                        </StackPanel>
-                    </Border>
-
-                    <!-- Sekcja dolna: siatka2x2 -->
+                    <!-- ================= Sekcja dolna 2x2 ================= -->
                     <Grid Grid.Row="3" Grid.ColumnSpan="2" Margin="0,12,0,0">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*"/>
@@ -465,10 +532,12 @@
                             <RowDefinition Height="*"/>
                         </Grid.RowDefinitions>
 
-                        <!-- Trend (lewa kolumna, wiersz1) -->
+                        <!-- Trend -->
                         <Border Grid.Row="0" Grid.Column="0" Style="{StaticResource Card}" Margin="0,0,8,8">
                             <StackPanel>
-                                <TextBlock Text="Trend wydatków — bieżący okres" Style="{StaticResource CardHeader}" Margin="0,0,0,8"/>
+                                <TextBlock Text="Trend wydatków — bieżący okres"
+                                           Style="{StaticResource CardHeader}"
+                                           Margin="0,0,0,8"/>
                                 <Canvas x:Name="ExpenseTrendCanvas" Height="180" Margin="0,0,0,4"/>
                                 <ItemsControl x:Name="ExpenseTrendLabels" Visibility="Collapsed" Margin="0,4,0,0">
                                     <ItemsControl.ItemsPanel>
@@ -485,24 +554,33 @@
                                         </DataTemplate>
                                     </ItemsControl.ItemTemplate>
                                 </ItemsControl>
-                                <TextBlock x:Name="ExpenseTrendEmptyText" Text="Brak danych w tym okresie" Foreground="{DynamicResource App.Foreground}" Visibility="Collapsed" HorizontalAlignment="Center" FontStyle="Italic"/>
+                                <TextBlock x:Name="ExpenseTrendEmptyText"
+                                           Text="Brak danych w tym okresie"
+                                           Foreground="{DynamicResource App.Foreground}"
+                                           Visibility="Collapsed"
+                                           HorizontalAlignment="Center"
+                                           FontStyle="Italic"/>
                             </StackPanel>
                         </Border>
 
-                        <!-- Podsumowanie (lewa kolumna, wiersz2) -->
+                        <!-- Podsumowanie -->
                         <Border Grid.Row="1" Grid.Column="0" Style="{StaticResource Card}" Margin="0,0,8,0">
                             <StackPanel>
-                                <TextBlock Text="Podsumowanie — bieżący okres" Style="{StaticResource CardHeader}" Margin="0,0,0,8"/>
+                                <TextBlock Text="Podsumowanie — bieżący okres"
+                                           Style="{StaticResource CardHeader}"
+                                           Margin="0,0,0,8"/>
                                 <TextBlock x:Name="PeriodIncomeSummaryText" Foreground="{DynamicResource App.Foreground}" Margin="0,0,0,4"/>
                                 <TextBlock x:Name="PeriodExpenseSummaryText" Foreground="{DynamicResource App.Foreground}" Margin="0,0,0,4"/>
                                 <TextBlock x:Name="PeriodBalanceSummaryText" Foreground="{DynamicResource App.Foreground}" FontWeight="Bold"/>
                             </StackPanel>
                         </Border>
 
-                        <!-- Najwyższe wydatki (prawa kolumna, wiersz1) -->
+                        <!-- Najwyższe wydatki -->
                         <Border Grid.Row="0" Grid.Column="1" Style="{StaticResource Card}" Margin="8,0,0,8">
                             <StackPanel>
-                                <TextBlock Text="Najwyższe wydatki — kategorie" Style="{StaticResource CardHeader}" Margin="0,0,0,8"/>
+                                <TextBlock Text="Najwyższe wydatki — kategorie"
+                                           Style="{StaticResource CardHeader}"
+                                           Margin="0,0,0,8"/>
                                 <ItemsControl x:Name="TopCategoryBars">
                                     <ItemsControl.ItemTemplate>
                                         <DataTemplate>
@@ -533,25 +611,49 @@
                             </StackPanel>
                         </Border>
 
-                        <!-- Zaplanowane transakcje (prawa kolumna, wiersz2) -->
+                        <!-- Zaplanowane transakcje -->
                         <Border Grid.Row="1" Grid.Column="1" Style="{StaticResource Card}" Margin="8,0,0,0">
                             <StackPanel>
-                                <Grid Margin="0,0,0,4">
+
+                                <Grid Margin="0,0,0,6">
                                     <Grid.ColumnDefinitions>
                                         <ColumnDefinition Width="*"/>
                                         <ColumnDefinition Width="Auto"/>
                                     </Grid.ColumnDefinitions>
-                                    <TextBlock Text="Zaplanowane transakcje" Style="{StaticResource CardHeader}" VerticalAlignment="Center"/>
-                                    <Button Grid.Column="1" Width="28" Height="28" ToolTip="Usuń zaznaczony" Click="ShowPlannedDeleteConfirm_Click">
-                                        <Image Source="/Assets/Icons/delete.png" Width="16" Height="16"/>
-                                    </Button>
+
+                                    <TextBlock Text="Zaplanowane transakcje"
+                                               Style="{StaticResource CardHeader}"
+                                               VerticalAlignment="Center"/>
+
+                                    <Button Grid.Column="1"
+                                            Style="{StaticResource DeleteIconButton}"
+                                            Width="34" Height="34"
+                                            HorizontalAlignment="Right"
+                                            VerticalAlignment="Center"
+                                            Panel.ZIndex="10"
+                                            ToolTip="Usuń zaznaczony"
+                                            Click="ShowPlannedDeleteConfirm_Click"/>
                                 </Grid>
-                                <StackPanel x:Name="PlannedDeleteConfirmPanel" Orientation="Horizontal" Visibility="Collapsed" Margin="0,0,0,8" HorizontalAlignment="Left">
-                                    <TextBlock Text="Czy na pewno chcesz usunąć transakcję?" Foreground="{DynamicResource App.Foreground}" Margin="0,0,8,0"/>
-                                    <Button Content="Tak" Width="60" Margin="0,0,6,0" Click="PlannedDeleteConfirmYes_Click"/>
-                                    <Button Content="Nie" Width="60" Click="PlannedDeleteConfirmNo_Click"/>
+
+                                <StackPanel x:Name="PlannedDeleteConfirmPanel"
+                                            Orientation="Horizontal"
+                                            Visibility="Collapsed"
+                                            Margin="0,0,0,8"
+                                            HorizontalAlignment="Left">
+                                    <TextBlock Text="Czy na pewno chcesz usunąć transakcję?"
+                                               Foreground="{DynamicResource App.Foreground}"
+                                               Margin="0,0,8,0"/>
+                                    <Button Content="Tak" Width="60" Margin="0,0,6,0"
+                                            Click="PlannedDeleteConfirmYes_Click"
+                                            Style="{StaticResource PrimaryButton}"/>
+                                    <Button Content="Nie" Width="60"
+                                            Click="PlannedDeleteConfirmNo_Click"
+                                            Style="{StaticResource SecondaryButton}"/>
                                 </StackPanel>
-                                <Border Margin="0,0,0,4" Background="{DynamicResource Surface.Background}" Padding="6,4,6,4">
+
+                                <Border Margin="0,0,0,4"
+                                        Background="{DynamicResource Surface.Background}"
+                                        Padding="6,4">
                                     <Grid>
                                         <Grid.ColumnDefinitions>
                                             <ColumnDefinition Width="120"/>
@@ -562,18 +664,22 @@
                                             <ColumnDefinition Width="120"/>
                                         </Grid.ColumnDefinitions>
 
-                                        <TextBlock Grid.Column="0" Text="Data" FontSize="11" FontWeight="SemiBold" Foreground="{DynamicResource App.Foreground}" Opacity="0.8"/>
-                                        <TextBlock Grid.Column="1" Text="Kwota" FontSize="11" FontWeight="SemiBold" Foreground="{DynamicResource App.Foreground}" Opacity="0.8" HorizontalAlignment="Right"/>
-                                        <TextBlock Grid.Column="2" Text="Kategoria" FontSize="11" FontWeight="SemiBold" Foreground="{DynamicResource App.Foreground}" Opacity="0.8"/>
-                                        <TextBlock Grid.Column="3" Text="Z/Na konto" FontSize="11" FontWeight="SemiBold" Foreground="{DynamicResource App.Foreground}" Opacity="0.8"/>
-                                        <TextBlock Grid.Column="4" Text="Opis" FontSize="11" FontWeight="SemiBold" Foreground="{DynamicResource App.Foreground}" Opacity="0.8"/>
-                                        <TextBlock Grid.Column="5" Text="Typ" FontSize="11" FontWeight="SemiBold" Foreground="{DynamicResource App.Foreground}" Opacity="0.8"/>
+                                        <TextBlock Grid.Column="0" Text="Data" Style="{StaticResource TableHeaderText}"/>
+                                        <TextBlock Grid.Column="1" Text="Kwota" Style="{StaticResource TableHeaderText}" HorizontalAlignment="Right"/>
+                                        <TextBlock Grid.Column="2" Text="Kategoria" Style="{StaticResource TableHeaderText}"/>
+                                        <TextBlock Grid.Column="3" Text="Z/Na konto" Style="{StaticResource TableHeaderText}"/>
+                                        <TextBlock Grid.Column="4" Text="Opis" Style="{StaticResource TableHeaderText}"/>
+                                        <TextBlock Grid.Column="5" Text="Typ" Style="{StaticResource TableHeaderText}"/>
                                     </Grid>
                                 </Border>
-                                <ListBox x:Name="PlannedTransactionsList" ItemsSource="{Binding DataContext.PlannedTransactions, ElementName=Root}" Background="Transparent" BorderThickness="0">
+
+                                <ListBox x:Name="PlannedTransactionsList"
+                                         ItemsSource="{Binding DataContext.PlannedTransactions, ElementName=Root}"
+                                         Background="Transparent"
+                                         BorderThickness="0">
                                     <ListBox.ItemTemplate>
                                         <DataTemplate>
-                                            <Grid Margin="0,2,0,2">
+                                            <Grid Margin="0,2">
                                                 <Grid.ColumnDefinitions>
                                                     <ColumnDefinition Width="120"/>
                                                     <ColumnDefinition Width="90"/>
@@ -582,6 +688,7 @@
                                                     <ColumnDefinition Width="2*"/>
                                                     <ColumnDefinition Width="120"/>
                                                 </Grid.ColumnDefinitions>
+
                                                 <TextBlock Grid.Column="0" Text="{Binding DateDisplay}" Foreground="{DynamicResource App.Foreground}"/>
                                                 <TextBlock Grid.Column="1" Text="{Binding AmountStr}" HorizontalAlignment="Right" Foreground="{DynamicResource App.Foreground}"/>
                                                 <TextBlock Grid.Column="2" Text="{Binding Category}" Foreground="{DynamicResource App.Foreground}" TextTrimming="CharacterEllipsis"/>
@@ -592,13 +699,19 @@
                                         </DataTemplate>
                                     </ListBox.ItemTemplate>
                                 </ListBox>
-                                <TextBlock x:Name="PlannedEmptyText" Text="Brak zaplanowanych transakcji" Foreground="{DynamicResource App.Foreground}" Visibility="Collapsed" HorizontalAlignment="Center" Margin="0,8,0,0" FontStyle="Italic"/>
+
+                                <TextBlock x:Name="PlannedEmptyText"
+                                           Text="Brak zaplanowanych transakcji"
+                                           Foreground="{DynamicResource App.Foreground}"
+                                           Visibility="Collapsed"
+                                           HorizontalAlignment="Center"
+                                           Margin="0,8,0,0"
+                                           FontStyle="Italic"/>
                             </StackPanel>
                         </Border>
                     </Grid>
                 </Grid>
             </Border>
-
         </Grid>
     </ScrollViewer>
 </UserControl>

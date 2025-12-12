@@ -133,34 +133,9 @@
                     <StackPanel Orientation="Horizontal"
                                 HorizontalAlignment="Right"
                                 Margin="0,10,0,0">
-                        <Button Click="EditGoal_Click"
-                                Margin="0,0,8,0"
-                                Padding="8,4"
-                                MinWidth="80">
-                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                                <!-- ikona edit po lewej stronie (jasno określony margin, wyrównanie) -->
-                                <Image Source="/Assets/Icons/edit.png"
-                                       Width="16" Height="16"
-                                       Margin="0,0,6,0"
-                                       VerticalAlignment="Center"
-                                       OpacityMask="{DynamicResource Brand.Orange}"/>
-                                <TextBlock Text="Edytuj" VerticalAlignment="Center"/>
-                            </StackPanel>
-                        </Button>
-
-                        <Button Click="DeleteGoal_Click"
-                                Padding="8,4"
-                                MinWidth="80">
-                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                                <Image Source="/Assets/Icons/delete.png"
-                                       Width="16" Height="16"
-                                       Margin="0,0,6,0"
-                                       VerticalAlignment="Center"
-                                       OpacityMask="{DynamicResource Brand.Orange}"/>
-                                <TextBlock Text="Usuń" VerticalAlignment="Center"/>
-                            </StackPanel>
-                        </Button>
-                    </StackPanel>
+                        <Button Click="EditGoal_Click" Style="{StaticResource EditIconButton}" Margin="0,0,8,0"/>
+                        <Button Click="DeleteGoal_Click" Style="{StaticResource DeleteIconButton}"/>
+                     </StackPanel>
 
                     <!-- PANEL POTWIERDZENIA USUNIĘCIA CELU -->
                     <StackPanel x:Name="GoalDeleteConfirmPanel"

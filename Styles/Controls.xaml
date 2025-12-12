@@ -180,6 +180,83 @@
         </Setter>
     </Style>
 
+    <!-- New: FilterCheckBox moved from TransactionsPage (global) -->
+    <Style x:Key="FilterCheckBox" TargetType="CheckBox">
+        <Setter Property="FontSize" Value="15"/>
+        <Setter Property="FontWeight" Value="SemiBold"/>
+        <Setter Property="Foreground" Value="{DynamicResource App.Foreground}"/>
+        <Setter Property="Cursor" Value="Hand"/>
+        <Setter Property="Padding" Value="8,6"/>
+        <Setter Property="Margin" Value="0,4,0,4"/>
+        <Setter Property="MinHeight" Value="32"/>
+        <Setter Property="VerticalContentAlignment" Value="Center"/>
+        <Setter Property="HorizontalContentAlignment" Value="Left"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="CheckBox">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+
+                        <Border x:Name="Box"
+                                Width="18"
+                                Height="18"
+                                CornerRadius="3"
+                                Background="{DynamicResource Surface.Background}"
+                                BorderBrush="{DynamicResource Surface.Border}"
+                                BorderThickness="1"
+                                VerticalAlignment="Center"
+                                Margin="0,0,8,0"/>
+                        <Path x:Name="CheckGlyph"
+                              Data="M4,9 L7,12 L14,5"
+                              Stroke="{DynamicResource App.Foreground}"
+                              StrokeThickness="2.2"
+                              StrokeLineJoin="Round"
+                              StrokeStartLineCap="Round"
+                              StrokeEndLineCap="Round"
+                              Visibility="Collapsed"
+                              HorizontalAlignment="Left"
+                              VerticalAlignment="Center"
+                              Margin="2,0,0,0"/>
+                        <ContentPresenter Grid.Column="1"
+                                          VerticalAlignment="Center"
+                                          HorizontalAlignment="Left"
+                                          RecognizesAccessKey="True"/>
+                    </Grid>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsChecked" Value="True">
+                            <Setter TargetName="CheckGlyph"
+                                    Property="Visibility"
+                                    Value="Visible"/>
+                            <Setter TargetName="Box"
+                                    Property="Background"
+                                    Value="{DynamicResource Accent}"/>
+                            <Setter TargetName="Box"
+                                    Property="BorderBrush"
+                                    Value="{DynamicResource Accent}"/>
+                        </Trigger>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="Box"
+                                    Property="Background"
+                                    Value="{DynamicResource Btn.Hover}"/>
+                            <Setter TargetName="Box"
+                                    Property="BorderBrush"
+                                    Value="{DynamicResource Btn.Border}"/>
+                        </Trigger>
+                        <Trigger Property="IsEnabled" Value="False">
+                            <Setter TargetName="Box"
+                                    Property="Opacity"
+                                    Value="0.5"/>
+                            <Setter Property="Foreground"
+                                    Value="{DynamicResource App.Foreground}"/>
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
 
     <!-- ===== ScrollBar: czarny w Dark, beżowy w Light ===== -->
 

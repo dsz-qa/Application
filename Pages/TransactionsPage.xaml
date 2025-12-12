@@ -125,83 +125,7 @@
             <Setter Property="FontWeight" Value="SemiBold"/>
         </Style>
 
-        <!-- checkbox filtrów -->
-        <Style x:Key="FilterCheckBoxStyle" TargetType="CheckBox">
-            <Setter Property="FontSize" Value="15"/>
-            <Setter Property="FontWeight" Value="SemiBold"/>
-            <Setter Property="Foreground" Value="{DynamicResource App.Foreground}"/>
-            <Setter Property="Cursor" Value="Hand"/>
-            <Setter Property="Padding" Value="8,6"/>
-            <Setter Property="Margin" Value="0,4,0,4"/>
-            <Setter Property="MinHeight" Value="32"/>
-            <Setter Property="VerticalContentAlignment" Value="Center"/>
-            <Setter Property="HorizontalContentAlignment" Value="Left"/>
-            <Setter Property="Template">
-                <Setter.Value>
-                    <ControlTemplate TargetType="CheckBox">
-                        <Grid>
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="Auto"/>
-                                <ColumnDefinition Width="*"/>
-                            </Grid.ColumnDefinitions>
-
-                            <Border x:Name="Box"
-                                    Width="18"
-                                    Height="18"
-                                    CornerRadius="3"
-                                    Background="{DynamicResource Surface.Background}"
-                                    BorderBrush="{DynamicResource Surface.Border}"
-                                    BorderThickness="1"
-                                    VerticalAlignment="Center"
-                                    Margin="0,0,8,0"/>
-                            <Path x:Name="CheckGlyph"
-                                  Data="M4,9 L7,12 L14,5"
-                                  Stroke="{DynamicResource App.Foreground}"
-                                  StrokeThickness="2.2"
-                                  StrokeLineJoin="Round"
-                                  StrokeStartLineCap="Round"
-                                  StrokeEndLineCap="Round"
-                                  Visibility="Collapsed"
-                                  HorizontalAlignment="Left"
-                                  VerticalAlignment="Center"
-                                  Margin="2,0,0,0"/>
-                            <ContentPresenter Grid.Column="1"
-                                              VerticalAlignment="Center"
-                                              HorizontalAlignment="Left"
-                                              RecognizesAccessKey="True"/>
-                        </Grid>
-                        <ControlTemplate.Triggers>
-                            <Trigger Property="IsChecked" Value="True">
-                                <Setter TargetName="CheckGlyph"
-                                        Property="Visibility"
-                                        Value="Visible"/>
-                                <Setter TargetName="Box"
-                                        Property="Background"
-                                        Value="{DynamicResource Accent}"/>
-                                <Setter TargetName="Box"
-                                        Property="BorderBrush"
-                                        Value="{DynamicResource Accent}"/>
-                            </Trigger>
-                            <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="Box"
-                                        Property="Background"
-                                        Value="{DynamicResource Btn.Hover}"/>
-                                <Setter TargetName="Box"
-                                        Property="BorderBrush"
-                                        Value="{DynamicResource Btn.Border}"/>
-                            </Trigger>
-                            <Trigger Property="IsEnabled" Value="False">
-                                <Setter TargetName="Box"
-                                        Property="Opacity"
-                                        Value="0.5"/>
-                                <Setter Property="Foreground"
-                                        Value="{DynamicResource App.Foreground}"/>
-                            </Trigger>
-                        </ControlTemplate.Triggers>
-                    </ControlTemplate>
-                </Setter.Value>
-            </Setter>
-        </Style>
+        <!-- Removed local FilterCheckBoxStyle; using global 'FilterCheckBox' in Styles/Controls.xaml -->
 
         <!-- Panel filtrów – nagłówek jako dowolny XAML (żeby można było dodać przycisk) -->
         <Style x:Key="FilterPanelStyle" TargetType="GroupBox">
@@ -508,18 +432,8 @@
                           Panel.ZIndex="10">
                         <!-- Normal actions -->
                         <StackPanel x:Name="NormalActions" Orientation="Horizontal">
-                            <Button Margin="0,0,8,0" Padding="8,4" MinWidth="70" ToolTip="Edytuj" Click="StartEdit_Click">
-                                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                                    <Image Source="/Assets/Icons/edit.png" Width="16" Height="16" Margin="0,0,6,0" OpacityMask="{DynamicResource Brand.Orange}"/>
-                                    <TextBlock Text="Edytuj" VerticalAlignment="Center"/>
-                                </StackPanel>
-                            </Button>
-                            <Button Padding="8,4" MinWidth="70" ToolTip="Usuń" Command="{Binding ShowDeleteConfirmationCommand}">
-                                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                                    <Image Source="/Assets/Icons/delete.png" Width="16" Height="16" Margin="0,0,6,0" OpacityMask="{DynamicResource Brand.Orange}"/>
-                                    <TextBlock Text="Usuń" VerticalAlignment="Center"/>
-                                </StackPanel>
-                            </Button>
+                            <Button Margin="0,0,8,0" ToolTip="Edytuj" Click="StartEdit_Click" Style="{StaticResource EditIconButton}"/>
+                            <Button ToolTip="Usuń" Command="{Binding ShowDeleteConfirmationCommand}" Style="{StaticResource DeleteIconButton}"/>
                         </StackPanel>
                         <!-- Edit actions -->
                         <StackPanel x:Name="EditActions" Orientation="Horizontal" Visibility="Collapsed">
@@ -641,7 +555,7 @@
                         <ScrollViewer VerticalScrollBarVisibility="Auto">
                             <StackPanel>
                                 <!-- Wydatki -->
-                                <CheckBox Style="{StaticResource FilterCheckBoxStyle}"
+                                <CheckBox Style="{StaticResource FilterCheckBox}"
                                           IsChecked="{Binding ShowExpenses, Mode=TwoWay}">
                                     <StackPanel Orientation="Horizontal">
                                         <Image Source="/Assets/Icons/wydatki.png"
@@ -653,7 +567,7 @@
                                 </CheckBox>
 
                                 <!-- Przychody -->
-                                <CheckBox Style="{StaticResource FilterCheckBoxStyle}"
+                                <CheckBox Style="{StaticResource FilterCheckBox}"
                                           IsChecked="{Binding ShowIncomes, Mode=TwoWay}">
                                     <StackPanel Orientation="Horizontal">
                                         <Image Source="/Assets/Icons/przychody.png"
@@ -665,7 +579,7 @@
                                 </CheckBox>
 
                                 <!-- Transfery -->
-                                <CheckBox Style="{StaticResource FilterCheckBoxStyle}"
+                                <CheckBox Style="{StaticResource FilterCheckBox}"
                                           IsChecked="{Binding ShowTransfers, Mode=TwoWay}">
                                     <StackPanel Orientation="Horizontal">
                                         <Image Source="/Assets/Icons/transfer.png"
@@ -700,7 +614,7 @@
                             <ItemsControl ItemsSource="{Binding Categories}">
                                 <ItemsControl.ItemTemplate>
                                     <DataTemplate>
-                                        <CheckBox Style="{StaticResource FilterCheckBoxStyle}"
+                                        <CheckBox Style="{StaticResource FilterCheckBox}"
                                                   Content="{Binding Name}"
                                                   IsChecked="{Binding IsSelected, Mode=TwoWay}"/>
                                     </DataTemplate>
@@ -730,7 +644,7 @@
                             <ItemsControl ItemsSource="{Binding Accounts}">
                                 <ItemsControl.ItemTemplate>
                                     <DataTemplate>
-                                        <CheckBox Style="{StaticResource FilterCheckBoxStyle}"
+                                        <CheckBox Style="{StaticResource FilterCheckBox}"
                                                   Content="{Binding Name}"
                                                   IsChecked="{Binding IsSelected, Mode=TwoWay}"/>
                                     </DataTemplate>
@@ -780,10 +694,9 @@
                             <!-- TextBox z watermarkiem (Twój globalny styl) -->
                             <TextBox x:Name="SearchBox"
                                      Grid.Column="0"
-                                     Style="{StaticResource WatermarkTextBox}"
+                                     Style="{StaticResource SearchBoxStyle}"
                                      Tag="Szukaj: opis, kategoria, konto…"
                                      Text="{Binding SearchQuery, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                                     Height="34"
                                      KeyDown="SearchBox_KeyDown"/>
 
                             <!-- Wyczyść -->
@@ -828,7 +741,7 @@
                                             <Setter Property="Visibility" Value="Collapsed"/>
                                             <Setter Property="Text">
                                                 <Setter.Value>
-                                                    <Binding ElementName="PlannedItems" Path="HasItems"/>
+                                                    <Binding ElementName="PlannedItemsList" Path="HasItems"/>
                                                 </Setter.Value>
                                             </Setter>
                                             <Style.Triggers>
@@ -878,7 +791,7 @@
                                         <Style TargetType="TextBlock">
                                             <Setter Property="Visibility" Value="Collapsed"/>
                                             <Style.Triggers>
-                                                <DataTrigger Binding="{Binding ElementName=PlannedItems, Path=HasItems}"
+                                                <DataTrigger Binding="{Binding ElementName=PlannedItemsList, Path=HasItems}"
                                                              Value="False">
                                                     <Setter Property="Visibility"
                                                             Value="Visible"/>
@@ -888,7 +801,7 @@
                                     </TextBlock.Style>
                                 </TextBlock>
 
-                                <ItemsControl x:Name="PlannedItems"
+                                <ItemsControl x:Name="PlannedItemsList"
                                               ItemsSource="{Binding PlannedTransactionsList}"
                                               ItemTemplate="{StaticResource TransactionCardTemplate}">
                                 </ItemsControl>

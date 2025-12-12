@@ -8,35 +8,6 @@
              x:Name="Root">
 
     <UserControl.Resources>
-        <!-- Watermark / placeholder dla TextBox -->
-        <Style x:Key="WatermarkTextBoxStyle" TargetType="TextBox">
-            <Setter Property="Foreground" Value="White" />
-            <Setter Property="Template">
-                <Setter.Value>
-                    <ControlTemplate TargetType="TextBox">
-                        <Grid>
-                            <ScrollViewer x:Name="PART_ContentHost" />
-                            <TextBlock x:Name="Watermark"
-                                       Text="{TemplateBinding Tag}"
-                                       Foreground="#666"
-                                       Margin="6,0,0,0"
-                                       VerticalAlignment="Center"
-                                       IsHitTestVisible="False"
-                                       Visibility="Collapsed" />
-                        </Grid>
-                        <ControlTemplate.Triggers>
-                            <Trigger Property="Text" Value="">
-                                <Setter TargetName="Watermark" Property="Visibility" Value="Visible" />
-                            </Trigger>
-                            <Trigger Property="IsFocused" Value="True">
-                                <Setter TargetName="Watermark" Property="Visibility" Value="Collapsed" />
-                            </Trigger>
-                        </ControlTemplate.Triggers>
-                    </ControlTemplate>
-                </Setter.Value>
-            </Setter>
-        </Style>
-
         <!-- Style KPI spójne z Dashboard -->
         <Style x:Key="KpiCard" TargetType="Border">
             <Setter Property="Background" Value="Transparent" />
@@ -671,38 +642,12 @@
                                     <!-- Szukanie -->
                                     <StackPanel Margin="0,8,0,0">
                                         <Grid x:Name="AllCategoriesSearchArea">
-                                            <Border Background="#10FFFFFF"
-                                                    BorderBrush="{DynamicResource Surface.Border}"
-                                                    BorderThickness="1"
-                                                    CornerRadius="6"
-                                                    Padding="8">
-                                                <Grid>
-                                                    <Grid.ColumnDefinitions>
-                                                        <ColumnDefinition Width="Auto" />
-                                                        <ColumnDefinition Width="*" />
-                                                    </Grid.ColumnDefinitions>
-
-                                                    <Image Grid.Column="0"
-                                                           Width="18"
-                                                           Height="18"
-                                                           Margin="2,0,8,0"
-                                                           VerticalAlignment="Center"
-                                                           Stretch="Uniform"
-                                                           Source="pack://application:,,,/Assets/Icons/search.png" />
-
-                                                    <TextBox Grid.Column="1"
-                                                             x:Name="AllCategoriesSearchBox"
-                                                             Style="{StaticResource WatermarkTextBoxStyle}"
-                                                             Tag="Szukaj"
-                                                             Height="28"
-                                                             BorderThickness="0"
-                                                             Background="Transparent"
-                                                             Foreground="{DynamicResource App.Foreground}"
-                                                             VerticalContentAlignment="Center"
-                                                             Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}" />
-                                                </Grid>
-                                            </Border>
-                                        </Grid>
+                                                <TextBox x:Name="AllCategoriesSearchBox"
+                                                         Style="{StaticResource SearchBoxStyle}"
+                                                         Tag="Szukaj"
+                                                         VerticalContentAlignment="Center"
+                                                         Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}" />
+                                            </Grid>
 
                                         <!-- Lista kategorii (WrapPanel) -->
                                         <ItemsControl x:Name="AllCategoriesList"
@@ -778,31 +723,14 @@
                                                                             Orientation="Horizontal"
                                                                             HorizontalAlignment="Right"
                                                                             Margin="0,8,0,0">
-                                                                    <Button Width="24"
-                                                                            Height="24"
-                                                                            Background="Transparent"
-                                                                            BorderThickness="0"
+                                                                    <Button Style="{StaticResource EditIconButton}"
                                                                             ToolTip="Edytuj"
                                                                             Click="EditCategory_Click"
-                                                                            Tag="{Binding}">
-                                                                        <Image Source="pack://application:,,,/Assets/Icons/edit.png"
-                                                                               Width="18"
-                                                                               Height="18"
-                                                                               Stretch="Uniform" />
-                                                                    </Button>
-                                                                    <Button Width="24"
-                                                                            Height="24"
-                                                                            Background="Transparent"
-                                                                            BorderThickness="0"
+                                                                            Tag="{Binding}" />
+                                                                    <Button Style="{StaticResource DeleteIconButton}"
                                                                             ToolTip="Usuń"
                                                                             Click="ShowDeleteConfirm_Click"
-                                                                            Tag="{Binding}"
-                                                                            Margin="8,0,0,0">
-                                                                        <Image Source="pack://application:,,,/Assets/Icons/delete.png"
-                                                                               Width="18"
-                                                                               Height="18"
-                                                                               Stretch="Uniform" />
-                                                                    </Button>
+                                                                            Tag="{Binding}" />
                                                                 </StackPanel>
 
                                                                 <!-- Potwierdzenie usunięcia -->

@@ -7,5 +7,6 @@
 		<ResourceDictionary Source="Buttons.xaml"/>
 		<ResourceDictionary Source="Nav.xaml"/>
 		<ResourceDictionary Source="DataGrid.xaml"/>
+		<ResourceDictionary Source="SearchBox.xaml"/>
 	</ResourceDictionary.MergedDictionaries>
 </ResourceDictionary>

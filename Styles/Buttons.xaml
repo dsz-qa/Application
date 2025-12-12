@@ -44,8 +44,17 @@
         </Setter>
     </Style>
 
+    <!-- Action button base for equal sizing (primary/secondary) -->
+    <Style x:Key="ActionButtonBase"
+           TargetType="Button"
+           BasedOn="{StaticResource {x:Type Button}}">
+        <Setter Property="Height" Value="30"/>
+        <Setter Property="MinWidth" Value="72"/>
+        <Setter Property="Padding" Value="14,6"/>
+    </Style>
+
     <!-- Primary = niebieski akcent -->
-    <Style x:Key="PrimaryButton" TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
+    <Style x:Key="PrimaryButton" TargetType="Button" BasedOn="{StaticResource ActionButtonBase}">
         <Setter Property="Foreground"  Value="{DynamicResource Accent.Foreground}"/>
         <Setter Property="Background"  Value="{DynamicResource Accent}"/>
         <Setter Property="BorderBrush" Value="{DynamicResource Accent}"/>
@@ -77,7 +86,7 @@
     </Style>
 
     <!-- Secondary = neutralny button zgodny z bazowym, z większym zaokrągleniem -->
-    <Style x:Key="SecondaryButton" TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
+    <Style x:Key="SecondaryButton" TargetType="Button" BasedOn="{StaticResource ActionButtonBase}">
         <Setter Property="Foreground"  Value="{DynamicResource App.Foreground}"/>
         <Setter Property="Background"  Value="{DynamicResource Btn.Background}"/>
         <Setter Property="BorderBrush" Value="{DynamicResource Btn.Border}"/>
@@ -103,6 +112,80 @@
                         </Trigger>
                     </ControlTemplate.Triggers>
                 </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- ===== ICON BUTTONS ===== -->
+
+    <!-- Wspólny styl ikon (taka sama wielkość dla delete/edit) -->
+    <Style x:Key="IconButtonBase" TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
+        <Setter Property="Width" Value="34"/>
+        <Setter Property="Height" Value="34"/>
+        <Setter Property="Padding" Value="0"/>
+        <Setter Property="Margin" Value="0"/>
+        <Setter Property="Background" Value="{DynamicResource Btn.Background}"/>
+        <Setter Property="BorderBrush" Value="{DynamicResource Btn.Border}"/>
+        <Setter Property="BorderThickness" Value="1"/>
+        <Setter Property="Cursor" Value="Hand"/>
+        <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Button">
+                    <Border x:Name="Bd"
+                        Background="{TemplateBinding Background}"
+                        BorderBrush="{TemplateBinding BorderBrush}"
+                        BorderThickness="{TemplateBinding BorderThickness}"
+                        CornerRadius="8">
+                        <ContentPresenter HorizontalAlignment="Center"
+                                      VerticalAlignment="Center"/>
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="Bd" Property="Background" Value="{DynamicResource Btn.Hover}"/>
+                        </Trigger>
+                        <Trigger Property="IsPressed" Value="True">
+                            <Setter TargetName="Bd" Property="Background" Value="{DynamicResource Btn.Pressed}"/>
+                        </Trigger>
+                        <Trigger Property="IsEnabled" Value="False">
+                            <Setter TargetName="Bd" Property="Opacity" Value="0.55"/>
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- DELETE -->
+    <Style x:Key="DeleteIconButton"
+       TargetType="Button"
+       BasedOn="{StaticResource IconButtonBase}">
+        <Setter Property="ContentTemplate">
+            <Setter.Value>
+                <DataTemplate>
+                    <Image Source="pack://application:,,,/Finly;component/Assets/Icons/delete.png"
+                       Width="18" Height="18"
+                       Stretch="Uniform"
+                       SnapsToDevicePixels="True"
+                       RenderOptions.BitmapScalingMode="HighQuality"/>
+                </DataTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- EDIT -->
+    <Style x:Key="EditIconButton"
+       TargetType="Button"
+       BasedOn="{StaticResource IconButtonBase}">
+        <Setter Property="ContentTemplate">
+            <Setter.Value>
+                <DataTemplate>
+                    <Image Source="pack://application:,,,/Finly;component/Assets/Icons/edit.png"
+                       Width="18" Height="18"
+                       Stretch="Uniform"
+                       SnapsToDevicePixels="True"
+                       RenderOptions.BitmapScalingMode="HighQuality"/>
+                </DataTemplate>
             </Setter.Value>
         </Setter>
     </Style>

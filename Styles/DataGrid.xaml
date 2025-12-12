@@ -9,7 +9,6 @@
         <Setter Property="HorizontalGridLinesBrush" Value="{DynamicResource Surface.Border}"/>
         <Setter Property="VerticalGridLinesBrush"   Value="{DynamicResource Surface.Border}"/>
         <Setter Property="RowBackground"            Value="{DynamicResource Surface.Background}"/>
-        <!-- w trybie jasnym też bezpiecznie – bez „mocnej” ciemnej alternacji -->
         <Setter Property="AlternatingRowBackground" Value="{DynamicResource Surface.Background}"/>
         <Setter Property="SelectionUnit"            Value="FullRow"/>
         <Setter Property="CanUserAddRows"           Value="False"/>

@@ -231,34 +231,9 @@
                             </Grid.ColumnDefinitions>
 
                             <!-- Zmienione: dodano ikonę edit.png po lewej stronie -->
-                            <Button Grid.Column="0"
-                                    Padding="8,4"
-                                    MinWidth="80"
-                                    Click="EditAccount_Click"
-                                    Tag="{Binding}">
-                                <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
-                                    <Image Source="/Assets/Icons/edit.png" Width="16" Height="16" Margin="0,0,4,0"/>
-                                    <TextBlock Text="Edytuj"/>
-                                </StackPanel>
-                            </Button>
+                            <Button Grid.Column="0" Click="EditAccount_Click" Tag="{Binding}" Style="{StaticResource EditIconButton}"/>
 
-                            <Button Grid.Column="2"
-                                    Padding="8,4"
-                                    MinWidth="80"
-                                    Background="Transparent"
-                                    BorderBrush="{DynamicResource Brand.Red}"
-                                    BorderThickness="1.2"
-                                    Click="DeleteAccount_Click"
-                                    Tag="{Binding}">
-                                <StackPanel Orientation="Horizontal"
-                                            HorizontalAlignment="Center">
-                                    <Image Source="/Assets/Icons/delete.png"
-                                           Width="16" Height="16"
-                                           Margin="0,0,4,0"/>
-                                    <TextBlock Text="Usuń"
-                                               Foreground="{DynamicResource Brand.Red}"/>
-                                </StackPanel>
-                            </Button>
+                            <Button Grid.Column="2" Click="DeleteAccount_Click" Tag="{Binding}" Style="{StaticResource DeleteIconButton}"/>
                         </Grid>
                     </StackPanel>
 
@@ -753,6 +728,10 @@
         </Grid>
     </ScrollViewer>
 </UserControl>
+
+
+
+
 
 
 

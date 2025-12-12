@@ -68,8 +68,12 @@
 	  <Resource Include="Assets\Banks\pkobplogo.jpg" />
 	  <Resource Include="Assets\Banks\revolutlogo.png" />
 	  <Resource Include="Assets\Banks\santanderlogo.png" />
-	  <Resource Include="Assets\Icons\delete.png" />
-	  <Resource Include="Assets\Icons\edit.png" />
+	  <Resource Include="Assets\Icons\delete.png">
+	    <CopyToOutputDirectory>Never</CopyToOutputDirectory>
+	  </Resource>
+	  <Resource Include="Assets\Icons\edit.png">
+	    <CopyToOutputDirectory>Never</CopyToOutputDirectory>
+	  </Resource>
 	  <Resource Include="Assets\Icons\kalendarz.png" />
 	  <Resource Include="Assets\Icons\kontabankowe.png" />
 	</ItemGroup>
@@ -93,7 +97,6 @@
 	<!-- Same foldery (opcjonalnie) -->
 	<ItemGroup>
 		<Folder Include="Themes\" />
-		<Folder Include="Styles\" />
 	</ItemGroup>
 	<ItemGroup>
 	  <Resource Include="Assets\Icons\budzety.png" />
