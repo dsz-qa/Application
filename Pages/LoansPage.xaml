@@ -306,12 +306,6 @@
 									<StackPanel Grid.Column="0">
 
 										<!-- main actions -->
-										<UniformGrid Columns="2" Margin="0,0,0,8">
-											<Button Content="Symulacja nadpłaty"
-                                                    Style="{StaticResource LoansPrimarySmallButton}"
-                                                    Click="ShowSimPanel_Click"
-                                                    Tag="{Binding}"/>
-										</UniformGrid>
 
 										<!-- icon actions -->
 										<StackPanel Orientation="Horizontal">
@@ -329,13 +323,6 @@
                                                     Tag="{Binding}"
                                                     ToolTip="Usuń kredyt"
                                                     Style="{StaticResource DeleteIconButton}"/>
-
-							<!-- Nadpłać button moved next to Delete; no-wrap variant to keep text on one line -->
-							<Button Content="Nadpłać kredyt"
-								Style="{StaticResource LoansPrimarySmallButtonNoWrap}"
-								Margin="8,0,0,0"
-								Click="CardAddPayment_Click"
-								Tag="{Binding}"/>
 
 										</StackPanel>
 
@@ -366,30 +353,47 @@
 
 									<!-- RIGHT -->
 									<StackPanel Grid.Column="1"
-                                                Margin="12,0,0,0"
-                                                VerticalAlignment="Top"
-                                                MinWidth="170">
+							Margin="12,0,0,0"
+							VerticalAlignment="Top"
+							MinWidth="170">
 
-										<Button Height="30"
-                                                Padding="12,0"
-                                                Margin="0,0,0,8"
-                                                Click="CardAttachSchedule_Click"
-                                                Tag="{Binding}"
-                                                ToolTip="Załącz harmonogram spłat rat kredytu">
-											<StackPanel Orientation="Horizontal">
-												<TextBlock Text="Załącz harmonogram"/>
-											</StackPanel>
-										</Button>
+							<!-- simulation and attach side-by-side -->
+							<StackPanel Orientation="Horizontal" Margin="0,0,0,8">
+								<Button Content="Symulacja nadpłaty"
+									Style="{StaticResource LoansPrimarySmallButton}"
+									Margin="0,0,8,0"
+									Click="ShowSimPanel_Click"
+									Tag="{Binding}"/>
 
-										<Button Height="30"
-                                                Padding="12,0"
-                                                Click="CardSchedule_Click"
-                                                Tag="{Binding}"
-                                                ToolTip="Harmonogram spłat rat kredytu">
-											<TextBlock Text="Harmonogram spłat"/>
-										</Button>
-
+								<Button Height="30"
+									Padding="12,0"
+									Click="CardAttachSchedule_Click"
+									Tag="{Binding}"
+									ToolTip="Załącz harmonogram spłat rat kredytu">
+									<StackPanel Orientation="Horizontal">
+										<TextBlock Text="Załącz harmonogram"/>
 									</StackPanel>
+								</Button>
+							</StackPanel>
+
+							<!-- Nadpłać and Harmonogram placed side-by-side -->
+							<StackPanel Orientation="Horizontal">
+								<Button Content="Nadpłać kredyt"
+									Style="{StaticResource LoansPrimarySmallButtonNoWrap}"
+									Margin="0,0,8,0"
+									Click="CardAddPayment_Click"
+									Tag="{Binding}"/>
+
+								<Button Height="30"
+									Padding="12,0"
+									Click="CardSchedule_Click"
+									Tag="{Binding}"
+									ToolTip="Harmonogram spłat rat kredytu">
+									<TextBlock Text="Harmonogram spłat"/>
+								</Button>
+							</StackPanel>
+
+						</StackPanel>
 								</Grid>
 
 							</Grid>
