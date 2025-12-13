@@ -7,7 +7,7 @@ using System.Globalization;
 using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
-using System.Windows.Data;
+using static Finly.Models.Expense;
 
 namespace Finly.Pages
 {
@@ -45,12 +45,9 @@ namespace Finly.Pages
         {
             if (combo?.SelectedItem is Finly.Models.Budget b)
             {
-                // Jeśli w modelu Budget masz daty – pilnujemy, żeby operacja
-                // była w zakresie budżetu:
                 if (b.StartDate <= date && date <= b.EndDate)
                     return b.Id;
 
-                // Gdy użytkownik wybierze budżet spoza zakresu – ignorujemy
                 ToastService.Info("Wybrany budżet nie obejmuje daty tej operacji – zostanie zapisana bez powiązania z budżetem.");
             }
 
@@ -61,13 +58,28 @@ namespace Finly.Pages
         {
         }
 
+        // ================== MISSING XAML EVENT HANDLERS (fix CS1061) ==================
+
+        // Te metody są podpięte w AddExpensePage.xaml (różne eventy).
+        // Robimy overloady, żeby XAML zawsze znalazł pasującą sygnaturę.
+
+        private void ExpenseForm_Changed(object sender, RoutedEventArgs e) => UpdateExpensePlannedVisibility();
+        private void ExpenseForm_Changed(object sender, SelectionChangedEventArgs e) => UpdateExpensePlannedVisibility();
+        private void ExpenseForm_Changed(object sender, TextChangedEventArgs e) => UpdateExpensePlannedVisibility();
+
+        private void IncomeForm_Changed(object sender, RoutedEventArgs e) => UpdateIncomePlannedVisibility();
+        private void IncomeForm_Changed(object sender, SelectionChangedEventArgs e) => UpdateIncomePlannedVisibility();
+        private void IncomeForm_Changed(object sender, TextChangedEventArgs e) => UpdateIncomePlannedVisibility();
+
+        private void TransferForm_Changed(object sender, RoutedEventArgs e) => UpdateTransferPlannedVisibility();
+        private void TransferForm_Changed(object sender, SelectionChangedEventArgs e) => UpdateTransferPlannedVisibility();
+        private void TransferForm_Changed(object sender, TextChangedEventArgs e) => UpdateTransferPlannedVisibility();
+
         public AddExpensePage(int userId)
         {
             InitializeComponent();
 
             _uid = userId <= 0 ? UserService.GetCurrentUserId() : userId;
-            LoadExpenseBudgetsForCurrentDate();
-            LoadIncomeBudgetsForCurrentDate();
 
             Loaded += (_, __) =>
             {
@@ -98,18 +110,18 @@ namespace Finly.Pages
                 // populate income planned source/account
                 if (IncomePlannedAccountCombo != null)
                 {
-                    IncomePlannedAccountCombo.ItemsSource = DatabaseService.GetAccounts(_uid)?.Select(a => a.AccountName).ToList() ?? new List<string>();
+                    IncomePlannedAccountCombo.ItemsSource =
+                        DatabaseService.GetAccounts(_uid)?.Select(a => a.AccountName).ToList()
+                        ?? new List<string>();
                 }
 
                 // populate transfer planned accounts
                 TransferPlannedFromBox.ItemsSource = TransferFromBox.ItemsSource;
                 TransferPlannedToBox.ItemsSource = TransferToBox.ItemsSource;
 
-                // populate planned expense source combos (and account/envelope lists)
+                // planned expense source handler
                 if (ExpensePlannedSourceCombo != null)
-                {
                     ExpensePlannedSourceCombo.SelectionChanged += ExpensePlannedSourceCombo_SelectionChanged;
-                }
 
                 // populate planned envelopes and bank accounts
                 if (ExpensePlannedEnvelopeCombo != null)
@@ -119,10 +131,10 @@ namespace Finly.Pages
                     if (envNames.Count > 0)
                         ExpensePlannedEnvelopeCombo.SelectedIndex = 0;
                 }
+
                 if (ExpensePlannedBankAccountCombo != null)
                 {
                     var accs = DatabaseService.GetAccounts(_uid) ?? new List<BankAccountModel>();
-                    // bind full BankAccountModel list so SelectedValue can be account Id like other controls
                     ExpensePlannedBankAccountCombo.ItemsSource = accs;
                     ExpensePlannedBankAccountCombo.DisplayMemberPath = "AccountName";
                     ExpensePlannedBankAccountCombo.SelectedValuePath = "Id";
@@ -130,13 +142,20 @@ namespace Finly.Pages
                 }
 
                 // enable/disable planned save buttons based on amount
-                ExpensePlannedAmountBox.TextChanged += (s, e) => ExpensePlannedButton.IsEnabled = TryParseAmount(ExpensePlannedAmountBox.Text, out var a) && a > 0m;
-                IncomePlannedAmountBox.TextChanged += (s, e) => IncomePlannedButton.IsEnabled = TryParseAmount(IncomePlannedAmountBox.Text, out var b) && b > 0m;
-                TransferPlannedAmountBox.TextChanged += (s, e) => TransferPlannedButton.IsEnabled = TryParseAmount(TransferPlannedAmountBox.Text, out var c) && c > 0m;
+                ExpensePlannedAmountBox.TextChanged += (_, __2) =>
+                    ExpensePlannedButton.IsEnabled = TryParseAmount(ExpensePlannedAmountBox.Text, out var a) && a > 0m;
+                IncomePlannedAmountBox.TextChanged += (_, __2) =>
+                    IncomePlannedButton.IsEnabled = TryParseAmount(IncomePlannedAmountBox.Text, out var b) && b > 0m;
+                TransferPlannedAmountBox.TextChanged += (_, __2) =>
+                    TransferPlannedButton.IsEnabled = TryParseAmount(TransferPlannedAmountBox.Text, out var c) && c > 0m;
 
-                // source selection handler for planned income
+                // planned income source handler
                 if (IncomePlannedSourceCombo != null)
                     IncomePlannedSourceCombo.SelectionChanged += IncomePlannedSourceCombo_SelectionChanged;
+
+                // wczytaj budżety pod bieżące daty (bez zależności od metody GetBudgetsForDate)
+                LoadExpenseBudgetsForDate(ExpenseDatePicker.SelectedDate ?? DateTime.Today);
+                LoadIncomeBudgetsForDate(IncomeDatePicker.SelectedDate ?? DateTime.Today);
             };
         }
 
@@ -187,7 +206,6 @@ namespace Finly.Pages
                 string.Equals(header, "Transfer", StringComparison.OrdinalIgnoreCase)
                     ? Visibility.Visible : Visibility.Collapsed;
 
-            // Update planned panels whenever panels are shown/hidden (so they appear immediately on tab switch)
             UpdateExpensePlannedVisibility();
             UpdateIncomePlannedVisibility();
             UpdateTransferPlannedVisibility();
@@ -250,29 +268,12 @@ namespace Finly.Pages
             }
         }
 
-        /// <summary>
-        /// Buduje listę wszystkich miejsc, między którymi można robić transfer:
-        /// - wolna gotówka
-        /// - odłożona gotówka
-        /// - każde konto bankowe
-        /// - każda koperta
-        /// </summary>
         private void LoadTransferItems()
         {
             var items = new List<TransferItem>
             {
-                new TransferItem
-                {
-                    Key  = "free",
-                    Name = "Wolna gotówka",
-                    Kind = TransferItemKind.FreeCash
-                },
-                new TransferItem
-                {
-                    Key  = "saved",
-                    Name = "Odłożona gotówka",
-                    Kind = TransferItemKind.SavedCash
-                }
+                new TransferItem { Key="free",  Name="Wolna gotówka",    Kind=TransferItemKind.FreeCash },
+                new TransferItem { Key="saved", Name="Odłożona gotówka", Kind=TransferItemKind.SavedCash }
             };
 
             // Konta bankowe
@@ -280,19 +281,15 @@ namespace Finly.Pages
             {
                 var accs = DatabaseService.GetAccounts(_uid) ?? new List<BankAccountModel>();
 
-                items.AddRange(
-                    accs.Select(a => new TransferItem
-                    {
-                        Key = $"bank:{a.Id}",
-                        Kind = TransferItemKind.BankAccount,
-                        BankAccountId = a.Id,
-                        Name = $"Konto bankowe: {a.AccountName} — {a.Balance.ToString("N2", CultureInfo.CurrentCulture)} zł"
-                    }));
+                items.AddRange(accs.Select(a => new TransferItem
+                {
+                    Key = $"bank:{a.Id}",
+                    Kind = TransferItemKind.BankAccount,
+                    BankAccountId = a.Id,
+                    Name = $"Konto bankowe: {a.AccountName} — {a.Balance.ToString("N2", CultureInfo.CurrentCulture)} zł"
+                }));
             }
-            catch
-            {
-                // pomijamy konta jeśli coś pójdzie nie tak
-            }
+            catch { }
 
             // Koperty
             try
@@ -303,7 +300,7 @@ namespace Finly.Pages
                     foreach (DataRow r in dt.Rows)
                     {
                         var id = Convert.ToInt32(r["Id"]);
-                        var name = r["Name"]?.ToString() ?? "(bez nazwy)";
+                        var name = (r["Name"]?.ToString() ?? "(bez nazwy)").Trim();
                         decimal allocated = 0m;
                         if (r["Allocated"] != DBNull.Value)
                             allocated = Convert.ToDecimal(r["Allocated"]);
@@ -318,10 +315,7 @@ namespace Finly.Pages
                     }
                 }
             }
-            catch
-            {
-                // brak kopert – trudno
-            }
+            catch { }
 
             TransferFromBox.ItemsSource = items.ToList();
             TransferToBox.ItemsSource = items.ToList();
@@ -338,7 +332,6 @@ namespace Finly.Pages
         {
             ClearAmountErrors();
 
-            // Wspólne
             ExpenseAmountBox.Clear();
             IncomeAmountBox.Clear();
             TransferAmountBox.Clear();
@@ -376,7 +369,7 @@ namespace Finly.Pages
             LoadIncomeAccounts();
         }
 
-        // ================== OBSŁUGA FORM PRZYCHODU / SKĄD PłACISZ ==================
+        // ================== OBSŁUGA FORM ==================
 
         private void ExpenseSourceCombo_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
@@ -388,13 +381,9 @@ namespace Finly.Pages
                 var tag = item.Tag as string;
 
                 if (string.Equals(tag, "envelope", StringComparison.OrdinalIgnoreCase))
-                {
                     ExpenseEnvelopeRow.Visibility = Visibility.Visible;
-                }
                 else if (string.Equals(tag, "bank", StringComparison.OrdinalIgnoreCase))
-                {
                     ExpenseBankRow.Visibility = Visibility.Visible;
-                }
             }
         }
 
@@ -413,21 +402,17 @@ namespace Finly.Pages
 
         private void IncomePlannedSourceCombo_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
-            if (!(IncomePlannedSourceCombo.SelectedItem is ComboBoxItem item))
+            if (IncomePlannedSourceCombo.SelectedItem is not ComboBoxItem item)
             {
                 IncomePlannedAccountRow.Visibility = Visibility.Collapsed;
                 return;
             }
 
             var tag = item.Tag as string ?? "";
-            if (string.Equals(tag, "transfer", StringComparison.OrdinalIgnoreCase))
-            {
-                IncomePlannedAccountRow.Visibility = Visibility.Visible;
-            }
-            else
-            {
-                IncomePlannedAccountRow.Visibility = Visibility.Collapsed;
-            }
+            IncomePlannedAccountRow.Visibility =
+                string.Equals(tag, "transfer", StringComparison.OrdinalIgnoreCase)
+                    ? Visibility.Visible
+                    : Visibility.Collapsed;
         }
 
         private void ExpensePlannedSourceCombo_SelectionChanged(object sender, SelectionChangedEventArgs e)
@@ -440,7 +425,6 @@ namespace Finly.Pages
                 var tag = item.Tag as string ?? "";
                 if (string.Equals(tag, "envelope", StringComparison.OrdinalIgnoreCase))
                 {
-                    // populate envelopes and show
                     try
                     {
                         var envNames = DatabaseService.GetEnvelopesNames(_uid) ?? new List<string>();
@@ -452,7 +436,6 @@ namespace Finly.Pages
                 }
                 else if (string.Equals(tag, "bank", StringComparison.OrdinalIgnoreCase))
                 {
-                    // populate bank accounts and show
                     try
                     {
                         var accs = DatabaseService.GetAccounts(_uid) ?? new List<BankAccountModel>();
@@ -490,62 +473,65 @@ namespace Finly.Pages
         private int GetCategoryIdOrZero(string? catName)
         {
             if (string.IsNullOrWhiteSpace(catName)) return 0;
+            try { return DatabaseService.GetOrCreateCategoryId(_uid, catName); }
+            catch { return 0; }
+        }
+
+        private int? TryResolveEnvelopeIdByName(string? envName)
+        {
+            if (string.IsNullOrWhiteSpace(envName)) return null;
 
             try
             {
-                return DatabaseService.GetOrCreateCategoryId(_uid, catName);
+                var dt = DatabaseService.GetEnvelopesTable(_uid);
+                if (dt == null) return null;
+
+                foreach (DataRow r in dt.Rows)
+                {
+                    var name = (r["Name"]?.ToString() ?? "").Trim();
+                    if (string.Equals(name, envName.Trim(), StringComparison.OrdinalIgnoreCase))
+                        return Convert.ToInt32(r["Id"]);
+                }
             }
-            catch
-            {
-                return 0;
-            }
+            catch { }
+
+            return null;
         }
 
-        // New: react to form changes to show/hide planned area and enable planned button
-        private void ExpenseForm_Changed(object sender, RoutedEventArgs e)
-        {
-            UpdateExpensePlannedVisibility();
-        }
-
-        private void IncomeForm_Changed(object sender, RoutedEventArgs e)
-        {
-            UpdateIncomePlannedVisibility();
-        }
-
-        private void TransferForm_Changed(object sender, RoutedEventArgs e)
-        {
-            UpdateTransferPlannedVisibility();
-        }
-
+        // planned panels enablement
         private void UpdateExpensePlannedVisibility()
         {
-            // Always show the planned panel when the expense panel exists (visibility of the parent controls which panel is visible)
             ExpensePlannedPanel.Visibility = Visibility.Visible;
 
             bool hasAmount = TryParseAmount(ExpenseAmountBox.Text, out var amount) && amount > 0m;
-            bool hasCategory = (ExpenseCategoryBox.SelectedItem is string s && !string.IsNullOrWhiteSpace(s)) || !string.IsNullOrWhiteSpace(ExpenseNewCategoryBox.Text);
+            bool hasCategory =
+                (ExpenseCategoryBox.SelectedItem is string s && !string.IsNullOrWhiteSpace(s)) ||
+                !string.IsNullOrWhiteSpace(ExpenseNewCategoryBox.Text);
 
             ExpensePlannedButton.IsEnabled = hasAmount && hasCategory;
         }
 
         private void UpdateIncomePlannedVisibility()
         {
-            // Always show planned panel for income
             IncomePlannedPanel.Visibility = Visibility.Visible;
 
             bool hasAmount = TryParseAmount(IncomeAmountBox.Text, out var amount) && amount > 0m;
-            bool hasCategory = (IncomeCategoryBox.SelectedItem is string s && !string.IsNullOrWhiteSpace(s)) || !string.IsNullOrWhiteSpace(IncomeNewCategoryBox.Text);
+            bool hasCategory =
+                (IncomeCategoryBox.SelectedItem is string s && !string.IsNullOrWhiteSpace(s)) ||
+                !string.IsNullOrWhiteSpace(IncomeNewCategoryBox.Text);
 
             IncomePlannedButton.IsEnabled = hasAmount && hasCategory;
         }
 
         private void UpdateTransferPlannedVisibility()
         {
-            // Always show planned panel for transfer
             TransferPlannedPanel.Visibility = Visibility.Visible;
 
             bool hasAmount = TryParseAmount(TransferAmountBox.Text, out var amount) && amount > 0m;
-            bool endpointsSelected = TransferFromBox.SelectedItem != null && TransferToBox.SelectedItem != null && TransferFromBox.SelectedIndex != TransferToBox.SelectedIndex;
+            bool endpointsSelected =
+                TransferFromBox.SelectedItem != null &&
+                TransferToBox.SelectedItem != null &&
+                TransferFromBox.SelectedIndex != TransferToBox.SelectedIndex;
 
             TransferPlannedButton.IsEnabled = hasAmount && endpointsSelected;
         }
@@ -569,11 +555,13 @@ namespace Finly.Pages
             }
 
             var sourceTag = sourceItem.Tag as string ?? string.Empty;
+
             var date = ExpenseDatePicker.SelectedDate ?? DateTime.Today;
             var desc = string.IsNullOrWhiteSpace(ExpenseDescBox.Text) ? null : ExpenseDescBox.Text.Trim();
             var catName = ResolveCategoryName(ExpenseCategoryBox, ExpenseNewCategoryBox);
             int categoryId = GetCategoryIdOrZero(catName);
 
+            // 1) Tworzymy model (bez ustawiania Account na pusto, bo zaraz ustawimy właściwe)
             var eModel = new Expense
             {
                 UserId = _uid,
@@ -581,58 +569,74 @@ namespace Finly.Pages
                 Date = date,
                 Description = desc ?? string.Empty,
                 CategoryId = categoryId,
-                Account = string.Empty // ustawimy poniżej
+                BudgetId = GetSelectedBudgetId(ExpenseBudgetCombo, date),
+
+                // wartości domyślne (i tak ustawimy je switch-em)
+                PaymentKind = Finly.Models.PaymentKind.FreeCash,
+                PaymentRefId = null,
+                Account = "Wolna gotówka"
             };
 
-            // Powiązanie wydatku z budżetem (opcjonalnie)
-            if (eModel is not null)
+            // 2) Ustawiamy źródło płatności (JUŻ PO UTWORZENIU eModel)
+            switch (sourceTag)
             {
-                // zakładam, że w klasie Expense masz właściwość int? BudgetId
-                eModel.BudgetId = GetSelectedBudgetId(ExpenseBudgetCombo, date);
-            }
+                case "cash_free":
+                    eModel.PaymentKind = Finly.Models.PaymentKind.FreeCash;
+                    eModel.PaymentRefId = null;
+                    eModel.Account = "Wolna gotówka";
+                    break;
 
-            try
-            {
-                switch (sourceTag)
-                {
-                    case "cash_free":
-                        DatabaseService.SpendFromFreeCash(_uid, amount);
-                        eModel.Account = "Wolna gotówka";
-                        break;
+                case "cash_saved":
+                    eModel.PaymentKind = Finly.Models.PaymentKind.SavedCash;
+                    eModel.PaymentRefId = null;
+                    eModel.Account = "Odłożona gotówka";
+                    break;
 
-                    case "cash_saved":
-                        DatabaseService.SpendFromSavedCash(_uid, amount);
-                        eModel.Account = "Odłożona gotówka";
-                        break;
+                case "envelope":
+                    {
+                        var envName = ExpenseEnvelopeCombo.SelectedItem as string;
+                        var envId = TryResolveEnvelopeIdByName(envName);
+                        if (envId == null)
+                        {
+                            ToastService.Info("Wybierz kopertę.");
+                            return;
+                        }
 
-                    case "envelope":
-                        if (ExpenseEnvelopeCombo.SelectedItem is not string envName || string.IsNullOrWhiteSpace(envName))
-                        { ToastService.Info("Wybierz kopertę, z której chcesz zapłacić."); return; }
-                        var envId = DatabaseService.GetEnvelopeIdByName(_uid, envName);
-                        if (envId == null) { ToastService.Error("Nie udało się odnaleźć wybranej koperty."); return; }
-                        DatabaseService.SpendFromEnvelope(_uid, envId.Value, amount);
+                        eModel.PaymentKind = Finly.Models.PaymentKind.Envelope;
+                        eModel.PaymentRefId = envId.Value;
                         eModel.Account = $"Koperta: {envName}";
                         break;
+                    }
 
-                    case "bank":
+                case "bank":
+                    {
                         if (ExpenseBankAccountCombo.SelectedItem is not BankAccountModel acc)
-                        { ToastService.Info("Wybierz konto bankowe, z którego ma zejść wydatek."); return; }
-                        DatabaseService.SpendFromBankAccount(_uid, acc.Id, amount);
+                        {
+                            ToastService.Info("Wybierz konto bankowe.");
+                            return;
+                        }
+
+                        eModel.PaymentKind = Finly.Models.PaymentKind.BankAccount;
+                        eModel.PaymentRefId = acc.Id;
                         eModel.Account = $"Konto: {acc.AccountName}";
                         break;
+                    }
 
-                    default:
-                        ToastService.Info("Wybierz poprawne źródło płatności.");
-                        return;
-                }
+                default:
+                    ToastService.Info("Wybierz poprawne źródło płatności.");
+                    return;
+            }
 
+            // 3) Zapis + księgowanie tylko raz w DB
+            try
+            {
                 DatabaseService.InsertExpense(eModel);
+
                 ToastService.Success("Dodano wydatek.");
 
                 LoadCategories();
                 LoadEnvelopes();
                 LoadIncomeAccounts();
-
                 RefreshMoneySummary();
 
                 Cancel_Click(sender, e);
@@ -642,6 +646,8 @@ namespace Finly.Pages
                 ToastService.Error("Nie udało się dodać wydatku.\n" + ex.Message);
             }
         }
+
+
 
         private void SaveExpensePlanned_Click(object sender, RoutedEventArgs e)
         {
@@ -660,15 +666,9 @@ namespace Finly.Pages
             if (string.IsNullOrWhiteSpace(catName) && !string.IsNullOrWhiteSpace(ExpensePlannedNewCategoryBox.Text))
                 catName = ExpensePlannedNewCategoryBox.Text.Trim();
 
-            var catId = 0;
-            try
-            {
-                catId = DatabaseService.GetOrCreateCategoryId(_uid, catName ?? "");
-            }
-            catch
-            {
-                catId = 0;
-            }
+            int catId;
+            try { catId = DatabaseService.GetOrCreateCategoryId(_uid, catName ?? ""); }
+            catch { catId = 0; }
 
             string accountDisplay = string.Empty;
             if (ExpensePlannedSourceCombo.SelectedItem is ComboBoxItem srcItem)
@@ -676,12 +676,8 @@ namespace Finly.Pages
                 var tag = srcItem.Tag as string ?? string.Empty;
                 switch (tag)
                 {
-                    case "cash_free":
-                        accountDisplay = "Wolna gotówka";
-                        break;
-                    case "cash_saved":
-                        accountDisplay = "Odłożona gotówka";
-                        break;
+                    case "cash_free": accountDisplay = "Wolna gotówka"; break;
+                    case "cash_saved": accountDisplay = "Odłożona gotówka"; break;
                     case "envelope":
                         if (ExpensePlannedEnvelopeCombo.SelectedItem is string envName &&
                             !string.IsNullOrWhiteSpace(envName))
@@ -694,7 +690,6 @@ namespace Finly.Pages
                 }
             }
 
-            // 🔵 NOWE: pobranie wybranego budżetu dla zaplanowanego wydatku
             int? budgetId = GetSelectedBudgetId(ExpensePlannedBudgetCombo, date);
 
             var eModel = new Expense
@@ -706,7 +701,7 @@ namespace Finly.Pages
                 CategoryId = catId,
                 IsPlanned = true,
                 Account = accountDisplay,
-                BudgetId = budgetId   // 🔵 powiązanie z budżetem (opcjonalne)
+                BudgetId = budgetId
             };
 
             try
@@ -744,42 +739,58 @@ namespace Finly.Pages
             var desc = string.IsNullOrWhiteSpace(IncomeDescBox.Text) ? null : IncomeDescBox.Text.Trim();
 
             var catName = ResolveCategoryName(IncomeCategoryBox, IncomeNewCategoryBox);
-            int? categoryId = GetCategoryIdOrZero(catName); if (categoryId == 0) categoryId = null;
+            int? categoryId = GetCategoryIdOrZero(catName);
+            if (categoryId == 0) categoryId = null;
+
             int? incomeBudgetId = null;
             if (IncomeBudgetCombo.SelectedItem is Budget selectedBudget)
                 incomeBudgetId = selectedBudget.Id;
 
-            string sourceDisplay = string.Empty;
+            string sourceDisplay;
+            BankAccountModel? acc = null;
+
             switch (formTag)
             {
-                case "cash_free": sourceDisplay = "Wolna gotówka"; break;
-                case "cash_saved": sourceDisplay = "Odłożona gotówka"; break;
+                case "cash_free":
+                    sourceDisplay = "Wolna gotówka";
+                    break;
+
+                case "cash_saved":
+                    sourceDisplay = "Odłożona gotówka";
+                    break;
+
                 case "transfer":
-                    if (IncomeAccountCombo.SelectedItem is not BankAccountModel acc)
+                    if (IncomeAccountCombo.SelectedItem is not BankAccountModel a)
                     {
                         ToastService.Info("Wybierz konto bankowe, na które wpływa przelew.");
                         return;
                     }
-                    sourceDisplay = $"Konto: {acc.AccountName}"; break;
-                default: ToastService.Info("Wybierz poprawną formę przychodu."); return;
+                    acc = a;
+                    sourceDisplay = $"Konto: {acc.AccountName}";
+                    break;
+
+                default:
+                    ToastService.Info("Wybierz poprawną formę przychodu.");
+                    return;
             }
 
             try
             {
+                // zapis transakcji przychodu
+                AddIncomeRaw(_uid, amount, date, categoryId, sourceDisplay, desc, false, incomeBudgetId);
+
+                // aktualizacja sald (tu zostawiamy mechanikę jak było)
                 if (formTag == "cash_free")
                 {
-                    AddIncomeRaw(_uid, amount, date, categoryId, sourceDisplay, desc, false, incomeBudgetId);
                     UpdateCashOnHand(_uid, amount);
                 }
                 else if (formTag == "cash_saved")
                 {
-                    AddIncomeRaw(_uid, amount, date, categoryId, sourceDisplay, desc, false, incomeBudgetId);
                     UpdateSavedCash(_uid, amount);
-                    UpdateCashOnHand(_uid, amount); // całkowita gotówka również rośnie
+                    UpdateCashOnHand(_uid, amount);
                 }
-                else if (formTag == "transfer" && IncomeAccountCombo.SelectedItem is BankAccountModel acc)
+                else if (formTag == "transfer" && acc != null)
                 {
-                    AddIncomeRaw(_uid, amount, date, categoryId, sourceDisplay, desc, false, incomeBudgetId);
                     IncreaseBankBalance(acc.Id, _uid, amount);
                 }
 
@@ -798,23 +809,20 @@ namespace Finly.Pages
 
         private void SaveIncomePlanned_Click(object sender, RoutedEventArgs e)
         {
-            // 1. Walidacja kwoty
             if (!TryParseAmount(IncomePlannedAmountBox.Text, out var amount) || amount <= 0m)
             {
                 ToastService.Info("Podaj poprawną kwotę.");
                 return;
             }
 
-            // 2. Data + opis
             var date = IncomePlannedDatePicker.SelectedDate ?? DateTime.Today;
             var desc = string.IsNullOrWhiteSpace(IncomePlannedDescBox.Text)
                 ? null
                 : IncomePlannedDescBox.Text.Trim();
 
-            // 3. Forma przychodu -> sourceDisplay
-            string sourceDisplay = string.Empty;
             var sourceTag = (IncomePlannedSourceCombo.SelectedItem as ComboBoxItem)?.Tag as string ?? string.Empty;
 
+            string sourceDisplay;
             if (sourceTag == "cash_free")
             {
                 sourceDisplay = "Wolna gotówka";
@@ -836,8 +844,12 @@ namespace Finly.Pages
                     return;
                 }
             }
+            else
+            {
+                ToastService.Info("Wybierz formę planowanego przychodu.");
+                return;
+            }
 
-            // 4. Kategoria
             var catName = IncomePlannedCategoryBox.SelectedItem as string;
             if (string.IsNullOrWhiteSpace(catName) &&
                 !string.IsNullOrWhiteSpace(IncomePlannedNewCategoryBox.Text))
@@ -851,20 +863,13 @@ namespace Finly.Pages
                 var id = DatabaseService.GetOrCreateCategoryId(_uid, catName ?? string.Empty);
                 if (id > 0) catId = id;
             }
-            catch
-            {
-                // zostawiamy catId = null
-            }
+            catch { }
 
-            // 5. 🔵 NOWE – budżet dla ZAPLANOWANEGO przychodu
             int? plannedIncomeBudgetId = GetSelectedBudgetId(IncomePlannedBudgetCombo, date);
 
             try
             {
-                // 6. Zapis do bazy jako PRZYCHÓD ZAPLANOWANY
-                //    (ostatni parametr = budgetId, przedostatni = isPlanned = true)
                 AddIncomeRaw(_uid, amount, date, catId, sourceDisplay, desc, true, plannedIncomeBudgetId);
-
                 ToastService.Success("Dodano zaplanowany przychód.");
                 Cancel_Click(sender, e);
             }
@@ -895,9 +900,6 @@ namespace Finly.Pages
                 return;
             }
 
-            var catName = ResolveCategoryName(TransferCategoryBox, TransferNewCategoryBox);
-            _ = GetCategoryIdOrZero(catName); // na razie kategoria tylko informacyjnie
-
             try
             {
                 bool handled = false;
@@ -909,7 +911,7 @@ namespace Finly.Pages
                     from.BankAccountId is int accFrom &&
                     to.BankAccountId is int accTo)
                 {
-                    DatabaseService.TransferBankToBank(_uid, accFrom, accTo, amount);
+                    TransactionsFacadeService.TransferBankToBank(_uid, accFrom, accTo, amount);
                     handled = true;
                 }
 
@@ -919,7 +921,7 @@ namespace Finly.Pages
                     to.Kind == TransferItemKind.FreeCash &&
                     from.BankAccountId is int accFromBankToFree)
                 {
-                    DatabaseService.TransferBankToCash(_uid, accFromBankToFree, amount);
+                    TransactionsFacadeService.TransferBankToFreeCash(_uid, accFromBankToFree, amount);
                     handled = true;
                 }
 
@@ -929,7 +931,7 @@ namespace Finly.Pages
                     to.Kind == TransferItemKind.BankAccount &&
                     to.BankAccountId is int accToFreeToBank)
                 {
-                    DatabaseService.TransferCashToBank(_uid, accToFreeToBank, amount);
+                    TransactionsFacadeService.TransferFreeCashToBank(_uid, accToFreeToBank, amount);
                     handled = true;
                 }
 
@@ -938,7 +940,7 @@ namespace Finly.Pages
                     from.Kind == TransferItemKind.FreeCash &&
                     to.Kind == TransferItemKind.SavedCash)
                 {
-                    DatabaseService.TransferFreeToSaved(_uid, amount);
+                    TransactionsFacadeService.TransferFreeToSaved(_uid, amount);
                     handled = true;
                 }
 
@@ -947,7 +949,7 @@ namespace Finly.Pages
                     from.Kind == TransferItemKind.SavedCash &&
                     to.Kind == TransferItemKind.FreeCash)
                 {
-                    DatabaseService.TransferSavedToFree(_uid, amount);
+                    TransactionsFacadeService.TransferSavedToFree(_uid, amount);
                     handled = true;
                 }
 
@@ -957,7 +959,7 @@ namespace Finly.Pages
                     to.Kind == TransferItemKind.BankAccount &&
                     to.BankAccountId is int accToSavedToBank)
                 {
-                    DatabaseService.TransferSavedToBank(_uid, accToSavedToBank, amount);
+                    TransactionsFacadeService.TransferSavedToBank(_uid, accToSavedToBank, amount);
                     handled = true;
                 }
 
@@ -967,7 +969,7 @@ namespace Finly.Pages
                     to.Kind == TransferItemKind.SavedCash &&
                     from.BankAccountId is int accFromBankToSaved)
                 {
-                    DatabaseService.TransferBankToSaved(_uid, accFromBankToSaved, amount);
+                    TransactionsFacadeService.TransferBankToSaved(_uid, accFromBankToSaved, amount);
                     handled = true;
                 }
 
@@ -978,7 +980,7 @@ namespace Finly.Pages
                     from.EnvelopeId is int envFrom &&
                     to.EnvelopeId is int envTo)
                 {
-                    DatabaseService.TransferEnvelopeToEnvelope(_uid, envFrom, envTo, amount);
+                    TransactionsFacadeService.TransferEnvelopeToEnvelope(_uid, envFrom, envTo, amount);
                     handled = true;
                 }
 
@@ -988,7 +990,7 @@ namespace Finly.Pages
                     to.Kind == TransferItemKind.Envelope &&
                     to.EnvelopeId is int envToFromSaved)
                 {
-                    DatabaseService.TransferSavedToEnvelope(_uid, envToFromSaved, amount);
+                    TransactionsFacadeService.TransferSavedToEnvelope(_uid, envToFromSaved, amount);
                     handled = true;
                 }
 
@@ -998,7 +1000,7 @@ namespace Finly.Pages
                     to.Kind == TransferItemKind.SavedCash &&
                     from.EnvelopeId is int envFromToSaved)
                 {
-                    DatabaseService.TransferEnvelopeToSaved(_uid, envFromToSaved, amount);
+                    TransactionsFacadeService.TransferEnvelopeToSaved(_uid, envFromToSaved, amount);
                     handled = true;
                 }
 
@@ -1008,7 +1010,7 @@ namespace Finly.Pages
                     to.Kind == TransferItemKind.Envelope &&
                     to.EnvelopeId is int envToFromFree)
                 {
-                    DatabaseService.TransferFreeToEnvelope(_uid, envToFromFree, amount);
+                    TransactionsFacadeService.TransferFreeToEnvelope(_uid, envToFromFree, amount);
                     handled = true;
                 }
 
@@ -1018,7 +1020,7 @@ namespace Finly.Pages
                     to.Kind == TransferItemKind.FreeCash &&
                     from.EnvelopeId is int envFromToFree)
                 {
-                    DatabaseService.TransferEnvelopeToFree(_uid, envFromToFree, amount);
+                    TransactionsFacadeService.TransferEnvelopeToFree(_uid, envFromToFree, amount);
                     handled = true;
                 }
 
@@ -1033,8 +1035,6 @@ namespace Finly.Pages
                 Cancel_Click(sender, e);
                 LoadTransferItems();
                 LoadCategories();
-
-                // odśwież KPI
                 RefreshMoneySummary();
             }
             catch (Exception ex)
@@ -1064,8 +1064,9 @@ namespace Finly.Pages
 
             try
             {
-                // zaplanowany transfer: zapisujemy planowany wydatek i przychód bez specjalnych metod
-                AddIncomeRaw(_uid, amount, date, null, "Przelew", desc, true);
+                // Minimalnie: zapisujemy informacyjny planned wpis jako Income (tak jak miałaś),
+                // żeby nie rozwalać istniejącej bazy. Logikę planned-transferów dopracujemy później.
+                AddIncomeRaw(_uid, amount, date, null, "Transfer (planowany)", desc, true, null);
 
                 ToastService.Success("Dodano zaplanowany transfer.");
                 Cancel_Click(sender, e);
@@ -1089,86 +1090,68 @@ namespace Finly.Pages
         // ====== Income helpers (raw) ======
         private void AddIncomeRaw(int userId, decimal amount, DateTime date, int? categoryId, string source, string? desc, bool isPlanned = false, int? budgetId = null)
         {
-            try
-            {
-                using var con = DatabaseService.GetConnection();
-                using var cmd = con.CreateCommand();
-                cmd.CommandText = @"
+            using var con = DatabaseService.GetConnection();
+            using var cmd = con.CreateCommand();
+            cmd.CommandText = @"
 INSERT INTO Incomes (UserId, Amount, Date, Description, Source, CategoryId, IsPlanned, BudgetId)
 VALUES (@u, @a, @d, @desc, @s, @cat, @p, @b);";
 
-                cmd.Parameters.AddWithValue("@u", userId);
-                cmd.Parameters.AddWithValue("@a", amount);
-                cmd.Parameters.AddWithValue("@d", date.ToString("yyyy-MM-dd"));
-                cmd.Parameters.AddWithValue("@desc", (object?)desc ?? DBNull.Value);
-                cmd.Parameters.AddWithValue("@s", (object?)source ?? DBNull.Value);
+            cmd.Parameters.AddWithValue("@u", userId);
+            cmd.Parameters.AddWithValue("@a", amount);
+            cmd.Parameters.AddWithValue("@d", date.ToString("yyyy-MM-dd"));
+            cmd.Parameters.AddWithValue("@desc", (object?)desc ?? DBNull.Value);
+            cmd.Parameters.AddWithValue("@s", (object?)source ?? DBNull.Value);
 
-                if (categoryId.HasValue && categoryId.Value > 0)
-                    cmd.Parameters.AddWithValue("@cat", categoryId.Value);
-                else
-                    cmd.Parameters.AddWithValue("@cat", DBNull.Value);
+            if (categoryId.HasValue && categoryId.Value > 0)
+                cmd.Parameters.AddWithValue("@cat", categoryId.Value);
+            else
+                cmd.Parameters.AddWithValue("@cat", DBNull.Value);
 
-                cmd.Parameters.AddWithValue("@p", isPlanned ? 1 : 0);
-                cmd.Parameters.AddWithValue("@b", (object?)budgetId ?? DBNull.Value);
+            cmd.Parameters.AddWithValue("@p", isPlanned ? 1 : 0);
+            cmd.Parameters.AddWithValue("@b", (object?)budgetId ?? DBNull.Value);
 
-                cmd.ExecuteNonQuery();
-            }
-            catch
-            {
-                // możesz dodać logowanie błędu, jeśli chcesz
-            }
+            cmd.ExecuteNonQuery();
         }
-
-        private void InsertPlannedIncomeRaw(int userId, decimal amount, DateTime date, int? categoryId, string source, string? desc, int? budgetId)
-    => AddIncomeRaw(userId, amount, date, categoryId, source, desc, true, budgetId);
 
         private void UpdateCashOnHand(int userId, decimal delta)
         {
-            try
-            {
-                using var con = DatabaseService.GetConnection();
-                using var cmd = con.CreateCommand();
-                cmd.CommandText = @"UPDATE CashOnHand SET Amount = Amount + @d WHERE UserId=@u; INSERT INTO CashOnHand(UserId,Amount) SELECT @u,@d WHERE (SELECT changes())=0;";
-                cmd.Parameters.AddWithValue("@u", userId);
-                cmd.Parameters.AddWithValue("@d", delta);
-                cmd.ExecuteNonQuery();
-            }
-            catch { }
+            using var con = DatabaseService.GetConnection();
+            using var cmd = con.CreateCommand();
+            cmd.CommandText = @"UPDATE CashOnHand SET Amount = Amount + @d WHERE UserId=@u;
+INSERT INTO CashOnHand(UserId,Amount) SELECT @u,@d WHERE (SELECT changes())=0;";
+            cmd.Parameters.AddWithValue("@u", userId);
+            cmd.Parameters.AddWithValue("@d", delta);
+            cmd.ExecuteNonQuery();
         }
+
         private void UpdateSavedCash(int userId, decimal delta)
         {
-            try
-            {
-                using var con = DatabaseService.GetConnection();
-                using var cmd = con.CreateCommand();
-                cmd.CommandText = @"UPDATE SavedCash SET Amount = Amount + @d WHERE UserId=@u; INSERT INTO SavedCash(UserId,Amount) SELECT @u,@d WHERE (SELECT changes())=0;";
-                cmd.Parameters.AddWithValue("@u", userId);
-                cmd.Parameters.AddWithValue("@d", delta);
-                cmd.ExecuteNonQuery();
-            }
-            catch { }
+            using var con = DatabaseService.GetConnection();
+            using var cmd = con.CreateCommand();
+            cmd.CommandText = @"UPDATE SavedCash SET Amount = Amount + @d WHERE UserId=@u;
+INSERT INTO SavedCash(UserId,Amount) SELECT @u,@d WHERE (SELECT changes())=0;";
+            cmd.Parameters.AddWithValue("@u", userId);
+            cmd.Parameters.AddWithValue("@d", delta);
+            cmd.ExecuteNonQuery();
         }
+
         private void IncreaseBankBalance(int accountId, int userId, decimal delta)
         {
-            try
-            {
-                using var con = DatabaseService.GetConnection();
-                using var cmd = con.CreateCommand();
-                cmd.CommandText = "UPDATE BankAccounts SET Balance = Balance + @d WHERE Id=@id AND UserId=@u;";
-                cmd.Parameters.AddWithValue("@d", delta);
-                cmd.Parameters.AddWithValue("@id", accountId);
-                cmd.Parameters.AddWithValue("@u", userId);
-                cmd.ExecuteNonQuery();
-            }
-            catch { }
+            using var con = DatabaseService.GetConnection();
+            using var cmd = con.CreateCommand();
+            cmd.CommandText = "UPDATE BankAccounts SET Balance = Balance + @d WHERE Id=@id AND UserId=@u;";
+            cmd.Parameters.AddWithValue("@d", delta);
+            cmd.Parameters.AddWithValue("@id", accountId);
+            cmd.Parameters.AddWithValue("@u", userId);
+            cmd.ExecuteNonQuery();
         }
+
         private void LoadBudgets()
         {
             try
             {
                 var today = DateTime.Today;
 
-                // Pobieramy tylko budżety aktywne dziś
                 _budgets = BudgetService
                     .GetBudgetsForUser(_uid, from: today, to: today)
                     .ToList();
@@ -1176,22 +1159,14 @@ VALUES (@u, @a, @d, @desc, @s, @cat, @p, @b);";
                 void BindBudgetCombo(ComboBox? combo)
                 {
                     if (combo == null) return;
-
                     combo.ItemsSource = _budgets;
-                    combo.SelectedValuePath = "Id";   // ID budżetu
+                    combo.SelectedValuePath = "Id";
                 }
 
-                // 🔵 PRZYPISANIE BUDŻETÓW — tylko dla przychodów i wydatków
-
-                // Wydatek
                 BindBudgetCombo(ExpenseBudgetCombo);
                 BindBudgetCombo(ExpensePlannedBudgetCombo);
-
-                // Przychód
                 BindBudgetCombo(IncomeBudgetCombo);
                 BindBudgetCombo(IncomePlannedBudgetCombo);
-
-                // ❌ Transfery nie dostają budżetów
             }
             catch (Exception ex)
             {
@@ -1199,57 +1174,60 @@ VALUES (@u, @a, @d, @desc, @s, @cat, @p, @b);";
             }
         }
 
-        // Reakcja na zmianę daty wydatku – na razie tylko ewentualnie odświeżamy budżety
         private void ExpenseDatePicker_SelectedDateChanged(object sender, SelectionChangedEventArgs e)
         {
-            // Jeśli kiedyś będziesz chciał filtrować budżety po dacie,
-            // możesz tu zawołać własną metodę, np. LoadBudgetsForDate(date).
-            var date = ExpenseDatePicker.SelectedDate ?? DateTime.Today;
-
-            // Na ten moment nic więcej nie musi tu być – ważne, że metoda istnieje.
+            LoadExpenseBudgetsForDate(ExpenseDatePicker.SelectedDate ?? DateTime.Today);
         }
 
-        // Ładuje budżety dla wybranej daty wydatku.
-        // Jeśli użytkownik nie ma żadnych budżetów, wiersz z ComboBoxem jest ukryty.
-        private void LoadExpenseBudgetsForCurrentDate()
+        private void IncomeDatePicker_SelectedDateChanged(object sender, SelectionChangedEventArgs e)
         {
-            // jeśli DatePicker nie ma daty, bierzemy dzisiejszy dzień
-            var date = ExpenseDatePicker.SelectedDate ?? DateTime.Today;
+            LoadIncomeBudgetsForDate(IncomeDatePicker.SelectedDate ?? DateTime.Today);
+        }
 
-            // Pobieramy budżety z serwisu – użyj tej metody, którą masz w BudgetService
-            // Ja zakładam, że masz coś w stylu GetBudgetsForDate.
-            var budgets = BudgetService.GetBudgetsForDate(_uid, date);
-
-            if (budgets != null && budgets.Any())
+        private void LoadExpenseBudgetsForDate(DateTime date)
+        {
+            try
             {
-                ExpenseBudgetRow.Visibility = Visibility.Visible;
-                ExpenseBudgetCombo.ItemsSource = budgets;
-                ExpenseBudgetCombo.SelectedIndex = -1;
+                var budgets = BudgetService.GetBudgetsForUser(_uid, from: date, to: date).ToList();
+
+                if (budgets.Any())
+                {
+                    ExpenseBudgetRow.Visibility = Visibility.Visible;
+                    ExpenseBudgetCombo.ItemsSource = budgets;
+                    ExpenseBudgetCombo.SelectedIndex = -1;
+                }
+                else
+                {
+                    ExpenseBudgetRow.Visibility = Visibility.Collapsed;
+                    ExpenseBudgetCombo.ItemsSource = null;
+                }
             }
-            else
+            catch
             {
-                // Brak budżetów – chowamy cały wiersz
                 ExpenseBudgetRow.Visibility = Visibility.Collapsed;
                 ExpenseBudgetCombo.ItemsSource = null;
             }
         }
 
-        // Ładuje budżety dla daty wybranego PRZYCHODU.
-        // Jeśli nie ma żadnych budżetów, wiersz z ComboBoxem jest ukryty.
-        private void LoadIncomeBudgetsForCurrentDate()
+        private void LoadIncomeBudgetsForDate(DateTime date)
         {
-            var date = IncomeDatePicker.SelectedDate ?? DateTime.Today;
-
-            // zakładam, że masz taką samą metodę jak dla wydatków:
-            var budgets = BudgetService.GetBudgetsForDate(_uid, date);
-
-            if (budgets != null && budgets.Any())
+            try
             {
-                IncomeBudgetRow.Visibility = Visibility.Visible;
-                IncomeBudgetCombo.ItemsSource = budgets;
-                IncomeBudgetCombo.SelectedIndex = -1;
+                var budgets = BudgetService.GetBudgetsForUser(_uid, from: date, to: date).ToList();
+
+                if (budgets.Any())
+                {
+                    IncomeBudgetRow.Visibility = Visibility.Visible;
+                    IncomeBudgetCombo.ItemsSource = budgets;
+                    IncomeBudgetCombo.SelectedIndex = -1;
+                }
+                else
+                {
+                    IncomeBudgetRow.Visibility = Visibility.Collapsed;
+                    IncomeBudgetCombo.ItemsSource = null;
+                }
             }
-            else
+            catch
             {
                 IncomeBudgetRow.Visibility = Visibility.Collapsed;
                 IncomeBudgetCombo.ItemsSource = null;

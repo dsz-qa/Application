@@ -3,13 +3,13 @@ using Finly.Services;
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
+using System.Data;
 using System.Globalization;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
 using System.Windows.Input;
 using System.Windows.Media;
-using System.Data;
 
 namespace Finly.Pages
 {
@@ -371,29 +371,24 @@ namespace Finly.Pages
             switch (_opSourceKind)
             {
                 case "free":
-                    // konto -> wolna gotówka
-                    DatabaseService.TransferBankToCash(_uid, _currentAccount.Id, amount);
+                    // konto -> wolna gotówka (kompozycja w fasadzie)
+                    TransactionsFacadeService.TransferBankToFreeCash(_uid, _currentAccount.Id, amount);
                     ToastService.Success($"Wypłacono {amount:N2} zł do wolnej gotówki.");
                     break;
 
                 case "saved":
-                    // konto -> gotówka -> odłożona gotówka
-                    DatabaseService.TransferBankToCash(_uid, _currentAccount.Id, amount);
-                    DatabaseService.AddToSavedCash(_uid, amount);
+                    // konto -> odłożona gotówka
+                    TransactionsFacadeService.TransferBankToSaved(_uid, _currentAccount.Id, amount);
                     ToastService.Success($"Wypłacono {amount:N2} zł do odłożonej gotówki.");
                     break;
 
                 case "envelope":
-                    // konto -> gotówka -> odłożona gotówka -> konkretna koperta
+                    // konto -> koperta (kompozycja w fasadzie)
                     if (OpEnvelopeCombo.SelectedItem is not EnvelopeItem env)
                         throw new InvalidOperationException("Nie wybrano koperty.");
 
-                    DatabaseService.TransferBankToCash(_uid, _currentAccount.Id, amount);
-                    DatabaseService.AddToSavedCash(_uid, amount);
-                    DatabaseService.AddToEnvelopeAllocated(_uid, env.Id, amount);
-
-                    ToastService.Success(
-                        $"Przelano {amount:N2} zł z konta do koperty \"{env.Name}\".");
+                    TransactionsFacadeService.TransferBankToEnvelope(_uid, _currentAccount.Id, env.Id, amount);
+                    ToastService.Success($"Przelano {amount:N2} zł z konta do koperty \"{env.Name}\".");
                     break;
             }
         }
@@ -405,29 +400,24 @@ namespace Finly.Pages
             switch (_opSourceKind)
             {
                 case "free":
-                    // wolna gotówka -> konto
-                    DatabaseService.TransferCashToBank(_uid, _currentAccount.Id, amount);
+                    // wolna gotówka -> konto (kompozycja w fasadzie)
+                    TransactionsFacadeService.TransferFreeCashToBank(_uid, _currentAccount.Id, amount);
                     ToastService.Success($"Wpłacono {amount:N2} zł na konto.");
                     break;
 
                 case "saved":
-                    // odłożona gotówka -> gotówka -> konto
-                    DatabaseService.TransferCashToBank(_uid, _currentAccount.Id, amount);
-                    DatabaseService.SubtractFromSavedCash(_uid, amount);
+                    // odłożona gotówka -> konto
+                    TransactionsFacadeService.TransferSavedToBank(_uid, _currentAccount.Id, amount);
                     ToastService.Success($"Wpłacono {amount:N2} zł z odłożonej gotówki na konto.");
                     break;
 
                 case "envelope":
-                    // koperta -> odłożona gotówka -> gotówka -> konto
+                    // koperta -> konto (kompozycja w fasadzie)
                     if (OpEnvelopeCombo.SelectedItem is not EnvelopeItem env)
                         throw new InvalidOperationException("Nie wybrano koperty.");
 
-                    DatabaseService.TransferCashToBank(_uid, _currentAccount.Id, amount);
-                    DatabaseService.SubtractFromEnvelopeAllocated(_uid, env.Id, amount);
-                    DatabaseService.SubtractFromSavedCash(_uid, amount);
-
-                    ToastService.Success(
-                        $"Wpłacono {amount:N2} zł z koperty \"{env.Name}\" na konto.");
+                    TransactionsFacadeService.TransferEnvelopeToBank(_uid, env.Id, _currentAccount.Id, amount);
+                    ToastService.Success($"Wpłacono {amount:N2} zł z koperty \"{env.Name}\" na konto.");
                     break;
             }
         }
@@ -468,9 +458,7 @@ namespace Finly.Pages
 
             EditPanel.Visibility = Visibility.Visible;
             OperationPanel.Visibility = Visibility.Collapsed;
-
         }
-
 
         private void ShowEditPanel(BankAccountModel model) => ShowEditPanel(model, isNew: false);
 
@@ -548,7 +536,6 @@ namespace Finly.Pages
             EditErrorText.Visibility = Visibility.Collapsed;
             EditErrorText.Text = "";
 
-            // 🔴 na start chowamy hint IBAN
             if (IbanHintText != null)
             {
                 IbanHintText.Text = "Polski IBAN musi mieć dokładnie 28 znaków (PL + 26 cyfr).";
@@ -572,7 +559,6 @@ namespace Finly.Pages
             {
                 if (!ValidatePolishIban(rawIban, out var normalized, out string? error))
                 {
-                    // 🔴 zamiast EditErrorText – pokazujemy czerwony hint pod polem IBAN
                     if (IbanHintText != null)
                     {
                         IbanHintText.Text = error ?? "Nieprawidłowy numer IBAN.";
@@ -583,8 +569,6 @@ namespace Finly.Pages
 
                 finalIban = FormatPolishIban(normalized);
             }
-
-
 
             // bank
             var bankFromCombo = GetSelectedEditBankName();
@@ -629,13 +613,11 @@ namespace Finly.Pages
             }
         }
 
-
         private void EditIbanBox_TextChanged(object sender, TextChangedEventArgs e)
         {
             if (IbanHintText != null)
                 IbanHintText.Visibility = Visibility.Collapsed;
         }
-
 
         private void EditCancel_Click(object sender, RoutedEventArgs e)
         {
@@ -894,7 +876,6 @@ namespace Finly.Pages
 
         private static string FormatPolishIban(string normalized)
         {
-            // normalized: "PL" + 26 cyfr, bez spacji
             if (string.IsNullOrWhiteSpace(normalized))
                 return "";
 
@@ -906,7 +887,6 @@ namespace Finly.Pages
             string check = s.Substring(2, 2);
             string rest = s.Substring(4);      // 24 cyfry
 
-            // grupujemy resztę po 4 cyfry
             var parts = new List<string> { country + check };
             for (int i = 0; i < rest.Length; i += 4)
             {
@@ -988,4 +968,3 @@ namespace Finly.Pages
     {
     }
 }
-

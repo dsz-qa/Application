@@ -11,7 +11,12 @@ using System.Text;
 namespace Finly.Services
 {
     /// <summary>
-    /// Centralny serwis SQLite – spójny z wywo³aniami w UI.
+    /// Centralny serwis SQLite:
+    /// - po³¹czenie, schemat i migracje,
+    /// - CRUD i zapytania,
+    /// - event DataChanged dla UI.
+    ///
+    /// Uwaga: ksiêgowanie sald (bank/cash/saved/envelopes) jest w LedgerService.
     /// </summary>
     public static class DatabaseService
     {
@@ -31,6 +36,20 @@ namespace Finly.Services
                 return Path.Combine(dir, "finly.db");
             }
         }
+
+        // ====== event dla UI ======
+        public static event EventHandler? DataChanged;
+
+        private static void RaiseDataChanged()
+        {
+            try { DataChanged?.Invoke(null, EventArgs.Empty); }
+            catch { }
+        }
+
+        /// <summary>
+        /// Umo¿liwia innym serwisom (LedgerService) odpalenie eventu bez duplikacji logiki.
+        /// </summary>
+        internal static void NotifyDataChanged() => RaiseDataChanged();
 
         // ====== po³¹czenia ======
         public static SqliteConnection GetConnection()
@@ -52,6 +71,9 @@ namespace Finly.Services
             return con;
         }
 
+        /// <summary>
+        /// Zapewnia, ¿e schemat i migracje zosta³y wykonane.
+        /// </summary>
         public static void EnsureTables()
         {
             lock (_schemaLock)
@@ -73,7 +95,6 @@ namespace Finly.Services
             }
         }
 
-
         private static SqliteConnection OpenAndEnsureSchema()
         {
             if (!_schemaInitialized)
@@ -84,10 +105,8 @@ namespace Finly.Services
                     {
                         using var c0 = GetConnection();
 
-                        // 1) g³ówny schemat
                         SchemaService.Ensure(c0);
 
-                        // 2) dodatkowe migracje/kolumny
                         EnsureBankAccountsSchema(c0);
                         EnsureExpensesSchema(c0);
                         EnsureBudgetsSchema(c0);
@@ -98,126 +117,30 @@ namespace Finly.Services
                 }
             }
 
-            // zwracamy normalne po³¹czenie do u¿ycia w metodach CRUD
             return GetConnection();
         }
 
+        // =========================================================
+        // ========================= HELPERS ========================
+        // =========================================================
 
-        // === MIGRACJE DODATKOWE ===
-        /// <summary>
-        /// Upewnia siê, ¿e tabela BankAccounts posiada kolumnê BankName (u¿ywan¹ w UI).
-        /// </summary>
-        private static void EnsureBankAccountsSchema(SqliteConnection c)
+        private static string ToIsoDate(DateTime dt) => dt.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
+
+        private static string? GetNullableString(SqliteDataReader r, int i) => r.IsDBNull(i) ? null : r.GetString(i);
+        private static string GetStringSafe(SqliteDataReader r, int i) => r.IsDBNull(i) ? "" : r.GetString(i);
+
+        private static DateTime GetDate(SqliteDataReader r, int i)
         {
-            try
-            {
-                if (!TableExists(c, "BankAccounts")) return; // tabela mo¿e byæ jeszcze nieutworzona
-                if (!ColumnExists(c, "BankAccounts", "BankName"))
-                {
-                    using var alter = c.CreateCommand();
-                    alter.CommandText = "ALTER TABLE BankAccounts ADD COLUMN BankName TEXT NULL;";
-                    alter.ExecuteNonQuery();
-                }
-            }
-            catch { /* ignorujemy – nie blokujemy startu */ }
-        }
-
-        private static void EnsureExpensesSchema(SqliteConnection c)
-        {
-            try
-            {
-                if (!TableExists(c, "Expenses")) return;
-
-                // Nowy schemat: AccountId (FK do BankAccounts) - nullable
-                if (!ColumnExists(c, "Expenses", "AccountId"))
-                {
-                    using var alter = c.CreateCommand();
-                    alter.CommandText = "ALTER TABLE Expenses ADD COLUMN AccountId INTEGER NULL;";
-                    alter.ExecuteNonQuery();
-                }
-
-                // Dodajemy opcjonalne powi¹zanie BudgetId jeœli nie istnieje
-                if (!ColumnExists(c, "Expenses", "BudgetId"))
-                {
-                    using var alterB = c.CreateCommand();
-                    alterB.CommandText = "ALTER TABLE Expenses ADD COLUMN BudgetId INTEGER NULL;";
-                    alterB.ExecuteNonQuery();
-                }
-
-                // indeks pod filtr UserId + AccountId
-                try
-                {
-                    using var idx = c.CreateCommand();
-                    idx.CommandText = "CREATE INDEX IF NOT EXISTS IX_Expenses_UserId_AccountId ON Expenses(UserId, AccountId);";
-                    idx.ExecuteNonQuery();
-                }
-                catch { }
-            }
-            catch
-            {
-                // nie blokujemy startu aplikacji
-            }
+            if (r.IsDBNull(i)) return DateTime.MinValue;
+            var v = r.GetValue(i);
+            if (v is DateTime dt) return dt;
+            return DateTime.TryParse(v?.ToString(), out var p) ? p : DateTime.MinValue;
         }
 
         /// <summary>
-        /// Upewnia siê, ¿e tabela Budgets posiada kolumny u¿ywane w UI: OverState oraz OverNotifiedAt.
+        /// Sprawdza istnienie tabeli w bazie. (internal – u¿ywa LedgerService)
         /// </summary>
-        private static void EnsureBudgetsSchema(SqliteConnection c)
-        {
-            try
-            {
-                if (!TableExists(c, "Budgets")) return;
-
-                if (!ColumnExists(c, "Budgets", "OverState"))
-                {
-                    using var alter = c.CreateCommand();
-                    alter.CommandText = "ALTER TABLE Budgets ADD COLUMN OverState INTEGER NOT NULL DEFAULT0;";
-                    alter.ExecuteNonQuery();
-                }
-
-                if (!ColumnExists(c, "Budgets", "OverNotifiedAt"))
-                {
-                    using var alter = c.CreateCommand();
-                    alter.CommandText = "ALTER TABLE Budgets ADD COLUMN OverNotifiedAt TEXT NULL;";
-                    alter.ExecuteNonQuery();
-                }
-            }
-            catch
-            {
-                // nie blokujemy startu aplikacji
-            }
-        }
-
-        private static void EnsureIncomesSchema(SqliteConnection c)
-        {
-            try
-            {
-                if (!TableExists(c, "Incomes")) return;
-
-                if (!ColumnExists(c, "Incomes", "BudgetId"))
-                {
-                    using var alter = c.CreateCommand();
-                    alter.CommandText = "ALTER TABLE Incomes ADD COLUMN BudgetId INTEGER NULL;";
-                    alter.ExecuteNonQuery();
-                }
-            }
-            catch
-            {
-                // nie blokujemy startu aplikacji
-            }
-        }
-
-        private static bool ExpensesHasAccountId(SqliteConnection c)
-    => TableExists(c, "Expenses") && ColumnExists(c, "Expenses", "AccountId");
-
-        private static bool ExpensesHasBudgetId(SqliteConnection c)
-    => TableExists(c, "Expenses") && ColumnExists(c, "Expenses", "BudgetId");
-
-
-        /// <summary>
-        /// Sprawdza istnienie tabeli w bazie.
-        /// </summary>
-        private static bool TableExists(SqliteConnection c, string tableName)
+        internal static bool TableExists(SqliteConnection c, string tableName)
         {
             try
             {
@@ -227,17 +150,13 @@ namespace Finly.Services
                 var obj = cmd.ExecuteScalar();
                 return obj != null && obj != DBNull.Value;
             }
-            catch
-            {
-                return false;
-            }
+            catch { return false; }
         }
 
-
         /// <summary>
-        /// Sprawdza czy kolumna istnieje w tabeli.
+        /// Sprawdza czy kolumna istnieje w tabeli. (internal – u¿ywa LedgerService)
         /// </summary>
-        private static bool ColumnExists(SqliteConnection c, string table, string column)
+        internal static bool ColumnExists(SqliteConnection c, string table, string column)
         {
             try
             {
@@ -255,278 +174,130 @@ namespace Finly.Services
             return false;
         }
 
-        // Add a simple event to notify UI about data changes so pages can refresh
-        public static event EventHandler? DataChanged;
+        private static bool ExpensesHasAccountId(SqliteConnection c)
+            => TableExists(c, "Expenses") && ColumnExists(c, "Expenses", "AccountId");
 
-        private static void RaiseDataChanged()
+        private static bool ExpensesHasBudgetId(SqliteConnection c)
+            => TableExists(c, "Expenses") && ColumnExists(c, "Expenses", "BudgetId");
+
+        // =========================================================
+        // ========================= MIGRACJE =======================
+        // =========================================================
+
+        private static void EnsureBankAccountsSchema(SqliteConnection c)
         {
             try
             {
-                DataChanged?.Invoke(null, EventArgs.Empty);
+                if (!TableExists(c, "BankAccounts")) return;
+
+                if (!ColumnExists(c, "BankAccounts", "BankName"))
+                {
+                    using var alter = c.CreateCommand();
+                    alter.CommandText = "ALTER TABLE BankAccounts ADD COLUMN BankName TEXT NULL;";
+                    alter.ExecuteNonQuery();
+                }
             }
-            catch
+            catch { }
+        }
+
+        private static void EnsureExpensesSchema(SqliteConnection c)
+        {
+            try
             {
-                // ignore exceptions from handlers
+                if (!TableExists(c, "Expenses")) return;
+
+                if (!ColumnExists(c, "Expenses", "AccountId"))
+                {
+                    using var alter = c.CreateCommand();
+                    alter.CommandText = "ALTER TABLE Expenses ADD COLUMN AccountId INTEGER NULL;";
+                    alter.ExecuteNonQuery();
+                }
+
+                if (!ColumnExists(c, "Expenses", "BudgetId"))
+                {
+                    using var alterB = c.CreateCommand();
+                    alterB.CommandText = "ALTER TABLE Expenses ADD COLUMN BudgetId INTEGER NULL;";
+                    alterB.ExecuteNonQuery();
+                }
+
+                // NOWE kolumny dla stabilnego ksiêgowania
+                if (!ColumnExists(c, "Expenses", "PaymentKind"))
+                {
+                    using var alterPk = c.CreateCommand();
+                    alterPk.CommandText = "ALTER TABLE Expenses ADD COLUMN PaymentKind INTEGER NOT NULL DEFAULT 0;";
+                    alterPk.ExecuteNonQuery();
+                }
+
+                if (!ColumnExists(c, "Expenses", "PaymentRefId"))
+                {
+                    using var alterPr = c.CreateCommand();
+                    alterPr.CommandText = "ALTER TABLE Expenses ADD COLUMN PaymentRefId INTEGER NULL;";
+                    alterPr.ExecuteNonQuery();
+                }
+
+                // Indeksy (bezpieczne)
+                try
+                {
+                    using var idx1 = c.CreateCommand();
+                    idx1.CommandText = "CREATE INDEX IF NOT EXISTS IX_Expenses_UserId_AccountId ON Expenses(UserId, AccountId);";
+                    idx1.ExecuteNonQuery();
+                }
+                catch { }
+
+                try
+                {
+                    using var idx2 = c.CreateCommand();
+                    idx2.CommandText = "CREATE INDEX IF NOT EXISTS IX_Expenses_UserId_PaymentKind ON Expenses(UserId, PaymentKind);";
+                    idx2.ExecuteNonQuery();
+                }
+                catch { }
             }
+            catch { }
         }
 
-        // ===== PRZENOSZENIE GOTÓWKI MIÊDZY PULAMI =====
-        /// <summary>
-        /// Przeniesienie z wolnej gotówki do od³o¿onej.
-        /// Wolna gotówka = CashOnHand - SavedCash.
-        /// Saved roœnie, free maleje, suma (free + saved) zostaje taka sama.
-        /// Dodatkowo korygujemy CashOnHand tak, ¿eby zawsze zgadza³o siê: CashOnHand = free + saved.
-        /// </summary>
-        public static void TransferFreeToSaved(int userId, decimal amount)
+
+        private static void EnsureBudgetsSchema(SqliteConnection c)
         {
-            if (amount <= 0) return;
-
-            var allCash = GetCashOnHand(userId);
-            var saved = GetSavedCash(userId);
-            var free = Math.Max(0m, allCash - saved);
-
-            if (free < amount)
-                throw new InvalidOperationException("Za ma³o wolnej gotówki.");
-
-            var newSaved = saved + amount;
-            var newFree = free - amount;
-            var newAll = newSaved + newFree;
-
-            SetSavedCash(userId, newSaved);
-            SetCashOnHand(userId, newAll);
-
-            RaiseDataChanged();
-        }
-
-        /// <summary>
-        /// Przeniesienie z od³o¿onej gotówki do wolnej.
-        /// Wolna gotówka = CashOnHand - SavedCash.
-        /// Saved maleje, free roœnie, suma (free + saved) zostaje taka sama.
-        /// Dodatkowo korygujemy CashOnHand tak, ¿eby zawsze zgadza³o siê: CashOnHand = free + saved.
-        /// </summary>
-        public static void TransferSavedToFree(int userId, decimal amount)
-        {
-            if (amount <= 0) return;
-
-            var allCash = GetCashOnHand(userId);
-            var saved = GetSavedCash(userId);
-            var free = Math.Max(0m, allCash - saved);
-
-            if (saved < amount)
-                throw new InvalidOperationException("Za ma³o od³o¿onej gotówki.");
-
-            var newSaved = saved - amount;
-            var newFree = free + amount;
-            var newAll = newSaved + newFree;
-
-            SetSavedCash(userId, newSaved);
-            SetCashOnHand(userId, newAll);
-
-            RaiseDataChanged();
-        }
-
-        /// <summary>
-        /// Przeniesienie œrodków z od³o¿onej gotówki na konto bankowe.
-        /// Zmniejsza SavedCash i CashOnHand, zwiêksza wybrane konto.
-        /// </summary>
-        public static void TransferSavedToBank(int userId, int accountId, decimal amount)
-        {
-            if (amount <= 0) throw new ArgumentException("Kwota musi byæ dodatnia.", nameof(amount));
-
-            var saved = GetSavedCash(userId);
-            if (saved < amount)
-                throw new InvalidOperationException("Za ma³o od³o¿onej gotówki.");
-
-            var cash = GetCashOnHand(userId);
-            if (cash < amount)
-                throw new InvalidOperationException("Za ma³o gotówki w portfelu.");
-
-            SetSavedCash(userId, saved - amount);
-            SetCashOnHand(userId, cash - amount);
-
-            using var c = OpenAndEnsureSchema();
-            using var cmd = c.CreateCommand();
-            cmd.CommandText = @"
-UPDATE BankAccounts
-   SET Balance = Balance + @a
- WHERE Id=@id AND UserId=@u;";
-            cmd.Parameters.AddWithValue("@a", amount);
-            cmd.Parameters.AddWithValue("@id", accountId);
-            cmd.Parameters.AddWithValue("@u", userId);
-            var rows = cmd.ExecuteNonQuery();
-            if (rows == 0)
-                throw new InvalidOperationException("Nie znaleziono rachunku bankowego lub nie nale¿y do u¿ytkownika.");
-
-            RaiseDataChanged();
-        }
-
-        /// <summary>
-        /// Przeniesienie œrodków z konta bankowego do od³o¿onej gotówki.
-        /// </summary>
-        public static void TransferBankToSaved(int userId, int accountId, decimal amount)
-        {
-            if (amount <= 0) throw new ArgumentException("Kwota musi byæ dodatnia.", nameof(amount));
-
-            using var c = OpenAndEnsureSchema();
-            using var tx = c.BeginTransaction();
-
-            decimal currentBal;
-            using (var chk = c.CreateCommand())
+            try
             {
-                chk.Transaction = tx;
-                chk.CommandText = @"SELECT Balance FROM BankAccounts WHERE Id=@id AND UserId=@u LIMIT 1;";
-                chk.Parameters.AddWithValue("@id", accountId);
-                chk.Parameters.AddWithValue("@u", userId);
-                var obj = chk.ExecuteScalar();
-                if (obj == null || obj == DBNull.Value)
-                    throw new InvalidOperationException("Nie znaleziono rachunku lub nie nale¿y do u¿ytkownika.");
-                currentBal = Convert.ToDecimal(obj);
+                if (!TableExists(c, "Budgets")) return;
+
+                if (!ColumnExists(c, "Budgets", "OverState"))
+                {
+                    using var alter = c.CreateCommand();
+                    alter.CommandText = "ALTER TABLE Budgets ADD COLUMN OverState INTEGER NOT NULL DEFAULT 0;";
+                    alter.ExecuteNonQuery();
+                }
+
+                if (!ColumnExists(c, "Budgets", "OverNotifiedAt"))
+                {
+                    using var alter = c.CreateCommand();
+                    alter.CommandText = "ALTER TABLE Budgets ADD COLUMN OverNotifiedAt TEXT NULL;";
+                    alter.ExecuteNonQuery();
+                }
             }
+            catch { }
+        }
 
-            if (currentBal < amount)
-                throw new InvalidOperationException("Na rachunku brakuje œrodków na tak¹ wyp³atê.");
-
-            using (var up = c.CreateCommand())
+        private static void EnsureIncomesSchema(SqliteConnection c)
+        {
+            try
             {
-                up.Transaction = tx;
-                up.CommandText = @"UPDATE BankAccounts SET Balance = Balance - @a WHERE Id=@id AND UserId=@u;";
-                up.Parameters.AddWithValue("@a", amount);
-                up.Parameters.AddWithValue("@id", accountId);
-                up.Parameters.AddWithValue("@u", userId);
-                up.ExecuteNonQuery();
+                if (!TableExists(c, "Incomes")) return;
+
+                if (!ColumnExists(c, "Incomes", "BudgetId"))
+                {
+                    using var alter = c.CreateCommand();
+                    alter.CommandText = "ALTER TABLE Incomes ADD COLUMN BudgetId INTEGER NULL;";
+                    alter.ExecuteNonQuery();
+                }
             }
-
-            tx.Commit();
-
-            var cash = GetCashOnHand(userId);
-            SetCashOnHand(userId, cash + amount);
-            AddToSavedCash(userId, amount);
+            catch { }
         }
 
-        /// <summary>
-        /// Przeniesienie œrodków miêdzy kopertami.
-        /// </summary>
-        public static void TransferEnvelopeToEnvelope(int userId, int fromEnvelopeId, int toEnvelopeId, decimal amount)
-        {
-            if (amount <= 0 || fromEnvelopeId == toEnvelopeId) return;
-
-            SubtractFromEnvelopeAllocated(userId, fromEnvelopeId, amount);
-            AddToEnvelopeAllocated(userId, toEnvelopeId, amount);
-        }
-
-        /// <summary>
-        /// Od³o¿ona gotówka (poza kopertami) -> koperta.
-        /// SavedCash siê nie zmienia, zmienia siê tylko podzia³.
-        /// </summary>
-        public static void TransferSavedToEnvelope(int userId, int envelopeId, decimal amount)
-        {
-            if (amount <= 0) return;
-
-            var saved = GetSavedCash(userId);
-            var allocated = GetTotalAllocatedInEnvelopesForUser(userId);
-            var unassigned = saved - allocated;
-
-            if (unassigned < amount)
-                throw new InvalidOperationException("Za ma³o od³o¿onej gotówki poza kopertami.");
-
-            AddToEnvelopeAllocated(userId, envelopeId, amount);
-        }
-
-        /// <summary>
-        /// Koperta -> od³o¿ona gotówka (poza kopertami).
-        /// </summary>
-        public static void TransferEnvelopeToSaved(int userId, int envelopeId, decimal amount)
-        {
-            if (amount <= 0) return;
-
-            SubtractFromEnvelopeAllocated(userId, envelopeId, amount);
-            // SavedCash siê nie zmienia – dalej jest od³o¿ona, tylko bez przypisania do koperty
-        }
-
-        /// <summary>
-        /// Wolna gotówka -> koperta.
-        /// Zwiêksza SavedCash oraz przydzia³ w kopercie, fizyczna gotówka bez zmian.
-        /// </summary>
-        public static void TransferFreeToEnvelope(int userId, int envelopeId, decimal amount)
-        {
-            if (amount <= 0) return;
-
-            var allCash = GetCashOnHand(userId);
-            var saved = GetSavedCash(userId);
-            var free = Math.Max(0m, allCash - saved);
-
-            if (free < amount)
-                throw new InvalidOperationException("Za ma³o wolnej gotówki.");
-
-            SetSavedCash(userId, saved + amount);
-            AddToEnvelopeAllocated(userId, envelopeId, amount);
-        }
-
-        /// <summary>
-        /// Koperta -> wolna gotówka.
-        /// Zmniejsza SavedCash i przydzia³ w kopercie.
-        /// </summary>
-        public static void TransferEnvelopeToFree(int userId, int envelopeId, decimal amount)
-        {
-            if (amount <= 0) return;
-
-            var saved = GetSavedCash(userId);
-            if (saved < amount)
-                throw new InvalidOperationException("Za ma³o od³o¿onej gotówki.");
-
-            SubtractFromEnvelopeAllocated(userId, envelopeId, amount);
-            SetSavedCash(userId, saved - amount);
-        }
-
-        /// <summary>
-        /// Przelew miêdzy dwoma kontami bankowymi tego samego u¿ytkownika.
-        /// </summary>
-        public static void TransferBankToBank(int userId, int fromAccountId, int toAccountId, decimal amount)
-        {
-            if (amount <= 0) throw new ArgumentException("Kwota musi byæ dodatnia.", nameof(amount));
-            if (fromAccountId == toAccountId) return;
-
-            using var c = OpenAndEnsureSchema();
-            using var tx = c.BeginTransaction();
-
-            decimal fromBal;
-            using (var chk = c.CreateCommand())
-            {
-                chk.Transaction = tx;
-                chk.CommandText = @"SELECT Balance FROM BankAccounts WHERE Id=@id AND UserId=@u LIMIT 1;";
-                chk.Parameters.AddWithValue("@id", fromAccountId);
-                chk.Parameters.AddWithValue("@u", userId);
-                var obj = chk.ExecuteScalar();
-                if (obj == null || obj == DBNull.Value) return;
-                fromBal = Convert.ToDecimal(obj);
-            }
-
-            if (fromBal < amount) return;
-
-            using (var updFrom = c.CreateCommand())
-            {
-                updFrom.Transaction = tx;
-                updFrom.CommandText = @"UPDATE BankAccounts SET Balance = Balance - @a WHERE Id=@id AND UserId=@u;";
-                updFrom.Parameters.AddWithValue("@a", amount);
-                updFrom.Parameters.AddWithValue("@id", fromAccountId);
-                updFrom.Parameters.AddWithValue("@u", userId);
-                updFrom.ExecuteNonQuery();
-            }
-
-            using (var updTo = c.CreateCommand())
-            {
-                updTo.Transaction = tx;
-                updTo.CommandText = @"UPDATE BankAccounts SET Balance = Balance + @a WHERE Id=@id AND UserId=@u;";
-                updTo.Parameters.AddWithValue("@a", amount);
-                updTo.Parameters.AddWithValue("@id", toAccountId);
-                updTo.Parameters.AddWithValue("@u", userId);
-                updTo.ExecuteNonQuery();
-            }
-
-            tx.Commit();
-
-            InsertTransfer(userId, DateTime.Today, amount, "bank", fromAccountId, "bank", toAccountId, "Przelew bank->bank");
-        }
+        // =========================================================
+        // ======================= USERS (CASCADE) ==================
+        // =========================================================
 
         public static void DeleteUserCascade(int userId)
         {
@@ -547,39 +318,21 @@ UPDATE BankAccounts
 
             bool Has(string tableName) => TableExists(con, tableName);
 
-            // ===== Tabele z danymi u¿ytkownika =====
-            if (Has("Incomes"))
-                Exec("DELETE FROM Incomes WHERE UserId = @uid;");
-
-            if (Has("Expenses"))
-                Exec("DELETE FROM Expenses WHERE UserId = @uid;");
-
-            if (Has("Envelopes"))
-                Exec("DELETE FROM Envelopes WHERE UserId = @uid;");
-
-            if (Has("CashOnHand"))
-                Exec("DELETE FROM CashOnHand WHERE UserId = @uid;");
-
-            if (Has("SavedCash"))
-                Exec("DELETE FROM SavedCash WHERE UserId = @uid;");
-
-            if (Has("BankAccounts"))
-                Exec("DELETE FROM BankAccounts WHERE UserId = @uid;");
-
-            if (Has("BankConnections"))
-                Exec("DELETE FROM BankConnections WHERE UserId = @uid;");
-
-            if (Has("Categories"))
-                Exec("DELETE FROM Categories WHERE UserId = @uid;");
-
-            // ===== Na koñcu sam u¿ytkownik =====
-            if (Has("Users"))
-                Exec("DELETE FROM Users WHERE Id = @uid;");
+            if (Has("Incomes")) Exec("DELETE FROM Incomes WHERE UserId = @uid;");
+            if (Has("Expenses")) Exec("DELETE FROM Expenses WHERE UserId = @uid;");
+            if (Has("Transfers")) Exec("DELETE FROM Transfers WHERE UserId = @uid;");
+            if (Has("Envelopes")) Exec("DELETE FROM Envelopes WHERE UserId = @uid;");
+            if (Has("CashOnHand")) Exec("DELETE FROM CashOnHand WHERE UserId = @uid;");
+            if (Has("SavedCash")) Exec("DELETE FROM SavedCash WHERE UserId = @uid;");
+            if (Has("BankAccounts")) Exec("DELETE FROM BankAccounts WHERE UserId = @uid;");
+            if (Has("BankConnections")) Exec("DELETE FROM BankConnections WHERE UserId = @uid;");
+            if (Has("Categories")) Exec("DELETE FROM Categories WHERE UserId = @uid;");
+            if (Has("Users")) Exec("DELETE FROM Users WHERE Id = @uid;");
 
             tx.Commit();
+            RaiseDataChanged();
         }
 
-        //=== strona po pierwszym logowaniu na nowe konto===
         public static bool IsUserOnboarded(int userId)
         {
             using var c = OpenAndEnsureSchema();
@@ -597,66 +350,16 @@ UPDATE BankAccounts
             cmd.CommandText = "UPDATE Users SET IsOnboarded = 1 WHERE Id=@id;";
             cmd.Parameters.AddWithValue("@id", userId);
             cmd.ExecuteNonQuery();
+            RaiseDataChanged();
         }
-
-        /// <summary>
-        /// Alias dla zgodnoœci – wiele miejsc wo³a GetEnvelopeNames, a w³aœciwa
-        /// implementacja jest w GetEnvelopesNames.
-        /// </summary>
-        public static List<string> GetEnvelopeNames(int userId) => GetEnvelopesNames(userId);
-
-        public static List<string> GetEnvelopesNames(int userId)
-        {
-            var result = new List<string>();
-
-            try
-            {
-                using var conn = OpenAndEnsureSchema();
-                using var cmd = conn.CreateCommand();
-                cmd.CommandText = @"
-SELECT Name
-FROM Envelopes
-WHERE UserId = @uid
-ORDER BY Name;";
-                cmd.Parameters.AddWithValue("@uid", userId);
-
-                using var rd = cmd.ExecuteReader();
-                while (rd.Read())
-                {
-                    var name = rd["Name"]?.ToString();
-                    if (!string.IsNullOrWhiteSpace(name))
-                        result.Add(name);
-                }
-            }
-            catch
-            {
-                // jeœli coœ pójdzie nie tak, po prostu zwracamy pust¹ listê
-            }
-
-            return result;
-        }
-
-        private static string ToIsoDate(DateTime dt) => dt.ToString("yyyy-MM-dd");
-
-        // ==== helpery odczytu z DataReadera ====
-        private static string? GetNullableString(SqliteDataReader r, int i) => r.IsDBNull(i) ? null : r.GetString(i);
-        private static string GetStringSafe(SqliteDataReader r, int i) => r.IsDBNull(i) ? "" : r.GetString(i);
-        private static DateTime GetDate(SqliteDataReader r, int i)
-        {
-            if (r.IsDBNull(i)) return DateTime.MinValue;
-            var v = r.GetValue(i);
-            if (v is DateTime dt) return dt;
-            return DateTime.TryParse(v?.ToString(), out var p) ? p : DateTime.MinValue;
-        }
-
-
 
         // =========================================================
-        // ======================= KREDYTY =======================
+        // ======================= LOANS ============================
         // =========================================================
-        public static System.Collections.Generic.List<Finly.Models.LoanModel> GetLoans(int userId)
+
+        public static List<LoanModel> GetLoans(int userId)
         {
-            var list = new System.Collections.Generic.List<Finly.Models.LoanModel>();
+            var list = new List<LoanModel>();
             using var c = OpenAndEnsureSchema();
             using var cmd = c.CreateCommand();
             cmd.CommandText = @"
@@ -669,7 +372,7 @@ ORDER BY Name;";
             using var r = cmd.ExecuteReader();
             while (r.Read())
             {
-                list.Add(new Finly.Models.LoanModel
+                list.Add(new LoanModel
                 {
                     Id = r.IsDBNull(0) ? 0 : r.GetInt32(0),
                     UserId = r.IsDBNull(1) ? userId : r.GetInt32(1),
@@ -686,7 +389,7 @@ ORDER BY Name;";
             return list;
         }
 
-        public static int InsertLoan(Finly.Models.LoanModel loan)
+        public static int InsertLoan(LoanModel loan)
         {
             using var c = OpenAndEnsureSchema();
             using var cmd = c.CreateCommand();
@@ -703,13 +406,12 @@ SELECT last_insert_rowid();";
             cmd.Parameters.AddWithValue("@note", (object?)loan.Note ?? DBNull.Value);
             cmd.Parameters.AddWithValue("@pd", loan.PaymentDay);
 
-            var idObj = cmd.ExecuteScalar();
-            var id = Convert.ToInt32(idObj);
+            var id = Convert.ToInt32(cmd.ExecuteScalar() ?? 0);
             RaiseDataChanged();
             return id;
         }
 
-        public static void UpdateLoan(Finly.Models.LoanModel loan)
+        public static void UpdateLoan(LoanModel loan)
         {
             using var c = OpenAndEnsureSchema();
             using var cmd = c.CreateCommand();
@@ -745,12 +447,11 @@ UPDATE Loans
             cmd.Parameters.AddWithValue("@id", id);
             cmd.Parameters.AddWithValue("@u", userId);
             cmd.ExecuteNonQuery();
-
             RaiseDataChanged();
         }
 
         // =========================================================
-        // ======================= KATEGORIE =======================
+        // ======================= CATEGORIES =======================
         // =========================================================
 
         public sealed class CategorySummaryDto
@@ -761,102 +462,6 @@ UPDATE Loans
             public int EntryCount { get; set; }
             public decimal TotalAmount { get; set; }
             public double SharePercent { get; set; }
-        }
-
-        public static int? GetEnvelopeIdByName(int userId, string name)
-        {
-            using var c = OpenAndEnsureSchema();
-            using var cmd = c.CreateCommand();
-            cmd.CommandText = @"
-SELECT Id
-FROM Envelopes
-WHERE UserId=@u AND Name=@n
-LIMIT 1;";
-            cmd.Parameters.AddWithValue("@u", userId);
-            cmd.Parameters.AddWithValue("@n", name.Trim());
-
-            var obj = cmd.ExecuteScalar();
-            if (obj == null || obj == DBNull.Value) return null;
-            return Convert.ToInt32(obj);
-        }
-
-        // ===== WYDATKI – operacje na Ÿród³ach pieniêdzy =====
-
-        public static void SpendFromFreeCash(int userId, decimal amount)
-        {
-            if (amount <= 0) return;
-
-            var allCash = GetCashOnHand(userId);
-            var saved = GetSavedCash(userId);
-            var free = Math.Max(0m, allCash - saved);
-
-            if (free < amount)
-                throw new InvalidOperationException("Za ma³o wolnej gotówki na taki wydatek.");
-
-            SetCashOnHand(userId, allCash - amount);
-        }
-
-        public static void SpendFromSavedCash(int userId, decimal amount)
-        {
-            if (amount <= 0) return;
-
-            SubtractFromSavedCash(userId, amount);
-
-            var allCash = GetCashOnHand(userId);
-            if (allCash < amount)
-                throw new InvalidOperationException("Za ma³o gotówki na taki wydatek.");
-
-            SetCashOnHand(userId, allCash - amount);
-        }
-
-        public static void SpendFromEnvelope(int userId, int envelopeId, decimal amount)
-        {
-            if (amount <= 0) return;
-
-            SubtractFromEnvelopeAllocated(userId, envelopeId, amount);
-            SubtractFromSavedCash(userId, amount);
-
-            var allCash = GetCashOnHand(userId);
-            if (allCash < amount)
-                throw new InvalidOperationException("Za ma³o gotówki na taki wydatek.");
-
-            SetCashOnHand(userId, allCash - amount);
-        }
-
-        public static void SpendFromBankAccount(int userId, int accountId, decimal amount)
-        {
-            if (amount <= 0) return;
-
-            using var c = OpenAndEnsureSchema();
-            using var tx = c.BeginTransaction();
-
-            decimal currentBal;
-            using (var chk = c.CreateCommand())
-            {
-                chk.Transaction = tx;
-                chk.CommandText = @"SELECT Balance FROM BankAccounts WHERE Id=@id AND UserId=@u LIMIT 1;";
-                chk.Parameters.AddWithValue("@id", accountId);
-                chk.Parameters.AddWithValue("@u", userId);
-                var obj = chk.ExecuteScalar();
-                if (obj == null || obj == DBNull.Value)
-                    throw new InvalidOperationException("Nie znaleziono rachunku lub nie nale¿y do u¿ytkownika.");
-                currentBal = Convert.ToDecimal(obj);
-            }
-
-            if (currentBal < amount)
-                throw new InvalidOperationException("Na koncie bankowym brakuje œrodków na taki wydatek.");
-
-            using (var upd = c.CreateCommand())
-            {
-                upd.Transaction = tx;
-                upd.CommandText = @"UPDATE BankAccounts SET Balance = Balance - @a WHERE Id=@id AND UserId=@u;";
-                upd.Parameters.AddWithValue("@a", amount);
-                upd.Parameters.AddWithValue("@id", accountId);
-                upd.Parameters.AddWithValue("@u", userId);
-                upd.ExecuteNonQuery();
-            }
-
-            tx.Commit();
         }
 
         public sealed class CategoryTransactionDto
@@ -877,13 +482,9 @@ LIMIT 1;";
             using var cmd = c.CreateCommand();
 
             if (ColumnExists(c, "Categories", "IsArchived"))
-            {
                 cmd.CommandText = "SELECT Id, Name FROM Categories WHERE UserId=@u AND IsArchived = 0 ORDER BY Name;";
-            }
             else
-            {
                 cmd.CommandText = "SELECT Id, Name FROM Categories WHERE UserId=@u ORDER BY Name;";
-            }
 
             cmd.Parameters.AddWithValue("@u", userId);
 
@@ -899,13 +500,9 @@ LIMIT 1;";
             using var cmd = c.CreateCommand();
 
             if (ColumnExists(c, "Categories", "IsArchived"))
-            {
                 cmd.CommandText = "SELECT Name FROM Categories WHERE UserId=@u AND IsArchived = 0 ORDER BY Name;";
-            }
             else
-            {
                 cmd.CommandText = "SELECT Name FROM Categories WHERE UserId=@u ORDER BY Name;";
-            }
 
             cmd.Parameters.AddWithValue("@u", userId);
 
@@ -936,9 +533,7 @@ FROM Categories
 WHERE UserId=@u AND lower(Name)=lower(@n)";
 
             if (ColumnExists(c, "Categories", "IsArchived"))
-            {
                 sql += " AND IsArchived = 0";
-            }
 
             sql += " LIMIT 1;";
 
@@ -949,19 +544,17 @@ WHERE UserId=@u AND lower(Name)=lower(@n)";
             return (obj == null || obj == DBNull.Value) ? (int?)null : Convert.ToInt32(obj);
         }
 
-        /// <summary>
-        /// Tworzy now¹ kategoriê. Mo¿esz w przysz³oœci rozszerzyæ o typ, kolor, ikonê.
-        /// </summary>
         public static int CreateCategory(int userId, string name)
         {
             using var c = OpenAndEnsureSchema();
             using var cmd = c.CreateCommand();
-
             cmd.CommandText = @"INSERT INTO Categories(UserId, Name) VALUES(@u,@n);
                                 SELECT last_insert_rowid();";
             cmd.Parameters.AddWithValue("@u", userId);
             cmd.Parameters.AddWithValue("@n", name.Trim());
-            return Convert.ToInt32(cmd.ExecuteScalar());
+            var id = Convert.ToInt32(cmd.ExecuteScalar() ?? 0);
+            RaiseDataChanged();
+            return id;
         }
 
         public static int GetOrCreateCategoryId(int userId, string name)
@@ -981,12 +574,9 @@ WHERE UserId=@u AND lower(Name)=lower(@n)";
             cmd.Parameters.AddWithValue("@n", name.Trim());
             cmd.Parameters.AddWithValue("@id", id);
             cmd.ExecuteNonQuery();
+            RaiseDataChanged();
         }
 
-        /// <summary>
-        /// Historyczne usuwanie kategorii – fizycznie z tabeli.
-        /// Przy nowym podejœciu lepiej u¿ywaæ ArchiveCategory (miêkkie usuniêcie).
-        /// </summary>
         public static void DeleteCategory(int id)
         {
             using var c = OpenAndEnsureSchema();
@@ -994,11 +584,9 @@ WHERE UserId=@u AND lower(Name)=lower(@n)";
             cmd.CommandText = "DELETE FROM Categories WHERE Id=@id;";
             cmd.Parameters.AddWithValue("@id", id);
             cmd.ExecuteNonQuery();
+            RaiseDataChanged();
         }
 
-        /// <summary>
-        /// Miêkka archiwizacja kategorii (IsArchived = 1). Jeœli kolumna nie istnieje – fallback do DELETE.
-        /// </summary>
         public static void ArchiveCategory(int id)
         {
             using var c = OpenAndEnsureSchema();
@@ -1009,158 +597,16 @@ WHERE UserId=@u AND lower(Name)=lower(@n)";
                 cmd.CommandText = "DELETE FROM Categories WHERE Id=@id;";
                 cmd.Parameters.AddWithValue("@id", id);
                 cmd.ExecuteNonQuery();
+                RaiseDataChanged();
                 return;
             }
 
             cmd.CommandText = "UPDATE Categories SET IsArchived = 1 WHERE Id=@id;";
             cmd.Parameters.AddWithValue("@id", id);
             cmd.ExecuteNonQuery();
+            RaiseDataChanged();
         }
 
-        /// <summary>
-        /// Podsumowanie kategorii w zadanym okresie – liczba transakcji, suma, udzia³ %.
-        /// U¿ywane przez stronê Kategorie / Dashboard.
-        /// </summary>
-        public static List<CategorySummaryDto> GetCategorySummary(
-            int userId,
-            DateTime from,
-            DateTime to,
-            int? typeFilter = null,
-            string? search = null)
-        {
-            var result = new List<CategorySummaryDto>();
-
-            using var con = OpenAndEnsureSchema();
-            using var cmd = con.CreateCommand();
-
-            var sb = new StringBuilder(@"
-SELECT 
-    c.Id,
-    c.Name,
-    c.Type,
-    COUNT(e.Id) AS EntryCount,
-    IFNULL(SUM(e.Amount), 0) AS TotalAmount
-FROM Categories c
-LEFT JOIN Expenses e
-    ON e.CategoryId = c.Id
-    AND e.UserId = @uid
-    AND date(e.Date) BETWEEN date(@from) AND date(@to)
-WHERE c.UserId = @uid
-");
-
-            if (ColumnExists(con, "Categories", "IsArchived"))
-            {
-                sb.Append("  AND c.IsArchived = 0");
-            }
-
-            if (typeFilter.HasValue && ColumnExists(con, "Categories", "Type"))
-            {
-                sb.Append(" AND c.Type = @type");
-                cmd.Parameters.AddWithValue("@type", typeFilter.Value);
-            }
-
-            if (!string.IsNullOrWhiteSpace(search))
-            {
-                sb.Append(" AND lower(c.Name) LIKE @search");
-                cmd.Parameters.AddWithValue("@search", "%" + search.Trim().ToLowerInvariant() + "%");
-            }
-
-            sb.Append(@"
-GROUP BY c.Id, c.Name, c.Type
-ORDER BY TotalAmount DESC;
-");
-
-            cmd.CommandText = sb.ToString();
-            cmd.Parameters.AddWithValue("@uid", userId);
-            cmd.Parameters.AddWithValue("@from", from.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture));
-            cmd.Parameters.AddWithValue("@to", to.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture));
-
-            using var r = cmd.ExecuteReader();
-
-            var buffer = new List<(int id, string name, int type, int entries, decimal total)>();
-            decimal totalAll = 0m;
-
-            while (r.Read())
-            {
-                var id = r.GetInt32(0);
-                var name = GetStringSafe(r, 1);
-                var type = r.IsDBNull(2) ? 0 : r.GetInt32(2);
-                var entries = r.IsDBNull(3) ? 0 : r.GetInt32(3);
-                var total = r.IsDBNull(4) ? 0m : r.GetDecimal(4);
-
-                buffer.Add((id, name, type, entries, total));
-                totalAll += total;
-            }
-
-            foreach (var x in buffer)
-            {
-                double share = totalAll > 0 ? (double)(x.total / totalAll * 100m) : 0;
-
-                result.Add(new CategorySummaryDto
-                {
-                    CategoryId = x.id,
-                    Name = x.name,
-                    TypeDisplay = x.type switch
-                    {
-                        1 => "Przychód",
-                        2 => "Obie",
-                        _ => "Wydatek"
-                    },
-                    EntryCount = x.entries,
-                    TotalAmount = x.total,
-                    SharePercent = Math.Round(share, 1)
-                });
-            }
-
-            return result;
-        }
-
-        /// <summary>
-        /// Ostatnie transakcje w danej kategorii – do panelu szczegó³ów kategorii.
-        /// </summary>
-        public static List<CategoryTransactionDto> GetLastTransactionsForCategory(int userId, int categoryId, int limit = 10)
-        {
-            var list = new List<CategoryTransactionDto>();
-
-            using var con = OpenAndEnsureSchema();
-            using var cmd = con.CreateCommand();
-            cmd.CommandText = @"
-SELECT Date, Amount, Description
-FROM Expenses
-WHERE UserId = @uid AND CategoryId = @cid
-ORDER BY date(Date) DESC, Id DESC
-LIMIT @limit;";
-
-            cmd.Parameters.AddWithValue("@uid", userId);
-            cmd.Parameters.AddWithValue("@cid", categoryId);
-            cmd.Parameters.AddWithValue("@limit", limit);
-
-            using var r = cmd.ExecuteReader();
-            while (r.Read())
-            {
-                var date = GetDate(r, 0);
-                decimal amount;
-                var val = r.GetValue(1);
-                if (val is decimal dec) amount = dec;
-                else if (val is double d) amount = (decimal)d;
-                else amount = Convert.ToDecimal(val);
-
-                var desc = GetNullableString(r, 2) ?? string.Empty;
-
-                list.Add(new CategoryTransactionDto
-                {
-                    Date = date,
-                    Amount = amount,
-                    Description = desc
-                });
-            }
-
-            return list;
-        }
-
-        /// <summary>
-        /// Scala dwie kategorie: przenosi transakcje ze Ÿród³owej na docelow¹ i archiwizuje/usuwa Ÿród³ow¹.
-        /// </summary>
         public static void MergeCategories(int userId, int sourceCategoryId, int targetCategoryId)
         {
             if (sourceCategoryId == targetCategoryId) return;
@@ -1201,13 +647,9 @@ WHERE UserId = @u AND CategoryId = @src;";
                 arch.Transaction = tx;
 
                 if (ColumnExists(c, "Categories", "IsArchived"))
-                {
                     arch.CommandText = @"UPDATE Categories SET IsArchived = 1 WHERE Id=@src AND UserId=@u;";
-                }
                 else
-                {
                     arch.CommandText = @"DELETE FROM Categories WHERE Id=@src AND UserId=@u;";
-                }
 
                 arch.Parameters.AddWithValue("@src", sourceCategoryId);
                 arch.Parameters.AddWithValue("@u", userId);
@@ -1215,10 +657,183 @@ WHERE UserId = @u AND CategoryId = @src;";
             }
 
             tx.Commit();
+            RaiseDataChanged();
+        }
+
+        public static List<CategorySummaryDto> GetCategorySummary(
+            int userId,
+            DateTime from,
+            DateTime to,
+            int? typeFilter = null,
+            string? search = null)
+        {
+            var result = new List<CategorySummaryDto>();
+
+            using var con = OpenAndEnsureSchema();
+            using var cmd = con.CreateCommand();
+
+            var sb = new StringBuilder(@"
+SELECT 
+    c.Id,
+    c.Name,
+    c.Type,
+    COUNT(e.Id) AS EntryCount,
+    IFNULL(SUM(e.Amount), 0) AS TotalAmount
+FROM Categories c
+LEFT JOIN Expenses e
+    ON e.CategoryId = c.Id
+    AND e.UserId = @uid
+    AND date(e.Date) BETWEEN date(@from) AND date(@to)
+WHERE c.UserId = @uid
+");
+
+            if (ColumnExists(con, "Categories", "IsArchived"))
+                sb.Append(" AND c.IsArchived = 0");
+
+            if (typeFilter.HasValue && ColumnExists(con, "Categories", "Type"))
+            {
+                sb.Append(" AND c.Type = @type");
+                cmd.Parameters.AddWithValue("@type", typeFilter.Value);
+            }
+
+            if (!string.IsNullOrWhiteSpace(search))
+            {
+                sb.Append(" AND lower(c.Name) LIKE @search");
+                cmd.Parameters.AddWithValue("@search", "%" + search.Trim().ToLowerInvariant() + "%");
+            }
+
+            sb.Append(@"
+GROUP BY c.Id, c.Name, c.Type
+ORDER BY TotalAmount DESC;");
+
+            cmd.CommandText = sb.ToString();
+            cmd.Parameters.AddWithValue("@uid", userId);
+            cmd.Parameters.AddWithValue("@from", from.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture));
+            cmd.Parameters.AddWithValue("@to", to.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture));
+
+            using var r = cmd.ExecuteReader();
+
+            var buffer = new List<(int id, string name, int type, int entries, decimal total)>();
+            decimal totalAll = 0m;
+
+            while (r.Read())
+            {
+                var id = r.GetInt32(0);
+                var name = GetStringSafe(r, 1);
+                var type = r.IsDBNull(2) ? 0 : r.GetInt32(2);
+                var entries = r.IsDBNull(3) ? 0 : r.GetInt32(3);
+                var total = r.IsDBNull(4) ? 0m : Convert.ToDecimal(r.GetValue(4));
+
+                buffer.Add((id, name, type, entries, total));
+                totalAll += total;
+            }
+
+            foreach (var x in buffer)
+            {
+                double share = totalAll > 0 ? (double)(x.total / totalAll * 100m) : 0;
+
+                result.Add(new CategorySummaryDto
+                {
+                    CategoryId = x.id,
+                    Name = x.name,
+                    TypeDisplay = x.type switch
+                    {
+                        1 => "Przychód",
+                        2 => "Obie",
+                        _ => "Wydatek"
+                    },
+                    EntryCount = x.entries,
+                    TotalAmount = x.total,
+                    SharePercent = Math.Round(share, 1)
+                });
+            }
+
+            return result;
+        }
+
+        public static List<CategoryTransactionDto> GetLastTransactionsForCategory(int userId, int categoryId, int limit = 10)
+        {
+            var list = new List<CategoryTransactionDto>();
+
+            using var con = OpenAndEnsureSchema();
+            using var cmd = con.CreateCommand();
+            cmd.CommandText = @"
+SELECT Date, Amount, Description
+FROM Expenses
+WHERE UserId = @uid AND CategoryId = @cid
+ORDER BY date(Date) DESC, Id DESC
+LIMIT @limit;";
+
+            cmd.Parameters.AddWithValue("@uid", userId);
+            cmd.Parameters.AddWithValue("@cid", categoryId);
+            cmd.Parameters.AddWithValue("@limit", limit);
+
+            using var r = cmd.ExecuteReader();
+            while (r.Read())
+            {
+                var date = GetDate(r, 0);
+                var val = r.GetValue(1);
+                decimal amount = Convert.ToDecimal(val);
+                var desc = GetNullableString(r, 2) ?? string.Empty;
+
+                list.Add(new CategoryTransactionDto
+                {
+                    Date = date,
+                    Amount = amount,
+                    Description = desc
+                });
+            }
+
+            return list;
+        }
+
+        public static List<(int Id, string Name, string? Color, string? Icon)> GetCategoriesExtended(int userId)
+        {
+            var list = new List<(int, string, string?, string?)>();
+            using var c = OpenAndEnsureSchema();
+            using var cmd = c.CreateCommand();
+            if (ColumnExists(c, "Categories", "IsArchived"))
+                cmd.CommandText = "SELECT Id, Name, Color, Icon FROM Categories WHERE UserId=@u AND IsArchived=0 ORDER BY Name;";
+            else
+                cmd.CommandText = "SELECT Id, Name, Color, Icon FROM Categories WHERE UserId=@u ORDER BY Name;";
+            cmd.Parameters.AddWithValue("@u", userId);
+
+            using var r = cmd.ExecuteReader();
+            while (r.Read())
+            {
+                var id = r.IsDBNull(0) ? 0 : r.GetInt32(0);
+                var name = r.IsDBNull(1) ? string.Empty : r.GetString(1);
+                var color = r.IsDBNull(2) ? null : r.GetString(2);
+                var icon = r.IsDBNull(3) ? null : r.GetString(3);
+                list.Add((id, name, color, icon));
+            }
+            return list;
+        }
+
+        public static void UpdateCategoryFull(int id, int userId, string? name = null, string? color = null, string? icon = null)
+        {
+            using var c = OpenAndEnsureSchema();
+            using var cmd = c.CreateCommand();
+
+            var setParts = new List<string>();
+            if (name != null) setParts.Add("Name=@n");
+            if (color != null) setParts.Add("Color=@c");
+            if (icon != null) setParts.Add("Icon=@i");
+            if (setParts.Count == 0) return;
+
+            cmd.CommandText = $"UPDATE Categories SET {string.Join(", ", setParts)} WHERE Id=@id AND UserId=@u;";
+            cmd.Parameters.AddWithValue("@id", id);
+            cmd.Parameters.AddWithValue("@u", userId);
+            if (name != null) cmd.Parameters.AddWithValue("@n", name.Trim());
+            if (color != null) cmd.Parameters.AddWithValue("@c", (object?)color ?? DBNull.Value);
+            if (icon != null) cmd.Parameters.AddWithValue("@i", (object?)icon ?? DBNull.Value);
+
+            cmd.ExecuteNonQuery();
+            RaiseDataChanged();
         }
 
         // =========================================================
-        // ========================= KONTA =========================
+        // ========================= ACCOUNTS =======================
         // =========================================================
 
         public static DataTable GetAccountsTable(int userId)
@@ -1306,7 +921,10 @@ SELECT last_insert_rowid();";
             cmd.Parameters.AddWithValue("@iban", a.Iban ?? "");
             cmd.Parameters.AddWithValue("@cur", string.IsNullOrWhiteSpace(a.Currency) ? "PLN" : a.Currency);
             cmd.Parameters.AddWithValue("@bal", a.Balance);
-            return Convert.ToInt32(cmd.ExecuteScalar());
+
+            var id = Convert.ToInt32(cmd.ExecuteScalar() ?? 0);
+            RaiseDataChanged();
+            return id;
         }
 
         public static void UpdateAccount(BankAccountModel a)
@@ -1342,16 +960,8 @@ WHERE Id=@id AND UserId=@u;";
             cmd.Parameters.AddWithValue("@cur", string.IsNullOrWhiteSpace(a.Currency) ? "PLN" : a.Currency);
             cmd.Parameters.AddWithValue("@bal", a.Balance);
 
-            try
-            {
-                cmd.ExecuteNonQuery();
-            }
-            catch (SqliteException ex) when (ex.SqliteErrorCode == 19) // FK failed
-            {
-                EnsureValidConnectionId(c, a.Id);
-                cmd.Parameters["@conn"].Value = (object?)a.ConnectionId ?? DBNull.Value;
-                cmd.ExecuteNonQuery();
-            }
+            cmd.ExecuteNonQuery();
+            RaiseDataChanged();
         }
 
         public static void DeleteAccount(int id, int userId)
@@ -1362,10 +972,422 @@ WHERE Id=@id AND UserId=@u;";
             cmd.Parameters.AddWithValue("@id", id);
             cmd.Parameters.AddWithValue("@u", userId);
             cmd.ExecuteNonQuery();
+            RaiseDataChanged();
+        }
+
+        /// <summary>
+        /// Jeœli BankAccounts.ConnectionId wskazuje na nieistniej¹cy rekord – ustawia NULL.
+        /// </summary>
+        private static void EnsureValidConnectionId(SqliteConnection c, int accountId)
+        {
+            using var get = c.CreateCommand();
+            get.CommandText = "SELECT ConnectionId FROM BankAccounts WHERE Id=@id LIMIT 1;";
+            get.Parameters.AddWithValue("@id", accountId);
+            var raw = get.ExecuteScalar();
+
+            if (raw is null || raw == DBNull.Value) return;
+
+            var cid = Convert.ToInt32(raw);
+
+            using var chk = c.CreateCommand();
+            chk.CommandText = "SELECT 1 FROM BankConnections WHERE Id=@cid LIMIT 1;";
+            chk.Parameters.AddWithValue("@cid", cid);
+            var exists = chk.ExecuteScalar() != null;
+            if (exists) return;
+
+            using var fix = c.CreateCommand();
+            fix.CommandText = "UPDATE BankAccounts SET ConnectionId=NULL WHERE Id=@id;";
+            fix.Parameters.AddWithValue("@id", accountId);
+            fix.ExecuteNonQuery();
         }
 
         // =========================================================
-        // ========================= WYDATKI =======================
+        // ========================= ENVELOPES ======================
+        // =========================================================
+
+        public sealed class EnvelopeGoalDto
+        {
+            public int EnvelopeId { get; set; }
+            public string Name { get; set; } = "";
+            public decimal Target { get; set; }
+            public decimal Allocated { get; set; }
+            public DateTime? Deadline { get; set; }
+            public string? GoalText { get; set; }
+        }
+
+        public static DataTable GetEnvelopesTable(int userId)
+        {
+            using var c = OpenAndEnsureSchema();
+            using var cmd = c.CreateCommand();
+            cmd.CommandText = @"
+SELECT 
+    Id,
+    UserId,
+    Name,
+    Target,
+    Allocated,
+    Note,
+    CreatedAt
+FROM Envelopes
+WHERE UserId=@u
+ORDER BY Name COLLATE NOCASE;";
+            cmd.Parameters.AddWithValue("@u", userId);
+
+            var dt = new DataTable();
+            using var r = cmd.ExecuteReader();
+            dt.Load(r);
+            return dt;
+        }
+
+        public static List<string> GetEnvelopeNames(int userId) => GetEnvelopesNames(userId);
+
+        public static List<string> GetEnvelopesNames(int userId)
+        {
+            var result = new List<string>();
+
+            try
+            {
+                using var conn = OpenAndEnsureSchema();
+                using var cmd = conn.CreateCommand();
+                cmd.CommandText = @"
+SELECT Name
+FROM Envelopes
+WHERE UserId = @uid
+ORDER BY Name;";
+                cmd.Parameters.AddWithValue("@uid", userId);
+
+                using var rd = cmd.ExecuteReader();
+                while (rd.Read())
+                {
+                    var name = rd["Name"]?.ToString();
+                    if (!string.IsNullOrWhiteSpace(name))
+                        result.Add(name);
+                }
+            }
+            catch { }
+
+            return result;
+        }
+
+        public static int? GetEnvelopeIdByName(int userId, string name)
+        {
+            using var c = OpenAndEnsureSchema();
+            using var cmd = c.CreateCommand();
+            cmd.CommandText = @"
+SELECT Id
+FROM Envelopes
+WHERE UserId=@u AND Name=@n
+LIMIT 1;";
+            cmd.Parameters.AddWithValue("@u", userId);
+            cmd.Parameters.AddWithValue("@n", name.Trim());
+            var obj = cmd.ExecuteScalar();
+            if (obj == null || obj == DBNull.Value) return null;
+            return Convert.ToInt32(obj);
+        }
+
+        public static List<EnvelopeGoalDto> GetEnvelopeGoals(int userId)
+        {
+            var list = new List<EnvelopeGoalDto>();
+
+            using var c = OpenAndEnsureSchema();
+            using var cmd = c.CreateCommand();
+
+            bool hasDeadline = ColumnExists(c, "Envelopes", "Deadline");
+            bool hasGoalText = ColumnExists(c, "Envelopes", "GoalText");
+
+            var sql = @"
+SELECT 
+    Id,
+    Name,
+    Target,
+    COALESCE(Allocated,0) AS Allocated";
+
+            sql += hasDeadline ? ", Deadline" : ", NULL AS Deadline";
+            sql += hasGoalText ? ", GoalText" : ", Note AS GoalText";
+
+            sql += @"
+FROM Envelopes
+WHERE UserId = @u
+  AND Target IS NOT NULL
+  AND Target > 0";
+
+            if (hasDeadline) sql += " AND Deadline IS NOT NULL";
+
+            sql += @"
+ORDER BY Name COLLATE NOCASE;";
+
+            cmd.CommandText = sql;
+            cmd.Parameters.AddWithValue("@u", userId);
+
+            using var r = cmd.ExecuteReader();
+            while (r.Read())
+            {
+                var dto = new EnvelopeGoalDto
+                {
+                    EnvelopeId = r.GetInt32(0),
+                    Name = GetStringSafe(r, 1),
+                    Target = r.IsDBNull(2) ? 0m : Convert.ToDecimal(r.GetValue(2)),
+                    Allocated = r.IsDBNull(3) ? 0m : Convert.ToDecimal(r.GetValue(3)),
+                    GoalText = GetNullableString(r, 5)
+                };
+
+                if (hasDeadline)
+                {
+                    var dt = GetDate(r, 4);
+                    dto.Deadline = dt == DateTime.MinValue ? (DateTime?)null : dt;
+                }
+
+                if (dto.Deadline == null && !string.IsNullOrWhiteSpace(dto.GoalText))
+                {
+                    dto.Deadline = TryParseDeadlineFromGoalText(dto.GoalText);
+                }
+
+                list.Add(dto);
+            }
+
+            return list;
+        }
+
+        private static DateTime? TryParseDeadlineFromGoalText(string? text)
+        {
+            if (string.IsNullOrWhiteSpace(text))
+                return null;
+
+            var lines = text.Split(new[] { '\n' }, StringSplitOptions.RemoveEmptyEntries);
+
+            foreach (var rawLine in lines)
+            {
+                var line = rawLine.Trim();
+
+                if (line.StartsWith("Termin:", StringComparison.OrdinalIgnoreCase))
+                {
+                    var dateText = line.Substring(7).Trim();
+
+                    if (DateTime.TryParseExact(
+                            dateText,
+                            "yyyy-MM-dd",
+                            CultureInfo.InvariantCulture,
+                            DateTimeStyles.None,
+                            out var d1))
+                    {
+                        return d1.Date;
+                    }
+
+                    if (DateTime.TryParse(
+                            dateText,
+                            CultureInfo.CurrentCulture,
+                            DateTimeStyles.None,
+                            out var d2))
+                    {
+                        return d2.Date;
+                    }
+                }
+            }
+
+            return null;
+        }
+
+        public static void ClearEnvelopeGoal(int userId, int envelopeId)
+        {
+            using var c = OpenAndEnsureSchema();
+
+            bool hasDeadline = ColumnExists(c, "Envelopes", "Deadline");
+            bool hasGoalText = ColumnExists(c, "Envelopes", "GoalText");
+
+            var sb = new StringBuilder("UPDATE Envelopes SET ");
+            bool first = true;
+
+            if (hasDeadline)
+            {
+                sb.Append("Deadline = NULL");
+                first = false;
+            }
+
+            if (hasGoalText)
+            {
+                if (!first) sb.Append(", ");
+                sb.Append("GoalText = NULL");
+            }
+            else
+            {
+                if (!first) sb.Append(", ");
+                sb.Append("Note = NULL");
+            }
+
+            sb.Append(" WHERE Id=@id AND UserId=@u;");
+
+            using var cmd = c.CreateCommand();
+            cmd.CommandText = sb.ToString();
+            cmd.Parameters.AddWithValue("@id", envelopeId);
+            cmd.Parameters.AddWithValue("@u", userId);
+            cmd.ExecuteNonQuery();
+            RaiseDataChanged();
+        }
+
+        public static void UpdateEnvelopeGoal(
+            int userId,
+            int envelopeId,
+            decimal target,
+            decimal allocated,
+            DateTime deadline,
+            string? goalText)
+        {
+            using var c = OpenAndEnsureSchema();
+
+            bool hasDeadline = ColumnExists(c, "Envelopes", "Deadline");
+            bool hasGoalText = ColumnExists(c, "Envelopes", "GoalText");
+
+            var sb = new StringBuilder(@"
+UPDATE Envelopes
+   SET Target   = @t,
+       Allocated = @a");
+
+            if (hasDeadline)
+                sb.Append(", Deadline = @d");
+
+            if (hasGoalText)
+                sb.Append(", GoalText = @g");
+            else
+                sb.Append(", Note = @g");
+
+            sb.Append(" WHERE Id=@id AND UserId=@u;");
+
+            using var cmd = c.CreateCommand();
+            cmd.CommandText = sb.ToString();
+            cmd.Parameters.AddWithValue("@t", target);
+            cmd.Parameters.AddWithValue("@a", allocated);
+
+            if (hasDeadline)
+                cmd.Parameters.AddWithValue("@d", deadline.ToString("yyyy-MM-dd"));
+
+            cmd.Parameters.AddWithValue("@g", (object?)goalText ?? DBNull.Value);
+            cmd.Parameters.AddWithValue("@id", envelopeId);
+            cmd.Parameters.AddWithValue("@u", userId);
+            cmd.ExecuteNonQuery();
+            RaiseDataChanged();
+        }
+
+        public static int InsertEnvelope(int userId, string name, decimal target, decimal allocated, string? note)
+        {
+            using var c = OpenAndEnsureSchema();
+            using var cmd = c.CreateCommand();
+            cmd.CommandText = @"
+INSERT INTO Envelopes(UserId, Name, Target, Allocated, Note, CreatedAt)
+VALUES (@u, @n, @t, @a, @note, CURRENT_TIMESTAMP);
+SELECT last_insert_rowid();";
+            cmd.Parameters.AddWithValue("@u", userId);
+            cmd.Parameters.AddWithValue("@n", name?.Trim() ?? "");
+            cmd.Parameters.AddWithValue("@t", target);
+            cmd.Parameters.AddWithValue("@a", allocated);
+            cmd.Parameters.AddWithValue("@note", (object?)note ?? DBNull.Value);
+
+            var id = Convert.ToInt32(cmd.ExecuteScalar() ?? 0);
+            RaiseDataChanged();
+            return id;
+        }
+
+        public static void UpdateEnvelope(int id, int userId, string name, decimal target, decimal allocated, string? note)
+        {
+            using var c = OpenAndEnsureSchema();
+            using var cmd = c.CreateCommand();
+            cmd.CommandText = @"
+UPDATE Envelopes
+SET Name=@n, Target=@t, Allocated=@a, Note=@note
+WHERE Id=@id AND UserId=@u;";
+            cmd.Parameters.AddWithValue("@id", id);
+            cmd.Parameters.AddWithValue("@u", userId);
+            cmd.Parameters.AddWithValue("@n", name?.Trim() ?? "");
+            cmd.Parameters.AddWithValue("@t", target);
+            cmd.Parameters.AddWithValue("@a", allocated);
+            cmd.Parameters.AddWithValue("@note", (object?)note ?? DBNull.Value);
+            cmd.ExecuteNonQuery();
+            RaiseDataChanged();
+        }
+
+        public static void DeleteEnvelope(int id)
+        {
+            using var c = OpenAndEnsureSchema();
+            using var cmd = c.CreateCommand();
+            cmd.CommandText = "DELETE FROM Envelopes WHERE Id=@id;";
+            cmd.Parameters.AddWithValue("@id", id);
+            cmd.ExecuteNonQuery();
+            RaiseDataChanged();
+        }
+
+        // =========================================================
+        // ======================= CASH / SAVED (READ) ==============
+        // =========================================================
+        // Uwaga: zapisy/transfery robi LedgerService. Tu zostawiamy tylko bezpieczne odczyty,
+        // bo UI czêsto chce snapshoty.
+
+        public static decimal GetCashOnHand(int userId)
+        {
+            using var c = OpenAndEnsureSchema();
+            using var cmd = c.CreateCommand();
+            cmd.CommandText = "SELECT COALESCE(Amount,0) FROM CashOnHand WHERE UserId=@u LIMIT 1;";
+            cmd.Parameters.AddWithValue("@u", userId);
+            return Convert.ToDecimal(cmd.ExecuteScalar() ?? 0m);
+        }
+
+        public static decimal GetSavedCash(int userId)
+        {
+            using var c = OpenAndEnsureSchema();
+            using var cmd = c.CreateCommand();
+            cmd.CommandText = "SELECT COALESCE(Amount,0) FROM SavedCash WHERE UserId=@u LIMIT 1;";
+            cmd.Parameters.AddWithValue("@u", userId);
+            return Convert.ToDecimal(cmd.ExecuteScalar() ?? 0m);
+        }
+
+        public static decimal GetTotalAllocatedInEnvelopesForUser(int userId)
+        {
+            using var c = OpenAndEnsureSchema();
+            using var cmd = c.CreateCommand();
+            cmd.CommandText = "SELECT COALESCE(SUM(Allocated),0) FROM Envelopes WHERE UserId=@u;";
+            cmd.Parameters.AddWithValue("@u", userId);
+            return Convert.ToDecimal(cmd.ExecuteScalar() ?? 0m);
+        }
+
+        private static decimal GetTotalBanksBalance(int userId)
+        {
+            using var c = OpenAndEnsureSchema();
+            using var cmd = c.CreateCommand();
+            cmd.CommandText = "SELECT COALESCE(SUM(Balance),0) FROM BankAccounts WHERE UserId=@u;";
+            cmd.Parameters.AddWithValue("@u", userId);
+            return Convert.ToDecimal(cmd.ExecuteScalar() ?? 0m);
+        }
+
+        public sealed class MoneySnapshot
+        {
+            public decimal Banks { get; set; }
+            public decimal Cash { get; set; }       // wolna
+            public decimal Saved { get; set; }      // ca³a pula od³o¿onej
+            public decimal Envelopes { get; set; }  // przydzielona do kopert
+
+            public decimal SavedUnallocated => Saved - Envelopes;
+            public decimal Total => Banks + Cash + Saved;
+        }
+
+        public static MoneySnapshot GetMoneySnapshot(int userId)
+        {
+            var banks = GetTotalBanksBalance(userId);
+
+            var allCash = GetCashOnHand(userId);
+            var savedCash = GetSavedCash(userId);
+
+            var freeCash = Math.Max(0m, allCash - savedCash);
+            var allocated = GetTotalAllocatedInEnvelopesForUser(userId);
+
+            return new MoneySnapshot
+            {
+                Banks = banks,
+                Cash = freeCash,
+                Saved = savedCash,
+                Envelopes = allocated
+            };
+        }
+
+        // =========================================================
+        // ========================= EXPENSES =======================
         // =========================================================
 
         public static DataTable GetExpenses(
@@ -1396,7 +1418,6 @@ FROM Expenses e
 LEFT JOIN Categories c ON c.Id = e.CategoryId
 WHERE e.UserId = @uid");
 
-
             cmd.Parameters.AddWithValue("@uid", userId);
 
             if (from != null)
@@ -1423,7 +1444,6 @@ WHERE e.UserId = @uid");
                 cmd.Parameters.AddWithValue("@acc", accountId.Value);
             }
 
-
             if (!string.IsNullOrWhiteSpace(search))
             {
                 sb.Append(" AND lower(e.Description) LIKE @q");
@@ -1431,7 +1451,6 @@ WHERE e.UserId = @uid");
             }
 
             sb.Append(" ORDER BY date(e.Date) DESC, e.Id DESC;");
-
             cmd.CommandText = sb.ToString();
 
             var dt = new DataTable();
@@ -1498,7 +1517,6 @@ ORDER BY e.Date DESC, e.Id DESC;";
             return list;
         }
 
-
         public static Expense? GetExpenseById(int id)
         {
             using var c = OpenAndEnsureSchema();
@@ -1525,7 +1543,6 @@ LIMIT 1;";
 
             var catId = r.IsDBNull(5) ? 0 : r.GetInt32(5);
 
-            // AccountOrId: jeœli to AccountId -> liczba, jeœli Account -> tekst
             string accountText = "";
             if (!r.IsDBNull(6))
             {
@@ -1541,16 +1558,17 @@ LIMIT 1;";
                 Date = GetDate(r, 3),
                 Description = GetNullableString(r, 4),
                 CategoryId = catId,
-                Account = accountText // na razie trzymamy w starym polu, ¿eby UI nie pêk³o
+                Account = accountText,
+                IsPlanned = !r.IsDBNull(7) && Convert.ToInt32(r.GetValue(7)) == 1
             };
         }
+
         private static int? TryResolveAccountIdFromExpenseAccountText(SqliteConnection c, int userId, string? accountText)
         {
             if (string.IsNullOrWhiteSpace(accountText)) return null;
 
             var t = accountText.Trim();
 
-            // Jeœli masz u siebie formaty typu: "Konto: mBank" albo "Konto: PKO"
             if (t.StartsWith("Konto:", StringComparison.OrdinalIgnoreCase))
             {
                 var name = t.Substring("Konto:".Length).Trim();
@@ -1564,11 +1582,8 @@ LIMIT 1;";
                 return (obj == null || obj == DBNull.Value) ? (int?)null : Convert.ToInt32(obj);
             }
 
-            // Jeœli w przysz³oœci bêdziesz kodowaæ inaczej, dodasz tu kolejne regu³y.
             return null;
         }
-
-
 
         public static int InsertExpense(Expense e)
         {
@@ -1578,22 +1593,21 @@ LIMIT 1;";
             bool hasAccountText = ColumnExists(c, "Expenses", "Account"); // legacy
             bool hasBudgetId = ExpensesHasBudgetId(c);
 
-            // Spróbuj rozpoznaæ AccountId po nazwie, je¿eli UI nadal trzyma tekstowo konto w e.Account
-            int? accountId = null;
-            if (hasAccountId)
-            {
-                accountId = TryResolveAccountIdFromExpenseAccountText(c, e.UserId, e.Account);
-            }
+            bool hasPaymentKind = ColumnExists(c, "Expenses", "PaymentKind");
+            bool hasPaymentRefId = ColumnExists(c, "Expenses", "PaymentRefId");
 
             using var cmd = c.CreateCommand();
 
-            // Budujemy INSERT zale¿nie od istniej¹cych kolumn
             var cols = new List<string> { "UserId", "Amount", "Date", "Description", "CategoryId", "IsPlanned" };
             var vals = new List<string> { "@u", "@a", "@d", "@desc", "@c", "@planned" };
 
             if (hasAccountId) { cols.Add("AccountId"); vals.Add("@accId"); }
             if (hasAccountText) { cols.Add("Account"); vals.Add("@accText"); }
             if (hasBudgetId) { cols.Add("BudgetId"); vals.Add("@budgetId"); }
+
+            // NOWE: stabilne pola
+            if (hasPaymentKind) { cols.Add("PaymentKind"); vals.Add("@pk"); }
+            if (hasPaymentRefId) { cols.Add("PaymentRefId"); vals.Add("@pr"); }
 
             cmd.CommandText = $@"
 INSERT INTO Expenses({string.Join(",", cols)})
@@ -1605,24 +1619,57 @@ SELECT last_insert_rowid();";
             cmd.Parameters.AddWithValue("@d", ToIsoDate(e.Date));
             cmd.Parameters.AddWithValue("@desc", (object?)e.Description ?? DBNull.Value);
 
-            if (e.CategoryId is int cid && cid >0)
-                cmd.Parameters.AddWithValue("@c", cid);
-            else
-                cmd.Parameters.AddWithValue("@c", DBNull.Value);
+            if (e.CategoryId > 0) cmd.Parameters.AddWithValue("@c", e.CategoryId);
+            else cmd.Parameters.AddWithValue("@c", DBNull.Value);
 
-            cmd.Parameters.AddWithValue("@planned", e.IsPlanned ?1 :0);
+            cmd.Parameters.AddWithValue("@planned", e.IsPlanned ? 1 : 0);
 
-            var rowId = (long)(cmd.ExecuteScalar() ??0L);
+            // AccountId (legacy) – ustawiamy NULL, bo ju¿ nie parsujemy tekstu do ksiêgowania.
+            // Dla kompatybilnoœci mo¿esz zostawiæ próbê ustawienia AccountId dla banku:
+            int? legacyAccountId = null;
+            if (hasAccountId && e.PaymentKind == PaymentKind.BankAccount && e.PaymentRefId.HasValue)
+                legacyAccountId = e.PaymentRefId.Value;
 
-            // Aktualizacja salda (tylko dla wydatku ZREALIZOWANEGO)
+            if (hasAccountId) cmd.Parameters.AddWithValue("@accId", (object?)legacyAccountId ?? DBNull.Value);
+            if (hasAccountText) cmd.Parameters.AddWithValue("@accText", (object?)e.Account ?? DBNull.Value);
+            if (hasBudgetId) cmd.Parameters.AddWithValue("@budgetId", (object?)e.BudgetId ?? DBNull.Value);
+
+            if (hasPaymentKind) cmd.Parameters.AddWithValue("@pk", (int)e.PaymentKind);
+            if (hasPaymentRefId) cmd.Parameters.AddWithValue("@pr", (object?)e.PaymentRefId ?? DBNull.Value);
+
+            var rowId = (long)(cmd.ExecuteScalar() ?? 0L);
+
+            // Ksiêgowanie TYLKO raz i TYLKO dla nieplanowanych
             if (!e.IsPlanned)
             {
-                if (hasAccountId && accountId.HasValue)
-                    SpendFromBankAccount(e.UserId, accountId.Value, Convert.ToDecimal(e.Amount));
-                else
-                    SpendFromFreeCash(e.UserId, Convert.ToDecimal(e.Amount));
-            }
+                var amt = Convert.ToDecimal(e.Amount);
 
+                switch (e.PaymentKind)
+                {
+                    case PaymentKind.FreeCash:
+                        TransactionsFacadeService.SpendFromFreeCash(e.UserId, amt);
+                        break;
+
+                    case PaymentKind.SavedCash:
+                        TransactionsFacadeService.SpendFromSavedCash(e.UserId, amt);
+                        break;
+
+                    case PaymentKind.BankAccount:
+                        if (!e.PaymentRefId.HasValue)
+                            throw new InvalidOperationException("Brak PaymentRefId dla p³atnoœci z konta bankowego.");
+                        TransactionsFacadeService.SpendFromBankAccount(e.UserId, e.PaymentRefId.Value, amt);
+                        break;
+
+                    case PaymentKind.Envelope:
+                        if (!e.PaymentRefId.HasValue)
+                            throw new InvalidOperationException("Brak PaymentRefId dla p³atnoœci z koperty.");
+                        TransactionsFacadeService.SpendFromEnvelope(e.UserId, e.PaymentRefId.Value, amt);
+                        break;
+
+                    default:
+                        throw new InvalidOperationException("Nieznany PaymentKind.");
+                }
+            }
 
             RaiseDataChanged();
             return (int)rowId;
@@ -1633,20 +1680,34 @@ SELECT last_insert_rowid();";
         {
             using var c = OpenAndEnsureSchema();
 
-            //1) Ustal, jakie kolumny faktycznie istniej¹ w DB (MUSI byæ przed u¿yciem)
             bool hasAccountId = ExpensesHasAccountId(c);
             bool hasAccountText = ColumnExists(c, "Expenses", "Account"); // legacy
             bool hasBudgetId = ExpensesHasBudgetId(c);
 
-            //2) Pobierz stary rekord (do cofniêcia wp³ywu na saldo)
             var old = GetExpenseById(e.Id);
 
-            // 3) Cofnij stary wp³yw na saldo (tylko jeœli wydatek by³ zrealizowany)
+            // 1) Cofnij wp³yw starego wydatku (jeœli by³ zrealizowany) – robimy to przez Ledger delete + reinsert?
+            // Stabilniejszy wariant: u¿yj Ledger usuwania + update rekordu? Nie – bo update ma zachowaæ Id.
+            // Tu robimy minimalnie: odwracamy saldo "rêcznie" tylko przez Ledger: usuwamy transakcjê i potem wstawiamy ponownie? odpada.
+            // Dlatego: cofniêcie realizujemy przez LedgerService.DeleteTransactionAndRevertBalance na KOPII rekordu?
+            // To usunê³oby wiersz. Nie.
+            //
+            // W praktyce: cofniêcie starego wp³ywu robimy lokalnie, ale TYLKO jako operacja ksiêgowa – bez duplikowania logiki transferów.
+            // U¿ywamy LedgerService jako prymitywów: dodajemy œrodki "w drug¹ stronê" nie mamy publicznych API.
+            // Dlatego w ETAPIE 1 zostawiamy mechanikê: jeœli old by³ zrealizowany, to najproœciej:
+            // - usuñ rekord i wstaw nowy (utrata Id) – odpada.
+            //
+            // Wniosek: na teraz utrzymujemy dotychczasowy bezpieczny mechanizm update:
+            // - odwrócenie starego wp³ywu robimy tu bez transferów, tylko jako "add back" (bank/cash),
+            // - na³o¿enie nowego wp³ywu robimy przez TransactionsFacadeService.Spend*.
+            //
+            // To NIE dubluje logiki (bo Transfery i DeleteTransaction s¹ w Ledger),
+            // a update expense to specyficzna operacja.
+
             if (old != null && !old.IsPlanned)
             {
                 int? oldAccId = null;
 
-                // a) jeœli mamy AccountId w tabeli, spróbuj go odczytaæ
                 if (hasAccountId)
                 {
                     using var cmdOldAcc = c.CreateCommand();
@@ -1657,7 +1718,6 @@ SELECT last_insert_rowid();";
                         oldAccId = Convert.ToInt32(raw);
                 }
 
-                // b) jeœli AccountId jest NULL, a istnieje legacy Account (tekst) – spróbuj zmapowaæ po nazwie
                 if (!oldAccId.HasValue && hasAccountText)
                 {
                     using var cmdOldTxt = c.CreateCommand();
@@ -1670,7 +1730,6 @@ SELECT last_insert_rowid();";
                         oldAccId = resolved.Value;
                 }
 
-                // c) cofniêcie: jeœli by³o konto bankowe -> + do banku, inaczej -> + do gotówki
                 if (oldAccId.HasValue)
                 {
                     using var addBack = c.CreateCommand();
@@ -1697,774 +1756,121 @@ SET Amount = CashOnHand.Amount + excluded.Amount,
                 }
             }
 
-            // 4) Wylicz nowe AccountId z tekstu (jeœli DB ma AccountId)
             int? newAccountId = null;
             if (hasAccountId)
                 newAccountId = TryResolveAccountIdFromExpenseAccountText(c, e.UserId, e.Account);
 
-            // 5) Zapisz now¹ wersjê wydatku (UPDATE)
             var setParts = new List<string>
- {
- "UserId=@u",
- "Amount=@a",
- "Date=@d",
- "Description=@desc",
- "CategoryId=@c",
- "Source=@s",
- "IsPlanned=@planned"
- };
+            {
+                "UserId=@u",
+                "Amount=@a",
+                "Date=@d",
+                "Description=@desc",
+                "CategoryId=@c",
+                "IsPlanned=@planned"
+            };
 
- if (hasAccountId) setParts.Add("AccountId=@accId");
- if (hasAccountText) setParts.Add("Account=@accText");
- if (hasBudgetId) setParts.Add("BudgetId=@budgetId");
+            if (hasAccountId) setParts.Add("AccountId=@accId");
+            if (hasAccountText) setParts.Add("Account=@accText");
+            if (hasBudgetId) setParts.Add("BudgetId=@budgetId");
 
- using (var cmd = c.CreateCommand())
- {
- cmd.CommandText = $@"
+            using (var cmd = c.CreateCommand())
+            {
+                cmd.CommandText = $@"
 UPDATE Expenses SET
  {string.Join(",\n ", setParts)}
 WHERE Id=@id;";
 
- cmd.Parameters.AddWithValue("@id", e.Id);
- cmd.Parameters.AddWithValue("@u", e.UserId);
- cmd.Parameters.AddWithValue("@a", e.Amount);
- cmd.Parameters.AddWithValue("@d", ToIsoDate(e.Date));
- cmd.Parameters.AddWithValue("@desc", (object?)e.Description ?? DBNull.Value);
+                cmd.Parameters.AddWithValue("@id", e.Id);
+                cmd.Parameters.AddWithValue("@u", e.UserId);
+                cmd.Parameters.AddWithValue("@a", e.Amount);
+                cmd.Parameters.AddWithValue("@d", ToIsoDate(e.Date));
+                cmd.Parameters.AddWithValue("@desc", (object?)e.Description ?? DBNull.Value);
 
- if (e.CategoryId is int cid && cid > 0)
-     cmd.Parameters.AddWithValue("@c", cid);
- else
-     cmd.Parameters.AddWithValue("@c", DBNull.Value);
+                if (e.CategoryId is int cid && cid > 0) cmd.Parameters.AddWithValue("@c", cid);
+                else cmd.Parameters.AddWithValue("@c", DBNull.Value);
 
- cmd.Parameters.AddWithValue("@planned", e.IsPlanned ? 1 : 0);
+                cmd.Parameters.AddWithValue("@planned", e.IsPlanned ? 1 : 0);
 
- if (hasAccountId)
-     cmd.Parameters.AddWithValue("@accId", (object?)newAccountId ?? DBNull.Value);
+                if (hasAccountId) cmd.Parameters.AddWithValue("@accId", (object?)newAccountId ?? DBNull.Value);
+                if (hasAccountText) cmd.Parameters.AddWithValue("@accText", (object?)e.Account ?? DBNull.Value);
+                if (hasBudgetId) cmd.Parameters.AddWithValue("@budgetId", (object?)e.BudgetId ?? DBNull.Value);
 
- if (hasAccountText)
-     cmd.Parameters.AddWithValue("@accText", (object?)e.Account ?? DBNull.Value);
- 
- if (hasBudgetId)
-     cmd.Parameters.AddWithValue("@budgetId", (object?)e.BudgetId ?? DBNull.Value);
+                cmd.ExecuteNonQuery();
+            }
 
- cmd.ExecuteNonQuery();
- }
-
-            // 6) Na³ó¿ nowy wp³yw na saldo (tylko jeœli wydatek jest zrealizowany)
             if (!e.IsPlanned)
             {
                 if (hasAccountId && newAccountId.HasValue)
-                    SpendFromBankAccount(e.UserId, newAccountId.Value, Convert.ToDecimal(e.Amount));
+                    TransactionsFacadeService.SpendFromBankAccount(e.UserId, newAccountId.Value, Convert.ToDecimal(e.Amount));
                 else
-                    SpendFromFreeCash(e.UserId, Convert.ToDecimal(e.Amount));
+                    TransactionsFacadeService.SpendFromFreeCash(e.UserId, Convert.ToDecimal(e.Amount));
             }
 
             RaiseDataChanged();
         }
 
-
-
-        /// <summary>
-        /// Historyczny alias – teraz po prostu wo³a InsertExpense i ignoruje zwracane Id.
-        /// </summary>
-        public static void AddExpense(Expense e)
-        {
-            _ = InsertExpense(e);
-        }
+        public static void AddExpense(Expense e) => _ = InsertExpense(e);
 
         public static void DeleteExpense(int id)
         {
             if (id <= 0) return;
-            DeleteTransactionAndRevertBalance(id);
-        }
-
-
-        // ===== FK helper =====
-
-        /// <summary>
-        /// Jeœli BankAccounts.ConnectionId wskazuje na nieistniej¹cy rekord – ustawia NULL.
-        /// </summary>
-        private static void EnsureValidConnectionId(SqliteConnection c, int accountId)
-        {
-            using var get = c.CreateCommand();
-            get.CommandText = "SELECT ConnectionId FROM BankAccounts WHERE Id=@id LIMIT 1;";
-            get.Parameters.AddWithValue("@id", accountId);
-            var raw = get.ExecuteScalar();
-
-            if (raw is null || raw == DBNull.Value) return;
-
-            var cid = Convert.ToInt32(raw);
-
-            using var chk = c.CreateCommand();
-            chk.CommandText = "SELECT 1 FROM BankConnections WHERE Id=@cid LIMIT 1;";
-            chk.Parameters.AddWithValue("@cid", cid);
-            var exists = chk.ExecuteScalar() != null;
-            if (exists) return;
-
-            using var fix = c.CreateCommand();
-            fix.CommandText = "UPDATE BankAccounts SET ConnectionId=NULL WHERE Id=@id;";
-            fix.Parameters.AddWithValue("@id", accountId);
-            fix.ExecuteNonQuery();
+            TransactionsFacadeService.DeleteTransaction(id);
         }
 
         // =========================================================
-        // ======================== KOPERTY ========================
+        // ========================= TRANSFERS ======================
         // =========================================================
 
-        public sealed class EnvelopeGoalDto
-        {
-            public int EnvelopeId { get; set; }
-            public string Name { get; set; } = "";
-            public decimal Target { get; set; }
-            public decimal Allocated { get; set; }
-            public DateTime? Deadline { get; set; }
-            public string? GoalText { get; set; }
-        }
-
-        public static DataTable GetEnvelopesTable(int userId)
-        {
-            using var c = OpenAndEnsureSchema();
-            using var cmd = c.CreateCommand();
-            cmd.CommandText = @"
-SELECT 
-    Id,
-    UserId,
-    Name,
-    Target,
-    Allocated,
-    Note,
-    CreatedAt
-FROM Envelopes
-WHERE UserId=@u
-ORDER BY Name COLLATE NOCASE;";
-            cmd.Parameters.AddWithValue("@u", userId);
-
-            var dt = new DataTable();
-            using var r = cmd.ExecuteReader();
-            dt.Load(r);
-            return dt;
-        }
-
-        /// <summary>
-        /// Zwraca listê celów na podstawie kopert:
-        /// bierzemy tylko te, które maj¹ dodatni¹ docelow¹ kwotê (Target > 0).
-        /// Jeœli w tabeli s¹ kolumny Deadline / GoalText – korzystamy z nich.
-        /// </summary>
-        public static List<EnvelopeGoalDto> GetEnvelopeGoals(int userId)
-        {
-            var list = new List<EnvelopeGoalDto>();
-
-            using var c = OpenAndEnsureSchema();
-            using var cmd = c.CreateCommand();
-
-            bool hasDeadline = ColumnExists(c, "Envelopes", "Deadline");
-            bool hasGoalText = ColumnExists(c, "Envelopes", "GoalText");
-
-            // ===== budowa SQL =====
-            var sql = @"
-SELECT 
-    Id,
-    Name,
-    Target,
-    COALESCE(Allocated,0) AS Allocated";
-
-            // kolumna z deadlinem (jeœli nie ma – zwracamy NULL)
-            sql += hasDeadline ? ", Deadline" : ", NULL AS Deadline";
-
-            // tekst celu: osobna kolumna GoalText lub fallback na Note
-            sql += hasGoalText ? ", GoalText" : ", Note AS GoalText";
-
-            sql += @"
-FROM Envelopes
-WHERE UserId = @u
-  AND Target IS NOT NULL
-  AND Target > 0";
-
-            // jeœli mamy kolumnê Deadline, traktujemy j¹ jako warunek:
-            // cel jest tylko wtedy, gdy Deadline nie jest NULL
-            if (hasDeadline)
-            {
-                sql += " AND Deadline IS NOT NULL";
-            }
-
-            sql += @"
-ORDER BY Name COLLATE NOCASE;";
-
-            cmd.CommandText = sql;
-            cmd.Parameters.AddWithValue("@u", userId);
-
-            using var r = cmd.ExecuteReader();
-            while (r.Read())
-            {
-                var dto = new EnvelopeGoalDto
-                {
-                    EnvelopeId = r.GetInt32(0),
-                    Name = GetStringSafe(r, 1),
-                    Target = r.IsDBNull(2) ? 0m : Convert.ToDecimal(r.GetValue(2)),
-                    Allocated = r.IsDBNull(3) ? 0m : Convert.ToDecimal(r.GetValue(3)),
-                    GoalText = GetNullableString(r, 5)
-                };
-
-                // 1) próba odczytu Deadline z kolumny (jeœli istnieje)
-                if (hasDeadline)
-                {
-                    var dt = GetDate(r, 4);
-                    dto.Deadline = dt == DateTime.MinValue ? (DateTime?)null : dt;
-                }
-
-                // 2) jeœli Deadline jest puste, spróbajmy wyci¹gn¹æ je z tekstu celu / notatki
-                if (dto.Deadline == null && !string.IsNullOrWhiteSpace(dto.GoalText))
-                {
-                    dto.Deadline = TryParseDeadlineFromGoalText(dto.GoalText);
-                }
-
-                list.Add(dto);
-            }
-
-            return list;
-        }
-
-
-        // === POMOCNICZE: parsowanie terminu z tekstu notatki / celu ===
-        private static DateTime? TryParseDeadlineFromGoalText(string? text)
-        {
-            if (string.IsNullOrWhiteSpace(text))
-                return null;
-
-            var lines = text.Split(new[] { '\n' }, StringSplitOptions.RemoveEmptyEntries);
-
-            foreach (var rawLine in lines)
-            {
-                var line = rawLine.Trim();
-
-                if (line.StartsWith("Termin:", StringComparison.OrdinalIgnoreCase))
-                {
-                    var dateText = line.Substring(7).Trim();
-
-                    // najpierw format "yyyy-MM-dd"
-                    if (DateTime.TryParseExact(
-                            dateText,
-                            "yyyy-MM-dd",
-                            CultureInfo.InvariantCulture,
-                            DateTimeStyles.None,
-                            out var d1))
-                    {
-                        return d1.Date;
-                    }
-
-                    // potem lokalny format (np. 12.10.2026)
-                    if (DateTime.TryParse(
-                            dateText,
-                            CultureInfo.CurrentCulture,
-                            DateTimeStyles.None,
-                            out var d2))
-                    {
-                        return d2.Date;
-                    }
-                }
-            }
-
-            return null;
-        }
-
-        /// <summary>
-        /// Czyœci dane celu w kopercie, ale NIE usuwa samej koperty
-        /// i NIE zmienia Target / Allocated (¿eby nie waliæ w NOT NULL).
-        /// Dziêki temu koperta zostaje, a znikaj¹ tylko dane celu.
-        /// </summary>
-        public static void ClearEnvelopeGoal(int userId, int envelopeId)
-        {
-            using var c = OpenAndEnsureSchema();
-
-            bool hasDeadline = ColumnExists(c, "Envelopes", "Deadline");
-            bool hasGoalText = ColumnExists(c, "Envelopes", "GoalText");
-
-            var sb = new StringBuilder("UPDATE Envelopes SET ");
-
-            bool first = true;
-
-            if (hasDeadline)
-            {
-                sb.Append("Deadline = NULL");
-                first = false;
-            }
-
-            // jeœli mamy osobn¹ kolumnê GoalText – czyœcimy j¹,
-            // w przeciwnym razie czyœcimy Note (tam trzymamy opis celu)
-            if (hasGoalText)
-            {
-                if (!first) sb.Append(", ");
-                sb.Append("GoalText = NULL");
-            }
-            else
-            {
-                if (!first) sb.Append(", ");
-                sb.Append("Note = NULL");
-            }
-
-            sb.Append(" WHERE Id=@id AND UserId=@u;");
-
-            using var cmd = c.CreateCommand();
-            cmd.CommandText = sb.ToString();
-            cmd.Parameters.AddWithValue("@id", envelopeId);
-            cmd.Parameters.AddWithValue("@u", userId);
-            cmd.ExecuteNonQuery();
-        }
-
-
-        /// <summary>
-        /// Ustawia / aktualizuje dane celu dla danej koperty:
-        /// Target, Allocated, Deadline oraz opis (GoalText lub Note).
-        /// </summary>
-        public static void UpdateEnvelopeGoal(
-            int userId,
-            int envelopeId,
-            decimal target,
-            decimal allocated,
-            DateTime deadline,
-            string? goalText)
-        {
-            using var c = OpenAndEnsureSchema();
-
-            bool hasDeadline = ColumnExists(c, "Envelopes", "Deadline");
-            bool hasGoalText = ColumnExists(c, "Envelopes", "GoalText");
-
-            var sb = new StringBuilder(@"
-UPDATE Envelopes
-   SET Target   = @t,
-       Allocated = @a");
-
-            if (hasDeadline)
-                sb.Append(", Deadline = @d");
-
-            // opis celu: jeœli jest kolumna GoalText – u¿ywamy jej,
-            // w przeciwnym razie zapisujemy do Note
-            if (hasGoalText)
-                sb.Append(", GoalText = @g");
-            else
-                sb.Append(", Note = @g");
-
-            sb.Append(" WHERE Id=@id AND UserId=@u;");
-
-            using var cmd = c.CreateCommand();
-            cmd.CommandText = sb.ToString();
-            cmd.Parameters.AddWithValue("@t", target);
-            cmd.Parameters.AddWithValue("@a", allocated);
-
-            if (hasDeadline)
-                cmd.Parameters.AddWithValue("@d", deadline.ToString("yyyy-MM-dd"));
-
-            cmd.Parameters.AddWithValue("@g", (object?)goalText ?? DBNull.Value);
-            cmd.Parameters.AddWithValue("@id", envelopeId);
-            cmd.Parameters.AddWithValue("@u", userId);
-
-            cmd.ExecuteNonQuery();
-        }
-
-
-        public static int InsertEnvelope(int userId, string name, decimal target, decimal allocated, string? note)
-        {
-            using var c = OpenAndEnsureSchema();
-            using var cmd = c.CreateCommand();
-            cmd.CommandText = @"
-INSERT INTO Envelopes(UserId, Name, Target, Allocated, Note, CreatedAt)
-VALUES (@u, @n, @t, @a, @note, CURRENT_TIMESTAMP);
-SELECT last_insert_rowid();";
-            cmd.Parameters.AddWithValue("@u", userId);
-            cmd.Parameters.AddWithValue("@n", name?.Trim() ?? "");
-            cmd.Parameters.AddWithValue("@t", target);
-            cmd.Parameters.AddWithValue("@a", allocated);
-            cmd.Parameters.AddWithValue("@note", (object?)note ?? DBNull.Value);
-
-            var idObj = cmd.ExecuteScalar();
-            var id = Convert.ToInt32(idObj);
-
-            RaiseDataChanged();
-
-            return id;
-        }
-
-        public static void UpdateEnvelope(int id, int userId, string name, decimal target, decimal allocated, string? note)
-        {
-            using var c = OpenAndEnsureSchema();
-            using var cmd = c.CreateCommand();
-            cmd.CommandText = @"
-UPDATE Envelopes
-SET Name=@n, Target=@t, Allocated=@a, Note=@note
-WHERE Id=@id AND UserId=@u;";
-            cmd.Parameters.AddWithValue("@id", id);
-            cmd.Parameters.AddWithValue("@u", userId);
-            cmd.Parameters.AddWithValue("@n", name?.Trim() ?? "");
-            cmd.Parameters.AddWithValue("@t", target);
-            cmd.Parameters.AddWithValue("@a", allocated);
-            cmd.Parameters.AddWithValue("@note", (object?)note ?? DBNull.Value);
-            cmd.ExecuteNonQuery();
-
-            RaiseDataChanged();
-        }
-
-        public static void DeleteEnvelope(int id)
-        {
-            using var c = OpenAndEnsureSchema();
-            using var cmd = c.CreateCommand();
-            cmd.CommandText = "DELETE FROM Envelopes WHERE Id=@id;";
-            cmd.Parameters.AddWithValue("@id", id);
-            cmd.ExecuteNonQuery();
-
-            RaiseDataChanged();
-        }
-
-        // GOTÓWKA
-        public static decimal GetCashOnHand(int userId)
-        {
-            using var c = OpenAndEnsureSchema();
-            using var cmd = c.CreateCommand();
-            cmd.CommandText = "SELECT Amount FROM CashOnHand WHERE UserId=@u LIMIT 1;";
-            cmd.Parameters.AddWithValue("@u", userId);
-            var obj = cmd.ExecuteScalar();
-            return (obj == null || obj == DBNull.Value) ? 0m : Convert.ToDecimal(obj);
-        }
-
-        public static void SetCashOnHand(int userId, decimal amount)
-        {
-            using var c = OpenAndEnsureSchema();
-            using var up = c.CreateCommand();
-            up.CommandText = @"
-INSERT INTO CashOnHand(UserId, Amount, UpdatedAt)
-VALUES (@u, @a, CURRENT_TIMESTAMP)
-ON CONFLICT(UserId) DO UPDATE 
-SET Amount=excluded.Amount, UpdatedAt=CURRENT_TIMESTAMP;";
-            up.Parameters.AddWithValue("@u", userId);
-            up.Parameters.AddWithValue("@a", amount);
-            up.ExecuteNonQuery();
-
-            RaiseDataChanged();
-        }
-
-        // ===== GOTÓWKA OD£O¯ONA (SavedCash) =====
-
-        public static decimal GetSavedCash(int userId)
-        {
-            using var c = OpenAndEnsureSchema();
-            using var cmd = c.CreateCommand();
-            cmd.CommandText = "SELECT Amount FROM SavedCash WHERE UserId=@u LIMIT 1;";
-            cmd.Parameters.AddWithValue("@u", userId);
-            var obj = cmd.ExecuteScalar();
-            return (obj == null || obj == DBNull.Value) ? 0m : Convert.ToDecimal(obj);
-        }
-
-        public static void SetSavedCash(int userId, decimal amount)
-        {
-            using var c = OpenAndEnsureSchema();
-            using var cmd = c.CreateCommand();
-            cmd.CommandText = @"
-INSERT INTO SavedCash(UserId, Amount, UpdatedAt)
-VALUES (@u, @a, CURRENT_TIMESTAMP)
-ON CONFLICT(UserId) DO UPDATE 
-SET Amount = excluded.Amount,
-    UpdatedAt = CURRENT_TIMESTAMP;";
-            cmd.Parameters.AddWithValue("@u", userId);
-            cmd.Parameters.AddWithValue("@a", amount);
-            cmd.ExecuteNonQuery();
-
-            RaiseDataChanged();
-        }
-
-        public static void AddToSavedCash(int userId, decimal amount)
-        {
-            if (amount <= 0) return;
-            var current = GetSavedCash(userId);
-            SetSavedCash(userId, current + amount);
-
-            // SetSavedCash already raises DataChanged
-        }
-
-        public static void SubtractFromSavedCash(int userId, decimal amount)
-        {
-            if (amount <= 0) return;
-
-            var current = GetSavedCash(userId);
-            if (current < amount)
-                throw new InvalidOperationException("Za ma³o œrodków w gotówce od³o¿onej.");
-
-            SetSavedCash(userId, current - amount);
-
-            // SetSavedCash raises DataChanged
-        }
-
-        public static void AddToEnvelopeAllocated(int userId, int envelopeId, decimal amount)
-        {
-            if (amount <= 0) return;
-
-            using var c = OpenAndEnsureSchema();
-            using var cmd = c.CreateCommand();
-            cmd.CommandText = @"
-UPDATE Envelopes
-   SET Allocated = COALESCE(Allocated,0) + @a
- WHERE Id=@id AND UserId=@u;";
-            cmd.Parameters.AddWithValue("@a", amount);
-            cmd.Parameters.AddWithValue("@id", envelopeId);
-            cmd.Parameters.AddWithValue("@u", userId);
-
-            var rows = cmd.ExecuteNonQuery();
-            if (rows == 0)
-                throw new InvalidOperationException("Nie znaleziono wybranej koperty.");
-
-            RaiseDataChanged();
-        }
-
-        public static void SubtractFromEnvelopeAllocated(int userId, int envelopeId, decimal amount)
-        {
-            if (amount <= 0) return;
-
-            using var c = OpenAndEnsureSchema();
-            decimal current;
-
-            using (var q = c.CreateCommand())
-            {
-                q.CommandText = @"
-SELECT COALESCE(Allocated,0) 
-FROM Envelopes 
-WHERE Id=@id AND UserId=@u 
-LIMIT 1;";
-                q.Parameters.AddWithValue("@id", envelopeId);
-                q.Parameters.AddWithValue("@u", userId);
-                current = Convert.ToDecimal(q.ExecuteScalar() ?? 0m);
-            }
-
-            if (current < amount)
-                throw new InvalidOperationException("W kopercie jest za ma³o œrodków.");
-
-            using (var cmd = c.CreateCommand())
-            {
-                cmd.CommandText = @"
-UPDATE Envelopes
-   SET Allocated = COALESCE(Allocated,0) - @a
- WHERE Id=@id AND UserId=@u;";
-                cmd.Parameters.AddWithValue("@a", amount);
-                cmd.Parameters.AddWithValue("@id", envelopeId);
-                cmd.Parameters.AddWithValue("@u", userId);
-                cmd.ExecuteNonQuery();
-            }
-
-            RaiseDataChanged();
-        }
-
-        // =========================================================
-        // ======================= PODSUMOWANIA ====================
-        // =========================================================
-
-        public static decimal GetTotalAllocatedInEnvelopesForUser(int userId)
-        {
-            using var c = OpenAndEnsureSchema();
-            using var cmd = c.CreateCommand();
-            cmd.CommandText = "SELECT COALESCE(SUM(Allocated),0) FROM Envelopes WHERE UserId=@u;";
-            cmd.Parameters.AddWithValue("@u", userId);
-            return Convert.ToDecimal(cmd.ExecuteScalar() ?? 0m);
-        }
-
-        public sealed class MoneySnapshot
-        {
-            public decimal Banks { get; set; }      // konta bankowe
-            public decimal Cash { get; set; }       // wolna gotówka
-            public decimal Saved { get; set; }      // od³o¿ona gotówka (ca³a pula)
-            public decimal Envelopes { get; set; }  // przydzielona do kopert
-
-            public decimal SavedUnallocated => Saved - Envelopes;
-            public decimal Total => Banks + Cash + Saved;
-        }
-
-        public static MoneySnapshot GetMoneySnapshot(int userId)
-        {
-            var banks = GetTotalBanksBalance(userId);
-
-            var allCash = GetCashOnHand(userId);
-            var savedCash = GetSavedCash(userId);
-
-            var freeCash = Math.Max(0m, allCash - savedCash);
-
-            var allocated = GetTotalAllocatedInEnvelopesForUser(userId);
-
-            return new MoneySnapshot
-            {
-                Banks = banks,
-                Cash = freeCash,
-                Saved = savedCash,
-                Envelopes = allocated
-            };
-        }
-
-        private static decimal GetTotalBanksBalance(int userId)
-        {
-            using var c = OpenAndEnsureSchema();
-            using var cmd = c.CreateCommand();
-            cmd.CommandText = "SELECT COALESCE(SUM(Balance),0) FROM BankAccounts WHERE UserId=@u;";
-            cmd.Parameters.AddWithValue("@u", userId);
-            return Convert.ToDecimal(cmd.ExecuteScalar() ?? 0m);
-        }
-
-        // == PRZELEWY ==
-
-        public static void TransferBankToCash(int userId, int accountId, decimal amount)
-        {
-            if (amount <= 0) throw new ArgumentException("Kwota musi byæ dodatnia.", nameof(amount));
-
-            using var c = OpenAndEnsureSchema();
-            using var tx = c.BeginTransaction();
-
-            decimal currentBal;
-            using (var chk = c.CreateCommand())
-            {
-                chk.Transaction = tx;
-                chk.CommandText = @"
-SELECT Balance 
-FROM BankAccounts 
-WHERE Id=@id AND UserId=@u 
-LIMIT 1;";
-                chk.Parameters.AddWithValue("@id", accountId);
-                chk.Parameters.AddWithValue("@u", userId);
-                var obj = chk.ExecuteScalar();
-                if (obj == null || obj == DBNull.Value)
-                    throw new InvalidOperationException("Nie znaleziono rachunku lub nie nale¿y do u¿ytkownika.");
-                currentBal = Convert.ToDecimal(obj);
-            }
-            if (currentBal < amount)
-                throw new InvalidOperationException("Na rachunku brakuje œrodków na tak¹ wyp³atê.");
-
-            using (var updFrom = c.CreateCommand())
-            {
-                updFrom.Transaction = tx;
-                updFrom.CommandText = @"UPDATE BankAccounts SET Balance = Balance - @a WHERE Id=@id AND UserId=@u;";
-                updFrom.Parameters.AddWithValue("@a", amount);
-                updFrom.Parameters.AddWithValue("@id", accountId);
-                updFrom.Parameters.AddWithValue("@u", userId);
-                updFrom.ExecuteNonQuery();
-            }
-
-            using (var updCash = c.CreateCommand())
-            {
-                updCash.Transaction = tx;
-                updCash.CommandText = @"
-INSERT INTO CashOnHand(UserId, Amount, UpdatedAt)
-VALUES (@u, @a, CURRENT_TIMESTAMP)
-ON CONFLICT(UserId) DO UPDATE
-SET Amount = CashOnHand.Amount + excluded.Amount, UpdatedAt=CURRENT_TIMESTAMP;";
-                updCash.Parameters.AddWithValue("@u", userId);
-                updCash.Parameters.AddWithValue("@a", amount);
-                updCash.ExecuteNonQuery();
-            }
-
-            tx.Commit();
-        }
-
-        public static void TransferCashToBank(int userId, int accountId, decimal amount)
-        {
-            if (amount <= 0) throw new ArgumentException("Kwota musi byæ dodatnia.", nameof(amount));
-
-            using var c = OpenAndEnsureSchema();
-            using var tx = c.BeginTransaction();
-
-            decimal currentCash;
-            using (var q = c.CreateCommand())
-            {
-                q.Transaction = tx;
-                q.CommandText = @"
-SELECT COALESCE(Amount,0) 
-FROM CashOnHand 
-WHERE UserId=@u 
-LIMIT 1;";
-                q.Parameters.AddWithValue("@u", userId);
-                currentCash = Convert.ToDecimal(q.ExecuteScalar() ?? 0m);
-            }
-            if (currentCash < amount)
-                throw new InvalidOperationException("Za ma³o gotówki na tak¹ wp³atê.");
-
-            using (var updCash = c.CreateCommand())
-            {
-                updCash.Transaction = tx;
-                updCash.CommandText = @"UPDATE CashOnHand SET Amount = Amount - @a, UpdatedAt = CURRENT_TIMESTAMP WHERE UserId=@u;";
-                updCash.Parameters.AddWithValue("@u", userId);
-                updCash.Parameters.AddWithValue("@a", amount);
-                updCash.ExecuteNonQuery();
-            }
-
-            using (var updAcc = c.CreateCommand())
-            {
-                updAcc.Transaction = tx;
-                updAcc.CommandText = @"
-UPDATE BankAccounts
-   SET Balance = Balance + @a
- WHERE Id=@id AND UserId=@u;";
-                updAcc.Parameters.AddWithValue("@a", amount);
-                updAcc.Parameters.AddWithValue("@id", accountId);
-                updAcc.Parameters.AddWithValue("@u", userId);
-                var rows = updAcc.ExecuteNonQuery();
-                if (rows == 0)
-                    throw new InvalidOperationException("Nie znaleziono rachunku lub nie nale¿y do u¿ytkownika.");
-            }
-
-            tx.Commit();
-        }
-
-        /// <summary>
-        /// Przeci¹¿enia pod now¹ stronê „Dodaj” – wersja z kategori¹, dat¹ i opisem.
-        /// Na razie kategoria/opis nie s¹ zapisywane w tabeli transferów – to tylko
-        /// rozszerzona sygnatura zgodna z UI.
-        /// </summary>
-        public static void TransferBankToCash(
-            int userId,
-            int accountId,
-            decimal amount,
-            int? categoryId,
-            DateTime date,
-            string? description)
-        {
-            TransferBankToCash(userId, accountId, amount);
-        }
-
-        public static void TransferCashToBank(
-            int userId,
-            int accountId,
-            decimal amount,
-            int? categoryId,
-            DateTime date,
-            string? description)
-        {
-            TransferCashToBank(userId, accountId, amount);
-        }
-
-        // =========================================================
-        // ==================== NOWE: TRANSFERY ====================
-        // =========================================================
         public static DataTable GetTransfers(int userId, DateTime? from = null, DateTime? to = null)
         {
             using var con = OpenAndEnsureSchema();
             using var cmd = con.CreateCommand();
-            var sb = new StringBuilder(@"SELECT Id, UserId, Date, Amount, Description, FromKind, FromRefId, ToKind, ToRefId, IsPlanned FROM Transfers WHERE UserId=@u");
+
+            var sb = new StringBuilder(@"
+SELECT Id, UserId, Date, Amount, Description, FromKind, FromRefId, ToKind, ToRefId, IsPlanned
+FROM Transfers
+WHERE UserId=@u");
+
             cmd.Parameters.AddWithValue("@u", userId);
+
             if (from.HasValue)
             {
                 sb.Append(" AND date(Date) >= date(@from)");
                 cmd.Parameters.AddWithValue("@from", from.Value.ToString("yyyy-MM-dd"));
             }
+
             if (to.HasValue)
             {
                 sb.Append(" AND date(Date) <= date(@to)");
                 cmd.Parameters.AddWithValue("@to", to.Value.ToString("yyyy-MM-dd"));
             }
+
             sb.Append(" ORDER BY date(Date) DESC, Id DESC;");
             cmd.CommandText = sb.ToString();
+
             var dt = new DataTable();
             using var r = cmd.ExecuteReader();
             dt.Load(r);
             return dt;
         }
 
-        private static void InsertTransfer(int userId, DateTime date, decimal amount, string fromKind, int? fromRefId, String toKind, int? toRefId, string? description = null)
+        public static void InsertTransfer(
+            int userId,
+            DateTime date,
+            decimal amount,
+            string fromKind,
+            int? fromRefId,
+            string toKind,
+            int? toRefId,
+            string? description = null,
+            bool isPlanned = false)
         {
             using var con = OpenAndEnsureSchema();
             using var cmd = con.CreateCommand();
-            cmd.CommandText = @"INSERT INTO Transfers(UserId, Date, Amount, Description, FromKind, FromRefId, ToKind, ToRefId, IsPlanned) VALUES (@u,@d,@a,@desc,@fk,@fr,@tk,@tr,0);";
+            cmd.CommandText = @"
+INSERT INTO Transfers(UserId, Date, Amount, Description, FromKind, FromRefId, ToKind, ToRefId, IsPlanned)
+VALUES (@u,@d,@a,@desc,@fk,@fr,@tk,@tr,@p);";
             cmd.Parameters.AddWithValue("@u", userId);
             cmd.Parameters.AddWithValue("@d", date.ToString("yyyy-MM-dd"));
             cmd.Parameters.AddWithValue("@a", amount);
@@ -2473,73 +1879,102 @@ UPDATE BankAccounts
             cmd.Parameters.AddWithValue("@fr", (object?)fromRefId ?? DBNull.Value);
             cmd.Parameters.AddWithValue("@tk", toKind);
             cmd.Parameters.AddWithValue("@tr", (object?)toRefId ?? DBNull.Value);
+            cmd.Parameters.AddWithValue("@p", isPlanned ? 1 : 0);
+
             cmd.ExecuteNonQuery();
             RaiseDataChanged();
         }
 
         // =========================================================
-        // ==================== NOWE: PRZYCHODY ====================
+        // ========================= INCOMES ========================
         // =========================================================
+
         public static DataTable GetIncomes(int userId, DateTime? from = null, DateTime? to = null, bool includePlanned = true)
         {
             using var con = OpenAndEnsureSchema();
             using var cmd = con.CreateCommand();
-            var sb = new StringBuilder(@"SELECT i.Id, i.UserId, i.Date, i.Amount, i.Description, i.Source, i.CategoryId, c.Name AS CategoryName, i.IsPlanned FROM Incomes i LEFT JOIN Categories c ON c.Id = i.CategoryId WHERE i.UserId=@u");
+
+            var sb = new StringBuilder(@"
+SELECT i.Id, i.UserId, i.Date, i.Amount, i.Description, i.Source, i.CategoryId, c.Name AS CategoryName, i.IsPlanned
+FROM Incomes i
+LEFT JOIN Categories c ON c.Id = i.CategoryId
+WHERE i.UserId=@u");
+
             cmd.Parameters.AddWithValue("@u", userId);
-            if (from != null)
+
+            if (from.HasValue)
             {
                 sb.Append(" AND date(i.Date) >= date(@from)");
                 cmd.Parameters.AddWithValue("@from", from.Value.ToString("yyyy-MM-dd"));
             }
-            if (to != null)
+
+            if (to.HasValue)
             {
                 sb.Append(" AND date(i.Date) <= date(@to)");
                 cmd.Parameters.AddWithValue("@to", to.Value.ToString("yyyy-MM-dd"));
             }
-            if (!includePlanned) sb.Append(" AND (i.IsPlanned =0 OR i.IsPlanned IS NULL)");
+
+            if (!includePlanned) sb.Append(" AND (i.IsPlanned = 0 OR i.IsPlanned IS NULL)");
+
             sb.Append(" ORDER BY date(i.Date) DESC, i.Id DESC;");
             cmd.CommandText = sb.ToString();
+
             var dt = new DataTable();
             using var r = cmd.ExecuteReader();
             dt.Load(r);
             return dt;
         }
 
-        public static int InsertIncome(int userId, decimal amount, DateTime date, string? description, string? source, int? categoryId, bool isPlanned = false, int? budgetId = null)
+        public static int InsertIncome(
+            int userId,
+            decimal amount,
+            DateTime date,
+            string? description,
+            string? source,
+            int? categoryId,
+            bool isPlanned = false,
+            int? budgetId = null)
         {
             using var con = OpenAndEnsureSchema();
             bool hasBudgetId = ColumnExists(con, "Incomes", "BudgetId");
+
             using var cmd = con.CreateCommand();
 
-            // build INSERT depending on whether DB has BudgetId
-            if (hasBudgetId)
-            {
-                cmd.CommandText = @"INSERT INTO Incomes(UserId, Amount, Date, Description, Source, CategoryId, IsPlanned, BudgetId) VALUES (@u,@a,@d,@desc,@s,@c,@p,@b); SELECT last_insert_rowid();";
-            }
-            else
-            {
-                cmd.CommandText = @"INSERT INTO Incomes(UserId, Amount, Date, Description, Source, CategoryId, IsPlanned) VALUES (@u,@a,@d,@desc,@s,@c,@p); SELECT last_insert_rowid();";
-            }
+            cmd.CommandText = hasBudgetId
+                ? @"INSERT INTO Incomes(UserId, Amount, Date, Description, Source, CategoryId, IsPlanned, BudgetId)
+                    VALUES (@u,@a,@d,@desc,@s,@c,@p,@b);
+                    SELECT last_insert_rowid();"
+                : @"INSERT INTO Incomes(UserId, Amount, Date, Description, Source, CategoryId, IsPlanned)
+                    VALUES (@u,@a,@d,@desc,@s,@c,@p);
+                    SELECT last_insert_rowid();";
 
             cmd.Parameters.AddWithValue("@u", userId);
             cmd.Parameters.AddWithValue("@a", amount);
             cmd.Parameters.AddWithValue("@d", date.ToString("yyyy-MM-dd"));
             cmd.Parameters.AddWithValue("@desc", (object?)description ?? DBNull.Value);
             cmd.Parameters.AddWithValue("@s", (object?)source ?? DBNull.Value);
-            if (categoryId.HasValue && categoryId.Value >0) cmd.Parameters.AddWithValue("@c", categoryId.Value); else cmd.Parameters.AddWithValue("@c", DBNull.Value);
-            cmd.Parameters.AddWithValue("@p", isPlanned ?1 :0);
+            if (categoryId.HasValue && categoryId.Value > 0) cmd.Parameters.AddWithValue("@c", categoryId.Value);
+            else cmd.Parameters.AddWithValue("@c", DBNull.Value);
+            cmd.Parameters.AddWithValue("@p", isPlanned ? 1 : 0);
 
             if (hasBudgetId)
-            {
                 cmd.Parameters.AddWithValue("@b", (object?)budgetId ?? DBNull.Value);
-            }
 
-            var id = Convert.ToInt32(cmd.ExecuteScalar() ??0);
+            var id = Convert.ToInt32(cmd.ExecuteScalar() ?? 0);
             RaiseDataChanged();
             return id;
         }
 
-        public static void UpdateIncome(int id, int userId, decimal? amount = null, string? description = null, bool? isPlanned = null, DateTime? date = null, int? categoryId = null, string? source = null, int? budgetId = null)
+        public static void UpdateIncome(
+            int id,
+            int userId,
+            decimal? amount = null,
+            string? description = null,
+            bool? isPlanned = null,
+            DateTime? date = null,
+            int? categoryId = null,
+            string? source = null,
+            int? budgetId = null)
         {
             using var con = OpenAndEnsureSchema();
             bool hasBudgetId = ColumnExists(con, "Incomes", "BudgetId");
@@ -2558,40 +1993,41 @@ UPDATE BankAccounts
 
             using var cmd = con.CreateCommand();
             cmd.CommandText = $@"UPDATE Incomes SET {string.Join(", ", setParts)} WHERE Id=@id AND UserId=@u;";
+
             cmd.Parameters.AddWithValue("@id", id);
             cmd.Parameters.AddWithValue("@u", userId);
             cmd.Parameters.AddWithValue("@a", (object?)amount ?? DBNull.Value);
             cmd.Parameters.AddWithValue("@desc", (object?)description ?? DBNull.Value);
-            cmd.Parameters.AddWithValue("@p", isPlanned.HasValue ? (isPlanned.Value ?1 :0) : (object)DBNull.Value);
+            cmd.Parameters.AddWithValue("@p", isPlanned.HasValue ? (isPlanned.Value ? 1 : 0) : (object)DBNull.Value);
             cmd.Parameters.AddWithValue("@d", date.HasValue ? date.Value.ToString("yyyy-MM-dd") : (object)DBNull.Value);
-            if (categoryId.HasValue && categoryId.Value >0) cmd.Parameters.AddWithValue("@c", categoryId.Value); else cmd.Parameters.AddWithValue("@c", DBNull.Value);
+
+            if (categoryId.HasValue && categoryId.Value > 0) cmd.Parameters.AddWithValue("@c", categoryId.Value);
+            else cmd.Parameters.AddWithValue("@c", DBNull.Value);
+
             cmd.Parameters.AddWithValue("@s", (object?)source ?? DBNull.Value);
+
             if (hasBudgetId) cmd.Parameters.AddWithValue("@b", (object?)budgetId ?? DBNull.Value);
+
             cmd.ExecuteNonQuery();
             RaiseDataChanged();
         }
 
         public static void DeleteIncome(int id)
         {
-            using var con = OpenAndEnsureSchema();
-            using var cmd = con.CreateCommand();
-            cmd.CommandText = "DELETE FROM Incomes WHERE Id=@id;";
-            cmd.Parameters.AddWithValue("@id", id);
-            cmd.ExecuteNonQuery();
-            RaiseDataChanged();
+            if (id <= 0) return;
+            TransactionsFacadeService.DeleteTransaction(id);
         }
 
-        // ====== MODELE POMOCNICZE DO WYKRESÓW ======
+        // =========================================================
+        // ====================== CHART DTOs ========================
+        // =========================================================
+
         public sealed class CategoryAmountDto
         {
             public string Name { get; set; } = string.Empty;
             public decimal Amount { get; set; }
         }
 
-        /// <summary>
-        /// Zwraca zagregowane wydatki wg kategorii w podanym zakresie dat.
-        /// Stosowane w Dashboard oraz CategoriesPage. B³êdy zwracaj¹ pust¹ listê.
-        /// </summary>
         public static List<CategoryAmountDto> GetSpendingByCategorySafe(int userId, DateTime from, DateTime to)
         {
             var list = new List<CategoryAmountDto>();
@@ -2599,7 +2035,8 @@ UPDATE BankAccounts
             {
                 using var c = OpenAndEnsureSchema();
                 using var cmd = c.CreateCommand();
-                cmd.CommandText = @"SELECT COALESCE(c.Name,'(brak)') AS Name, IFNULL(SUM(e.Amount),0) AS Total
+                cmd.CommandText = @"
+SELECT COALESCE(c.Name,'(brak)') AS Name, IFNULL(SUM(e.Amount),0) AS Total
 FROM Expenses e
 LEFT JOIN Categories c ON c.Id = e.CategoryId
 WHERE e.UserId=@u AND date(e.Date) BETWEEN date(@f) AND date(@t)
@@ -2607,12 +2044,12 @@ GROUP BY c.Name;";
                 cmd.Parameters.AddWithValue("@u", userId);
                 cmd.Parameters.AddWithValue("@f", from.ToString("yyyy-MM-dd"));
                 cmd.Parameters.AddWithValue("@t", to.ToString("yyyy-MM-dd"));
+
                 using var r = cmd.ExecuteReader();
                 while (r.Read())
                 {
                     var name = r.IsDBNull(0) ? "(brak)" : r.GetString(0);
-                    decimal amount = r.IsDBNull(1) ?0m : Convert.ToDecimal(r.GetValue(1));
-                    // zabezpieczenie: dodatnia wartoœæ dla logiki UI
+                    var amount = r.IsDBNull(1) ? 0m : Convert.ToDecimal(r.GetValue(1));
                     list.Add(new CategoryAmountDto { Name = name, Amount = Math.Abs(amount) });
                 }
             }
@@ -2620,9 +2057,6 @@ GROUP BY c.Name;";
             return list;
         }
 
-        /// <summary>
-        /// Zwraca zagregowane przychody wg Ÿród³a (Source) w podanym zakresie dat.
-        /// </summary>
         public static List<CategoryAmountDto> GetIncomeBySourceSafe(int userId, DateTime from, DateTime to)
         {
             var list = new List<CategoryAmountDto>();
@@ -2630,341 +2064,25 @@ GROUP BY c.Name;";
             {
                 using var c = OpenAndEnsureSchema();
                 using var cmd = c.CreateCommand();
-                cmd.CommandText = @"SELECT COALESCE(i.Source,'Przychody') AS Name, IFNULL(SUM(i.Amount),0) AS Total
+                cmd.CommandText = @"
+SELECT COALESCE(i.Source,'Przychody') AS Name, IFNULL(SUM(i.Amount),0) AS Total
 FROM Incomes i
 WHERE i.UserId=@u AND date(i.Date) BETWEEN date(@f) AND date(@t)
 GROUP BY i.Source;";
                 cmd.Parameters.AddWithValue("@u", userId);
                 cmd.Parameters.AddWithValue("@f", from.ToString("yyyy-MM-dd"));
                 cmd.Parameters.AddWithValue("@t", to.ToString("yyyy-MM-dd"));
+
                 using var r = cmd.ExecuteReader();
                 while (r.Read())
                 {
                     var name = r.IsDBNull(0) ? "Przychody" : r.GetString(0);
-                    decimal amount = r.IsDBNull(1) ?0m : Convert.ToDecimal(r.GetValue(1));
+                    var amount = r.IsDBNull(1) ? 0m : Convert.ToDecimal(r.GetValue(1));
                     list.Add(new CategoryAmountDto { Name = name, Amount = Math.Abs(amount) });
                 }
             }
             catch { }
             return list;
-        }
-
-        public static List<(int Id, string Name, string? Color, string? Icon)> GetCategoriesExtended(int userId)
-        {
-            var list = new List<(int, string, string?, string?)>();
-            using var c = OpenAndEnsureSchema();
-            using var cmd = c.CreateCommand();
-            if (ColumnExists(c, "Categories", "IsArchived"))
-                cmd.CommandText = "SELECT Id, Name, Color, Icon FROM Categories WHERE UserId=@u AND IsArchived=0 ORDER BY Name;";
-            else
-                cmd.CommandText = "SELECT Id, Name, Color, Icon FROM Categories WHERE UserId=@u ORDER BY Name;";
-            cmd.Parameters.AddWithValue("@u", userId);
-            using var r = cmd.ExecuteReader();
-            while (r.Read())
-            {
-                var id = r.IsDBNull(0) ? 0 : r.GetInt32(0);
-                var name = r.IsDBNull(1) ? string.Empty : r.GetString(1);
-                var color = r.IsDBNull(2) ? null : r.GetString(2);
-                var icon = r.IsDBNull(3) ? null : r.GetString(3);
-                list.Add((id, name, color, icon));
-            }
-            return list;
-        }
-
-        public static void UpdateCategoryFull(int id, int userId, string? name = null, string? color = null, string? icon = null)
-        {
-            using var c = OpenAndEnsureSchema();
-            using var cmd = c.CreateCommand();
-            var setParts = new List<string>();
-            if (name != null) setParts.Add("Name=@n");
-            if (color != null) setParts.Add("Color=@c");
-            if (icon != null) setParts.Add("Icon=@i");
-            if (setParts.Count ==0) return;
-            cmd.CommandText = $"UPDATE Categories SET {string.Join(", ", setParts)} WHERE Id=@id AND UserId=@u;";
-            cmd.Parameters.AddWithValue("@id", id);
-            cmd.Parameters.AddWithValue("@u", userId);
-            if (name != null) cmd.Parameters.AddWithValue("@n", name.Trim());
-            if (color != null) cmd.Parameters.AddWithValue("@c", (object?)color ?? DBNull.Value);
-            if (icon != null) cmd.Parameters.AddWithValue("@i", (object?)icon ?? DBNull.Value);
-            cmd.ExecuteNonQuery();
-            RaiseDataChanged();
-        }
-
-        public static void DeleteTransactionAndRevertBalance(int transactionId)
-        {
-            using var c = OpenAndEnsureSchema();
-
-            // 1) Spróbuj jako transfer
-            if (TableExists(c, "Transfers"))
-            {
-                using var getTr = c.CreateCommand();
-                getTr.CommandText = @"SELECT Id, UserId, Amount, FromKind, FromRefId, ToKind, ToRefId FROM Transfers WHERE Id=@id LIMIT 1;";
-                getTr.Parameters.AddWithValue("@id", transactionId);
-
-                using var rTr = getTr.ExecuteReader();
-                if (rTr.Read())
-                {
-                    var id = rTr.GetInt32(0);
-                    var userId = rTr.GetInt32(1);
-                    var amount = Convert.ToDecimal(rTr.GetValue(2));
-                    var fromKind = GetStringSafe(rTr, 3).ToLowerInvariant();
-
-                    var fromRefId = rTr.IsDBNull(4) ? (int?)null : rTr.GetInt32(4);
-
-                    var toKind = GetStringSafe(rTr, 5).ToLowerInvariant();
-
-                    var toRefId = rTr.IsDBNull(6) ? (int?)null : rTr.GetInt32(6);
-
-                    using var tx = c.BeginTransaction();
-
-                    // Odwróæ operacjê transferu
-                    void AddBank(int? accId, decimal a)
-                    {
-                        if (!accId.HasValue) return;
-                        using var cmd = c.CreateCommand();
-                        cmd.Transaction = tx;
-                        cmd.CommandText = @"UPDATE BankAccounts SET Balance = Balance + @a WHERE Id=@id AND UserId=@u;";
-                        cmd.Parameters.AddWithValue("@a", a);
-                        cmd.Parameters.AddWithValue("@id", accId.Value);
-                        cmd.Parameters.AddWithValue("@u", userId);
-                        cmd.ExecuteNonQuery();
-                    }
-
-                    void SubBank(int? accId, decimal a)
-                    {
-                        if (!accId.HasValue) return;
-                        using var cmd = c.CreateCommand();
-                        cmd.Transaction = tx;
-                        cmd.CommandText = @"UPDATE BankAccounts SET Balance = Balance - @a WHERE Id=@id AND UserId=@u;";
-                        cmd.Parameters.AddWithValue("@a", a);
-                        cmd.Parameters.AddWithValue("@id", accId.Value);
-                        cmd.Parameters.AddWithValue("@u", userId);
-                        cmd.ExecuteNonQuery();
-                    }
-
-                    void AddCash(decimal a)
-                    {
-                        using var cmd = c.CreateCommand();
-                        cmd.Transaction = tx;
-                        cmd.CommandText = @"INSERT INTO CashOnHand(UserId, Amount, UpdatedAt) VALUES (@u, @a, CURRENT_TIMESTAMP)
-ON CONFLICT(UserId) DO UPDATE SET Amount = CashOnHand.Amount + excluded.Amount, UpdatedAt=CURRENT_TIMESTAMP;";
-                        cmd.Parameters.AddWithValue("@u", userId);
-                        cmd.Parameters.AddWithValue("@a", a);
-                        cmd.ExecuteNonQuery();
-                    }
-
-                    void SubCash(decimal a)
-                    {
-                        using var cmd = c.CreateCommand();
-                        cmd.Transaction = tx;
-                        cmd.CommandText = @"UPDATE CashOnHand SET Amount = Amount - @a, UpdatedAt = CURRENT_TIMESTAMP WHERE UserId=@u;";
-                        cmd.Parameters.AddWithValue("@u", userId);
-                        cmd.Parameters.AddWithValue("@a", a);
-                        cmd.ExecuteNonQuery();
-                    }
-
-                    // bank->bank
-                    if (fromKind == "bank" && toKind == "bank")
-                    {
-                        AddBank(fromRefId, amount);
-                        SubBank(toRefId, amount);
-                    }
-                    // bank->cash
-                    else if (fromKind == "bank" && toKind == "cash")
-                    {
-                        AddBank(fromRefId, amount);
-                        SubCash(amount);
-                    }
-                    // cash->bank
-                    else if (fromKind == "cash" && toKind == "bank")
-                    {
-                        AddCash(amount);
-                        SubBank(toRefId, amount);
-                    }
-                    // inne typy – na razie brak obs³ugi szczegó³owej
-
-                    // usuñ transfer
-                    using (var del = c.CreateCommand())
-                    {
-                        del.Transaction = tx;
-                        del.CommandText = "DELETE FROM Transfers WHERE Id=@id;";
-                        del.Parameters.AddWithValue("@id", id);
-                        del.ExecuteNonQuery();
-                    }
-
-                    tx.Commit();
-                    RaiseDataChanged();
-                    return;
-                }
-            }
-
-            // 2) Spróbuj jako wydatek
-            if (TableExists(c, "Expenses"))
-            {
-                using var getEx = c.CreateCommand();
-                getEx.CommandText = @"SELECT Id, UserId, Amount, AccountId, IsPlanned FROM Expenses WHERE Id=@id LIMIT 1;";
-                getEx.Parameters.AddWithValue("@id", transactionId);
-
-                using var rEx = getEx.ExecuteReader();
-                if (rEx.Read())
-                {
-                    var id = rEx.GetInt32(0);
-                    var userId = rEx.GetInt32(1);
-                    var amount = Convert.ToDecimal(rEx.GetValue(2));
-                    var accountId = rEx.IsDBNull(3) ? (int?)null : rEx.GetInt32(3);
-                    // Jeœli AccountId jest NULL, a stary "Account" tekstowo istnieje, spróbuj dopasowaæ do BankAccounts
-                    if (!accountId.HasValue && ColumnExists(c, "Expenses", "Account"))
-                    {
-                        using var cmdAccText = c.CreateCommand();
-                        cmdAccText.CommandText = "SELECT Account FROM Expenses WHERE Id=@id LIMIT 1;";
-                        cmdAccText.Parameters.AddWithValue("@id", transactionId);
-                        var accText = cmdAccText.ExecuteScalar()?.ToString();
-
-                        var resolved = TryResolveAccountIdFromExpenseAccountText(c, userId, accText);
-                        if (resolved.HasValue) accountId = resolved.Value;
-                    }
-
-                    var isPlanned = !rEx.IsDBNull(4) && Convert.ToInt32(rEx.GetValue(4)) == 1;
-
-                    using var tx = c.BeginTransaction();
-
-                    // Odwrócenie wydatku: saldo powinno siê zwiêkszyæ
-                    if (accountId.HasValue)
-                    {
-                        using var upd = c.CreateCommand();
-                        upd.Transaction = tx;
-                        upd.CommandText = @"UPDATE BankAccounts SET Balance = Balance + @a WHERE Id=@id AND UserId=@u;";
-                        upd.Parameters.AddWithValue("@a", amount);
-                        upd.Parameters.AddWithValue("@id", accountId.Value);
-                        upd.Parameters.AddWithValue("@u", userId);
-                        upd.ExecuteNonQuery();
-                    }
-                    else if (!isPlanned)
-                    {
-                        // Brak AccountId: potraktuj jako gotówkê – zwiêksz Amount w CashOnHand
-                        using var updCash = c.CreateCommand();
-                        updCash.Transaction = tx;
-                        updCash.CommandText = @"INSERT INTO CashOnHand(UserId, Amount, UpdatedAt) VALUES (@u, @a, CURRENT_TIMESTAMP)
-ON CONFLICT(UserId) DO UPDATE SET Amount = excluded.Amount + CashOnHand.Amount, UpdatedAt=CURRENT_TIMESTAMP;";
-                        updCash.Parameters.AddWithValue("@u", userId);
-                        updCash.Parameters.AddWithValue("@a", amount);
-                        updCash.ExecuteNonQuery();
-                    }
-
-                    // usuñ wydatek
-                    using (var del = c.CreateCommand())
-                    {
-                        del.Transaction = tx;
-                        del.CommandText = "DELETE FROM Expenses WHERE Id=@id;";
-                        del.Parameters.AddWithValue("@id", id);
-                        del.ExecuteNonQuery();
-                    }
-
-                    tx.Commit();
-                    RaiseDataChanged();
-                    return;
-                }
-            }
-
-            // 3) Spróbuj jako przychód
-            // 3) Spróbuj jako przychód
-            if (TableExists(c, "Incomes"))
-            {
-                using var getInc = c.CreateCommand();
-                getInc.CommandText = @"SELECT Id, UserId, Amount, Source, IsPlanned 
-FROM Incomes 
-WHERE Id=@id 
-LIMIT 1;";
-                getInc.Parameters.AddWithValue("@id", transactionId);
-
-                using var rInc = getInc.ExecuteReader();
-                if (rInc.Read())
-                {
-                    var id = rInc.GetInt32(0);
-                    var userId = rInc.GetInt32(1);
-                    var amount = Convert.ToDecimal(rInc.GetValue(2));
-                    var source = GetNullableString(rInc, 3) ?? string.Empty;
-                    var isPlanned = !rInc.IsDBNull(4) && Convert.ToInt32(rInc.GetValue(4)) == 1;
-
-                    using var tx = c.BeginTransaction();
-
-                    // cofamy wp³yw na salda tylko dla zrealizowanych
-                    if (!isPlanned && !string.IsNullOrWhiteSpace(source))
-                    {
-                        var src = source.Trim();
-
-                        if (src.StartsWith("Konto:", StringComparison.OrdinalIgnoreCase))
-                        {
-                            var accountName = src.Substring("Konto:".Length).Trim();
-
-                            using var cmdAcc = c.CreateCommand();
-                            cmdAcc.Transaction = tx;
-                            cmdAcc.CommandText = @"
-UPDATE BankAccounts
-   SET Balance = Balance - @a
- WHERE UserId=@u AND AccountName=@n;";
-                            cmdAcc.Parameters.AddWithValue("@a", amount);
-                            cmdAcc.Parameters.AddWithValue("@u", userId);
-                            cmdAcc.Parameters.AddWithValue("@n", accountName);
-                            cmdAcc.ExecuteNonQuery();
-                        }
-                        else if (src.Equals("Wolna gotówka", StringComparison.OrdinalIgnoreCase))
-                        {
-                            using var cmdCash = c.CreateCommand();
-                            cmdCash.Transaction = tx;
-                            cmdCash.CommandText = @"UPDATE CashOnHand SET Amount = Amount - @a, UpdatedAt = CURRENT_TIMESTAMP WHERE UserId=@u;";
-                            cmdCash.Parameters.AddWithValue("@u", userId);
-                            cmdCash.Parameters.AddWithValue("@a", amount);
-                            cmdCash.ExecuteNonQuery();
-                        }
-                        else if (src.Equals("Od³o¿ona gotówka", StringComparison.OrdinalIgnoreCase))
-                        {
-                            using (var cmdSaved = c.CreateCommand())
-                            {
-                                cmdSaved.Transaction = tx;
-                                cmdSaved.CommandText = @"
-UPDATE SavedCash
-   SET Amount = Amount - @a,
-       UpdatedAt = CURRENT_TIMESTAMP
- WHERE UserId=@u;";
-                                cmdSaved.Parameters.AddWithValue("@u", userId);
-                                cmdSaved.Parameters.AddWithValue("@a", amount);
-                                cmdSaved.ExecuteNonQuery();
-                            }
-
-                            using (var cmdCash = c.CreateCommand())
-                            {
-                                cmdCash.Transaction = tx;
-                                cmdCash.CommandText = @"
-UPDATE CashOnHand
-   SET Amount = Amount - @a,
-       UpdatedAt = CURRENT_TIMESTAMP
- WHERE UserId=@u;";
-                                cmdCash.Parameters.AddWithValue("@u", userId);
-                                cmdCash.Parameters.AddWithValue("@a", amount);
-                                cmdCash.ExecuteNonQuery();
-                            }
-                        }
-                    }
-
-                    // usuwamy przychód W TEJ SAMEJ transakcji (bez DeleteIncome, bo ono otwiera nowe po³¹czenie)
-                    using (var del = c.CreateCommand())
-                    {
-                        del.Transaction = tx;
-                        del.CommandText = "DELETE FROM Incomes WHERE Id=@id;";
-                        del.Parameters.AddWithValue("@id", id);
-                        del.ExecuteNonQuery();
-                    }
-
-                    tx.Commit();
-                    RaiseDataChanged();
-                    return;
-                }
-            }
-
-
-
-            // Je¿eli nie znaleziono transakcji w ¿adnej tabeli – nic nie robimy
         }
     }
 }

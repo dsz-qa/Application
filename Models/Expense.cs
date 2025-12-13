@@ -2,16 +2,24 @@ using System;
 
 namespace Finly.Models
 {
+    // Stabilnie: enum poza klas¹ (³atwiejsze u¿ycie w ca³ym projekcie)
+    public enum PaymentKind
+    {
+        FreeCash = 0,
+        SavedCash = 1,
+        BankAccount = 2,
+        Envelope = 3
+    }
+
     public class Expense
     {
         public int Id { get; set; }
 
-        // Zostawiamy double (masz ju¿ double.TryParse w kodzie UI)
+        // Zostawiamy double (tak masz w UI i DB)
         public double Amount { get; set; }
 
         public int CategoryId { get; set; }
 
-        // Tekstowa nazwa kategorii (bezpieczna pod null)
         public string CategoryName { get; set; } = string.Empty;
 
         public DateTime Date { get; set; } = DateTime.Today;
@@ -20,24 +28,27 @@ namespace Finly.Models
 
         public int UserId { get; set; }
 
-        // Czy transakcja jest zaplanowana (nie wp³ywa na salda)
+        // Nie wp³ywa na salda
         public bool IsPlanned { get; set; } = false;
 
-        // Nowe: konto/Ÿród³o p³atnoœci (karta/gotówka/bank)
+        // Tekst do UI / wsteczna zgodnoœæ (nie do ksiêgowania!)
         public string Account { get; set; } = string.Empty;
 
-        // Nowe: rodzaj transakcji (Wydatek/Przychód/Transfer)
         public string Kind { get; set; } = string.Empty;
 
-        // Powi¹zanie opcjonalne z bud¿etem (nullable)
         public int? BudgetId { get; set; }
 
-        // Wygodne w³aœciwoœci formatuj¹ce do bindowania
+        // NOWE – Ÿród³o p³atnoœci (to jest jedyna prawda do ksiêgowania)
+        public PaymentKind PaymentKind { get; set; } = PaymentKind.FreeCash;
+
+        // BankAccountId albo EnvelopeId; dla cash null
+        public int? PaymentRefId { get; set; }
+
+        // Formatowanie do bindowania
         public string DateDisplay => Date.ToString("yyyy-MM-dd");
         public string AmountStr => Amount.ToString("N2") + " z³";
 
-        // Alias zgodnoœci: czêœæ kodu mog³a u¿ywaæ 'Category'
-        // => wskazuje na CategoryName, wiêc nic siê nie rozsypie.
+        // Alias zgodnoœci
         public string Category
         {
             get => CategoryName;
