@@ -3,7 +3,7 @@ using System.Collections.ObjectModel;
 using System.Linq;
 using Finly.Pages;
 
-namespace Finly.Services
+namespace Finly.Services.SpecificPages
 {
     /// <summary>
     /// Prosty „magazyn” celów – współdzielony między stronami.

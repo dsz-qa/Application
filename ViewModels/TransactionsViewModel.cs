@@ -3,11 +3,11 @@ using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Linq;
 using System.Runtime.CompilerServices;
-using Finly.Services;
 using System.Data;
 using Finly.Models;
 using System.Collections.Generic;
 using System.Windows.Input;
+using Finly.Services.Features;
 
 namespace Finly.ViewModels
 {

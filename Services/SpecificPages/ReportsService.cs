@@ -3,8 +3,9 @@ using System.Data;
 // using System.Data.SQLite; // removed to avoid missing reference; we use DatabaseService.GetConnection()
 using Finly.ViewModels;
 using System.Collections.Generic;
+using Finly.Services.Features;
 
-namespace Finly.Services
+namespace Finly.Services.SpecificPages
 {
     public static class ReportsService
     {
@@ -24,11 +25,11 @@ namespace Finly.Services
 
         public static DataTable LoadExpensesReport(int uid, DateTime from, DateTime to,
             ReportsViewModel.SourceType source, string selectedCategory,
-            Finly.Models.BankAccountModel? selectedBankAccount, string selectedEnvelope)
+            Models.BankAccountModel? selectedBankAccount, string selectedEnvelope)
         {
-            int? accountId = (source == ReportsViewModel.SourceType.BankAccounts && selectedBankAccount != null && selectedBankAccount.Id > 0)
+            int? accountId = source == ReportsViewModel.SourceType.BankAccounts && selectedBankAccount != null && selectedBankAccount.Id > 0
                 ? selectedBankAccount.Id
-                : (int?)null;
+                : null;
 
             return DatabaseService.GetExpenses(uid, from, to,
                 GetCategoryIdSafe(uid, selectedCategory), null, accountId);
@@ -36,7 +37,7 @@ namespace Finly.Services
 
         public static DataTable LoadIncomesReport(int uid, DateTime from, DateTime to,
             ReportsViewModel.SourceType source, string selectedCategory,
-            Finly.Models.BankAccountModel? selectedBankAccount, string selectedEnvelope)
+            Models.BankAccountModel? selectedBankAccount, string selectedEnvelope)
         {
             var dt = new DataTable();
             dt.Columns.Add("Id", typeof(int));
@@ -78,7 +79,7 @@ WHERE i.UserId=@u AND i.Date>=@from AND i.Date<=@to";
 
         public static DataTable LoadAllTransactionsReport(int uid, DateTime from, DateTime to,
             ReportsViewModel.SourceType source, string selectedCategory,
-            Finly.Models.BankAccountModel? selectedBankAccount, string selectedEnvelope)
+            Models.BankAccountModel? selectedBankAccount, string selectedEnvelope)
         {
             var dt = new DataTable();
             dt.Columns.Add("Id", typeof(int));

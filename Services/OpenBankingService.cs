@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using Microsoft.Data.Sqlite;
 using Finly.Models;
+using Finly.Services.Features;
 
 namespace Finly.Services
 {

@@ -6,6 +6,7 @@ using Finly.ViewModels;
 using QuestPDF.Fluent;
 using QuestPDF.Helpers;
 using QuestPDF.Infrastructure;
+using Finly.Services.SpecificPages;
 
 namespace Finly.Services
 {

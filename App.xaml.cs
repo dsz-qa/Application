@@ -1,5 +1,7 @@
 ﻿using System.Windows;
 using Finly.Services;
+using Finly.Services.Features;
+using Finly.Services.SpecificPages;
 using Finly.Views;
 using QuestPDF.Infrastructure;   // QuestPDF
 

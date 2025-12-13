@@ -1,5 +1,5 @@
 ﻿using Finly.Models;
-using Finly.Services;
+using Finly.Services.Features;
 using Finly.Views.Dialogs;
 using Microsoft.Data.Sqlite;
 using System;
@@ -7,7 +7,7 @@ using System.Collections.Generic;
 using System.Data;
 using System.IO;
 
-namespace Finly.Services
+namespace Finly.Services.SpecificPages
 {
     public static class BudgetService
     {
@@ -135,7 +135,7 @@ namespace Finly.Services
             public decimal UsedPercent =>
                 PlannedAmount + IncomesForBudget == 0
                     ? 0
-                    : (Spent / (PlannedAmount + IncomesForBudget)) * 100m;
+                    : Spent / (PlannedAmount + IncomesForBudget) * 100m;
 
             // Ładny tekst dla kolumny „Okres”
             public string Period => $"{StartDate:dd.MM.yyyy} – {EndDate:dd.MM.yyyy}";

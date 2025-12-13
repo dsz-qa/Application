@@ -1,4 +1,5 @@
 using Finly.Models;
+using Finly.Services.Features;
 using Microsoft.Data.Sqlite;
 using System;
 using System.Security.Cryptography;

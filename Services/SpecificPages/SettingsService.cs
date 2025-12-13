@@ -2,7 +2,7 @@
 using System.IO;
 using System.Text.Json;
 
-namespace Finly.Services
+namespace Finly.Services.SpecificPages
 {
     /// <summary>
     /// Prosty zapis ustawień aplikacji do pliku JSON w %AppData%\Finly\settings.json

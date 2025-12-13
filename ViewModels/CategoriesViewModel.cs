@@ -1,4 +1,14 @@
-using System;using System.Collections.ObjectModel;using System.ComponentModel;using System.Runtime.CompilerServices;using System.Linq;using Finly.Services;using System.Data;using System.Windows.Input;using System.Windows.Media;using System.Collections.Generic;
+using System;
+using System.Collections.ObjectModel;
+using System.ComponentModel;
+using System.Runtime.CompilerServices;
+using System.Linq;
+using Finly.Services;
+using System.Data;
+using System.Windows.Input;
+using System.Windows.Media;
+using System.Collections.Generic;
+using Finly.Services.Features;
 
 namespace Finly.ViewModels
 {

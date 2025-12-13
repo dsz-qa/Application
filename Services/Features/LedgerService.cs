@@ -2,7 +2,7 @@
 using System;
 using System.Globalization;
 
-namespace Finly.Services.Ledger
+namespace Finly.Services.Features
 {
     /// <summary>
     /// Jedyny właściciel księgowania w aplikacji.
@@ -511,7 +511,7 @@ SET Amount = SavedCash.Amount + excluded.Amount,
                 {
                     var userId = r.GetInt32(0);
                     var amount = Convert.ToDecimal(r.GetValue(1));
-                    int? accountId = r.IsDBNull(2) ? (int?)null : r.GetInt32(2);
+                    int? accountId = r.IsDBNull(2) ? null : r.GetInt32(2);
                     var isPlanned = !r.IsDBNull(3) && Convert.ToInt32(r.GetValue(3)) == 1;
 
                     // legacy mapping (opcjonalnie)
@@ -559,7 +559,7 @@ SET Amount = SavedCash.Amount + excluded.Amount,
                 {
                     var userId = r.GetInt32(0);
                     var amount = Convert.ToDecimal(r.GetValue(1));
-                    var source = r.IsDBNull(2) ? "" : (r.GetString(2) ?? "");
+                    var source = r.IsDBNull(2) ? "" : r.GetString(2) ?? "";
                     var isPlanned = !r.IsDBNull(3) && Convert.ToInt32(r.GetValue(3)) == 1;
 
                     if (!isPlanned)
@@ -623,7 +623,7 @@ SET Amount = SavedCash.Amount + excluded.Amount,
                 cmd.Parameters.AddWithValue("@u", userId);
                 cmd.Parameters.AddWithValue("@n", name);
                 var obj = cmd.ExecuteScalar();
-                return (obj == null || obj == DBNull.Value) ? (int?)null : Convert.ToInt32(obj);
+                return obj == null || obj == DBNull.Value ? null : Convert.ToInt32(obj);
             }
 
             return null;

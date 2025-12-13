@@ -10,6 +10,8 @@ using System.Windows.Input;
 using System.Windows.Media;
 using Finly.Models;
 using Finly.Services;
+using Finly.Services.Features;
+using Finly.Services.SpecificPages;
 using Finly.ViewModels;
 using Finly.Views;
 
@@ -140,7 +142,7 @@ namespace Finly.Pages
                 {
                     if (vm.TermMonths > 0)
                     {
-                        loanMonthly = LoanService.CalculateMonthlyPayment(vm.Principal, vm.InterestRate, vm.TermMonths);
+                        loanMonthly = LoansService.CalculateMonthlyPayment(vm.Principal, vm.InterestRate, vm.TermMonths);
                         loanYearly = loanMonthly * 12m;
                     }
                     else
@@ -457,9 +459,9 @@ namespace Finly.Pages
                 return;
             }
 
-            var payment = LoanService.CalculateMonthlyPayment(principal, annualRate, months);
+            var payment = LoansService.CalculateMonthlyPayment(principal, annualRate, months);
             var (interestFirst, capitalFirst) =
-                LoanService.CalculateFirstInstallmentBreakdown(principal, annualRate, months);
+                LoansService.CalculateFirstInstallmentBreakdown(principal, annualRate, months);
 
             MonthlyPaymentText.Text = payment.ToString("N2") + " zł";
             FirstPrincipalText.Text = capitalFirst.ToString("N2") + " zł";
@@ -808,7 +810,7 @@ namespace Finly.Pages
 
                 DatabaseService.UpdateLoan(loanToUpdate);
 
-                var newMonthly = LoanService.CalculateMonthlyPayment(
+                var newMonthly = LoansService.CalculateMonthlyPayment(
                     newPrincipal,
                     _selectedVm.InterestRate,
                     _selectedVm.TermMonths);
@@ -859,9 +861,9 @@ namespace Finly.Pages
 
             var vm = _selectedVm;
 
-            var before = LoanService.CalculateMonthlyPayment(vm.Principal, vm.InterestRate, vm.TermMonths);
+            var before = LoansService.CalculateMonthlyPayment(vm.Principal, vm.InterestRate, vm.TermMonths);
             var newPrincipal = Math.Max(0m, vm.Principal - extra);
-            var after = LoanService.CalculateMonthlyPayment(newPrincipal, vm.InterestRate, vm.TermMonths);
+            var after = LoansService.CalculateMonthlyPayment(newPrincipal, vm.InterestRate, vm.TermMonths);
 
             var diff = before - after;
 

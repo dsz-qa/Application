@@ -1,4 +1,5 @@
-﻿using System;
+﻿// Finly/Services/LoansService.cs
+using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
@@ -8,6 +9,139 @@ using Finly.Models;
 
 namespace Finly.Services
 {
+    /// <summary>
+    /// Serwis kredytów – agreguje logikę obliczeń oraz parser harmonogramu CSV,
+    /// aby nie trzymać tego w osobnych plikach.
+    /// </summary>
+    public static class LoansService
+    {
+        /// <summary>
+        /// Standardowa rata annuitetowa.
+        /// </summary>
+        public static decimal CalculateMonthlyPayment(
+            decimal principal,
+            decimal annualRatePercent,
+            int termMonths)
+        {
+            if (principal <= 0m || termMonths <= 0)
+                return 0m;
+
+            var r = annualRatePercent / 100m / 12m; // miesięczna stopa
+
+            if (r == 0m)
+                return Math.Round(principal / termMonths, 2);
+
+            // A = P * r / (1 - (1+r)^-n)
+            var denom = 1m - (decimal)Math.Pow((double)(1m + r), -termMonths);
+            if (denom == 0m)
+                return Math.Round(principal / termMonths, 2);
+
+            var payment = principal * r / denom;
+            return Math.Round(payment, 2);
+        }
+
+        /// <summary>
+        /// Rozbija pierwszą ratę na część odsetkową i kapitałową.
+        /// </summary>
+        public static (decimal InterestPart, decimal PrincipalPart)
+            CalculateFirstInstallmentBreakdown(
+                decimal principal,
+                decimal annualRatePercent,
+                int termMonths)
+        {
+            var payment = CalculateMonthlyPayment(principal, annualRatePercent, termMonths);
+            if (payment <= 0m)
+                return (0m, 0m);
+
+            var r = annualRatePercent / 100m / 12m;
+            var interest = Math.Round(principal * r, 2);
+            var capital = Math.Round(payment - interest, 2);
+            if (capital < 0m) capital = 0m;
+
+            return (interest, capital);
+        }
+
+        /// <summary>
+        /// Poprzedni „umowny” termin raty względem podanej daty.
+        /// Uwzględnia PaymentDay oraz start kredytu (nie cofamy się przed start).
+        /// </summary>
+        public static DateTime GetPreviousDueDate(DateTime today, int paymentDay, DateTime startDate)
+        {
+            if (paymentDay <= 0)
+            {
+                var d = today.Date.AddMonths(-1);
+                return d < startDate.Date ? startDate.Date : d;
+            }
+
+            int dim = DateTime.DaysInMonth(today.Year, today.Month);
+            int day = Math.Min(paymentDay, dim);
+            var thisDue = new DateTime(today.Year, today.Month, day);
+
+            if (today.Date >= thisDue.Date)
+                return thisDue.Date < startDate.Date ? startDate.Date : thisDue.Date;
+
+            var prevMonthFirst = new DateTime(today.Year, today.Month, 1).AddMonths(-1);
+            int dimPrev = DateTime.DaysInMonth(prevMonthFirst.Year, prevMonthFirst.Month);
+            day = Math.Min(paymentDay, dimPrev);
+            var prevDue = new DateTime(prevMonthFirst.Year, prevMonthFirst.Month, day);
+
+            return prevDue.Date < startDate.Date ? startDate.Date : prevDue.Date;
+        }
+
+        /// <summary>
+        /// Kolejny termin raty – płatności danego dnia miesiąca z korektą weekendową.
+        /// </summary>
+        public static DateTime GetNextDueDate(DateTime previousDueDate, int paymentDay)
+        {
+            if (paymentDay <= 0)
+                return previousDueDate.AddMonths(1);
+
+            var nextMonthFirst = new DateTime(previousDueDate.Year, previousDueDate.Month, 1).AddMonths(1);
+            var daysInNextMonth = DateTime.DaysInMonth(nextMonthFirst.Year, nextMonthFirst.Month);
+            var day = Math.Min(paymentDay, daysInNextMonth);
+
+            var due = new DateTime(nextMonthFirst.Year, nextMonthFirst.Month, day);
+
+            // weekend → na najbliższy dzień roboczy
+            if (due.DayOfWeek == DayOfWeek.Saturday)
+                due = due.AddDays(2);
+            else if (due.DayOfWeek == DayOfWeek.Sunday)
+                due = due.AddDays(1);
+
+            return due;
+        }
+    }
+
+    /// <summary>
+    /// Pomocniczy serwis matematyczny do obliczeń kredytowych.
+    /// Jedno źródło prawdy dla odsetek dziennych.
+    /// </summary>
+    public static class LoanMathService
+    {
+        /// <summary>
+        /// Odsetki: kapitał * (oprocentowanie/365) * liczba dni.
+        /// annualRate podajesz w % (np. 6.28).
+        /// </summary>
+        public static decimal CalculateInterest(
+            decimal principal,
+            decimal annualRate,
+            DateTime from,
+            DateTime to)
+        {
+            if (to <= from || principal <= 0m || annualRate <= 0m)
+                return 0m;
+
+            int days = (to.Date - from.Date).Days;
+            if (days <= 0) return 0m;
+
+            decimal dailyRate = annualRate / 100m / 365m;
+            return Math.Round(principal * dailyRate * days, 2);
+        }
+    }
+
+    /// <summary>
+    /// Parser harmonogramu rat kredytu z CSV (bankowy, tolerancyjny).
+    /// </summary>
     public sealed class LoanScheduleCsvParser
     {
         private static readonly CultureInfo Pl = new("pl-PL");
@@ -37,7 +171,6 @@ namespace Finly.Services
             if (!File.Exists(filePath))
                 throw new FileNotFoundException("Nie znaleziono pliku harmonogramu.", filePath);
 
-            // 1) Czytanie z BOM + fallback na bankowe kodowania
             var text = ReadAllTextRobust(filePath);
 
             var lines = SplitLines(text)
@@ -129,7 +262,7 @@ namespace Finly.Services
 
         private static string ReadAllTextRobust(string path)
         {
-            // BOM detection (UTF8/UTF16) – standard w .NET. :contentReference[oaicite:1]{index=1}
+            // BOM detection (UTF8/UTF16) – standard w .NET
             string text = ReadWithEncoding(path, Encoding.UTF8, detectBom: true);
 
             // Jeżeli widać krzaki, spróbuj bankowych kodowań.
@@ -157,10 +290,8 @@ namespace Finly.Services
         private static bool LooksLikeMojibake(string text)
         {
             if (string.IsNullOrEmpty(text)) return true;
-
-            // Uproszczona heurystyka: dużo znaków replacement char '�'
             int bad = text.Count(c => c == '\uFFFD');
-            return bad >= 5; // próg praktyczny
+            return bad >= 5;
         }
 
         private static List<string> SplitLines(string text)
@@ -184,7 +315,6 @@ namespace Finly.Services
                 {
                     var parts = SplitCsvLine(line, c);
 
-                    // premiuj więcej kolumn + stabilność
                     if (parts.Count >= 6) score += 4;
                     else if (parts.Count >= 3) score += 2;
                     else if (parts.Count == 2) score += 1;
@@ -395,7 +525,6 @@ namespace Finly.Services
             raw = raw.Replace("\u00A0", " ").Replace("\u202F", " ");
             raw = raw.Replace(" ", "");
 
-            // nawiasy jako minus, czasem bank tak zapisuje
             if (raw.StartsWith("(") && raw.EndsWith(")"))
                 raw = "-" + raw.Trim('(', ')');
 

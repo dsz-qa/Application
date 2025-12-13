@@ -11,6 +11,7 @@ using System.Windows.Media;
 
 using Finly.Pages;
 using Finly.Services;
+using Finly.Services.SpecificPages;
 
 namespace Finly.Views
 {

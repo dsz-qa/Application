@@ -5,12 +5,12 @@ using System.Linq;
 using System.Data;
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
-using Finly.Services;
 using LiveChartsCore;
 using LiveChartsCore.SkiaSharpView;
 using LiveChartsCore.SkiaSharpView.Painting;
 using SkiaSharp;
 using Microsoft.Data.Sqlite;
+using Finly.Services.Features;
 
 namespace Finly.ViewModels
 {

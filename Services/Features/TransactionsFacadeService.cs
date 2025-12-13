@@ -1,7 +1,6 @@
 ﻿using System;
-using Finly.Services.Ledger;
 
-namespace Finly.Services
+namespace Finly.Services.Features
 {
     /// <summary>
     /// FASADA dla UI – jedno miejsce do operacji na transakcjach/saldach.
