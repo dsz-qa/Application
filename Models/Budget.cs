@@ -23,5 +23,12 @@ namespace Finly.Models
 
         // (opcjonalnie – jeśli później będziesz tego używać)
         // public decimal SpentAmount   { get; set; }
+
+        public override string ToString()
+        {
+            // Dzięki temu wszędzie (np. w ComboBoxach) zamiast
+            // "Finly.Models.Budget" zobaczysz po prostu nazwę budżetu
+            return Name ?? base.ToString();
+        }
     }
 }

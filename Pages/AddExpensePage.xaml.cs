@@ -14,6 +14,7 @@ namespace Finly.Pages
     public partial class AddExpensePage : UserControl
     {
         private readonly int _uid;
+        private List<Budget> _budgets = new();
 
         private enum TransferItemKind
         {
@@ -34,6 +35,28 @@ namespace Finly.Pages
             public override string ToString() => Name;
         }
 
+        // ================== BUDŻETY – POMOCNICZA METODA ==================
+
+        /// <summary>
+        /// Zwraca Id wybranego budżetu (albo null, jeśli nic nie wybrano
+        /// albo data nie mieści się w zakresie budżetu).
+        /// </summary>
+        private int? GetSelectedBudgetId(System.Windows.Controls.ComboBox combo, DateTime date)
+        {
+            if (combo?.SelectedItem is Finly.Models.Budget b)
+            {
+                // Jeśli w modelu Budget masz daty – pilnujemy, żeby operacja
+                // była w zakresie budżetu:
+                if (b.StartDate <= date && date <= b.EndDate)
+                    return b.Id;
+
+                // Gdy użytkownik wybierze budżet spoza zakresu – ignorujemy
+                ToastService.Info("Wybrany budżet nie obejmuje daty tej operacji – zostanie zapisana bez powiązania z budżetem.");
+            }
+
+            return null;
+        }
+
         public AddExpensePage() : this(UserService.GetCurrentUserId())
         {
         }
@@ -43,6 +66,8 @@ namespace Finly.Pages
             InitializeComponent();
 
             _uid = userId <= 0 ? UserService.GetCurrentUserId() : userId;
+            LoadExpenseBudgetsForCurrentDate();
+            LoadIncomeBudgetsForCurrentDate();
 
             Loaded += (_, __) =>
             {
@@ -55,6 +80,7 @@ namespace Finly.Pages
                 LoadTransferItems();
                 LoadEnvelopes();
                 LoadIncomeAccounts();
+                LoadBudgets();
 
                 var today = DateTime.Today;
                 ExpenseDatePicker.SelectedDate = today;
@@ -558,6 +584,13 @@ namespace Finly.Pages
                 Account = string.Empty // ustawimy poniżej
             };
 
+            // Powiązanie wydatku z budżetem (opcjonalnie)
+            if (eModel is not null)
+            {
+                // zakładam, że w klasie Expense masz właściwość int? BudgetId
+                eModel.BudgetId = GetSelectedBudgetId(ExpenseBudgetCombo, date);
+            }
+
             try
             {
                 switch (sourceTag)
@@ -613,13 +646,29 @@ namespace Finly.Pages
         private void SaveExpensePlanned_Click(object sender, RoutedEventArgs e)
         {
             if (!TryParseAmount(ExpensePlannedAmountBox.Text, out var amount) || amount <= 0m)
-            { ToastService.Info("Podaj poprawną kwotę."); return; }
+            {
+                ToastService.Info("Podaj poprawną kwotę.");
+                return;
+            }
+
             var date = ExpensePlannedDatePicker.SelectedDate ?? DateTime.Today;
-            var desc = string.IsNullOrWhiteSpace(ExpensePlannedDescBox.Text) ? null : ExpensePlannedDescBox.Text.Trim();
+            var desc = string.IsNullOrWhiteSpace(ExpensePlannedDescBox.Text)
+                ? null
+                : ExpensePlannedDescBox.Text.Trim();
+
             var catName = ExpensePlannedCategoryBox.SelectedItem as string;
             if (string.IsNullOrWhiteSpace(catName) && !string.IsNullOrWhiteSpace(ExpensePlannedNewCategoryBox.Text))
                 catName = ExpensePlannedNewCategoryBox.Text.Trim();
-            var catId =0; try { catId = DatabaseService.GetOrCreateCategoryId(_uid, catName ?? ""); } catch { catId =0; }
+
+            var catId = 0;
+            try
+            {
+                catId = DatabaseService.GetOrCreateCategoryId(_uid, catName ?? "");
+            }
+            catch
+            {
+                catId = 0;
+            }
 
             string accountDisplay = string.Empty;
             if (ExpensePlannedSourceCombo.SelectedItem is ComboBoxItem srcItem)
@@ -627,10 +676,15 @@ namespace Finly.Pages
                 var tag = srcItem.Tag as string ?? string.Empty;
                 switch (tag)
                 {
-                    case "cash_free": accountDisplay = "Wolna gotówka"; break;
-                    case "cash_saved": accountDisplay = "Odłożona gotówka"; break;
+                    case "cash_free":
+                        accountDisplay = "Wolna gotówka";
+                        break;
+                    case "cash_saved":
+                        accountDisplay = "Odłożona gotówka";
+                        break;
                     case "envelope":
-                        if (ExpensePlannedEnvelopeCombo.SelectedItem is string envName && !string.IsNullOrWhiteSpace(envName))
+                        if (ExpensePlannedEnvelopeCombo.SelectedItem is string envName &&
+                            !string.IsNullOrWhiteSpace(envName))
                             accountDisplay = $"Koperta: {envName}";
                         break;
                     case "bank":
@@ -640,10 +694,31 @@ namespace Finly.Pages
                 }
             }
 
-            var eModel = new Expense { UserId = _uid, Amount = (double)amount, Date = date, Description = (desc ?? string.Empty), CategoryId = catId, IsPlanned = true, Account = accountDisplay };
+            // 🔵 NOWE: pobranie wybranego budżetu dla zaplanowanego wydatku
+            int? budgetId = GetSelectedBudgetId(ExpensePlannedBudgetCombo, date);
+
+            var eModel = new Expense
+            {
+                UserId = _uid,
+                Amount = (double)amount,
+                Date = date,
+                Description = desc ?? string.Empty,
+                CategoryId = catId,
+                IsPlanned = true,
+                Account = accountDisplay,
+                BudgetId = budgetId   // 🔵 powiązanie z budżetem (opcjonalne)
+            };
+
             try
-            { DatabaseService.InsertExpense(eModel); ToastService.Success("Dodano zaplanowany wydatek."); Cancel_Click(sender, e); }
-            catch (Exception ex) { ToastService.Error("Nie udało się dodać zaplanowanego wydatek.\n" + ex.Message); }
+            {
+                DatabaseService.InsertExpense(eModel);
+                ToastService.Success("Dodano zaplanowany wydatek.");
+                Cancel_Click(sender, e);
+            }
+            catch (Exception ex)
+            {
+                ToastService.Error("Nie udało się dodać zaplanowanego wydatku.\n" + ex.Message);
+            }
         }
 
         // ================== PRZYCHÓD ==================
@@ -669,7 +744,10 @@ namespace Finly.Pages
             var desc = string.IsNullOrWhiteSpace(IncomeDescBox.Text) ? null : IncomeDescBox.Text.Trim();
 
             var catName = ResolveCategoryName(IncomeCategoryBox, IncomeNewCategoryBox);
-            int? categoryId = GetCategoryIdOrZero(catName); if (categoryId ==0) categoryId = null;
+            int? categoryId = GetCategoryIdOrZero(catName); if (categoryId == 0) categoryId = null;
+            int? incomeBudgetId = null;
+            if (IncomeBudgetCombo.SelectedItem is Budget selectedBudget)
+                incomeBudgetId = selectedBudget.Id;
 
             string sourceDisplay = string.Empty;
             switch (formTag)
@@ -688,16 +766,20 @@ namespace Finly.Pages
 
             try
             {
-                if (formTag == "cash_free") {
-                    // Insert income + zwiększ wolną gotówkę
-                    AddIncomeRaw(_uid, amount, date, categoryId, sourceDisplay, desc);
+                if (formTag == "cash_free")
+                {
+                    AddIncomeRaw(_uid, amount, date, categoryId, sourceDisplay, desc, false, incomeBudgetId);
                     UpdateCashOnHand(_uid, amount);
-                } else if (formTag == "cash_saved") {
-                    AddIncomeRaw(_uid, amount, date, categoryId, sourceDisplay, desc);
+                }
+                else if (formTag == "cash_saved")
+                {
+                    AddIncomeRaw(_uid, amount, date, categoryId, sourceDisplay, desc, false, incomeBudgetId);
                     UpdateSavedCash(_uid, amount);
                     UpdateCashOnHand(_uid, amount); // całkowita gotówka również rośnie
-                } else if (formTag == "transfer" && IncomeAccountCombo.SelectedItem is BankAccountModel acc) {
-                    AddIncomeRaw(_uid, amount, date, categoryId, sourceDisplay, desc);
+                }
+                else if (formTag == "transfer" && IncomeAccountCombo.SelectedItem is BankAccountModel acc)
+                {
+                    AddIncomeRaw(_uid, amount, date, categoryId, sourceDisplay, desc, false, incomeBudgetId);
                     IncreaseBankBalance(acc.Id, _uid, amount);
                 }
 
@@ -716,18 +798,38 @@ namespace Finly.Pages
 
         private void SaveIncomePlanned_Click(object sender, RoutedEventArgs e)
         {
+            // 1. Walidacja kwoty
             if (!TryParseAmount(IncomePlannedAmountBox.Text, out var amount) || amount <= 0m)
-            { ToastService.Info("Podaj poprawną kwotę."); return; }
+            {
+                ToastService.Info("Podaj poprawną kwotę.");
+                return;
+            }
+
+            // 2. Data + opis
             var date = IncomePlannedDatePicker.SelectedDate ?? DateTime.Today;
-            var desc = string.IsNullOrWhiteSpace(IncomePlannedDescBox.Text) ? null : IncomePlannedDescBox.Text.Trim();
+            var desc = string.IsNullOrWhiteSpace(IncomePlannedDescBox.Text)
+                ? null
+                : IncomePlannedDescBox.Text.Trim();
+
+            // 3. Forma przychodu -> sourceDisplay
             string sourceDisplay = string.Empty;
             var sourceTag = (IncomePlannedSourceCombo.SelectedItem as ComboBoxItem)?.Tag as string ?? string.Empty;
-            if (sourceTag == "cash_free") sourceDisplay = "Wolna gotówka";
-            else if (sourceTag == "cash_saved") sourceDisplay = "Odłożona gotówka";
+
+            if (sourceTag == "cash_free")
+            {
+                sourceDisplay = "Wolna gotówka";
+            }
+            else if (sourceTag == "cash_saved")
+            {
+                sourceDisplay = "Odłożona gotówka";
+            }
             else if (sourceTag == "transfer")
             {
-                if (IncomePlannedAccountCombo.SelectedItem is string accName && !string.IsNullOrWhiteSpace(accName))
+                if (IncomePlannedAccountCombo.SelectedItem is string accName &&
+                    !string.IsNullOrWhiteSpace(accName))
+                {
                     sourceDisplay = $"Konto: {accName}";
+                }
                 else
                 {
                     ToastService.Info("Wybierz konto docelowe dla planowanego przelewu.");
@@ -735,12 +837,41 @@ namespace Finly.Pages
                 }
             }
 
+            // 4. Kategoria
             var catName = IncomePlannedCategoryBox.SelectedItem as string;
-            if (string.IsNullOrWhiteSpace(catName) && !string.IsNullOrWhiteSpace(IncomePlannedNewCategoryBox.Text)) catName = IncomePlannedNewCategoryBox.Text.Trim();
-            int? catId = null; try { var id = DatabaseService.GetOrCreateCategoryId(_uid, catName ?? string.Empty); if (id >0) catId = id; } catch { }
+            if (string.IsNullOrWhiteSpace(catName) &&
+                !string.IsNullOrWhiteSpace(IncomePlannedNewCategoryBox.Text))
+            {
+                catName = IncomePlannedNewCategoryBox.Text.Trim();
+            }
+
+            int? catId = null;
             try
-            { InsertPlannedIncomeRaw(_uid, amount, date, catId, sourceDisplay, desc); ToastService.Success("Dodano zaplanowany przychód."); Cancel_Click(sender, e); }
-            catch (Exception ex) { ToastService.Error("Nie udało się dodać zaplanowanego przychodu.\n" + ex.Message); }
+            {
+                var id = DatabaseService.GetOrCreateCategoryId(_uid, catName ?? string.Empty);
+                if (id > 0) catId = id;
+            }
+            catch
+            {
+                // zostawiamy catId = null
+            }
+
+            // 5. 🔵 NOWE – budżet dla ZAPLANOWANEGO przychodu
+            int? plannedIncomeBudgetId = GetSelectedBudgetId(IncomePlannedBudgetCombo, date);
+
+            try
+            {
+                // 6. Zapis do bazy jako PRZYCHÓD ZAPLANOWANY
+                //    (ostatni parametr = budgetId, przedostatni = isPlanned = true)
+                AddIncomeRaw(_uid, amount, date, catId, sourceDisplay, desc, true, plannedIncomeBudgetId);
+
+                ToastService.Success("Dodano zaplanowany przychód.");
+                Cancel_Click(sender, e);
+            }
+            catch (Exception ex)
+            {
+                ToastService.Error("Nie udało się dodać zaplanowanego przychodu.\n" + ex.Message);
+            }
         }
 
         // ================== TRANSFER ==================
@@ -956,51 +1087,71 @@ namespace Finly.Pages
         }
 
         // ====== Income helpers (raw) ======
-        private void AddIncomeRaw(int userId, decimal amount, DateTime date, int? categoryId, string source, string? desc, bool isPlanned = false)
+        private void AddIncomeRaw(int userId, decimal amount, DateTime date, int? categoryId, string source, string? desc, bool isPlanned = false, int? budgetId = null)
         {
-            try {
+            try
+            {
                 using var con = DatabaseService.GetConnection();
                 using var cmd = con.CreateCommand();
-                cmd.CommandText = "INSERT INTO Incomes(UserId, Amount, Date, Description, Source, CategoryId, IsPlanned) VALUES (@u,@a,@d,@desc,@s,@cat,@p);";
+                cmd.CommandText = @"
+INSERT INTO Incomes (UserId, Amount, Date, Description, Source, CategoryId, IsPlanned, BudgetId)
+VALUES (@u, @a, @d, @desc, @s, @cat, @p, @b);";
+
                 cmd.Parameters.AddWithValue("@u", userId);
                 cmd.Parameters.AddWithValue("@a", amount);
                 cmd.Parameters.AddWithValue("@d", date.ToString("yyyy-MM-dd"));
                 cmd.Parameters.AddWithValue("@desc", (object?)desc ?? DBNull.Value);
                 cmd.Parameters.AddWithValue("@s", (object?)source ?? DBNull.Value);
-                if (categoryId.HasValue && categoryId.Value >0) cmd.Parameters.AddWithValue("@cat", categoryId.Value); else cmd.Parameters.AddWithValue("@cat", DBNull.Value);
-                cmd.Parameters.AddWithValue("@p", isPlanned ?1 :0);
+
+                if (categoryId.HasValue && categoryId.Value > 0)
+                    cmd.Parameters.AddWithValue("@cat", categoryId.Value);
+                else
+                    cmd.Parameters.AddWithValue("@cat", DBNull.Value);
+
+                cmd.Parameters.AddWithValue("@p", isPlanned ? 1 : 0);
+                cmd.Parameters.AddWithValue("@b", (object?)budgetId ?? DBNull.Value);
+
                 cmd.ExecuteNonQuery();
-            } catch { }
+            }
+            catch
+            {
+                // możesz dodać logowanie błędu, jeśli chcesz
+            }
         }
 
-        private void InsertPlannedIncomeRaw(int userId, decimal amount, DateTime date, int? categoryId, string source, string? desc)
-            => AddIncomeRaw(userId, amount, date, categoryId, source, desc, true);
+        private void InsertPlannedIncomeRaw(int userId, decimal amount, DateTime date, int? categoryId, string source, string? desc, int? budgetId)
+    => AddIncomeRaw(userId, amount, date, categoryId, source, desc, true, budgetId);
 
         private void UpdateCashOnHand(int userId, decimal delta)
         {
-            try {
+            try
+            {
                 using var con = DatabaseService.GetConnection();
                 using var cmd = con.CreateCommand();
                 cmd.CommandText = @"UPDATE CashOnHand SET Amount = Amount + @d WHERE UserId=@u; INSERT INTO CashOnHand(UserId,Amount) SELECT @u,@d WHERE (SELECT changes())=0;";
                 cmd.Parameters.AddWithValue("@u", userId);
                 cmd.Parameters.AddWithValue("@d", delta);
                 cmd.ExecuteNonQuery();
-            } catch { }
+            }
+            catch { }
         }
         private void UpdateSavedCash(int userId, decimal delta)
         {
-            try {
+            try
+            {
                 using var con = DatabaseService.GetConnection();
                 using var cmd = con.CreateCommand();
                 cmd.CommandText = @"UPDATE SavedCash SET Amount = Amount + @d WHERE UserId=@u; INSERT INTO SavedCash(UserId,Amount) SELECT @u,@d WHERE (SELECT changes())=0;";
                 cmd.Parameters.AddWithValue("@u", userId);
                 cmd.Parameters.AddWithValue("@d", delta);
                 cmd.ExecuteNonQuery();
-            } catch { }
+            }
+            catch { }
         }
         private void IncreaseBankBalance(int accountId, int userId, decimal delta)
         {
-            try {
+            try
+            {
                 using var con = DatabaseService.GetConnection();
                 using var cmd = con.CreateCommand();
                 cmd.CommandText = "UPDATE BankAccounts SET Balance = Balance + @d WHERE Id=@id AND UserId=@u;";
@@ -1008,7 +1159,101 @@ namespace Finly.Pages
                 cmd.Parameters.AddWithValue("@id", accountId);
                 cmd.Parameters.AddWithValue("@u", userId);
                 cmd.ExecuteNonQuery();
-            } catch { }
+            }
+            catch { }
+        }
+        private void LoadBudgets()
+        {
+            try
+            {
+                var today = DateTime.Today;
+
+                // Pobieramy tylko budżety aktywne dziś
+                _budgets = BudgetService
+                    .GetBudgetsForUser(_uid, from: today, to: today)
+                    .ToList();
+
+                void BindBudgetCombo(ComboBox? combo)
+                {
+                    if (combo == null) return;
+
+                    combo.ItemsSource = _budgets;
+                    combo.SelectedValuePath = "Id";   // ID budżetu
+                }
+
+                // 🔵 PRZYPISANIE BUDŻETÓW — tylko dla przychodów i wydatków
+
+                // Wydatek
+                BindBudgetCombo(ExpenseBudgetCombo);
+                BindBudgetCombo(ExpensePlannedBudgetCombo);
+
+                // Przychód
+                BindBudgetCombo(IncomeBudgetCombo);
+                BindBudgetCombo(IncomePlannedBudgetCombo);
+
+                // ❌ Transfery nie dostają budżetów
+            }
+            catch (Exception ex)
+            {
+                ToastService.Error("Nie udało się załadować budżetów.\n" + ex.Message);
+            }
+        }
+
+        // Reakcja na zmianę daty wydatku – na razie tylko ewentualnie odświeżamy budżety
+        private void ExpenseDatePicker_SelectedDateChanged(object sender, SelectionChangedEventArgs e)
+        {
+            // Jeśli kiedyś będziesz chciał filtrować budżety po dacie,
+            // możesz tu zawołać własną metodę, np. LoadBudgetsForDate(date).
+            var date = ExpenseDatePicker.SelectedDate ?? DateTime.Today;
+
+            // Na ten moment nic więcej nie musi tu być – ważne, że metoda istnieje.
+        }
+
+        // Ładuje budżety dla wybranej daty wydatku.
+        // Jeśli użytkownik nie ma żadnych budżetów, wiersz z ComboBoxem jest ukryty.
+        private void LoadExpenseBudgetsForCurrentDate()
+        {
+            // jeśli DatePicker nie ma daty, bierzemy dzisiejszy dzień
+            var date = ExpenseDatePicker.SelectedDate ?? DateTime.Today;
+
+            // Pobieramy budżety z serwisu – użyj tej metody, którą masz w BudgetService
+            // Ja zakładam, że masz coś w stylu GetBudgetsForDate.
+            var budgets = BudgetService.GetBudgetsForDate(_uid, date);
+
+            if (budgets != null && budgets.Any())
+            {
+                ExpenseBudgetRow.Visibility = Visibility.Visible;
+                ExpenseBudgetCombo.ItemsSource = budgets;
+                ExpenseBudgetCombo.SelectedIndex = -1;
+            }
+            else
+            {
+                // Brak budżetów – chowamy cały wiersz
+                ExpenseBudgetRow.Visibility = Visibility.Collapsed;
+                ExpenseBudgetCombo.ItemsSource = null;
+            }
+        }
+
+        // Ładuje budżety dla daty wybranego PRZYCHODU.
+        // Jeśli nie ma żadnych budżetów, wiersz z ComboBoxem jest ukryty.
+        private void LoadIncomeBudgetsForCurrentDate()
+        {
+            var date = IncomeDatePicker.SelectedDate ?? DateTime.Today;
+
+            // zakładam, że masz taką samą metodę jak dla wydatków:
+            var budgets = BudgetService.GetBudgetsForDate(_uid, date);
+
+            if (budgets != null && budgets.Any())
+            {
+                IncomeBudgetRow.Visibility = Visibility.Visible;
+                IncomeBudgetCombo.ItemsSource = budgets;
+                IncomeBudgetCombo.SelectedIndex = -1;
+            }
+            else
+            {
+                IncomeBudgetRow.Visibility = Visibility.Collapsed;
+                IncomeBudgetCombo.ItemsSource = null;
+            }
         }
     }
 }

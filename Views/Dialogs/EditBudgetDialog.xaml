@@ -1,6 +1,7 @@
 ﻿<Window x:Class="Finly.Views.Dialogs.EditBudgetDialog"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:sys="clr-namespace:System;assembly=mscorlib"
         Title="Budżet"
         WindowStartupLocation="CenterOwner"
         SizeToContent="WidthAndHeight"
@@ -9,7 +10,8 @@
         Foreground="{DynamicResource App.Foreground}" Width="1730">
 
     <Window.Resources>
-        <Style TargetType="ComboBox" x:Key="DarkComboBox">
+        <Style TargetType="ComboBox" x:Key="DarkComboBox"
+               BasedOn="{StaticResource {x:Type ComboBox}}">
             <Setter Property="Foreground" Value="#DDD"/>
             <Setter Property="Background" Value="#333"/>
             <Setter Property="BorderBrush" Value="#555"/>
@@ -29,8 +31,9 @@
 
                             <DockPanel>
                                 <ContentPresenter Margin="8,2,25,2"
-                                              VerticalAlignment="Center"
-                                              HorizontalAlignment="Left"/>
+                                                  VerticalAlignment="Center"
+                                                  HorizontalAlignment="Left"
+                                                  Content="{TemplateBinding SelectionBoxItem}"/>
                             </DockPanel>
 
                             <!-- Strzałka -->
@@ -149,20 +152,19 @@
                                     UpdateSourceTrigger=PropertyChanged}"/>
 
             <!-- Typ -->
-            <TextBlock Grid.Row="2" 
-                       Grid.Column="0" 
+            <TextBlock Grid.Row="2"
+                       Grid.Column="0"
                        Margin="0,0,8,8"
                        VerticalAlignment="Center"
                        Text="Typ:"/>
             <ComboBox Grid.Row="2"
                       Grid.Column="1"
                       Margin="0,0,0,8"
-                      SelectedValue="{Binding Type}"
-                      SelectedValuePath="Content"
+                      SelectedItem="{Binding Type, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                       Style="{StaticResource DarkComboBox}">
-                <ComboBoxItem Content="Miesięczny"/>
-                <ComboBoxItem Content="Roczny"/>
-                <ComboBoxItem Content="Cel specjalny"/>
+                <sys:String>Tygodniowy</sys:String>
+                <sys:String>Miesięczny</sys:String>
+                <sys:String>Roczny</sys:String>
             </ComboBox>
 
             <!-- Okres -->
@@ -188,10 +190,8 @@
                            VerticalAlignment="Center"/>
 
                 <!-- Data do -->
-                <DatePicker Width="143"
-                            SelectedDate="{Binding EndDate,
-                                                   Mode=TwoWay,
-                                                   UpdateSourceTrigger=PropertyChanged}"/>
+                <DatePicker SelectedDate="{Binding EndDate, Mode=OneWay}"
+                            IsEnabled="False" />
             </StackPanel>
 
             <!-- Planowana kwota -->

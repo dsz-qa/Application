@@ -57,12 +57,22 @@ namespace Finly.Services
             lock (_schemaLock)
             {
                 if (_schemaInitialized) return;
+
                 using var c = GetConnection();
+
+                // 1) g³ówny schemat (tabele bazowe)
                 SchemaService.Ensure(c);
-                EnsureBankAccountsSchema(c); // implementacja poni¿ej
+
+                // 2) dodatkowe migracje/kolumny wymagane przez UI
+                EnsureBankAccountsSchema(c);
+                EnsureExpensesSchema(c);
+                EnsureBudgetsSchema(c);
+                EnsureIncomesSchema(c);
+
                 _schemaInitialized = true;
             }
         }
+
 
         private static SqliteConnection OpenAndEnsureSchema()
         {
@@ -73,14 +83,25 @@ namespace Finly.Services
                     if (!_schemaInitialized)
                     {
                         using var c0 = GetConnection();
+
+                        // 1) g³ówny schemat
                         SchemaService.Ensure(c0);
+
+                        // 2) dodatkowe migracje/kolumny
                         EnsureBankAccountsSchema(c0);
+                        EnsureExpensesSchema(c0);
+                        EnsureBudgetsSchema(c0);
+                        EnsureIncomesSchema(c0);
+
                         _schemaInitialized = true;
                     }
                 }
             }
+
+            // zwracamy normalne po³¹czenie do u¿ycia w metodach CRUD
             return GetConnection();
         }
+
 
         // === MIGRACJE DODATKOWE ===
         /// <summary>
@@ -101,6 +122,98 @@ namespace Finly.Services
             catch { /* ignorujemy – nie blokujemy startu */ }
         }
 
+        private static void EnsureExpensesSchema(SqliteConnection c)
+        {
+            try
+            {
+                if (!TableExists(c, "Expenses")) return;
+
+                // Nowy schemat: AccountId (FK do BankAccounts) - nullable
+                if (!ColumnExists(c, "Expenses", "AccountId"))
+                {
+                    using var alter = c.CreateCommand();
+                    alter.CommandText = "ALTER TABLE Expenses ADD COLUMN AccountId INTEGER NULL;";
+                    alter.ExecuteNonQuery();
+                }
+
+                // Dodajemy opcjonalne powi¹zanie BudgetId jeœli nie istnieje
+                if (!ColumnExists(c, "Expenses", "BudgetId"))
+                {
+                    using var alterB = c.CreateCommand();
+                    alterB.CommandText = "ALTER TABLE Expenses ADD COLUMN BudgetId INTEGER NULL;";
+                    alterB.ExecuteNonQuery();
+                }
+
+                // indeks pod filtr UserId + AccountId
+                try
+                {
+                    using var idx = c.CreateCommand();
+                    idx.CommandText = "CREATE INDEX IF NOT EXISTS IX_Expenses_UserId_AccountId ON Expenses(UserId, AccountId);";
+                    idx.ExecuteNonQuery();
+                }
+                catch { }
+            }
+            catch
+            {
+                // nie blokujemy startu aplikacji
+            }
+        }
+
+        /// <summary>
+        /// Upewnia siê, ¿e tabela Budgets posiada kolumny u¿ywane w UI: OverState oraz OverNotifiedAt.
+        /// </summary>
+        private static void EnsureBudgetsSchema(SqliteConnection c)
+        {
+            try
+            {
+                if (!TableExists(c, "Budgets")) return;
+
+                if (!ColumnExists(c, "Budgets", "OverState"))
+                {
+                    using var alter = c.CreateCommand();
+                    alter.CommandText = "ALTER TABLE Budgets ADD COLUMN OverState INTEGER NOT NULL DEFAULT0;";
+                    alter.ExecuteNonQuery();
+                }
+
+                if (!ColumnExists(c, "Budgets", "OverNotifiedAt"))
+                {
+                    using var alter = c.CreateCommand();
+                    alter.CommandText = "ALTER TABLE Budgets ADD COLUMN OverNotifiedAt TEXT NULL;";
+                    alter.ExecuteNonQuery();
+                }
+            }
+            catch
+            {
+                // nie blokujemy startu aplikacji
+            }
+        }
+
+        private static void EnsureIncomesSchema(SqliteConnection c)
+        {
+            try
+            {
+                if (!TableExists(c, "Incomes")) return;
+
+                if (!ColumnExists(c, "Incomes", "BudgetId"))
+                {
+                    using var alter = c.CreateCommand();
+                    alter.CommandText = "ALTER TABLE Incomes ADD COLUMN BudgetId INTEGER NULL;";
+                    alter.ExecuteNonQuery();
+                }
+            }
+            catch
+            {
+                // nie blokujemy startu aplikacji
+            }
+        }
+
+        private static bool ExpensesHasAccountId(SqliteConnection c)
+    => TableExists(c, "Expenses") && ColumnExists(c, "Expenses", "AccountId");
+
+        private static bool ExpensesHasBudgetId(SqliteConnection c)
+    => TableExists(c, "Expenses") && ColumnExists(c, "Expenses", "BudgetId");
+
+
         /// <summary>
         /// Sprawdza istnienie tabeli w bazie.
         /// </summary>
@@ -109,13 +222,17 @@ namespace Finly.Services
             try
             {
                 using var cmd = c.CreateCommand();
-                cmd.CommandText = "SELECT1 FROM sqlite_master WHERE type='table' AND name=@n LIMIT1;";
+                cmd.CommandText = "SELECT 1 FROM sqlite_master WHERE type='table' AND name=@n LIMIT 1;";
                 cmd.Parameters.AddWithValue("@n", tableName);
                 var obj = cmd.ExecuteScalar();
                 return obj != null && obj != DBNull.Value;
             }
-            catch { return false; }
+            catch
+            {
+                return false;
+            }
         }
+
 
         /// <summary>
         /// Sprawdza czy kolumna istnieje w tabeli.
@@ -376,7 +493,7 @@ UPDATE BankAccounts
             using (var chk = c.CreateCommand())
             {
                 chk.Transaction = tx;
-                chk.CommandText = @"SELECT Balance FROM BankAccounts WHERE Id=@id AND UserId=@u LIMIT1;";
+                chk.CommandText = @"SELECT Balance FROM BankAccounts WHERE Id=@id AND UserId=@u LIMIT 1;";
                 chk.Parameters.AddWithValue("@id", fromAccountId);
                 chk.Parameters.AddWithValue("@u", userId);
                 var obj = chk.ExecuteScalar();
@@ -1262,6 +1379,8 @@ WHERE Id=@id AND UserId=@u;";
             using var con = OpenAndEnsureSchema();
             using var cmd = con.CreateCommand();
 
+            bool hasAccountId = ColumnExists(con, "Expenses", "AccountId");
+
             var sb = new StringBuilder(@"
 SELECT 
     e.Id,
@@ -1271,11 +1390,12 @@ SELECT
     e.Description,
     e.CategoryId,
     COALESCE(c.Name,'(brak)') AS CategoryName,
-    e.AccountId,
+    " + (hasAccountId ? "e.AccountId" : "NULL") + @" AS AccountId,
     e.IsPlanned
 FROM Expenses e
 LEFT JOIN Categories c ON c.Id = e.CategoryId
 WHERE e.UserId = @uid");
+
 
             cmd.Parameters.AddWithValue("@uid", userId);
 
@@ -1297,11 +1417,12 @@ WHERE e.UserId = @uid");
                 cmd.Parameters.AddWithValue("@cid", categoryId.Value);
             }
 
-            if (accountId != null)
+            if (accountId != null && hasAccountId)
             {
                 sb.Append(" AND e.AccountId = @acc");
                 cmd.Parameters.AddWithValue("@acc", accountId.Value);
             }
+
 
             if (!string.IsNullOrWhiteSpace(search))
             {
@@ -1381,11 +1502,21 @@ ORDER BY e.Date DESC, e.Id DESC;";
         public static Expense? GetExpenseById(int id)
         {
             using var c = OpenAndEnsureSchema();
+
+            bool hasAccountId = ColumnExists(c, "Expenses", "AccountId");
+            bool hasAccountText = ColumnExists(c, "Expenses", "Account"); // legacy
+
             using var cmd = c.CreateCommand();
-            cmd.CommandText = @"
-SELECT Id, UserId, Amount, Date, Description, CategoryId, Account, IsPlanned
-FROM Expenses 
-WHERE Id=@id 
+
+            var selectAccountPart =
+                hasAccountId ? "AccountId" :
+                hasAccountText ? "Account" :
+                "NULL";
+
+            cmd.CommandText = $@"
+SELECT Id, UserId, Amount, Date, Description, CategoryId, {selectAccountPart} AS AccountOrId, IsPlanned
+FROM Expenses
+WHERE Id=@id
 LIMIT 1;";
             cmd.Parameters.AddWithValue("@id", id);
 
@@ -1393,6 +1524,14 @@ LIMIT 1;";
             if (!r.Read()) return null;
 
             var catId = r.IsDBNull(5) ? 0 : r.GetInt32(5);
+
+            // AccountOrId: jeœli to AccountId -> liczba, jeœli Account -> tekst
+            string accountText = "";
+            if (!r.IsDBNull(6))
+            {
+                var raw = r.GetValue(6);
+                accountText = raw?.ToString() ?? "";
+            }
 
             return new Expense
             {
@@ -1402,18 +1541,63 @@ LIMIT 1;";
                 Date = GetDate(r, 3),
                 Description = GetNullableString(r, 4),
                 CategoryId = catId,
-                Account = GetStringSafe(r, 6),
-                IsPlanned = !r.IsDBNull(7) && Convert.ToInt32(r.GetValue(7)) == 1
+                Account = accountText // na razie trzymamy w starym polu, ¿eby UI nie pêk³o
             };
         }
+        private static int? TryResolveAccountIdFromExpenseAccountText(SqliteConnection c, int userId, string? accountText)
+        {
+            if (string.IsNullOrWhiteSpace(accountText)) return null;
+
+            var t = accountText.Trim();
+
+            // Jeœli masz u siebie formaty typu: "Konto: mBank" albo "Konto: PKO"
+            if (t.StartsWith("Konto:", StringComparison.OrdinalIgnoreCase))
+            {
+                var name = t.Substring("Konto:".Length).Trim();
+                if (string.IsNullOrWhiteSpace(name)) return null;
+
+                using var cmd = c.CreateCommand();
+                cmd.CommandText = @"SELECT Id FROM BankAccounts WHERE UserId=@u AND AccountName=@n LIMIT 1;";
+                cmd.Parameters.AddWithValue("@u", userId);
+                cmd.Parameters.AddWithValue("@n", name);
+                var obj = cmd.ExecuteScalar();
+                return (obj == null || obj == DBNull.Value) ? (int?)null : Convert.ToInt32(obj);
+            }
+
+            // Jeœli w przysz³oœci bêdziesz kodowaæ inaczej, dodasz tu kolejne regu³y.
+            return null;
+        }
+
+
 
         public static int InsertExpense(Expense e)
         {
             using var c = OpenAndEnsureSchema();
+
+            bool hasAccountId = ExpensesHasAccountId(c);
+            bool hasAccountText = ColumnExists(c, "Expenses", "Account"); // legacy
+            bool hasBudgetId = ExpensesHasBudgetId(c);
+
+            // Spróbuj rozpoznaæ AccountId po nazwie, je¿eli UI nadal trzyma tekstowo konto w e.Account
+            int? accountId = null;
+            if (hasAccountId)
+            {
+                accountId = TryResolveAccountIdFromExpenseAccountText(c, e.UserId, e.Account);
+            }
+
             using var cmd = c.CreateCommand();
-            cmd.CommandText = @"
-INSERT INTO Expenses(UserId, Amount, Date, Description, CategoryId, Account, IsPlanned)
-VALUES (@u,@a,@d,@desc,@c,@acc,@planned);
+
+            // Budujemy INSERT zale¿nie od istniej¹cych kolumn
+            var cols = new List<string> { "UserId", "Amount", "Date", "Description", "CategoryId", "IsPlanned" };
+            var vals = new List<string> { "@u", "@a", "@d", "@desc", "@c", "@planned" };
+
+            if (hasAccountId) { cols.Add("AccountId"); vals.Add("@accId"); }
+            if (hasAccountText) { cols.Add("Account"); vals.Add("@accText"); }
+            if (hasBudgetId) { cols.Add("BudgetId"); vals.Add("@budgetId"); }
+
+            cmd.CommandText = $@"
+INSERT INTO Expenses({string.Join(",", cols)})
+VALUES ({string.Join(",", vals)});
 SELECT last_insert_rowid();";
 
             cmd.Parameters.AddWithValue("@u", e.UserId);
@@ -1421,53 +1605,163 @@ SELECT last_insert_rowid();";
             cmd.Parameters.AddWithValue("@d", ToIsoDate(e.Date));
             cmd.Parameters.AddWithValue("@desc", (object?)e.Description ?? DBNull.Value);
 
-            if (e.CategoryId is int cid && cid > 0)
+            if (e.CategoryId is int cid && cid >0)
                 cmd.Parameters.AddWithValue("@c", cid);
             else
                 cmd.Parameters.AddWithValue("@c", DBNull.Value);
 
-            cmd.Parameters.AddWithValue("@acc", (object?)e.Account ?? DBNull.Value);
-            cmd.Parameters.AddWithValue("@planned", e.IsPlanned ? 1 : 0);
+            cmd.Parameters.AddWithValue("@planned", e.IsPlanned ?1 :0);
 
-            var rowId = (long)(cmd.ExecuteScalar() ?? 0L);
+            var rowId = (long)(cmd.ExecuteScalar() ??0L);
 
-            // Notify listeners that data changed (so dashboard and other pages can refresh)
-            try { RaiseDataChanged(); } catch { }
+            // Aktualizacja salda (tylko dla wydatku ZREALIZOWANEGO)
+            if (!e.IsPlanned)
+            {
+                if (hasAccountId && accountId.HasValue)
+                    SpendFromBankAccount(e.UserId, accountId.Value, Convert.ToDecimal(e.Amount));
+                else
+                    SpendFromFreeCash(e.UserId, Convert.ToDecimal(e.Amount));
+            }
 
+
+            RaiseDataChanged();
             return (int)rowId;
         }
+
 
         public static void UpdateExpense(Expense e)
         {
             using var c = OpenAndEnsureSchema();
-            using var cmd = c.CreateCommand();
-            cmd.CommandText = @"
+
+            //1) Ustal, jakie kolumny faktycznie istniej¹ w DB (MUSI byæ przed u¿yciem)
+            bool hasAccountId = ExpensesHasAccountId(c);
+            bool hasAccountText = ColumnExists(c, "Expenses", "Account"); // legacy
+            bool hasBudgetId = ExpensesHasBudgetId(c);
+
+            //2) Pobierz stary rekord (do cofniêcia wp³ywu na saldo)
+            var old = GetExpenseById(e.Id);
+
+            // 3) Cofnij stary wp³yw na saldo (tylko jeœli wydatek by³ zrealizowany)
+            if (old != null && !old.IsPlanned)
+            {
+                int? oldAccId = null;
+
+                // a) jeœli mamy AccountId w tabeli, spróbuj go odczytaæ
+                if (hasAccountId)
+                {
+                    using var cmdOldAcc = c.CreateCommand();
+                    cmdOldAcc.CommandText = "SELECT AccountId FROM Expenses WHERE Id=@id LIMIT 1;";
+                    cmdOldAcc.Parameters.AddWithValue("@id", e.Id);
+                    var raw = cmdOldAcc.ExecuteScalar();
+                    if (raw != null && raw != DBNull.Value)
+                        oldAccId = Convert.ToInt32(raw);
+                }
+
+                // b) jeœli AccountId jest NULL, a istnieje legacy Account (tekst) – spróbuj zmapowaæ po nazwie
+                if (!oldAccId.HasValue && hasAccountText)
+                {
+                    using var cmdOldTxt = c.CreateCommand();
+                    cmdOldTxt.CommandText = "SELECT Account FROM Expenses WHERE Id=@id LIMIT 1;";
+                    cmdOldTxt.Parameters.AddWithValue("@id", e.Id);
+                    var txt = cmdOldTxt.ExecuteScalar()?.ToString();
+
+                    var resolved = TryResolveAccountIdFromExpenseAccountText(c, old.UserId, txt);
+                    if (resolved.HasValue)
+                        oldAccId = resolved.Value;
+                }
+
+                // c) cofniêcie: jeœli by³o konto bankowe -> + do banku, inaczej -> + do gotówki
+                if (oldAccId.HasValue)
+                {
+                    using var addBack = c.CreateCommand();
+                    addBack.CommandText = @"UPDATE BankAccounts
+SET Balance = Balance + @a
+WHERE Id=@id AND UserId=@u;";
+                    addBack.Parameters.AddWithValue("@a", Convert.ToDecimal(old.Amount));
+                    addBack.Parameters.AddWithValue("@id", oldAccId.Value);
+                    addBack.Parameters.AddWithValue("@u", old.UserId);
+                    addBack.ExecuteNonQuery();
+                }
+                else
+                {
+                    using var addCash = c.CreateCommand();
+                    addCash.CommandText = @"
+INSERT INTO CashOnHand(UserId, Amount, UpdatedAt)
+VALUES (@u, @a, CURRENT_TIMESTAMP)
+ON CONFLICT(UserId) DO UPDATE
+SET Amount = CashOnHand.Amount + excluded.Amount,
+    UpdatedAt = CURRENT_TIMESTAMP;";
+                    addCash.Parameters.AddWithValue("@u", old.UserId);
+                    addCash.Parameters.AddWithValue("@a", Convert.ToDecimal(old.Amount));
+                    addCash.ExecuteNonQuery();
+                }
+            }
+
+            // 4) Wylicz nowe AccountId z tekstu (jeœli DB ma AccountId)
+            int? newAccountId = null;
+            if (hasAccountId)
+                newAccountId = TryResolveAccountIdFromExpenseAccountText(c, e.UserId, e.Account);
+
+            // 5) Zapisz now¹ wersjê wydatku (UPDATE)
+            var setParts = new List<string>
+ {
+ "UserId=@u",
+ "Amount=@a",
+ "Date=@d",
+ "Description=@desc",
+ "CategoryId=@c",
+ "Source=@s",
+ "IsPlanned=@planned"
+ };
+
+ if (hasAccountId) setParts.Add("AccountId=@accId");
+ if (hasAccountText) setParts.Add("Account=@accText");
+ if (hasBudgetId) setParts.Add("BudgetId=@budgetId");
+
+ using (var cmd = c.CreateCommand())
+ {
+ cmd.CommandText = $@"
 UPDATE Expenses SET
-    UserId=@u, 
-    Amount=@a, 
-    Date=@d, 
-    Description=@desc, 
-    CategoryId=@c,
-    Account=@acc,
-    IsPlanned=@planned
+ {string.Join(",\n ", setParts)}
 WHERE Id=@id;";
 
-            cmd.Parameters.AddWithValue("@id", e.Id);
-            cmd.Parameters.AddWithValue("@u", e.UserId);
-            cmd.Parameters.AddWithValue("@a", e.Amount);
-            cmd.Parameters.AddWithValue("@d", ToIsoDate(e.Date));
-            cmd.Parameters.AddWithValue("@desc", (object?)e.Description ?? DBNull.Value);
+ cmd.Parameters.AddWithValue("@id", e.Id);
+ cmd.Parameters.AddWithValue("@u", e.UserId);
+ cmd.Parameters.AddWithValue("@a", e.Amount);
+ cmd.Parameters.AddWithValue("@d", ToIsoDate(e.Date));
+ cmd.Parameters.AddWithValue("@desc", (object?)e.Description ?? DBNull.Value);
 
-            if (e.CategoryId is int cid && cid > 0)
-                cmd.Parameters.AddWithValue("@c", cid);
-            else
-                cmd.Parameters.AddWithValue("@c", DBNull.Value);
+ if (e.CategoryId is int cid && cid > 0)
+     cmd.Parameters.AddWithValue("@c", cid);
+ else
+     cmd.Parameters.AddWithValue("@c", DBNull.Value);
 
-            cmd.Parameters.AddWithValue("@acc", (object?)e.Account ?? DBNull.Value);
-            cmd.Parameters.AddWithValue("@planned", e.IsPlanned ? 1 : 0);
+ cmd.Parameters.AddWithValue("@planned", e.IsPlanned ? 1 : 0);
 
-            cmd.ExecuteNonQuery();
+ if (hasAccountId)
+     cmd.Parameters.AddWithValue("@accId", (object?)newAccountId ?? DBNull.Value);
+
+ if (hasAccountText)
+     cmd.Parameters.AddWithValue("@accText", (object?)e.Account ?? DBNull.Value);
+ 
+ if (hasBudgetId)
+     cmd.Parameters.AddWithValue("@budgetId", (object?)e.BudgetId ?? DBNull.Value);
+
+ cmd.ExecuteNonQuery();
+ }
+
+            // 6) Na³ó¿ nowy wp³yw na saldo (tylko jeœli wydatek jest zrealizowany)
+            if (!e.IsPlanned)
+            {
+                if (hasAccountId && newAccountId.HasValue)
+                    SpendFromBankAccount(e.UserId, newAccountId.Value, Convert.ToDecimal(e.Amount));
+                else
+                    SpendFromFreeCash(e.UserId, Convert.ToDecimal(e.Amount));
+            }
+
+            RaiseDataChanged();
         }
+
 
 
         /// <summary>
@@ -1480,12 +1774,10 @@ WHERE Id=@id;";
 
         public static void DeleteExpense(int id)
         {
-            using var c = OpenAndEnsureSchema();
-            using var cmd = c.CreateCommand();
-            cmd.CommandText = "DELETE FROM Expenses WHERE Id=@id;";
-            cmd.Parameters.AddWithValue("@id", id);
-            cmd.ExecuteNonQuery();
+            if (id <= 0) return;
+            DeleteTransactionAndRevertBalance(id);
         }
+
 
         // ===== FK helper =====
 
@@ -2090,7 +2382,7 @@ LIMIT 1;";
             using (var updCash = c.CreateCommand())
             {
                 updCash.Transaction = tx;
-                updCash.CommandText = @"UPDATE CashOnHand SET Amount = Amount - @a, UpdatedAt=CURRENT_TIMESTAMP WHERE UserId=@u;";
+                updCash.CommandText = @"UPDATE CashOnHand SET Amount = Amount - @a, UpdatedAt = CURRENT_TIMESTAMP WHERE UserId=@u;";
                 updCash.Parameters.AddWithValue("@u", userId);
                 updCash.Parameters.AddWithValue("@a", amount);
                 updCash.ExecuteNonQuery();
@@ -2194,12 +2486,12 @@ UPDATE BankAccounts
             using var cmd = con.CreateCommand();
             var sb = new StringBuilder(@"SELECT i.Id, i.UserId, i.Date, i.Amount, i.Description, i.Source, i.CategoryId, c.Name AS CategoryName, i.IsPlanned FROM Incomes i LEFT JOIN Categories c ON c.Id = i.CategoryId WHERE i.UserId=@u");
             cmd.Parameters.AddWithValue("@u", userId);
-            if (from.HasValue)
+            if (from != null)
             {
                 sb.Append(" AND date(i.Date) >= date(@from)");
                 cmd.Parameters.AddWithValue("@from", from.Value.ToString("yyyy-MM-dd"));
             }
-            if (to.HasValue)
+            if (to != null)
             {
                 sb.Append(" AND date(i.Date) <= date(@to)");
                 cmd.Parameters.AddWithValue("@to", to.Value.ToString("yyyy-MM-dd"));
@@ -2213,11 +2505,22 @@ UPDATE BankAccounts
             return dt;
         }
 
-        public static int InsertIncome(int userId, decimal amount, DateTime date, string? description, string? source, int? categoryId, bool isPlanned = false)
+        public static int InsertIncome(int userId, decimal amount, DateTime date, string? description, string? source, int? categoryId, bool isPlanned = false, int? budgetId = null)
         {
             using var con = OpenAndEnsureSchema();
+            bool hasBudgetId = ColumnExists(con, "Incomes", "BudgetId");
             using var cmd = con.CreateCommand();
-            cmd.CommandText = @"INSERT INTO Incomes(UserId, Amount, Date, Description, Source, CategoryId, IsPlanned) VALUES (@u,@a,@d,@desc,@s,@c,@p); SELECT last_insert_rowid();";
+
+            // build INSERT depending on whether DB has BudgetId
+            if (hasBudgetId)
+            {
+                cmd.CommandText = @"INSERT INTO Incomes(UserId, Amount, Date, Description, Source, CategoryId, IsPlanned, BudgetId) VALUES (@u,@a,@d,@desc,@s,@c,@p,@b); SELECT last_insert_rowid();";
+            }
+            else
+            {
+                cmd.CommandText = @"INSERT INTO Incomes(UserId, Amount, Date, Description, Source, CategoryId, IsPlanned) VALUES (@u,@a,@d,@desc,@s,@c,@p); SELECT last_insert_rowid();";
+            }
+
             cmd.Parameters.AddWithValue("@u", userId);
             cmd.Parameters.AddWithValue("@a", amount);
             cmd.Parameters.AddWithValue("@d", date.ToString("yyyy-MM-dd"));
@@ -2225,16 +2528,36 @@ UPDATE BankAccounts
             cmd.Parameters.AddWithValue("@s", (object?)source ?? DBNull.Value);
             if (categoryId.HasValue && categoryId.Value >0) cmd.Parameters.AddWithValue("@c", categoryId.Value); else cmd.Parameters.AddWithValue("@c", DBNull.Value);
             cmd.Parameters.AddWithValue("@p", isPlanned ?1 :0);
+
+            if (hasBudgetId)
+            {
+                cmd.Parameters.AddWithValue("@b", (object?)budgetId ?? DBNull.Value);
+            }
+
             var id = Convert.ToInt32(cmd.ExecuteScalar() ??0);
             RaiseDataChanged();
             return id;
         }
 
-        public static void UpdateIncome(int id, int userId, decimal? amount = null, string? description = null, bool? isPlanned = null, DateTime? date = null, int? categoryId = null, string? source = null)
+        public static void UpdateIncome(int id, int userId, decimal? amount = null, string? description = null, bool? isPlanned = null, DateTime? date = null, int? categoryId = null, string? source = null, int? budgetId = null)
         {
             using var con = OpenAndEnsureSchema();
+            bool hasBudgetId = ColumnExists(con, "Incomes", "BudgetId");
+
+            var setParts = new List<string>
+            {
+                "Amount = COALESCE(@a, Amount)",
+                "Description = COALESCE(@desc, Description)",
+                "IsPlanned = COALESCE(@p, IsPlanned)",
+                "Date = COALESCE(@d, Date)",
+                "CategoryId = @c",
+                "Source = COALESCE(@s, Source)"
+            };
+
+            if (hasBudgetId) setParts.Add("BudgetId = @b");
+
             using var cmd = con.CreateCommand();
-            cmd.CommandText = @"UPDATE Incomes SET Amount = COALESCE(@a, Amount), Description = COALESCE(@desc, Description), IsPlanned = COALESCE(@p, IsPlanned), Date = COALESCE(@d, Date), CategoryId = @c, Source = COALESCE(@s, Source) WHERE Id=@id AND UserId=@u;";
+            cmd.CommandText = $@"UPDATE Incomes SET {string.Join(", ", setParts)} WHERE Id=@id AND UserId=@u;";
             cmd.Parameters.AddWithValue("@id", id);
             cmd.Parameters.AddWithValue("@u", userId);
             cmd.Parameters.AddWithValue("@a", (object?)amount ?? DBNull.Value);
@@ -2243,6 +2566,7 @@ UPDATE BankAccounts
             cmd.Parameters.AddWithValue("@d", date.HasValue ? date.Value.ToString("yyyy-MM-dd") : (object)DBNull.Value);
             if (categoryId.HasValue && categoryId.Value >0) cmd.Parameters.AddWithValue("@c", categoryId.Value); else cmd.Parameters.AddWithValue("@c", DBNull.Value);
             cmd.Parameters.AddWithValue("@s", (object?)source ?? DBNull.Value);
+            if (hasBudgetId) cmd.Parameters.AddWithValue("@b", (object?)budgetId ?? DBNull.Value);
             cmd.ExecuteNonQuery();
             RaiseDataChanged();
         }
@@ -2384,8 +2708,11 @@ GROUP BY i.Source;";
                     var userId = rTr.GetInt32(1);
                     var amount = Convert.ToDecimal(rTr.GetValue(2));
                     var fromKind = GetStringSafe(rTr, 3).ToLowerInvariant();
+
                     var fromRefId = rTr.IsDBNull(4) ? (int?)null : rTr.GetInt32(4);
+
                     var toKind = GetStringSafe(rTr, 5).ToLowerInvariant();
+
                     var toRefId = rTr.IsDBNull(6) ? (int?)null : rTr.GetInt32(6);
 
                     using var tx = c.BeginTransaction();
@@ -2430,7 +2757,7 @@ ON CONFLICT(UserId) DO UPDATE SET Amount = CashOnHand.Amount + excluded.Amount, 
                     {
                         using var cmd = c.CreateCommand();
                         cmd.Transaction = tx;
-                        cmd.CommandText = @"UPDATE CashOnHand SET Amount = Amount - @a, UpdatedAt=CURRENT_TIMESTAMP WHERE UserId=@u;";
+                        cmd.CommandText = @"UPDATE CashOnHand SET Amount = Amount - @a, UpdatedAt = CURRENT_TIMESTAMP WHERE UserId=@u;";
                         cmd.Parameters.AddWithValue("@u", userId);
                         cmd.Parameters.AddWithValue("@a", a);
                         cmd.ExecuteNonQuery();
@@ -2485,6 +2812,18 @@ ON CONFLICT(UserId) DO UPDATE SET Amount = CashOnHand.Amount + excluded.Amount, 
                     var userId = rEx.GetInt32(1);
                     var amount = Convert.ToDecimal(rEx.GetValue(2));
                     var accountId = rEx.IsDBNull(3) ? (int?)null : rEx.GetInt32(3);
+                    // Jeœli AccountId jest NULL, a stary "Account" tekstowo istnieje, spróbuj dopasowaæ do BankAccounts
+                    if (!accountId.HasValue && ColumnExists(c, "Expenses", "Account"))
+                    {
+                        using var cmdAccText = c.CreateCommand();
+                        cmdAccText.CommandText = "SELECT Account FROM Expenses WHERE Id=@id LIMIT 1;";
+                        cmdAccText.Parameters.AddWithValue("@id", transactionId);
+                        var accText = cmdAccText.ExecuteScalar()?.ToString();
+
+                        var resolved = TryResolveAccountIdFromExpenseAccountText(c, userId, accText);
+                        if (resolved.HasValue) accountId = resolved.Value;
+                    }
+
                     var isPlanned = !rEx.IsDBNull(4) && Convert.ToInt32(rEx.GetValue(4)) == 1;
 
                     using var tx = c.BeginTransaction();
@@ -2512,6 +2851,7 @@ ON CONFLICT(UserId) DO UPDATE SET Amount = excluded.Amount + CashOnHand.Amount, 
                         updCash.ExecuteNonQuery();
                     }
 
+                    // usuñ wydatek
                     using (var del = c.CreateCommand())
                     {
                         del.Transaction = tx;
@@ -2546,19 +2886,19 @@ LIMIT 1;";
                     var source = GetNullableString(rInc, 3) ?? string.Empty;
                     var isPlanned = !rInc.IsDBNull(4) && Convert.ToInt32(rInc.GetValue(4)) == 1;
 
-                    // Najpierw cofamy wp³yw na salda (TYLKO dla przychodów zrealizowanych)
+                    using var tx = c.BeginTransaction();
+
+                    // cofamy wp³yw na salda tylko dla zrealizowanych
                     if (!isPlanned && !string.IsNullOrWhiteSpace(source))
                     {
                         var src = source.Trim();
 
-                        // 1) Przy usuwaniu przychodu z konta bankowego
-                        //    ("Konto: mBank" itd.) – zmniejszamy saldo tego konta
                         if (src.StartsWith("Konto:", StringComparison.OrdinalIgnoreCase))
                         {
                             var accountName = src.Substring("Konto:".Length).Trim();
 
-                            using var cAcc = OpenAndEnsureSchema();
-                            using var cmdAcc = cAcc.CreateCommand();
+                            using var cmdAcc = c.CreateCommand();
+                            cmdAcc.Transaction = tx;
                             cmdAcc.CommandText = @"
 UPDATE BankAccounts
    SET Balance = Balance - @a
@@ -2568,29 +2908,60 @@ UPDATE BankAccounts
                             cmdAcc.Parameters.AddWithValue("@n", accountName);
                             cmdAcc.ExecuteNonQuery();
                         }
-                        // 2) "Wolna gotówka" – odejmujemy z CashOnHand
                         else if (src.Equals("Wolna gotówka", StringComparison.OrdinalIgnoreCase))
                         {
-                            var cash = GetCashOnHand(userId);
-                            SetCashOnHand(userId, cash - amount);
+                            using var cmdCash = c.CreateCommand();
+                            cmdCash.Transaction = tx;
+                            cmdCash.CommandText = @"UPDATE CashOnHand SET Amount = Amount - @a, UpdatedAt = CURRENT_TIMESTAMP WHERE UserId=@u;";
+                            cmdCash.Parameters.AddWithValue("@u", userId);
+                            cmdCash.Parameters.AddWithValue("@a", amount);
+                            cmdCash.ExecuteNonQuery();
                         }
-                        // 3) "Od³o¿ona gotówka" – odejmujemy z SavedCash i z CashOnHand
                         else if (src.Equals("Od³o¿ona gotówka", StringComparison.OrdinalIgnoreCase))
                         {
-                            var saved = GetSavedCash(userId);
-                            var cash = GetCashOnHand(userId);
+                            using (var cmdSaved = c.CreateCommand())
+                            {
+                                cmdSaved.Transaction = tx;
+                                cmdSaved.CommandText = @"
+UPDATE SavedCash
+   SET Amount = Amount - @a,
+       UpdatedAt = CURRENT_TIMESTAMP
+ WHERE UserId=@u;";
+                                cmdSaved.Parameters.AddWithValue("@u", userId);
+                                cmdSaved.Parameters.AddWithValue("@a", amount);
+                                cmdSaved.ExecuteNonQuery();
+                            }
 
-                            SetSavedCash(userId, saved - amount);
-                            SetCashOnHand(userId, cash - amount);
+                            using (var cmdCash = c.CreateCommand())
+                            {
+                                cmdCash.Transaction = tx;
+                                cmdCash.CommandText = @"
+UPDATE CashOnHand
+   SET Amount = Amount - @a,
+       UpdatedAt = CURRENT_TIMESTAMP
+ WHERE UserId=@u;";
+                                cmdCash.Parameters.AddWithValue("@u", userId);
+                                cmdCash.Parameters.AddWithValue("@a", amount);
+                                cmdCash.ExecuteNonQuery();
+                            }
                         }
-                        // inne Ÿród³a – na razie ignorujemy (brak efektu ubocznego)
                     }
 
-                    // Potem usuwamy rekord przychodu z bazy
-                    DeleteIncome(id); // ta metoda sama zrobi RaiseDataChanged()
+                    // usuwamy przychód W TEJ SAMEJ transakcji (bez DeleteIncome, bo ono otwiera nowe po³¹czenie)
+                    using (var del = c.CreateCommand())
+                    {
+                        del.Transaction = tx;
+                        del.CommandText = "DELETE FROM Incomes WHERE Id=@id;";
+                        del.Parameters.AddWithValue("@id", id);
+                        del.ExecuteNonQuery();
+                    }
+
+                    tx.Commit();
+                    RaiseDataChanged();
                     return;
                 }
             }
+
 
 
             // Je¿eli nie znaleziono transakcji w ¿adnej tabeli – nic nie robimy

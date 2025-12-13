@@ -29,6 +29,9 @@ namespace Finly.Models
         // Nowe: rodzaj transakcji (Wydatek/Przychód/Transfer)
         public string Kind { get; set; } = string.Empty;
 
+        // Powi¹zanie opcjonalne z bud¿etem (nullable)
+        public int? BudgetId { get; set; }
+
         // Wygodne w³aœciwoœci formatuj¹ce do bindowania
         public string DateDisplay => Date.ToString("yyyy-MM-dd");
         public string AmountStr => Amount.ToString("N2") + " z³";

@@ -1,18 +1,27 @@
-﻿using System;
+﻿using Finly.Models;
+using Finly.Services;
+using LiveChartsCore;
+using LiveChartsCore.SkiaSharpView;
+using LiveChartsCore.SkiaSharpView.WPF;
+using Microsoft.Data.Sqlite;
+using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
+using System.Globalization;
 using System.Linq;
+using System.Threading;
 using System.Windows;
 using System.Windows.Controls;
-using Microsoft.Data.Sqlite;
-using Finly.Services;
+using static Finly.Pages.BudgetRow;
 
 namespace Finly.Pages
 {
     public partial class BudgetsPage : UserControl
     {
         private readonly ObservableCollection<BudgetRow> _allBudgets = new();
-        private readonly int _currentUserId = 1; // TODO: podmień na id zalogowanego użytkownika
+        // TODO: tu później podepniesz id zalogowanego użytkownika
+        private readonly int _currentUserId = 1;
+        private readonly ObservableCollection<BudgetOperationRow> _currentBudgetOps = new();
 
         public BudgetsPage()
         {
@@ -23,6 +32,8 @@ namespace Finly.Pages
 
             ApplyFilters();
             UpdateDetails();
+            CheckAndNotifyOverBudgets();
+            BudgetOperationsGrid.ItemsSource = _currentBudgetOps;
         }
 
         // =================== ŁADOWANIE Z TABELI BUDGETS ===================
@@ -36,45 +47,117 @@ namespace Finly.Pages
 
             using var cmd = conn.CreateCommand();
             cmd.CommandText = @"
-                SELECT 
-                    b.Id,
-                    b.Name,
-                    b.Type,
-                    b.StartDate,
-                    b.EndDate,
-                    b.PlannedAmount,
-                    IFNULL((
-                        SELECT SUM(e.Amount)
-                        FROM Expenses e
-                        WHERE e.UserId = b.UserId
-                          AND e.Date >= b.StartDate
-                          AND e.Date <= b.EndDate
-                    ), 0) AS SpentAmount
-                FROM Budgets b
-                WHERE b.UserId = $uid
-                ORDER BY b.StartDate;
+    SELECT
+        b.Id,
+        b.Name,
+        b.Type,
+        b.StartDate,
+        b.EndDate,
+        b.PlannedAmount,
+        b.OverState,
+        b.OverNotifiedAt,
+        IFNULL((
+            SELECT SUM(e.Amount)
+            FROM Expenses e
+            WHERE e.UserId  = b.UserId
+              AND e.BudgetId = b.Id
+              AND e.Date >= b.StartDate
+              AND e.Date <= b.EndDate
+        ), 0) AS SpentAmount,
+        IFNULL((
+            SELECT SUM(i.Amount)
+            FROM Incomes i
+            WHERE i.UserId  = b.UserId
+              AND i.BudgetId = b.Id
+              AND i.Date >= b.StartDate
+              AND i.Date <= b.EndDate
+        ), 0) AS IncomeAmount
+    FROM Budgets b
+    WHERE b.UserId = @uid
+    ORDER BY b.StartDate;
             ";
-            cmd.Parameters.AddWithValue("$uid", _currentUserId);
 
+            cmd.Parameters.AddWithValue("@uid", _currentUserId);
             using var reader = cmd.ExecuteReader();
+
             while (reader.Read())
             {
                 var row = new BudgetRow
                 {
                     Id = Convert.ToInt32(reader["Id"]),
                     Name = reader["Name"].ToString() ?? string.Empty,
-                    // 🔹 typ BIERZEMY Z TABELI Budgets.Type
                     Type = reader["Type"].ToString() ?? string.Empty,
                     TypeDisplay = reader["Type"].ToString() ?? string.Empty,
                     StartDate = Convert.ToDateTime(reader["StartDate"]),
                     EndDate = Convert.ToDateTime(reader["EndDate"]),
-                    PlannedAmount = Convert.ToDecimal(reader["PlannedAmount"]),
-                    SpentAmount = Convert.ToDecimal(reader["SpentAmount"])
+                    PlannedAmount = reader.GetDecimal(reader.GetOrdinal("PlannedAmount")),
+                    SpentAmount = reader.GetDecimal(reader.GetOrdinal("SpentAmount")),
+                    IncomeAmount = reader.GetDecimal(reader.GetOrdinal("IncomeAmount"))
                 };
 
                 row.Recalculate();
                 _allBudgets.Add(row);
             }
+        }
+
+        // =================== POWIADOMIENIA O PRZEKROCZENIU ===================
+
+        private void CheckAndNotifyOverBudgets()
+        {
+            var newlyOver = new List<BudgetRow>();
+
+            foreach (var b in _allBudgets)
+            {
+                var isOverNow = b.IsOverBudget;
+
+                // było OK → zrobiło się przekroczone
+                if (isOverNow && b.OverState == 0)
+                {
+                    newlyOver.Add(b);
+                    MarkOverStateInDb(b.Id, 1);
+                    b.OverState = 1;
+                    b.OverNotifiedAt = DateTime.Today.ToString("yyyy-MM-dd");
+                }
+
+                // wróciło do OK → zdejmij flagę
+                if (!isOverNow && b.OverState == 1)
+                {
+                    MarkOverStateInDb(b.Id, 0);
+                    b.OverState = 0;
+                }
+            }
+
+            if (newlyOver.Count > 0)
+            {
+                var msg = "Przekroczono budżety:\n\n" +
+                          string.Join("\n", newlyOver.Select(x =>
+                              $"• {x.Name} — o {x.OverAmount:N2} zł (okres: {x.StartDate:dd.MM.yyyy}–{x.EndDate:dd.MM.yyyy})"));
+
+                MessageBox.Show(
+                    msg,
+                    "Przekroczenie budżetu",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Warning);
+            }
+        }
+
+        private void MarkOverStateInDb(int budgetId, int state)
+        {
+            using var conn = DatabaseService.GetConnection();
+            conn.Open();
+
+            using var cmd = conn.CreateCommand();
+            cmd.CommandText = @"
+UPDATE Budgets
+SET OverState = $state,
+    OverNotifiedAt = CASE WHEN $state = 1 THEN $dt ELSE OverNotifiedAt END
+WHERE Id = $id AND UserId = $uid;";
+
+            cmd.Parameters.AddWithValue("$state", state);
+            cmd.Parameters.AddWithValue("$dt", DateTime.Today.ToString("yyyy-MM-dd"));
+            cmd.Parameters.AddWithValue("$id", budgetId);
+            cmd.Parameters.AddWithValue("$uid", _currentUserId);
+            cmd.ExecuteNonQuery();
         }
 
         private void SetupDefaultFilters()
@@ -108,7 +191,6 @@ namespace Finly.Pages
 
             var vm = dialog.Budget;
 
-            // zapis do bazy przez BudgetService
             var newId = BudgetService.InsertBudget(_currentUserId, vm);
 
             var row = new BudgetRow
@@ -120,15 +202,19 @@ namespace Finly.Pages
                 StartDate = vm.StartDate ?? DateTime.Today,
                 EndDate = vm.EndDate ?? vm.StartDate ?? DateTime.Today,
                 PlannedAmount = vm.PlannedAmount,
-                SpentAmount = 0m
+                SpentAmount = 0m,
+                IncomeAmount = 0m
             };
 
             row.Recalculate();
-            _allBudgets.Add(row);
 
-            // odśwież z bazy, żeby policzyć Wydano
+            // odśwież z bazy
             LoadBudgetsFromDatabase();
-            ApplyFilters();
+
+            //  TE DWIE LINIE SĄ KLUCZOWE
+            SetupDefaultFilters();   // przelicz zakres dat na nowo
+            ApplyFilters();          // zastosuj filtry do DataGrid
+
             SelectRow(row);
         }
 
@@ -175,6 +261,8 @@ namespace Finly.Pages
             }
 
             LoadBudgetsFromDatabase();
+            SetupDefaultFilters();
+            ApplyFilters();
             ApplyFilters();
         }
 
@@ -206,6 +294,74 @@ namespace Finly.Pages
             _allBudgets.Remove(budget);
             ApplyFilters();
             UpdateDetails();
+        }
+
+        private void TransferBudget_Click(object sender, RoutedEventArgs e)
+        {
+            var current = GetSelectedBudgetFromGrid();
+            if (current == null)
+            {
+                MessageBox.Show("Najpierw wybierz budżet, z którego chcesz przenieść środki.");
+                return;
+            }
+
+            var dialog = new Views.Dialogs.TransferBudgetDialog(_allBudgets, current)
+            {
+                Owner = Window.GetWindow(this)
+            };
+
+            var result = dialog.ShowDialog();
+            if (result != true)
+                return;
+
+            var from = dialog.FromBudget!;
+            var to = dialog.ToBudget!;
+            var amount = dialog.Amount;
+
+            if (amount <= 0)
+                return;
+
+            // Czy jest wystarczająco środków (patrzymy na RemainingAmount)?
+            if (from.RemainingAmount < amount)
+            {
+                MessageBox.Show("W wybranym budżecie nie ma wystarczających środków.");
+                return;
+            }
+
+            // ===== Zapis do bazy – przenosimy część planu między budżetami =====
+            using var conn = DatabaseService.GetConnection();
+            conn.Open();
+
+            using var tran = conn.BeginTransaction();
+            using var cmd = conn.CreateCommand();
+            cmd.Transaction = tran;
+
+            // odejmij z budżetu źródłowego
+            cmd.CommandText = @"
+        UPDATE Budgets
+        SET PlannedAmount = PlannedAmount - $amt
+        WHERE Id = $id AND UserId = $uid;";
+            cmd.Parameters.AddWithValue("$amt", amount);
+            cmd.Parameters.AddWithValue("$id", from.Id);
+            cmd.Parameters.AddWithValue("$uid", _currentUserId);
+            cmd.ExecuteNonQuery();
+            cmd.Parameters.Clear();
+
+            // dodaj do budżetu docelowego
+            cmd.CommandText = @"
+        UPDATE Budgets
+        SET PlannedAmount = PlannedAmount + $amt
+        WHERE Id = $id AND UserId = $uid;";
+            cmd.Parameters.AddWithValue("$amt", amount);
+            cmd.Parameters.AddWithValue("$id", to.Id);
+            cmd.Parameters.AddWithValue("$uid", _currentUserId);
+            cmd.ExecuteNonQuery();
+
+            tran.Commit();
+
+            // Odśwież dane w pamięci i UI
+            LoadBudgetsFromDatabase();
+            ApplyFilters();
         }
 
         // =================== FILTRY I SZCZEGÓŁY ===================
@@ -284,29 +440,282 @@ namespace Finly.Pages
         private void UpdateDetails()
         {
             var budget = GetSelectedBudgetFromGrid();
+
+            // nic nie zaznaczono
             if (budget == null)
             {
-                DetailsNameText.Text = "Brak wybranego budżetu";
-                DetailsPeriodText.Text = string.Empty;
-                DetailsStatusText.Text = string.Empty;
-                DetailsProgressBar.Value = 0;
+                BudgetNameText.Text = "(brak budżetu)";
+                BudgetPeriodText.Text = string.Empty;
+                BudgetPlannedText.Text = "0,00 zł";
+                BudgetSpentText.Text = "0,00 zł";
+                BudgetIncomeText.Text = "0,00 zł";
+                BudgetRemainingText.Text = "0,00 zł";
+                BudgetProgressBar.Value = 0;
+                BudgetProgressPercentText.Text = "0%";
+                BudgetStatusText.Text = string.Empty;
+                BudgetTimeSummaryText.Text = string.Empty;
+
+                // wyczyść wykres
+                LoadBudgetHistoryChart(null);
                 return;
             }
 
-            DetailsNameText.Text = budget.Name;
-            DetailsPeriodText.Text = $"{budget.StartDate:dd.MM.yyyy} – {budget.EndDate:dd.MM.yyyy}";
-            DetailsStatusText.Text =
-                $"{budget.StatusText} | Zaplanowano: {budget.PlannedAmount:N2} zł, " +
+            // ====== PODSUMOWANIE KWOT ======
+            BudgetNameText.Text = budget.Name;
+            BudgetPeriodText.Text = $"{budget.StartDate:dd.MM.yyyy} – {budget.EndDate:dd.MM.yyyy}";
+
+            BudgetPlannedText.Text = budget.PlannedAmount.ToString("N2") + " zł";
+            BudgetSpentText.Text = budget.SpentAmount.ToString("N2") + " zł";
+            BudgetIncomeText.Text = budget.IncomeAmount.ToString("N2") + " zł";
+            BudgetRemainingText.Text = budget.RemainingAmount.ToString("N2") + " zł";
+
+            var netSpent = budget.SpentAmount - budget.IncomeAmount;
+            var percentUsed = budget.PlannedAmount == 0
+                ? 0m
+                : netSpent / budget.PlannedAmount * 100m;
+            var usedClamped = Math.Max(0m, Math.Min(100m, percentUsed));
+
+            BudgetProgressBar.Value = (double)usedClamped;
+            BudgetProgressPercentText.Text = $"{usedClamped:0}%";
+
+            BudgetStatusText.Text =
+                $"Budżet w trakcie | plan: {budget.PlannedAmount:N2} zł, " +
+                $"przychody: {budget.IncomeAmount:N2} zł, " +
                 $"wydano: {budget.SpentAmount:N2} zł, " +
-                $"pozostało: {budget.RemainingAmount:N2} zł";
-            DetailsProgressBar.Value = budget.ProgressPercent;
+                $"pozostało: {budget.RemainingAmount:N2} zł.";
+
+            // ====== POSTĘP W CZASIE ======
+            var today = DateTime.Today;
+            var totalDays = (budget.EndDate - budget.StartDate).TotalDays;
+            var passed = (today - budget.StartDate).TotalDays;
+
+            if (totalDays <= 0)
+            {
+                BudgetTimeSummaryText.Text = "Okres budżetu ma 1 dzień.";
+            }
+            else
+            {
+                if (passed < 0) passed = 0;
+                if (passed > totalDays) passed = totalDays;
+
+                var timePct = passed / totalDays * 100.0;
+                BudgetTimeSummaryText.Text =
+                    $"Dni: {passed:0} / {totalDays:0} ({timePct:0}% czasu budżetu minęło).";
+            }
+
+            // ====== HISTORIA – WYKRES ======
+            LoadBudgetHistoryChart(budget);
+
+            // ====== HISTORIA – LISTA OPERACJI ======
+            LoadBudgetOperations(budget);
         }
+
+        // =================== WYKRES HISTORII BUDŻETU ===================
+
+        private void LoadBudgetHistoryChart(BudgetRow budget)
+        {
+            // jeżeli kontrolka jeszcze nie istnieje (np. w trakcie inicjalizacji) – nic nie rób
+            if (BudgetHistoryChartControl == null)
+                return;
+
+            // NIC NIE ZAZNACZONO – czyścimy wykres
+            if (budget == null)
+            {
+                BudgetHistoryChartControl.Series = Array.Empty<ISeries>();
+                return;
+            }
+
+            // słownik: dzień -> (przychody, wydatki)
+            var daily = new SortedDictionary<DateTime, (decimal income, decimal expense)>();
+
+            using var con = DatabaseService.GetConnection();
+            con.Open();
+
+            // ----- PRZYCHODY W BUDŻECIE -----
+            using (var cmd = con.CreateCommand())
+            {
+                cmd.CommandText = @"
+            SELECT Date, IFNULL(SUM(Amount), 0) AS Total
+            FROM Incomes
+            WHERE UserId  = @uid
+              AND BudgetId = @bid
+            GROUP BY Date
+            ORDER BY Date;";
+                cmd.Parameters.AddWithValue("@uid", _currentUserId);
+                cmd.Parameters.AddWithValue("@bid", budget.Id);
+
+                using var reader = cmd.ExecuteReader();
+                while (reader.Read())
+                {
+                    var dateStr = reader.GetString(0); // "yyyy-MM-dd"
+                    var date = DateTime.ParseExact(dateStr, "yyyy-MM-dd", CultureInfo.InvariantCulture);
+                    var total = (decimal)reader.GetDouble(1);
+
+                    if (!daily.TryGetValue(date, out var tuple))
+                        tuple = (0m, 0m);
+
+                    tuple.income += total;
+                    daily[date] = tuple;
+                }
+            }
+
+            // ----- WYDATKI W BUDŻECIE -----
+            using (var cmd = con.CreateCommand())
+            {
+                cmd.CommandText = @"
+            SELECT Date, IFNULL(SUM(Amount), 0) AS Total
+            FROM Expenses
+            WHERE UserId  = @uid
+              AND BudgetId = @bid
+            GROUP BY Date
+            ORDER BY Date;";
+                cmd.Parameters.AddWithValue("@uid", _currentUserId);
+                cmd.Parameters.AddWithValue("@bid", budget.Id);
+
+                using var reader = cmd.ExecuteReader();
+                while (reader.Read())
+                {
+                    var dateStr = reader.GetString(0);
+                    var date = DateTime.ParseExact(dateStr, "yyyy-MM-dd", CultureInfo.InvariantCulture);
+                    var total = (decimal)reader.GetDouble(1);
+
+                    if (!daily.TryGetValue(date, out var tuple))
+                        tuple = (0m, 0m);
+
+                    tuple.expense += total;
+                    daily[date] = tuple;
+                }
+            }
+
+
+            if (daily.Count == 0)
+            {
+                BudgetHistoryChartControl.Series = Array.Empty<ISeries>();
+                return;
+            }
+
+            // dane narastająco – widać rozwój budżetu
+            var incomeValues = new List<double>();
+            var expenseValues = new List<double>();
+
+            decimal cumIncome = 0m;
+            decimal cumExpense = 0m;
+
+            foreach (var kvp in daily)
+            {
+                var (income, expense) = kvp.Value;
+
+                cumIncome += income;
+                cumExpense += expense;
+
+                incomeValues.Add((double)cumIncome);
+                expenseValues.Add((double)cumExpense);
+            }
+
+            BudgetHistoryChartControl.Series = new ISeries[]
+            {
+        new LineSeries<double>
+        {
+            Name         = "Przychody (narastająco)",
+            Values       = incomeValues,
+            GeometrySize = 5
+        },
+        new LineSeries<double>
+        {
+            Name         = "Wydatki (narastająco)",
+            Values       = expenseValues,
+            GeometrySize = 5
+        }
+            };
+        }
+
+        private void LoadBudgetOperations(BudgetRow? budget)
+        {
+            _currentBudgetOps.Clear();
+
+            if (budget == null)
+                return;
+
+            using var con = DatabaseService.GetConnection();
+            con.Open();
+
+            using var cmd = con.CreateCommand();
+            cmd.CommandText = @"
+        SELECT 
+            e.Date               AS Date,
+            e.Amount             AS Amount,
+            'Wydatek'            AS Kind,
+            IFNULL(c.Name, '')   AS Category,
+            IFNULL(e.Description,'') AS Description
+        FROM Expenses e
+        LEFT JOIN Categories c ON e.CategoryId = c.Id
+        WHERE e.UserId  = @uid
+          AND e.BudgetId = @bid
+
+        UNION ALL
+
+        SELECT 
+            i.Date               AS Date,
+            i.Amount             AS Amount,
+            'Przychód'           AS Kind,
+            IFNULL(c.Name, '')   AS Category,
+            IFNULL(i.Description,'') AS Description
+        FROM Incomes i
+        LEFT JOIN Categories c ON i.CategoryId = c.Id
+        WHERE i.UserId  = @uid
+          AND i.BudgetId = @bid
+
+        ORDER BY Date;
+    ";
+
+            cmd.Parameters.AddWithValue("@uid", _currentUserId);
+            cmd.Parameters.AddWithValue("@bid", budget.Id);
+
+            using var reader = cmd.ExecuteReader();
+            while (reader.Read())
+            {
+                var dateStr = reader.GetString(0);           // "yyyy-MM-dd"
+                var date = DateTime.ParseExact(dateStr, "yyyy-MM-dd", CultureInfo.InvariantCulture);
+                var amount = (decimal)reader.GetDouble(1);
+                var kind = reader.GetString(2);              // "Wydatek" albo "Przychód"
+                var category = reader.GetString(3);
+                var desc = reader.GetString(4);
+
+                // dla czytelności możemy dać minus przy wydatkach
+                if (kind == "Wydatek")
+                    amount = -amount;
+
+                _currentBudgetOps.Add(new BudgetOperationRow
+                {
+                    Date = date,
+                    Kind = kind,
+                    Category = category,
+                    Amount = amount,
+                    Description = desc
+                });
+            }
+
+
+        }
+
+        // =================== POMOCNICZE ===================
 
         private BudgetRow? GetSelectedBudgetFromGrid() =>
             BudgetsGrid.SelectedItem as BudgetRow;
 
-        private void BudgetsGrid_SelectionChanged(object sender, SelectionChangedEventArgs e) =>
+        private void BudgetsGrid_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
             UpdateDetails();
+
+            var b = GetSelectedBudgetFromGrid();
+            if (b != null)
+                LoadBudgetHistoryChart(b);
+            if (BudgetHistoryChartControl == null)
+            {
+                MessageBox.Show("Wykres NULL – XAML nie zlinkowany");
+                return;
+            }
+        }
 
         private void SelectRow(BudgetRow row)
         {
@@ -319,6 +728,8 @@ namespace Finly.Pages
             UpdateDetails();
         }
     }
+
+    // =================== MODEL WIERSZA BUDŻETU ===================
 
     public class BudgetRow
     {
@@ -334,23 +745,27 @@ namespace Finly.Pages
 
         public decimal PlannedAmount { get; set; }
         public decimal SpentAmount { get; set; }
-        public decimal RemainingAmount => PlannedAmount - SpentAmount;
+        public decimal RemainingAmount { get; set; }
+        public decimal IncomeAmount { get; set; }
 
         public string StatusText { get; private set; } = string.Empty;
-        public double ProgressPercent { get; private set; }
+        public double ProgressPercent { get; set; }
+
+        public int OverState { get; set; }          // 0/1 z bazy
+        public string? OverNotifiedAt { get; set; } // data tekstowo
+
+        public bool IsOverBudget => RemainingAmount < 0;
+        public decimal OverAmount => IsOverBudget ? Math.Abs(RemainingAmount) : 0m;
 
         public void Recalculate()
         {
-            if (PlannedAmount <= 0)
+            var total = PlannedAmount + IncomeAmount;
+            RemainingAmount = total - SpentAmount;
+
+            if (total <= 0)
                 ProgressPercent = 0;
             else
-            {
-                var percentDecimal = Math.Clamp(
-                    SpentAmount / (PlannedAmount == 0 ? 1 : PlannedAmount) * 100m,
-                    0m,
-                    999m);
-                ProgressPercent = (double)percentDecimal;
-            }
+                ProgressPercent = (double)(SpentAmount / total) * 100.0;
 
             var today = DateTime.Today;
             if (today < StartDate)
@@ -359,6 +774,29 @@ namespace Finly.Pages
                 StatusText = "Budżet zakończony";
             else
                 StatusText = "Budżet w trakcie";
+
+            if (IsOverBudget)
+                StatusText = $"Przekroczony o {OverAmount:N2} zł";
         }
+
+        public class BudgetOperationRow
+        {
+            public DateTime Date { get; set; }
+            public string DateText => Date.ToString("dd.MM.yyyy");
+
+            /// <summary>"Przychód" albo "Wydatek"</summary>
+            public string Kind { get; set; } = string.Empty;
+
+            public string Category { get; set; } = string.Empty;
+            public decimal Amount { get; set; }
+
+            // np. +200,00 zł / -350,00 zł
+            public string AmountText => $"{Amount:N2} zł";
+
+            public string Description { get; set; } = string.Empty;
+        }
+
+        public override string ToString()
+        => Name;   //  TO DODAJ
     }
 }

@@ -9,47 +9,27 @@ namespace Finly.Views.Dialogs
         /// <summary>
         /// ViewModel dialogu – zawiera dane budżetu wprowadzane przez użytkownika.
         /// </summary>
-        public BudgetDialogViewModel Budget { get; }
+        public BudgetDialogViewModel Budget { get; private set; }
 
         public EditBudgetDialog()
         {
             InitializeComponent();
-
-            // Domyślne wartości
-            Budget = new BudgetDialogViewModel
-            {
-                StartDate = DateTime.Today,
-                EndDate = DateTime.Today
-            };
-
-            // Ustawiamy DataContext na VM – XAML binda do Name, StartDate, EndDate, PlannedAmount itd.
+            Budget = new BudgetDialogViewModel();
             DataContext = Budget;
         }
 
-        /// <summary>
-        /// Wczytuje istniejący budżet do dialogu (edycja).
-        /// Wołane z BudgetsPage: dialog.LoadBudget(budget);
-        /// </summary>
         public void LoadBudget(BudgetRow row)
         {
-            if (row == null)
-                return;
-
             Budget.Name = row.Name;
-            Budget.Type = row.Type;              // np. "Budżet", "Wydatek", "Przychód"
-            Budget.TypeDisplay = row.TypeDisplay;
-
+            Budget.Type = row.Type;          // <-- ważne
             Budget.StartDate = row.StartDate;
-            Budget.EndDate = row.EndDate;
-
             Budget.PlannedAmount = row.PlannedAmount;
-            Budget.SpentAmount = row.SpentAmount;
         }
 
         private void Ok_Click(object sender, RoutedEventArgs e)
         {
+            // Budget.Type jest już ustawione przez binding z ComboBoxa
             DialogResult = true;
-            Close();
         }
 
         private void Cancel_Click(object sender, RoutedEventArgs e)
