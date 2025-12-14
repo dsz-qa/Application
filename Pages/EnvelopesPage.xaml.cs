@@ -1,5 +1,4 @@
-﻿using Finly.Services;
-using Finly.Services.Features;
+﻿using Finly.Services.Features;
 using System;
 using System.Collections.ObjectModel;
 using System.Data;

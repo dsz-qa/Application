@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
@@ -15,26 +14,43 @@ namespace Finly.Views.Controls
         private decimal _total;
         private Brush[]? _brushes;
 
-        // zachowanie stanu
-        private string? _selectedKey;   // klikniêty wycinek (zapamiêtany)
-        private Path? _hoveredPath;      // aktualnie pod myszk¹
-
-        // parametry „wysuwania”
-        private const double ExplodeOffset = 10.0;  // o ile px wycinek „wyje¿d¿a”
-        private const double HoverStrokeThickness = 1.5;
-
         public DonutChartControl()
         {
             InitializeComponent();
 
-            Loaded += (_, __) => Redraw();
-            SizeChanged += (_, __) => Redraw();
+            Loaded += (s, e) => Redraw();
+            SizeChanged += (s, e) => Redraw();
+        }
+
+        /// <summary>
+        /// Allow parent to disable the built-in center panel (so parent can overlay its own texts).
+        /// Default: true
+        /// </summary>
+        public static readonly DependencyProperty ShowCenterPanelProperty =
+            DependencyProperty.Register(
+                nameof(ShowCenterPanel),
+                typeof(bool),
+                typeof(DonutChartControl),
+                new PropertyMetadata(true, OnShowCenterPanelChanged));
+
+        public bool ShowCenterPanel
+        {
+            get => (bool)GetValue(ShowCenterPanelProperty);
+            set => SetValue(ShowCenterPanelProperty, value);
+        }
+
+        private static void OnShowCenterPanelChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
+        {
+            if (d is DonutChartControl c && c.IsLoaded)
+            {
+                c.CenterPanel.Visibility = c.ShowCenterPanel ? Visibility.Visible : Visibility.Collapsed;
+            }
         }
 
         /// <summary>
         /// Rysuje wykres donut na podstawie s³ownika:
-        /// nazwa -> wartoœæ.
-        /// total – ca³kowita suma (jeœli 0 lub mniejsza, liczymy sumê z danych).
+        /// nazwa kategorii -> wartoœæ.
+        /// total – cakowita suma (jeœli0 lub mniejsza, liczymy sumê z danych).
         /// </summary>
         public void Draw(Dictionary<string, decimal> data, decimal total, Brush[] brushes)
         {
@@ -53,23 +69,29 @@ namespace Finly.Views.Controls
 
             if (_data == null || _data.Count == 0)
             {
-                CenterPanel.Visibility = Visibility.Collapsed;
+                CenterPanel.Visibility = ShowCenterPanel ? Visibility.Collapsed : Visibility.Collapsed;
                 NoDataText.Visibility = Visibility.Visible;
                 return;
             }
 
             if (_total <= 0)
-                _total = _data.Values.Sum();
+                _total = 0m;
 
             if (_total <= 0)
             {
-                CenterPanel.Visibility = Visibility.Collapsed;
+                foreach (var v in _data.Values)
+                    _total += v;
+            }
+
+            if (_total <= 0)
+            {
+                CenterPanel.Visibility = ShowCenterPanel ? Visibility.Collapsed : Visibility.Collapsed;
                 NoDataText.Visibility = Visibility.Visible;
                 return;
             }
 
             NoDataText.Visibility = Visibility.Collapsed;
-            CenterPanel.Visibility = Visibility.Visible;
+            CenterPanel.Visibility = ShowCenterPanel ? Visibility.Visible : Visibility.Collapsed;
 
             double width = ChartCanvas.ActualWidth;
             double height = ChartCanvas.ActualHeight;
@@ -82,9 +104,8 @@ namespace Finly.Views.Controls
 
             double cx = width / 2.0;
             double cy = height / 2.0;
-
             double outerRadius = Math.Min(width, height) / 2.0 - 10;
-            double innerRadius = outerRadius * 0.62;
+            double innerRadius = outerRadius * 0.6;
 
             double startAngle = -90.0; // od góry
             int index = 0;
@@ -97,140 +118,30 @@ namespace Finly.Views.Controls
                 double sweepAngle = (double)(value / _total) * 360.0;
                 if (sweepAngle <= 0) continue;
 
+                var path = CreateDonutSlice(cx, cy, innerRadius, outerRadius, startAngle, sweepAngle);
+
                 Brush fill;
                 if (_brushes != null && _brushes.Length > 0)
                     fill = _brushes[index % _brushes.Length];
                 else
                     fill = Brushes.SteelBlue;
 
-                var path = CreateDonutSlice(cx, cy, innerRadius, outerRadius, startAngle, sweepAngle);
                 path.Fill = fill;
                 path.Stroke = Brushes.Transparent;
-                path.StrokeThickness = 0;
-
-                // meta do hover/klik
-                path.Tag = new SliceMeta
-                {
-                    Name = kv.Key,
-                    Value = kv.Value,
-                    StartAngle = startAngle,
-                    SweepAngle = sweepAngle
-                };
-
+                path.Tag = kv; // przechowujemy parê (nazwa, wartoœæ)
                 path.Cursor = Cursors.Hand;
-                path.MouseEnter += Slice_MouseEnter;
-                path.MouseLeave += Slice_MouseLeave;
                 path.MouseLeftButtonDown += Slice_MouseLeftButtonDown;
 
                 ChartCanvas.Children.Add(path);
-
-                // jeœli to wybrany wycinek - poka¿ go w œrodku po redraw
-                if (!string.IsNullOrWhiteSpace(_selectedKey) && kv.Key == _selectedKey)
-                {
-                    SetCenterForSlice(kv.Key, kv.Value);
-                }
 
                 startAngle += sweepAngle;
                 index++;
             }
 
-            // jeœli nic nie jest wybrane, w œrodku suma
-            if (string.IsNullOrWhiteSpace(_selectedKey))
-                SetCenterToTotal();
-        }
-
-        private void Slice_MouseEnter(object sender, MouseEventArgs e)
-        {
-            if (sender is not Path p) return;
-            if (p.Tag is not SliceMeta meta) return;
-
-            // zdejmij hover z poprzedniego
-            ResetHoverVisual();
-
-            _hoveredPath = p;
-
-            // ustaw info w œrodku na hover
-            SetCenterForSlice(meta.Name, meta.Value);
-
-            // „wysuñ” wycinek w kierunku œrodka k¹ta
-            var midAngle = meta.StartAngle + (meta.SweepAngle / 2.0);
-            var rad = midAngle * Math.PI / 180.0;
-
-            var dx = ExplodeOffset * Math.Cos(rad);
-            var dy = ExplodeOffset * Math.Sin(rad);
-
-            p.RenderTransform = new TranslateTransform(dx, dy);
-
-            // delikatny outline
-            p.Stroke = new SolidColorBrush(Color.FromArgb(130, 255, 255, 255));
-            p.StrokeThickness = HoverStrokeThickness;
-        }
-
-        private void Slice_MouseLeave(object sender, MouseEventArgs e)
-        {
-            if (sender is not Path p) return;
-
-            // reset tylko jeœli to faktycznie hovered
-            if (_hoveredPath == p)
-            {
-                ResetHoverVisual();
-
-                // jeœli jest wybór (klik), wróæ do wybranego; jeœli nie, wróæ do sumy
-                if (!string.IsNullOrWhiteSpace(_selectedKey) && _data != null && _data.TryGetValue(_selectedKey, out var v))
-                    SetCenterForSlice(_selectedKey, v);
-                else
-                    SetCenterToTotal();
-            }
-        }
-
-        private void ResetHoverVisual()
-        {
-            if (_hoveredPath == null) return;
-
-            _hoveredPath.RenderTransform = Transform.Identity;
-            _hoveredPath.Stroke = Brushes.Transparent;
-            _hoveredPath.StrokeThickness = 0;
-
-            _hoveredPath = null;
-        }
-
-        // ===== CLICK =====
-
-        public event EventHandler<SliceClickedEventArgs>? SliceClicked;
-
-        private void Slice_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
-        {
-            if (sender is not Path p) return;
-            if (p.Tag is not SliceMeta meta) return;
-
-            _selectedKey = meta.Name;
-
-            // ustaw info w œrodku na klik
-            SetCenterForSlice(meta.Name, meta.Value);
-
-            // powiadom zewnêtrzny kod
-            SliceClicked?.Invoke(this, new SliceClickedEventArgs(meta.Name, meta.Value));
-        }
-
-        // ===== CENTER TEXT =====
-
-        private void SetCenterToTotal()
-        {
+            // Domyœlnie w œrodku pokazujemy sumê
             CenterTitleText.Text = "Suma";
             CenterValueText.Text = $"{_total:N2} z³";
-            CenterPercentText.Text = "";
         }
-
-        private void SetCenterForSlice(string name, decimal value)
-        {
-            CenterTitleText.Text = name;
-            CenterValueText.Text = $"{value:N2} z³";
-
-            var percent = _total > 0 ? (double)(value / _total) * 100.0 : 0.0;
-            CenterPercentText.Text = $"{percent:N0}%";
-        }
-
-        // ===== GEOMETRY =====
 
         private static Path CreateDonutSlice(
             double cx, double cy,
@@ -279,12 +190,21 @@ namespace Finly.Views.Controls
             return new Path { Data = geom };
         }
 
-        private sealed class SliceMeta
+        // ===== EVENTY =====
+
+        public event EventHandler<SliceClickedEventArgs>? SliceClicked;
+
+        private void Slice_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
         {
-            public string Name { get; set; } = "";
-            public decimal Value { get; set; }
-            public double StartAngle { get; set; }
-            public double SweepAngle { get; set; }
+            if (sender is Path p && p.Tag is KeyValuePair<string, decimal> kv)
+            {
+                // aktualizacja œrodka donuta
+                CenterTitleText.Text = kv.Key;
+                CenterValueText.Text = $"{kv.Value:N2} z³";
+
+                // powiadom zewnêtrzny kod (ReportsPage)
+                SliceClicked?.Invoke(this, new SliceClickedEventArgs(kv.Key, kv.Value));
+            }
         }
     }
 

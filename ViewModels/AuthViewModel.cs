@@ -5,7 +5,7 @@ using System.Runtime.CompilerServices;
 using System.Text.RegularExpressions;
 using System.Windows.Media;
 using Finly.Models;
-using Finly.Services;
+using Finly.Services.Features;
 
 namespace Finly.ViewModels
 {

@@ -8,6 +8,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
+using System.Collections.Generic;
 
 namespace Finly.Pages
 {
@@ -105,6 +106,7 @@ namespace Finly.Pages
             var list = DatabaseService.GetEnvelopeGoals(_uid);
             foreach (var g in list)
             {
+                // UWAGA: GoalText powinien być w formacie NOTE: "Cel:\nOpis:\nTermin:"
                 var (goalTitle, description) = SplitGoalText(g.GoalText, g.Name);
 
                 _goals.Add(new GoalVm
@@ -122,7 +124,6 @@ namespace Finly.Pages
             RebuildItems();
             RefreshKpis();
         }
-
 
         private void RebuildItems()
         {
@@ -159,13 +160,18 @@ namespace Finly.Pages
             TotalMonthlyNeededText.Text = totalMonthly.ToString("N2") + " zł";
         }
 
+        /// <summary>
+        /// NOTE jest przechowywany jako:
+        /// "Cel: ....\nOpis: ....\nTermin: RRRR-MM-DD"
+        /// Ta funkcja wydobywa tytuł celu i opis (bez Terminu).
+        /// </summary>
         private static (string goalTitle, string description) SplitGoalText(string? raw, string fallbackName)
         {
             if (string.IsNullOrWhiteSpace(raw))
                 return (fallbackName, string.Empty);
 
             string goalTitle = "";
-            var descLines = new System.Collections.Generic.List<string>();
+            var descLines = new List<string>();
 
             var lines = raw.Split(new[] { '\n' }, StringSplitOptions.RemoveEmptyEntries);
             foreach (var rawLine in lines)
@@ -175,28 +181,57 @@ namespace Finly.Pages
 
                 if (line.StartsWith("Cel:", StringComparison.OrdinalIgnoreCase))
                 {
-                    // "Cel: Spłata pożyczki u Pani Beaty" -> "Spłata pożyczki u Pani Beaty"
                     goalTitle = line.Substring(4).Trim();
                 }
                 else if (line.StartsWith("Termin:", StringComparison.OrdinalIgnoreCase))
                 {
-                    // tę linię pomijamy – termin już pokazujemy wyżej w osobnym polu
+                    // termin obsługujemy osobno (z kolumny Deadline)
                     continue;
                 }
                 else
                 {
-                    // reszta (np. "Opis: ...") leci do opisu
+                    // opis lub inne linie
+                    // jeżeli masz "Opis: ..." w Note, zostawiamy jak jest (żeby user widział)
                     descLines.Add(line);
                 }
             }
 
             if (string.IsNullOrWhiteSpace(goalTitle))
-                goalTitle = fallbackName;  // awaryjnie weź nazwę koperty
+                goalTitle = fallbackName;
 
             var description = string.Join(Environment.NewLine, descLines);
             return (goalTitle, description);
         }
 
+        /// <summary>
+        /// Buduje NOTE w identycznym formacie jak EnvelopesPage.BuildNote,
+        /// żeby Koperty i Cele były zawsze spójne.
+        /// </summary>
+        private static string BuildNote(string goalTitle, string description, DateTime? deadline)
+        {
+            goalTitle = (goalTitle ?? "").Trim();
+            description = (description ?? "").Trim();
+
+            var parts = new List<string>();
+
+            if (!string.IsNullOrEmpty(goalTitle))
+                parts.Add($"Cel: {goalTitle}");
+
+            if (!string.IsNullOrEmpty(description))
+            {
+                // jeśli user wpisał bez "Opis:", to dopiszmy prefix, żeby format był stabilny
+                var desc = description.Trim();
+                if (!desc.StartsWith("Opis:", StringComparison.OrdinalIgnoreCase))
+                    desc = "Opis: " + desc;
+
+                parts.Add(desc);
+            }
+
+            if (deadline.HasValue)
+                parts.Add("Termin: " + deadline.Value.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture));
+
+            return string.Join("\n", parts);
+        }
 
         // ========= helper do szukania panelu potwierdzenia w szablonie =========
 
@@ -248,7 +283,12 @@ namespace Finly.Pages
             GoalTargetBox.Text = vm.TargetAmount.ToString("N2");
             GoalCurrentBox.Text = vm.CurrentAmount.ToString("N2");
             GoalDueDatePicker.SelectedDate = vm.DueDate;
-            GoalDescriptionBox.Text = vm.Description ?? "";
+
+            // usuń "Opis:" jeśli jest, żeby user edytował czysty tekst
+            var d = vm.Description ?? "";
+            if (d.TrimStart().StartsWith("Opis:", StringComparison.OrdinalIgnoreCase))
+                d = d.Trim().Substring(5).Trim();
+            GoalDescriptionBox.Text = d;
         }
 
         /// <summary>
@@ -312,7 +352,7 @@ namespace Finly.Pages
             var target = ParseDecimal(GoalTargetBox.Text);
             var current = ParseDecimal(GoalCurrentBox.Text);
             var dueDate = GoalDueDatePicker.SelectedDate;
-            var desc = GoalDescriptionBox.Text ?? "";
+            var desc = (GoalDescriptionBox.Text ?? "").Trim();
 
             if (string.IsNullOrWhiteSpace(name))
             {
@@ -344,18 +384,22 @@ namespace Finly.Pages
                 return;
             }
 
+            // SPÓJNY NOTE: to jedyne źródło "Cel/Opis/Termin" w kopercie
+            var note = BuildNote(name, desc, dueDate.Value);
+
             try
             {
                 int envelopeId;
 
                 if (_editingEnvelopeId.HasValue)
                 {
-                    // edycja istniejącej koperty
                     envelopeId = _editingEnvelopeId.Value;
+
+                    // przy edycji celu NIE rób Insert – tylko aktualizacja danych celu
+                    // UpdateEnvelopeGoal powinien aktualizować: Target/Allocated/Deadline/Note (albo GoalText)
                 }
                 else
                 {
-                    // szukamy koperty o tej nazwie; jeśli brak – tworzymy nową kopertę z tym celem
                     var existingId = DatabaseService.GetEnvelopeIdByName(_uid, name);
                     if (existingId.HasValue)
                     {
@@ -363,14 +407,14 @@ namespace Finly.Pages
                     }
                     else
                     {
-                        envelopeId = DatabaseService.InsertEnvelope(_uid, name, target, current, desc);
+                        // UWAGA: zapisuj NOTE, nie sam opis
+                        envelopeId = DatabaseService.InsertEnvelope(_uid, name, target, current, note);
                     }
                 }
 
-                // ustaw / zaktualizuj dane celu w tej kopercie
-                DatabaseService.UpdateEnvelopeGoal(_uid, envelopeId, target, current, dueDate.Value, desc);
+                // UWAGA: przekazuj NOTE, nie "desc"
+                DatabaseService.UpdateEnvelopeGoal(_uid, envelopeId, target, current, dueDate.Value, note);
 
-                // przeładuj cele z bazy (procent, miesięcznie, KPI)
                 LoadGoals();
 
                 GoalFormMessage.Text = _editingEnvelopeId.HasValue

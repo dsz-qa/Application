@@ -14,11 +14,11 @@
                 Background="Transparent" />
 
         <Border x:Name="CenterPanel"
-                Width="140"
-                Height="140"
-                CornerRadius="70"
+                Width="120"
+                Height="120"
+                CornerRadius="60"
                 Background="{DynamicResource Surface.Background}"
-                Opacity="0.92"
+                Opacity="0.9"
                 HorizontalAlignment="Center"
                 VerticalAlignment="Center"
                 Visibility="Collapsed">
@@ -27,27 +27,16 @@
                 <TextBlock x:Name="CenterTitleText"
                            Text=""
                            TextAlignment="Center"
-                           FontSize="13"
-                           FontWeight="SemiBold"
+                           FontSize="12"
                            Foreground="{DynamicResource App.Foreground}"
-                           Margin="6,0,6,4"
-                           TextWrapping="Wrap"/>
-
+                           Margin="4,0,4,2"/>
                 <TextBlock x:Name="CenterValueText"
                            Text=""
                            TextAlignment="Center"
-                           FontSize="18"
+                           FontSize="16"
                            FontWeight="Bold"
                            Foreground="{DynamicResource App.Foreground}"
-                           Margin="6,0,6,2"/>
-
-                <TextBlock x:Name="CenterPercentText"
-                           Text=""
-                           TextAlignment="Center"
-                           FontSize="12"
-                           Opacity="0.85"
-                           Foreground="{DynamicResource App.Foreground}"
-                           Margin="6,0,6,0"/>
+                           Margin="4,0,4,0"/>
             </StackPanel>
         </Border>
 

@@ -7,7 +7,7 @@ using System.Windows.Controls;
 using System.Windows.Input;
 using Finly.Helpers;
 using Finly.Pages;
-using Finly.Services;
+using Finly.Services.Features;
 
 namespace Finly.ViewModels
 {

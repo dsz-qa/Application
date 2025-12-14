@@ -60,13 +60,13 @@ namespace Finly.Pages
         {
             if (PeriodBar == null) return;
 
-            PeriodBar.RangeChanged += (_, __) =>
+            PeriodBar.RangeChanged += (sender, args) =>
             {
                 if (DataContext is ChartsViewModel vm)
                     vm.SetCustomRange(PeriodBar.StartDate, PeriodBar.EndDate);
             };
 
-            PeriodBar.SearchClicked += (_, __) =>
+            PeriodBar.SearchClicked += (sender, args) =>
             {
                 if (DataContext is ChartsViewModel vm)
                     vm.SetCustomRange(PeriodBar.StartDate, PeriodBar.EndDate);

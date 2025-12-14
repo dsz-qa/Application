@@ -10,7 +10,7 @@ using System.Windows.Interop;
 using System.Windows.Media;
 
 using Finly.Pages;
-using Finly.Services;
+using Finly.Services.Features;
 using Finly.Services.SpecificPages;
 
 namespace Finly.Views

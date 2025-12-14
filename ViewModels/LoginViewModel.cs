@@ -5,7 +5,7 @@ using System.Runtime.CompilerServices;
 using System.Windows;
 using System.Windows.Input;
 using Finly.Helpers; // RelayCommand
-using Finly.Services; // UserService
+using Finly.Services.Features;
 using Finly.Views; // DashboardView, LoginView
 
 
