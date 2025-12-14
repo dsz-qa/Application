@@ -384,7 +384,14 @@ namespace Finly.Pages
                 return;
             }
 
-            // SPÓJNY NOTE: to jedyne źródło "Cel/Opis/Termin" w kopercie
+            // >>>>>> TU JEST KONKRETNE MIEJSCE WALIDACJI ŚRODKÓW <<<<<<
+            if (!ValidateGoalCurrentAgainstSavedCash(_uid, _editingEnvelopeId, current, out var fundsMsg))
+            {
+                GoalFormMessage.Text = fundsMsg;
+                return;
+            }
+
+            // NOTE – jedyne źródło prawdy dla celu/terminu/opisu
             var note = BuildNote(name, desc, dueDate.Value);
 
             try
@@ -394,9 +401,6 @@ namespace Finly.Pages
                 if (_editingEnvelopeId.HasValue)
                 {
                     envelopeId = _editingEnvelopeId.Value;
-
-                    // przy edycji celu NIE rób Insert – tylko aktualizacja danych celu
-                    // UpdateEnvelopeGoal powinien aktualizować: Target/Allocated/Deadline/Note (albo GoalText)
                 }
                 else
                 {
@@ -407,12 +411,11 @@ namespace Finly.Pages
                     }
                     else
                     {
-                        // UWAGA: zapisuj NOTE, nie sam opis
                         envelopeId = DatabaseService.InsertEnvelope(_uid, name, target, current, note);
                     }
                 }
 
-                // UWAGA: przekazuj NOTE, nie "desc"
+                // UWAGA: przekazujemy NOTE (a nie sam opis)
                 DatabaseService.UpdateEnvelopeGoal(_uid, envelopeId, target, current, dueDate.Value, note);
 
                 LoadGoals();
@@ -431,6 +434,7 @@ namespace Finly.Pages
             }
         }
 
+
         private void ClearGoalForm_Click(object sender, RoutedEventArgs e)
         {
             ClearGoalForm();
@@ -447,6 +451,51 @@ namespace Finly.Pages
             GoalDueDatePicker.SelectedDate = null;
             GoalDescriptionBox.Text = "";
         }
+
+        private bool ValidateGoalCurrentAgainstSavedCash(int userId, int? editingEnvelopeId, decimal newCurrent, out string message)
+        {
+            message = string.Empty;
+
+            if (newCurrent < 0m)
+            {
+                message = "Odłożona kwota nie może być ujemna.";
+                return false;
+            }
+
+            var savedTotal = DatabaseService.GetSavedCash(userId);
+            var dt = DatabaseService.GetEnvelopesTable(userId);
+
+            decimal totalAllocated = 0m;
+            decimal previousAllocated = 0m;
+
+            if (dt != null)
+            {
+                foreach (System.Data.DataRow r in dt.Rows)
+                {
+                    var id = Convert.ToInt32(r["Id"]);
+                    var alloc = 0m;
+                    try { alloc = Convert.ToDecimal(r["Allocated"]); } catch { }
+
+                    totalAllocated += alloc;
+
+                    if (editingEnvelopeId.HasValue && id == editingEnvelopeId.Value)
+                        previousAllocated = alloc;
+                }
+            }
+
+            var allocatedWithoutThis = totalAllocated - previousAllocated;
+            var availableForThis = savedTotal - allocatedWithoutThis;
+
+            if (newCurrent > availableForThis)
+            {
+                message = $"Masz za mało środków w „Odłożonej gotówce”. " +
+                          $"Dostępne do przydzielenia: {availableForThis:N2} zł, próbujesz odłożyć: {newCurrent:N2} zł.";
+                return false;
+            }
+
+            return true;
+        }
+
 
         // ========= 0,00 -> czyszczenie po kliknięciu =========
 

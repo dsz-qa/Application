@@ -438,8 +438,8 @@ namespace Finly.Pages
             var name = (NameBox.Text ?? "").Trim();
             var target = SafeParse(TargetBox.Text);
             var allocated = SafeParse(AllocatedBox.Text);
-            var goal = GoalBox.Text ?? string.Empty;
-            var description = DescriptionBox.Text ?? string.Empty;
+            var goal = (GoalBox.Text ?? "").Trim();
+            var description = (DescriptionBox.Text ?? "").Trim();
             var deadline = DeadlinePicker.SelectedDate;
 
             if (string.IsNullOrWhiteSpace(name))
@@ -454,31 +454,10 @@ namespace Finly.Pages
                 return;
             }
 
-            // poprzednia przydzielona kwota w tej kopercie (gdy edycja)
-            decimal previousAllocated = 0m;
-            int? editingId = _editingId;
-
-            if (editingId is int idExisting && _dt != null)
+            // >>>>>> TU JEST KONKRETNE MIEJSCE WALIDACJI ŚRODKÓW <<<<<<
+            if (!ValidateAllocationAgainstSavedCash(_userId, _editingId, allocated, out var fundsMsg))
             {
-                var row = _dt.AsEnumerable()
-                             .FirstOrDefault(r => Convert.ToInt32(r["Id"]) == idExisting);
-                if (row != null)
-                    previousAllocated = SafeDec(row["Allocated"]);
-            }
-
-            // różnica: ile DODAJEMY ( >0 ) albo ZABIERAMY ( <0 ) z tej koperty
-            var diff = allocated - previousAllocated;
-
-            // Sum of all allocated BEFORE this change
-            var totalAllocatedBefore = _dt?.AsEnumerable().Sum(r => SafeDec(r["Allocated"])) ?? 0m;
-
-            // available unassigned saved cash BEFORE change
-            var unassignedBefore = _savedTotal - totalAllocatedBefore;
-
-            // jeśli zwiększamy przydział – sprawdź, czy mamy tyle odłożonej gotówki poza kopertami
-            if (diff > 0m && diff > unassignedBefore)
-            {
-                FormMessage.Text = "Nie masz tyle odłożonej gotówki poza kopertami, aby przydzielić tę kwotę.";
+                FormMessage.Text = fundsMsg;
                 return;
             }
 
@@ -488,7 +467,7 @@ namespace Finly.Pages
             {
                 int envelopeId;
 
-                if (editingId is int id)
+                if (_editingId is int id)
                 {
                     DatabaseService.UpdateEnvelope(id, _userId, name, target, allocated, note);
                     envelopeId = id;
@@ -500,11 +479,7 @@ namespace Finly.Pages
                     FormMessage.Text = "Dodano kopertę.";
                 }
 
-                // Nie modyfikujemy SavedCash tutaj. SavedCash przechowuje całą pulę odłożonej gotówki,
-                // a przydział do kopert jest zapisywany w kolumnie Allocated. UI zostanie odświeżone
-                // i pokaże poprawną pulę do rozdysponowania (SavedTotal - suma Allocated).
-
-                // zapisujemy dane celu/terminu dla zakładki „Cele”
+                // Zapis celu/terminu dla zakładki „Cele”
                 if (deadline.HasValue)
                 {
                     DatabaseService.UpdateEnvelopeGoal(
@@ -526,6 +501,7 @@ namespace Finly.Pages
                 FormMessage.Text = "Błąd zapisu: " + ex.Message;
             }
         }
+
 
 
         private void CancelEdit_Click(object sender, RoutedEventArgs e)
@@ -582,6 +558,54 @@ namespace Finly.Pages
                 CollapseDeleteConfirm(ch);
             }
         }
+
+        private bool ValidateAllocationAgainstSavedCash(int userId, int? editingEnvelopeId, decimal newAllocated, out string message)
+        {
+            message = string.Empty;
+
+            if (newAllocated < 0m)
+            {
+                message = "Kwota nie może być ujemna.";
+                return false;
+            }
+
+            // 1) Pula odłożonej gotówki
+            var savedTotal = DatabaseService.GetSavedCash(userId);
+
+            // 2) Suma przydzielona do wszystkich kopert
+            var dt = DatabaseService.GetEnvelopesTable(userId);
+            decimal totalAllocated = 0m;
+            decimal previousAllocated = 0m;
+
+            if (dt != null)
+            {
+                foreach (System.Data.DataRow r in dt.Rows)
+                {
+                    var id = Convert.ToInt32(r["Id"]);
+                    var alloc = 0m;
+                    try { alloc = Convert.ToDecimal(r["Allocated"]); } catch { }
+
+                    totalAllocated += alloc;
+
+                    if (editingEnvelopeId.HasValue && id == editingEnvelopeId.Value)
+                        previousAllocated = alloc;
+                }
+            }
+
+            // 3) Ile wolno jeszcze przydzielić poza edytowaną kopertą
+            var allocatedWithoutThis = totalAllocated - previousAllocated;
+            var availableForThis = savedTotal - allocatedWithoutThis;
+
+            if (newAllocated > availableForThis)
+            {
+                message = $"Masz za mało środków w „Odłożonej gotówce”. " +
+                          $"Dostępne do przydzielenia: {availableForThis:N2} zł, próbujesz ustawić: {newAllocated:N2} zł.";
+                return false;
+            }
+
+            return true;
+        }
+
 
         private void EnvelopesPage_Unloaded(object sender, RoutedEventArgs e)
         {

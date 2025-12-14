@@ -119,7 +119,7 @@
 
  <!-- CAŁA STRONA -->
  <ScrollViewer VerticalScrollBarVisibility="Auto">
- <Grid Margin="24">
+ <Grid Margin="24,24,24,60">
  <Grid.RowDefinitions>
  <RowDefinition Height="Auto"/>
  <RowDefinition Height="Auto"/>
@@ -207,7 +207,14 @@
  <Button x:Name="SaveEnvelopeBtn" Content="Dodaj" Width="100" Margin="0,0,8,0" Click="SaveEnvelope_Click"/>
  <Button Content="Anuluj" Width="100" Click="CancelEdit_Click"/>
  </StackPanel>
- <TextBlock x:Name="FormMessage" Margin="0,8,0,0" HorizontalAlignment="Center" Foreground="OrangeRed"/>
+ <TextBlock x:Name="FormMessage"
+ Margin="0,10,0,0"
+ HorizontalAlignment="Center"
+ TextAlignment="Center"
+ Foreground="OrangeRed"
+ TextWrapping="Wrap"
+ MaxWidth="520"
+ LineHeight="18"/>
  </StackPanel>
  </Border>
  <TextBlock x:Name="UnassignedText" Text="Brak przypisanej gotówki" Visibility="Collapsed" />

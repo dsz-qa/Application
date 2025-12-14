@@ -487,18 +487,73 @@
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto"/>
                 <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
                 <RowDefinition Height="*"/>
             </Grid.RowDefinitions>
 
-            <!-- KPI -->
+            <!-- DASHBOARD-LIKE KPI (6 small cards) -->
             <Grid Grid.Row="0" Margin="16">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="*"/>
+            </Grid.ColumnDefinitions>
+
+            <Border Grid.Column="0" Style="{StaticResource AccentCard}">
+                <StackPanel>
+                    <TextBlock Text="Cały majątek" Style="{StaticResource KpiHeader}"/>
+                    <TextBlock Text="0,00 zł" Style="{StaticResource KpiValueStyle}"/>
+                </StackPanel>
+            </Border>
+
+            <Border Grid.Column="1" Style="{StaticResource AccentCard}">
+                <StackPanel>
+                    <TextBlock Text="Konta bankowe" Style="{StaticResource KpiHeader}"/>
+                    <TextBlock Text="0,00 zł" Style="{StaticResource KpiValueStyle}"/>
+                </StackPanel>
+            </Border>
+
+            <Border Grid.Column="2" Style="{StaticResource AccentCard}">
+                <StackPanel>
+                    <TextBlock Text="Wolna gotówka" Style="{StaticResource KpiHeader}"/>
+                    <TextBlock Text="0,00 zł" Style="{StaticResource KpiValueStyle}"/>
+                </StackPanel>
+            </Border>
+
+            <Border Grid.Column="3" Style="{StaticResource AccentCard}">
+                <StackPanel>
+                    <TextBlock Text="Gotówka odłożona" Style="{StaticResource KpiHeader}" TextWrapping="Wrap"/>
+                    <TextBlock Text="0,00 zł" Style="{StaticResource KpiValueStyle}"/>
+                </StackPanel>
+            </Border>
+
+            <Border Grid.Column="4" Style="{StaticResource AccentCard}" Margin="0">
+                <StackPanel HorizontalAlignment="Left">
+                    <TextBlock Text="Gotówka w kopertach" Style="{StaticResource KpiHeader}" TextWrapping="Wrap" TextAlignment="Left"/>
+                    <TextBlock Text="0,00 zł" Style="{StaticResource KpiValueStyle}" TextWrapping="Wrap" TextAlignment="Left"/>
+                </StackPanel>
+            </Border>
+
+            <Border Grid.Column="5" Style="{StaticResource AccentCard}" Margin="0">
+                <StackPanel>
+                    <TextBlock Text="Inwestycje" Style="{StaticResource KpiHeader}"/>
+                    <TextBlock Text="0,00 zł" Style="{StaticResource KpiValueStyle}"/>
+                </StackPanel>
+            </Border>
+            </Grid>
+
+            <!-- KPI -->
+            <Grid Grid.Row="1" Margin="16">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*"/>
                     <ColumnDefinition Width="*"/>
                     <ColumnDefinition Width="*"/>
                 </Grid.ColumnDefinitions>
 
-                <Border Grid.Column="0" Style="{StaticResource AccentCard}">
+                <Border Grid.Column="0" Style="{StaticResource AccentCard}" BorderBrush="{DynamicResource Brand.Orange}">
                     <StackPanel>
                         <TextBlock Text="Suma wydatków"
                                    Style="{StaticResource KpiHeader}"/>
@@ -507,7 +562,7 @@
                     </StackPanel>
                 </Border>
 
-                <Border Grid.Column="1" Style="{StaticResource AccentCard}">
+                <Border Grid.Column="1" Style="{StaticResource AccentCard}" BorderBrush="{DynamicResource Brand.Orange}">
                     <StackPanel>
                         <TextBlock Text="Suma przychodów"
                                    Style="{StaticResource KpiHeader}"/>
@@ -516,7 +571,7 @@
                     </StackPanel>
                 </Border>
 
-                <Border Grid.Column="2" Style="{StaticResource AccentCard}">
+                <Border Grid.Column="2" Style="{StaticResource AccentCard}" BorderBrush="{DynamicResource Brand.Orange}">
                     <StackPanel>
                         <TextBlock Text="Bilans"
                                    Style="{StaticResource KpiHeader}"/>
@@ -527,7 +582,7 @@
             </Grid>
 
             <!-- FILTRY -->
-            <StackPanel Grid.Row="1"
+            <StackPanel Grid.Row="2"
                         Margin="16,0,16,12"
                         Orientation="Vertical">
                 <Grid>
@@ -663,7 +718,7 @@
             </StackPanel>
 
             <!-- GŁÓWNY CONTENT -->
-            <Border Grid.Row="2"
+            <Border Grid.Row="3"
                     Margin="16"
                     BorderBrush="{DynamicResource Surface.Border}"
                     BorderThickness="1"
