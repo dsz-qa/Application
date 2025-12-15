@@ -2084,5 +2084,85 @@ GROUP BY i.Source;";
             catch { }
             return list;
         }
+
+
+        // =========================================================
+        // ======================= INVESTMENTS ======================
+        // =========================================================
+
+        public static List<InvestmentModel> GetInvestments(int userId)
+        {
+            var list = new List<InvestmentModel>();
+            try
+            {
+                using var c = OpenAndEnsureSchema();
+                using var cmd = c.CreateCommand();
+                cmd.CommandText = @"
+SELECT Id, UserId, Name, TargetAmount, CurrentAmount, TargetDate, Description
+FROM Investments
+WHERE UserId=@u
+ORDER BY Id DESC;";
+                cmd.Parameters.AddWithValue("@u", userId);
+
+                using var r = cmd.ExecuteReader();
+                while (r.Read())
+                {
+                    list.Add(new InvestmentModel
+                    {
+                        Id = r.IsDBNull(0) ? 0 : r.GetInt32(0),
+                        UserId = r.IsDBNull(1) ? userId : r.GetInt32(1),
+                        Name = r.IsDBNull(2) ? string.Empty : r.GetString(2),
+                        TargetAmount = r.IsDBNull(3) ? 0m : Convert.ToDecimal(r.GetValue(3)),
+                        CurrentAmount = r.IsDBNull(4) ? 0m : Convert.ToDecimal(r.GetValue(4)),
+                        TargetDate = r.IsDBNull(5) ? null : r.GetString(5),
+                        Description = r.IsDBNull(6) ? null : r.GetString(6)
+                    });
+                }
+            }
+            catch { }
+
+            return list;
+        }
+
+        public static int InsertInvestment(InvestmentModel m)
+        {
+            using var c = OpenAndEnsureSchema();
+            using var cmd = c.CreateCommand();
+            cmd.CommandText = @"
+INSERT INTO Investments(UserId, Name, TargetAmount, CurrentAmount, TargetDate, Description)
+VALUES (@u,@n,@tgt,@cur,@d,@desc);
+SELECT last_insert_rowid();";
+            cmd.Parameters.AddWithValue("@u", m.UserId);
+            cmd.Parameters.AddWithValue("@n", m.Name ?? "");
+            cmd.Parameters.AddWithValue("@tgt", m.TargetAmount);
+            cmd.Parameters.AddWithValue("@cur", m.CurrentAmount);
+            cmd.Parameters.AddWithValue("@d", (object?)m.TargetDate ?? DBNull.Value);
+            cmd.Parameters.AddWithValue("@desc", (object?)m.Description ?? DBNull.Value);
+
+            var id = Convert.ToInt32(cmd.ExecuteScalar() ?? 0);
+            RaiseDataChanged();
+            return id;
+        }
+
+        public static void UpdateInvestment(InvestmentModel m)
+        {
+            using var c = OpenAndEnsureSchema();
+            using var cmd = c.CreateCommand();
+            cmd.CommandText = @"
+UPDATE Investments
+SET Name=@n, TargetAmount=@tgt, CurrentAmount=@cur, TargetDate=@d, Description=@desc
+WHERE Id=@id AND UserId=@u;";
+            cmd.Parameters.AddWithValue("@id", m.Id);
+            cmd.Parameters.AddWithValue("@u", m.UserId);
+            cmd.Parameters.AddWithValue("@n", m.Name ?? "");
+            cmd.Parameters.AddWithValue("@tgt", m.TargetAmount);
+            cmd.Parameters.AddWithValue("@cur", m.CurrentAmount);
+            cmd.Parameters.AddWithValue("@d", (object?)m.TargetDate ?? DBNull.Value);
+            cmd.Parameters.AddWithValue("@desc", (object?)m.Description ?? DBNull.Value);
+
+            cmd.ExecuteNonQuery();
+            RaiseDataChanged();
+        }
+
     }
 }

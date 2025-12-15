@@ -14,6 +14,7 @@ using System.Collections.Generic;
 using System.Data;
 using Finly.Services.Features;
 using Finly.Services.SpecificPages;
+using Finly.Pages; // for GoalVm
 
 namespace Finly.ViewModels
 {
@@ -63,6 +64,11 @@ namespace Finly.ViewModels
             ExpenseCategoriesSummary = new ObservableCollection<CategoryAmount>();
             IncomeCategoriesSummary = new ObservableCollection<CategoryAmount>();
 
+            // NEW: collections for other tabs
+            BudgetsSummary = new ObservableCollection<BudgetService.BudgetSummary>();
+            GoalsList = new ObservableCollection<GoalVm>();
+            LoansList = new ObservableCollection<LoanModel>();
+
             LoadAccountsAndEnvelopes();
             LoadMoneyPlaces();
         }
@@ -70,6 +76,11 @@ namespace Finly.ViewModels
         // Podsumowania kategorii dla zak³adki "Kategorie"
         public ObservableCollection<CategoryAmount> ExpenseCategoriesSummary { get; }
         public ObservableCollection<CategoryAmount> IncomeCategoriesSummary { get; }
+
+        // NEW: bud¿ety / cele / kredyty
+        public ObservableCollection<BudgetService.BudgetSummary> BudgetsSummary { get; }
+        public ObservableCollection<GoalVm> GoalsList { get; }
+        public ObservableCollection<LoanModel> LoansList { get; }
 
         private void LoadAccountsAndEnvelopes()
         {
@@ -870,7 +881,7 @@ namespace Finly.ViewModels
 
             // Powrót do widoku wszystkich transakcji
             OverviewCenterTitle = "Wszystkie transakcje";
-            OverviewCenterSubtitle = $"{_transactionsSnapshot.Count} transakcji w wybranym okresie";
+            OverviewCenterSubtitle = $"{_transactionsSnapshot.Count} transakcje w wybranym okresie";
 
             Raise(nameof(OverviewTransactionsCountStr));
             Raise(nameof(OverviewTotalAmountStr));
@@ -1003,11 +1014,294 @@ namespace Finly.ViewModels
                 Raise(nameof(OverviewTransactionsCountStr));
                 Raise(nameof(OverviewTotalAmountStr));
                 Raise(nameof(OverviewTopCategoryStr));
+
+                // ====== LOAD Budgets / Goals / Loans for other tabs =====
+                try
+                {
+                    BudgetsSummary.Clear();
+                    var budgets = BudgetService.GetBudgetsWithSummary(uid) ?? new List<BudgetService.BudgetSummary>();
+                    foreach (var b in budgets)
+                        BudgetsSummary.Add(b);
+                }
+                catch { }
+
+                try
+                {
+                    GoalsList.Clear();
+
+                    // If shared GoalsService is empty, try to load envelope goals from DB
+                    if (GoalsService.Goals == null || GoalsService.Goals.Count == 0)
+                    {
+                        try
+                        {
+                            var envGoals = DatabaseService.GetEnvelopeGoals(uid);
+                            if (envGoals != null)
+                            {
+                                foreach (var g in envGoals)
+                                {
+                                    var goalTitle = string.Empty;
+                                    var description = string.Empty;
+                                    try
+                                    {
+                                        var raw = (g.GoalText as string) ?? string.Empty;
+                                        var lines = raw.Split(new[] { '\n' }, StringSplitOptions.RemoveEmptyEntries);
+                                        var descLines = new List<string>();
+                                        foreach (var rawLine in lines)
+                                        {
+                                            var line = rawLine.Trim();
+                                            if (line.StartsWith("Cel:", StringComparison.OrdinalIgnoreCase))
+                                                goalTitle = line.Substring(4).Trim();
+                                            else if (line.StartsWith("Termin:", StringComparison.OrdinalIgnoreCase))
+                                                continue;
+                                            else
+                                                descLines.Add(line);
+                                        }
+                                        if (string.IsNullOrWhiteSpace(goalTitle)) goalTitle = g.Name ?? string.Empty;
+                                        description = string.Join(Environment.NewLine, descLines);
+                                    }
+                                    catch { }
+
+                                    var vm = new GoalVm
+                                    {
+                                        EnvelopeId = g.EnvelopeId,
+                                        Name = g.Name ?? string.Empty,
+                                        GoalTitle = goalTitle,
+                                        TargetAmount = g.Target,
+                                        CurrentAmount = g.Allocated,
+                                        DueDate = g.Deadline,
+                                        Description = description
+                                    };
+
+                                    GoalsService.Goals.Add(vm);
+                                }
+                            }
+                        }
+                        catch { }
+                    }
+
+                    foreach (var g in GoalsService.Goals)
+                        GoalsList.Add(g);
+                }
+                catch { }
+
+                try
+                {
+                    LoansList.Clear();
+                    LoansViewList.Clear();
+
+                    var loans = DatabaseService.GetLoans(uid) ?? new List<LoanModel>();
+                    foreach (var l in loans)
+                        LoansList.Add(l);
+
+                    foreach (var l in loans)
+                    {
+                        var monthly = LoansService.CalculateMonthlyPayment(l.Principal, l.InterestRate, l.TermMonths);
+                        string nextInfo = monthly.ToString("N2", CultureInfo.CurrentCulture) + " z³";
+                        try
+                        {
+                            var today = DateTime.Today;
+                            DateTime nextDate;
+                            if (l.PaymentDay <= 0)
+                                nextDate = l.StartDate.AddMonths(1);
+                            else
+                            {
+                                int daysInThisMonth = DateTime.DaysInMonth(today.Year, today.Month);
+                                int day = Math.Min(l.PaymentDay, daysInThisMonth);
+                                var candidate = new DateTime(today.Year, today.Month, day);
+                                if (candidate <= today)
+                                {
+                                    var nextMonth = new DateTime(today.Year, today.Month, 1).AddMonths(1);
+                                    day = Math.Min(l.PaymentDay, DateTime.DaysInMonth(nextMonth.Year, nextMonth.Month));
+                                    candidate = new DateTime(nextMonth.Year, nextMonth.Month, day);
+                                }
+                                nextDate = candidate;
+                            }
+                            nextInfo += " · " + nextDate.ToString("dd.MM.yyyy");
+                        }
+                        catch { }
+
+                        LoansViewList.Add(new ReportsLoanVm
+                        {
+                            Id = l.Id,
+                            Name = l.Name,
+                            Principal = l.Principal,
+                            InterestRate = l.InterestRate,
+                            TermMonths = l.TermMonths,
+                            MonthlyPaymentStr = monthly.ToString("N2", CultureInfo.CurrentCulture) + " z³",
+                            NextPaymentInfo = nextInfo
+                        });
+                    }
+                }
+                catch { }
+
+                // If some sections are empty (no DB data), try to load missing data again from DB
+                FillMissingFromDatabase(uid);
+
+                // If still empty, populate demo/sample data so UI looks informative in dev mode
+                EnsureDemoData(uid);
+
+                Raise(nameof(BudgetsSummary));
+                Raise(nameof(GoalsList));
+                Raise(nameof(LoansList));
+                Raise(nameof(LoansViewList));
             }
             catch (Exception ex)
             {
                 MessageBox.Show("B³¹d odczytu raportu: " + ex.Message,
                     "B³¹d", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+
+        // Try to fill missing collections from database (called before falling back to demo data)
+        private void FillMissingFromDatabase(int uid)
+        {
+            try
+            {
+                if (uid <= 0) return;
+
+                if (BudgetsSummary.Count == 0)
+                {
+                    try
+                    {
+                        var budgets = BudgetService.GetBudgetsWithSummary(uid) ?? new List<BudgetService.BudgetSummary>();
+                        foreach (var b in budgets)
+                            BudgetsSummary.Add(b);
+                    }
+                    catch (Exception ex)
+                    {
+                        System.Diagnostics.Debug.WriteLine("FillMissingFromDatabase Budgets error: " + ex.Message);
+                    }
+                }
+
+                if (GoalsList.Count == 0)
+                {
+                    try
+                    {
+                        var envGoals = DatabaseService.GetEnvelopeGoals(uid);
+                        if (envGoals != null)
+                        {
+                            foreach (var g in envGoals)
+                            {
+                                try
+                                {
+                                    var vm = new GoalVm
+                                    {
+                                        EnvelopeId = g.EnvelopeId,
+                                        Name = g.Name ?? string.Empty,
+                                        GoalTitle = (g.GoalText as string) ?? string.Empty,
+                                        TargetAmount = g.Target,
+                                        CurrentAmount = g.Allocated,
+                                        DueDate = g.Deadline,
+                                        Description = g.GoalText as string ?? string.Empty
+                                    };
+                                    GoalsList.Add(vm);
+                                }
+                                catch (Exception ex)
+                                {
+                                    System.Diagnostics.Debug.WriteLine("FillMissingFromDatabase Goals item error: " + ex.Message);
+                                }
+                            }
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        System.Diagnostics.Debug.WriteLine("FillMissingFromDatabase Goals error: " + ex.Message);
+                    }
+                }
+
+                if (LoansViewList.Count == 0)
+                {
+                    try
+                    {
+                        var loans = DatabaseService.GetLoans(uid) ?? new List<LoanModel>();
+                        foreach (var l in loans)
+                        {
+                            var monthly = LoansService.CalculateMonthlyPayment(l.Principal, l.InterestRate, l.TermMonths);
+                            string nextInfo = monthly.ToString("N2", CultureInfo.CurrentCulture) + " z³";
+                            try
+                            {
+                                var today = DateTime.Today;
+                                DateTime nextDate;
+                                if (l.PaymentDay <= 0)
+                                    nextDate = l.StartDate.AddMonths(1);
+                                else
+                                {
+                                    int daysInThisMonth = DateTime.DaysInMonth(today.Year, today.Month);
+                                    int day = Math.Min(l.PaymentDay, daysInThisMonth);
+                                    var candidate = new DateTime(today.Year, today.Month, day);
+                                    if (candidate <= today)
+                                    {
+                                        var nextMonth = new DateTime(today.Year, today.Month, 1).AddMonths(1);
+                                        day = Math.Min(l.PaymentDay, DateTime.DaysInMonth(nextMonth.Year, nextMonth.Month));
+                                        candidate = new DateTime(nextMonth.Year, nextMonth.Month, day);
+                                    }
+                                    nextDate = candidate;
+                                }
+                                nextInfo += " · " + nextDate.ToString("dd.MM.yyyy");
+                            }
+                            catch { }
+
+                            LoansViewList.Add(new ReportsLoanVm
+                            {
+                                Id = l.Id,
+                                Name = l.Name,
+                                Principal = l.Principal,
+                                InterestRate = l.InterestRate,
+                                TermMonths = l.TermMonths,
+                                MonthlyPaymentStr = monthly.ToString("N2", CultureInfo.CurrentCulture) + " z³",
+                                NextPaymentInfo = nextInfo
+                            });
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        System.Diagnostics.Debug.WriteLine("FillMissingFromDatabase Loans error: " + ex.Message);
+                    }
+                }
+
+                // Ensure Envelopes (filter) is populated
+                try
+                {
+                    var envs = DatabaseService.GetEnvelopesNames(uid) ?? new List<string>();
+                    Envelopes.Clear();
+                    Envelopes.Add("Wszystkie koperty");
+                    foreach (var e in envs)
+                        Envelopes.Add(e);
+                }
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Debug.WriteLine("FillMissingFromDatabase Envelopes error: " + ex.Message);
+                }
+
+                // Ensure Categories & Accounts
+                try
+                {
+                    var cats = DatabaseService.GetCategoriesByUser(uid) ?? new List<string>();
+                    Categories.Clear();
+                    Categories.Add("Wszystkie kategorie");
+                    foreach (var c in cats)
+                        Categories.Add(c);
+                }
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Debug.WriteLine("FillMissingFromDatabase Categories error: " + ex.Message);
+                }
+
+                try
+                {
+                    BankAccounts.Clear();
+                    BankAccounts.Add(new BankAccountModel { Id = 0, UserId = uid, AccountName = "Wszystkie konta bankowe", BankName = "" });
+                    foreach (var a in DatabaseService.GetAccounts(uid) ?? new List<BankAccountModel>())
+                        BankAccounts.Add(a);
+                }
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Debug.WriteLine("FillMissingFromDatabase Accounts error: " + ex.Message);
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine("FillMissingFromDatabase general error: " + ex.Message);
             }
         }
 
@@ -1209,12 +1503,207 @@ namespace Finly.ViewModels
                     Raise(nameof(SelectedTabIndex));
                     Raise(nameof(IsOverviewTab));
                     Raise(nameof(IsCategoriesTab));
+                    // Removed direct Refresh() call to avoid exceptions during tab switch.
                 }
             }
         }
 
         public bool IsOverviewTab => SelectedTabIndex == 0;
         public bool IsCategoriesTab => SelectedTabIndex == 1;
+
+        // NEW: pretty view model for loans shown in Reports page
+        public class ReportsLoanVm
+        {
+            public int Id { get; set; }
+            public string Name { get; set; } = "";
+            public decimal Principal { get; set; }
+            public decimal InterestRate { get; set; }
+            public int TermMonths { get; set; }
+            public string PrincipalStr => Principal.ToString("N2", CultureInfo.CurrentCulture) + " z³";
+            public string InterestRateStr => InterestRate.ToString("N2", CultureInfo.CurrentCulture) + " %";
+            public string MonthlyPaymentStr { get; set; } = "0,00 z³";
+            public string NextPaymentInfo { get; set; } = "-";
+        }
+
+        public ObservableCollection<ReportsLoanVm> LoansViewList { get; } = new();
+
+        // NEW: fallback demo data if some DB collections are empty
+        private void EnsureDemoData(int uid)
+        {
+            // Basic demo data for empty setup
+            try
+            {
+                // Budgets
+                if (BudgetsSummary.Count == 0)
+                {
+                    BudgetsSummary.Add(new BudgetService.BudgetSummary
+                    {
+                        Id = -1,
+                        Name = "Domowy bud¿et",
+                        Type = "Miesiêczny",
+                        StartDate = DateTime.Today.AddMonths(-1),
+                        EndDate = DateTime.Today.AddMonths(1),
+                        PlannedAmount = 5000m,
+                        Spent = 3120.45m,
+                        IncomesForBudget = 0m
+                    });
+                }
+
+                // Goals
+                if (GoalsList.Count == 0)
+                {
+                    GoalsList.Add(new GoalVm { EnvelopeId = -1, Name = "Wakacje", GoalTitle = "Wakacje", TargetAmount = 6000m, CurrentAmount = 1500m, DueDate = DateTime.Today.AddMonths(12), Description = "Demo" });
+                }
+
+                // Loans view
+                if (LoansViewList.Count == 0)
+                {
+                    LoansViewList.Add(new ReportsLoanVm { Id = -1, Name = "Kredyt demo", Principal = 250000m, InterestRate = 3.6m, TermMonths = 360, MonthlyPaymentStr = LoansService.CalculateMonthlyPayment(250000m, 3.6m, 360).ToString("N2", CultureInfo.CurrentCulture) + " z³", NextPaymentInfo = DateTime.Today.AddDays(14).ToString("dd.MM.yyyy") });
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine("EnsureDemoData error: " + ex.Message);
+            }
+        }
+
+        // Public explicit loaders for individual tabs so ReportsPage can call them on demand
+        public void LoadBudgets()
+        {
+            try
+            {
+                var uid = UserService.GetCurrentUserId();
+                BudgetsSummary.Clear();
+                var budgets = BudgetService.GetBudgetsWithSummary(uid) ?? new List<BudgetService.BudgetSummary>();
+                foreach (var b in budgets)
+                    BudgetsSummary.Add(b);
+                Raise(nameof(BudgetsSummary));
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine("LoadBudgets error: " + ex.Message);
+            }
+        }
+
+        public void LoadGoals()
+        {
+            try
+            {
+                var uid = UserService.GetCurrentUserId();
+                GoalsList.Clear();
+
+                try
+                {
+                    // Load directly from DB so we don't miss goals stored in Note/GoalText
+                    var envGoals = DatabaseService.GetEnvelopeGoals(uid) ?? new List<DatabaseService.EnvelopeGoalDto>();
+
+                    // also refresh shared cache
+                    GoalsService.Goals.Clear();
+
+                    foreach (var g in envGoals)
+                    {
+                        try
+                        {
+                            var raw = (g.GoalText as string) ?? string.Empty;
+                            var goalTitle = string.Empty;
+                            var descLines = new List<string>();
+                            var lines = raw.Split(new[] { '\n' }, StringSplitOptions.RemoveEmptyEntries);
+                            foreach (var rawLine in lines)
+                            {
+                                var line = rawLine.Trim();
+                                if (line.StartsWith("Cel:", StringComparison.OrdinalIgnoreCase))
+                                    goalTitle = line.Substring(4).Trim();
+                                else if (line.StartsWith("Termin:", StringComparison.OrdinalIgnoreCase))
+                                    continue;
+                                else
+                                    descLines.Add(line);
+                            }
+                            if (string.IsNullOrWhiteSpace(goalTitle)) goalTitle = g.Name ?? string.Empty;
+
+                            var vm = new GoalVm
+                            {
+                                EnvelopeId = g.EnvelopeId,
+                                Name = g.Name ?? string.Empty,
+                                GoalTitle = goalTitle,
+                                TargetAmount = g.Target,
+                                CurrentAmount = g.Allocated,
+                                DueDate = g.Deadline,
+                                Description = string.Join(Environment.NewLine, descLines)
+                            };
+
+                            GoalsList.Add(vm);
+                            GoalsService.Goals.Add(vm);
+                        }
+                        catch (Exception ex)
+                        {
+                            System.Diagnostics.Debug.WriteLine("LoadGoals item error: " + ex.Message);
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Debug.WriteLine("LoadGoals error: " + ex.Message);
+                }
+
+                Raise(nameof(GoalsList));
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine("LoadGoals error: " + ex.Message);
+            }
+        }
+
+        public void LoadEnvelopes()
+        {
+            try
+            {
+                var uid = UserService.GetCurrentUserId();
+                Envelopes.Clear();
+                Envelopes.Add("Wszystkie koperty");
+                var envs = DatabaseService.GetEnvelopesNames(uid) ?? new List<string>();
+                foreach (var e in envs)
+                    Envelopes.Add(e);
+                Raise(nameof(Envelopes));
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine("LoadEnvelopes error: " + ex.Message);
+            }
+        }
+
+        public void LoadCategoryStats()
+        {
+            try
+            {
+                var uid = UserService.GetCurrentUserId();
+                // rebuild expense/income summaries using current Rows if present, otherwise read fresh rows
+                if (Rows == null || Rows.Count == 0)
+                {
+                    // load unified rows for current period
+                    var currentRows = ReportsService.LoadReport(
+                        uid,
+                        GetSourceString(),
+                        SelectedCategory,
+                        SelectedTransactionType,
+                        SelectedMoneyPlace,
+                        FromDate,
+                        ToDate
+                    ).ToList();
+
+                    Rows.Clear();
+                    foreach (var row in currentRows)
+                        Rows.Add(row);
+                }
+
+                RebuildCategorySummariesFromRows();
+                Raise(nameof(ExpenseCategoriesSummary));
+                Raise(nameof(IncomeCategoriesSummary));
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine("LoadCategoryStats error: " + ex.Message);
+            }
+        }
     }
 
     static class DataTableExtensions

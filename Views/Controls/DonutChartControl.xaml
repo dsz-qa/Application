@@ -7,46 +7,85 @@
              d:DesignWidth="300"
              d:DesignHeight="250">
 
-    <Grid>
-        <Canvas x:Name="ChartCanvas"
+	<Grid>
+		<Canvas x:Name="ChartCanvas"
                 HorizontalAlignment="Stretch"
                 VerticalAlignment="Stretch"
-                Background="Transparent" />
+                Background="Transparent"
+                ClipToBounds="True" />
 
-        <Border x:Name="CenterPanel"
-                Width="120"
-                Height="120"
-                CornerRadius="60"
+		<Border x:Name="CenterPanel"
+                CornerRadius="70"
                 Background="{DynamicResource Surface.Background}"
-                Opacity="0.9"
+                Opacity="0.92"
                 HorizontalAlignment="Center"
                 VerticalAlignment="Center"
-                Visibility="Collapsed">
-            <StackPanel HorizontalAlignment="Center"
-                        VerticalAlignment="Center">
-                <TextBlock x:Name="CenterTitleText"
-                           Text=""
+                Visibility="Collapsed"
+                Panel.ZIndex="100">
+			<!-- Minimal center: single short label only -->
+			<StackPanel x:Name="CenterStack" HorizontalAlignment="Center" VerticalAlignment="Center" Margin="8" >
+				<TextBlock x:Name="CenterStaticLabel"
+                           Text="Wydatki"
                            TextAlignment="Center"
-                           FontSize="12"
+                           FontSize="13"
+                           FontWeight="SemiBold"
                            Foreground="{DynamicResource App.Foreground}"
-                           Margin="4,0,4,2"/>
-                <TextBlock x:Name="CenterValueText"
+                           Margin="6,0,6,4" />
+
+				<!-- legacy dynamic texts (kept but hidden) -->
+				<TextBlock x:Name="CenterTitleText"
                            Text=""
+                           Visibility="Collapsed"
                            TextAlignment="Center"
-                           FontSize="16"
+                           FontSize="13"
+                           FontWeight="SemiBold"
+                           Foreground="{DynamicResource App.Foreground}"
+                           Margin="6,0,6,6"
+                           TextWrapping="Wrap"
+                           TextTrimming="CharacterEllipsis"/>
+
+				<TextBlock x:Name="CenterValueText"
+                           Text=""
+                           Visibility="Collapsed"
+                           TextAlignment="Center"
+                           FontSize="18"
                            FontWeight="Bold"
                            Foreground="{DynamicResource App.Foreground}"
-                           Margin="4,0,4,0"/>
-            </StackPanel>
-        </Border>
+                           Margin="6,0,6,4"
+                           TextTrimming="CharacterEllipsis"/>
 
-        <!-- Gdy nie ma danych -->
-        <TextBlock x:Name="NoDataText"
+				<TextBlock x:Name="CenterPercentText"
+                           Text=""
+                           Visibility="Collapsed"
+                           TextAlignment="Center"
+                           FontSize="12"
+                           Opacity="0.85"
+                           Foreground="{DynamicResource App.Foreground}"
+                           Margin="6,0,6,2"
+                           TextTrimming="CharacterEllipsis"/>
+			</StackPanel>
+		</Border>
+
+		<!-- Overflow panel: hidden in minimal mode -->
+		<StackPanel x:Name="CenterOverflowPanel"
+                    Orientation="Vertical"
+                    HorizontalAlignment="Center"
+                    VerticalAlignment="Center"
+                    Margin="0,0,0,-40"
+                    Visibility="Collapsed"
+                    Panel.ZIndex="95"
+                    IsHitTestVisible="False">
+			<TextBlock x:Name="CenterBottomTitle" Text="" FontSize="13" FontWeight="SemiBold" TextAlignment="Center" Foreground="{DynamicResource App.Foreground}" Margin="0,6,0,2" TextTrimming="CharacterEllipsis" />
+			<TextBlock x:Name="CenterBottomPercent" Text="" FontSize="12" Opacity="0.85" TextAlignment="Center" Foreground="{DynamicResource App.Foreground}" />
+		</StackPanel>
+
+		<!-- Gdy nie ma danych -->
+		<TextBlock x:Name="NoDataText"
                    Text="Brak danych"
                    FontStyle="Italic"
                    Foreground="{DynamicResource App.Foreground}"
                    HorizontalAlignment="Center"
                    VerticalAlignment="Center"
                    Visibility="Collapsed"/>
-    </Grid>
+	</Grid>
 </UserControl>

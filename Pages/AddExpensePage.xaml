@@ -111,7 +111,7 @@
             <!-- Odłożona gotówka -->
             <Border Grid.Column="3" Style="{StaticResource KpiCard}">
                 <StackPanel>
-                    <TextBlock Text="Odłożona gotówka (do rozdysponowania)" Style="{StaticResource KpiHeader}"/>
+                    <TextBlock Text="Odłożona gotówka" Style="{StaticResource KpiHeader}"/>
                     <TextBlock x:Name="SavedToAllocateText" Style="{StaticResource KpiValueStyle}" Text="0,00 zł"/>
                 </StackPanel>
             </Border>
