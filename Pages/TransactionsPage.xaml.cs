@@ -18,6 +18,8 @@ namespace Finly.Pages
     {
         private readonly TransactionsViewModel _vm;
         private PeriodBarControl? _periodBar;
+        // UID used for data queries and KPI refresh
+        private int _uid;
 
         public TransactionsPage()
         {
@@ -27,6 +29,7 @@ namespace Finly.Pages
             DataContext = _vm;
 
             Loaded += TransactionsPage_Loaded;
+            Unloaded += TransactionsPage_Unloaded;
         }
 
         // ================== INIT ==================
@@ -73,6 +76,53 @@ namespace Finly.Pages
             {
                 Resources["AccountsForEditRes"] = new[] { "Wolna gotówka", "Odłożona gotówka" };
             }
+
+            // store uid for later use and refresh KPI tiles
+            _uid = uid;
+            RefreshMoneySummary();
+
+            // subscribe to DB changes to auto-refresh KPI when data changes
+            DatabaseService.DataChanged += DatabaseService_DataChanged;
+        }
+
+        private void TransactionsPage_Unloaded(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                DatabaseService.DataChanged -= DatabaseService_DataChanged;
+            }
+            catch { }
+        }
+
+        private void DatabaseService_DataChanged(object? sender, EventArgs e)
+        {
+            // Refresh KPI on UI thread
+            Dispatcher.BeginInvoke(new Action(() =>
+            {
+                try { RefreshMoneySummary(); }
+                catch { }
+            }), System.Windows.Threading.DispatcherPriority.Background);
+        }
+
+        // Helper to set KPI TextBlocks by name
+        private void SetKpiText(string name, decimal value)
+        {
+            if (FindName(name) is TextBlock tb)
+                tb.Text = value.ToString("N2", CultureInfo.CurrentCulture) + " zł";
+        }
+
+        private void RefreshMoneySummary()
+        {
+            if (_uid <= 0) return;
+
+            var snap = DatabaseService.GetMoneySnapshot(_uid);
+
+            SetKpiText("TotalWealthText", snap.Total);
+            SetKpiText("BanksText", snap.Banks);
+            SetKpiText("FreeCashDashboardText", snap.Cash);
+            SetKpiText("SavedToAllocateText", snap.SavedUnallocated);
+            SetKpiText("EnvelopesDashboardText", snap.Envelopes);
+            SetKpiText("InvestmentsText", 0m);
         }
 
         private void PeriodBar_RangeChanged(object? sender, EventArgs e)
@@ -210,6 +260,8 @@ namespace Finly.Pages
                     _vm.SetPeriod(_periodBar.Mode, _periodBar.StartDate, _periodBar.EndDate);
 
                 _vm.LoadFromDatabase();
+                // update KPI tiles after changes
+                RefreshMoneySummary();
             }
         }
 
@@ -228,6 +280,8 @@ namespace Finly.Pages
             if (sender is FrameworkElement fe && fe.DataContext is TransactionCardVm vm)
             {
                 _vm.SaveEdit(vm);
+                // ensure KPI tiles reflect saved changes (if SaveEdit doesn't trigger DataChanged)
+                try { RefreshMoneySummary(); } catch { }
             }
         }
 

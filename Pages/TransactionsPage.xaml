@@ -505,42 +505,42 @@
             <Border Grid.Column="0" Style="{StaticResource AccentCard}">
                 <StackPanel>
                     <TextBlock Text="Cały majątek" Style="{StaticResource KpiHeader}"/>
-                    <TextBlock Text="0,00 zł" Style="{StaticResource KpiValueStyle}"/>
+                    <TextBlock x:Name="TotalWealthText" Text="0,00 zł" Style="{StaticResource KpiValueStyle}"/>
                 </StackPanel>
             </Border>
 
             <Border Grid.Column="1" Style="{StaticResource AccentCard}">
                 <StackPanel>
                     <TextBlock Text="Konta bankowe" Style="{StaticResource KpiHeader}"/>
-                    <TextBlock Text="0,00 zł" Style="{StaticResource KpiValueStyle}"/>
+                    <TextBlock x:Name="BanksText" Text="0,00 zł" Style="{StaticResource KpiValueStyle}"/>
                 </StackPanel>
             </Border>
 
             <Border Grid.Column="2" Style="{StaticResource AccentCard}">
                 <StackPanel>
                     <TextBlock Text="Wolna gotówka" Style="{StaticResource KpiHeader}"/>
-                    <TextBlock Text="0,00 zł" Style="{StaticResource KpiValueStyle}"/>
+                    <TextBlock x:Name="FreeCashDashboardText" Text="0,00 zł" Style="{StaticResource KpiValueStyle}"/>
                 </StackPanel>
             </Border>
 
             <Border Grid.Column="3" Style="{StaticResource AccentCard}">
                 <StackPanel>
                     <TextBlock Text="Gotówka odłożona" Style="{StaticResource KpiHeader}" TextWrapping="Wrap"/>
-                    <TextBlock Text="0,00 zł" Style="{StaticResource KpiValueStyle}"/>
+                    <TextBlock x:Name="SavedToAllocateText" Text="0,00 zł" Style="{StaticResource KpiValueStyle}"/>
                 </StackPanel>
             </Border>
 
             <Border Grid.Column="4" Style="{StaticResource AccentCard}" Margin="0">
                 <StackPanel HorizontalAlignment="Left">
-                    <TextBlock Text="Gotówka w kopertach" Style="{StaticResource KpiHeader}" TextWrapping="Wrap" TextAlignment="Left"/>
-                    <TextBlock Text="0,00 zł" Style="{StaticResource KpiValueStyle}" TextWrapping="Wrap" TextAlignment="Left"/>
+                    <TextBlock Text="Gotówka w kopertach" Style="{StaticResource KpiHeader}" TextWrapping="Wrap"/>
+                    <TextBlock x:Name="EnvelopesDashboardText" Text="0,00 zł" Style="{StaticResource KpiValueStyle}"/>
                 </StackPanel>
             </Border>
 
             <Border Grid.Column="5" Style="{StaticResource AccentCard}" Margin="0">
                 <StackPanel>
                     <TextBlock Text="Inwestycje" Style="{StaticResource KpiHeader}"/>
-                    <TextBlock Text="0,00 zł" Style="{StaticResource KpiValueStyle}"/>
+                    <TextBlock x:Name="InvestmentsText" Text="0,00 zł" Style="{StaticResource KpiValueStyle}"/>
                 </StackPanel>
             </Border>
             </Grid>
