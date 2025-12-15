@@ -447,79 +447,35 @@
                     </Border>
 
                     <!-- ================= WYKRESY KOŁOWE ================= -->
-                    <Border Grid.Row="2" Grid.Column="0" Style="{StaticResource Card}" Margin="0,12,8,0">
-                        <StackPanel>
-                            <TextBlock Text="Źródła przychodu — bieżący okres"
-                                       Style="{StaticResource CardHeader}"
-                                       Margin="0,0,0,8"/>
+<Border Grid.Row="2" Grid.Column="0" Style="{StaticResource Card}" Margin="0,12,8,0">
+    <StackPanel>
+        <TextBlock Text="Źródła przychodu — bieżący okres"
+                   Style="{StaticResource CardHeader}"
+                   Margin="0,0,0,8"/>
 
-                            <lvc:PieChart x:Name="IncomePieChart"
-                                          Series="{Binding DataContext.IncomeBySourceSeries, ElementName=Root}"
-                                          Height="220"
-                                          LegendPosition="Right"
-                                          Background="Transparent"
-                                          Foreground="{DynamicResource App.Foreground}"
-                                          DrawMargin="0">
-                                <lvc:PieChart.LegendTextPaint>
-                                    <lvc:SolidColorPaint Color="#FFFFFFFF"/>
-                                </lvc:PieChart.LegendTextPaint>
-                            </lvc:PieChart>
+        <!-- Donut z legendą po prawej (wbudowaną w kontrolkę) -->
+        <controls:DonutChartControl x:Name="IncomeDonut"
+                                    Height="240"
+                                    Title="Źródła przychodu"/>
 
-                            <TextBlock Text="Brak danych w tym okresie"
-                                       Foreground="{DynamicResource App.Foreground}"
-                                       FontStyle="Italic"
-                                       HorizontalAlignment="Center"
-                                       Margin="0,6,0,0">
-                                <TextBlock.Style>
-                                    <Style TargetType="TextBlock">
-                                        <Setter Property="Visibility" Value="Collapsed"/>
-                                        <Style.Triggers>
-                                            <DataTrigger Binding="{Binding DataContext.IncomeBySourceSeries.Count, ElementName=Root}" Value="0">
-                                                <Setter Property="Visibility" Value="Visible"/>
-                                            </DataTrigger>
-                                        </Style.Triggers>
-                                    </Style>
-                                </TextBlock.Style>
-                            </TextBlock>
-                        </StackPanel>
-                    </Border>
+    </StackPanel>
+</Border>
 
-                    <Border Grid.Row="2" Grid.Column="1" Style="{StaticResource Card}" Margin="8,12,0,0">
-                        <StackPanel>
-                            <TextBlock Text="Wydatki wg kategorii — bieżący okres"
-                                       Style="{StaticResource CardHeader}"
-                                       Margin="0,0,0,8"/>
 
-                            <lvc:PieChart x:Name="ExpensePieChart"
-                                          Series="{Binding DataContext.ExpensesByCategorySeries, ElementName=Root}"
-                                          Height="220"
-                                          LegendPosition="Right"
-                                          Background="Transparent"
-                                          Foreground="{DynamicResource App.Foreground}"
-                                          DrawMargin="0">
-                                <lvc:PieChart.LegendTextPaint>
-                                    <lvc:SolidColorPaint Color="#FFFFFFFF"/>
-                                </lvc:PieChart.LegendTextPaint>
-                            </lvc:PieChart>
+<Border Grid.Row="2" Grid.Column="1" Style="{StaticResource Card}" Margin="8,12,0,0">
+    <StackPanel>
+        <TextBlock Text="Wydatki wg kategorii — bieżący okres"
+                   Style="{StaticResource CardHeader}"
+                   Margin="0,0,0,8"/>
 
-                            <TextBlock Text="Brak danych w tym okresie"
-                                       Foreground="{DynamicResource App.Foreground}"
-                                       FontStyle="Italic"
-                                       HorizontalAlignment="Center"
-                                       Margin="0,6,0,0">
-                                <TextBlock.Style>
-                                    <Style TargetType="TextBlock">
-                                        <Setter Property="Visibility" Value="Collapsed"/>
-                                        <Style.Triggers>
-                                            <DataTrigger Binding="{Binding DataContext.ExpensesByCategorySeries.Count, ElementName=Root}" Value="0">
-                                                <Setter Property="Visibility" Value="Visible"/>
-                                            </DataTrigger>
-                                        </Style.Triggers>
-                                    </Style>
-                                </TextBlock.Style>
-                            </TextBlock>
-                        </StackPanel>
-                    </Border>
+        <!-- Donut z legendą po prawej (wbudowaną w kontrolkę) -->
+        <controls:DonutChartControl x:Name="ExpenseDonut"
+                                    Height="240"
+                                    Title="Wydatki wg kategorii"/>
+
+    </StackPanel>
+</Border>
+
 
                     <!-- ================= Sekcja dolna 2x2 ================= -->
                     <Grid Grid.Row="3" Grid.ColumnSpan="2" Margin="0,12,0,0">
