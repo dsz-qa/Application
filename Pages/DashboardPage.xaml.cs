@@ -346,6 +346,14 @@ namespace Finly.Pages
             if (FindName("IncomeDonut") is Finly.Views.Controls.DonutChartControl incCtrl)
                 incCtrl.Draw(incDict, incTotal, palette);
         }
+        private static double FitFontSize(int textLength, double baseSize, double minSize = 10)
+        {
+            if (textLength <= 12) return baseSize;
+            var scale = 12.0 / textLength;              // im dłuższy tekst, tym mniejsza skala
+            return Math.Max(minSize, baseSize * scale);
+        }
+
+
 
 
         private void UpdateTablesVisibility()

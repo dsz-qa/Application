@@ -8,7 +8,7 @@
 
     <UserControl.Resources>
 
-        <!-- ===== DASHBOARD-ONLY STYLES (bez globalnych Button/TextBox) ===== -->
+        <!-- ===================== DASHBOARD-ONLY STYLES ===================== -->
 
         <!-- Karty -->
         <Style x:Key="Card" TargetType="Border">
@@ -29,10 +29,9 @@
             <Setter Property="FontSize" Value="16"/>
             <Setter Property="FontWeight" Value="Bold"/>
             <Setter Property="Foreground" Value="{DynamicResource App.Foreground}"/>
-            <Setter Property="Opacity" Value="1"/>
         </Style>
 
-        <!-- KPI (górne kafle) -->
+        <!-- KPI -->
         <Style x:Key="KpiValueStyle" TargetType="TextBlock">
             <Setter Property="FontSize" Value="18"/>
             <Setter Property="FontWeight" Value="Bold"/>
@@ -44,7 +43,6 @@
             <Setter Property="FontSize" Value="20"/>
             <Setter Property="FontWeight" Value="Bold"/>
             <Setter Property="Foreground" Value="{DynamicResource App.Foreground}"/>
-            <Setter Property="Opacity" Value="1"/>
         </Style>
 
         <Style x:Key="KpiCard" TargetType="Border">
@@ -56,7 +54,7 @@
             <Setter Property="Margin" Value="0,0,16,0"/>
         </Style>
 
-        <!-- Mniejsze etykiety w sekcjach (jak KPI w Reports) -->
+        <!-- Mini etykiety -->
         <Style x:Key="MiniLabel" TargetType="TextBlock">
             <Setter Property="Foreground" Value="{DynamicResource App.Foreground}"/>
             <Setter Property="Opacity" Value="0.85"/>
@@ -74,6 +72,51 @@
             <Setter Property="FontWeight" Value="SemiBold"/>
             <Setter Property="Foreground" Value="{DynamicResource App.Foreground}"/>
             <Setter Property="Opacity" Value="0.8"/>
+        </Style>
+
+        <!-- ====== BRAKUJĄCE STYLE (fallback, żeby XAML zawsze się kompilował) ====== -->
+
+        <Style x:Key="FinancialAnalysisCardBorderStyle" TargetType="Border" BasedOn="{StaticResource Card}">
+            <Setter Property="Padding" Value="16"/>
+        </Style>
+
+        <Style x:Key="FinancialAnalysisCardHeaderStyle" TargetType="TextBlock" BasedOn="{StaticResource CardHeader}">
+            <Setter Property="FontSize" Value="16"/>
+        </Style>
+
+        <Style x:Key="PrimaryButton" TargetType="Button">
+            <Setter Property="Padding" Value="10,6"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Background" Value="{DynamicResource Brand.Blue}"/>
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Cursor" Value="Hand"/>
+        </Style>
+
+        <Style x:Key="SecondaryButton" TargetType="Button" BasedOn="{StaticResource PrimaryButton}">
+            <Setter Property="Background" Value="{DynamicResource Surface.Background}"/>
+            <Setter Property="Foreground" Value="{DynamicResource App.Foreground}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource Surface.Border}"/>
+        </Style>
+
+        <!-- Prosty przycisk ikony (fallback). Jeśli masz globalny DeleteIconButton, to ten i tak zadziała. -->
+        <Style x:Key="DeleteIconButton" TargetType="Button">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource Surface.Border}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Foreground" Value="{DynamicResource App.Foreground}"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Content" Value="🗑"/>
+            <Setter Property="FontSize" Value="14"/>
+            <Setter Property="Padding" Value="0"/>
+        </Style>
+
+        <!-- ====== Wspólny styl na długie teksty: utnij i pokaż tooltip ====== -->
+        <Style x:Key="EllipsizeWithTooltip" TargetType="TextBlock">
+            <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
+            <Setter Property="TextWrapping" Value="NoWrap"/>
+            <Setter Property="ToolTip" Value="{Binding RelativeSource={RelativeSource Self}, Path=Text}"/>
         </Style>
 
     </UserControl.Resources>
@@ -159,10 +202,9 @@
                 </Grid.ColumnDefinitions>
 
                 <!-- Analizy -->
-                <Border Grid.Column="0" Style="{StaticResource FinancialAnalysisCardBorderStyle}" Margin="0,0,12,0">
+                <Border Grid.Column="0" Style="{StaticResource AccentOrangeCard}" Margin="0,0,12,0">
                     <StackPanel>
                         <TextBlock Text="Analizy finansowe" Style="{StaticResource FinancialAnalysisCardHeaderStyle}" Margin="0,0,0,10"/>
-
                         <ItemsControl ItemsSource="{Binding DataContext.Insights, ElementName=Root}">
                             <ItemsControl.ItemTemplate>
                                 <DataTemplate>
@@ -177,10 +219,9 @@
                 </Border>
 
                 <!-- Alerty -->
-                <Border Grid.Column="1" Style="{StaticResource FinancialAnalysisCardBorderStyle}" Margin="0,0,12,0">
+                <Border Grid.Column="1" Style="{StaticResource AccentOrangeCard}" Margin="0,0,12,0">
                     <StackPanel>
                         <TextBlock Text="Alerty budżetowe" Style="{StaticResource FinancialAnalysisCardHeaderStyle}" Margin="0,0,0,10"/>
-
                         <ItemsControl ItemsSource="{Binding DataContext.Alerts, ElementName=Root}">
                             <ItemsControl.ItemTemplate>
                                 <DataTemplate>
@@ -195,7 +236,7 @@
                 </Border>
 
                 <!-- Prognoza -->
-                <Border Grid.Column="2" Style="{StaticResource FinancialAnalysisCardBorderStyle}">
+                <Border Grid.Column="2" Style="{StaticResource AccentOrangeCard}">
                     <StackPanel>
                         <TextBlock Text="Prognoza końca miesiąca" Style="{StaticResource FinancialAnalysisCardHeaderStyle}" Margin="0,0,0,10"/>
 
@@ -252,7 +293,6 @@
                     <Border Grid.Row="1" Grid.Column="0" Style="{StaticResource Card}" Margin="0,0,8,0">
                         <StackPanel>
 
-                            <!-- Header + delete button -->
                             <Grid Margin="0,0,0,6">
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="*"/>
@@ -273,7 +313,6 @@
                                         Click="ShowIncomeDeleteConfirm_Click"/>
                             </Grid>
 
-                            <!-- Confirmation row -->
                             <StackPanel x:Name="IncomeDeleteConfirmPanel"
                                         Orientation="Horizontal"
                                         Visibility="Collapsed"
@@ -293,7 +332,6 @@
                                         Style="{StaticResource SecondaryButton}"/>
                             </StackPanel>
 
-                            <!-- Nagłówki -->
                             <Border Margin="0,0,0,4"
                                     Background="{DynamicResource Surface.Background}"
                                     Padding="6,4">
@@ -314,7 +352,6 @@
                                 </Grid>
                             </Border>
 
-                            <!-- Wiersze -->
                             <ListBox x:Name="IncomeTable"
                                      ItemsSource="{Binding DataContext.Incomes, ElementName=Root}"
                                      Background="Transparent"
@@ -332,9 +369,21 @@
 
                                             <TextBlock Grid.Column="0" Text="{Binding DateDisplay}" Foreground="{DynamicResource App.Foreground}"/>
                                             <TextBlock Grid.Column="1" Text="{Binding AmountStr}" HorizontalAlignment="Right" Foreground="{DynamicResource App.Foreground}"/>
-                                            <TextBlock Grid.Column="2" Text="{Binding Category}" Foreground="{DynamicResource App.Foreground}" TextTrimming="CharacterEllipsis"/>
-                                            <TextBlock Grid.Column="3" Text="{Binding Account}" Foreground="{DynamicResource App.Foreground}" TextTrimming="CharacterEllipsis"/>
-                                            <TextBlock Grid.Column="4" Text="{Binding Description}" Foreground="{DynamicResource App.Foreground}" TextTrimming="CharacterEllipsis"/>
+
+                                            <TextBlock Grid.Column="2"
+                                                       Text="{Binding Category}"
+                                                       Foreground="{DynamicResource App.Foreground}"
+                                                       Style="{StaticResource EllipsizeWithTooltip}"/>
+
+                                            <TextBlock Grid.Column="3"
+                                                       Text="{Binding Account}"
+                                                       Foreground="{DynamicResource App.Foreground}"
+                                                       Style="{StaticResource EllipsizeWithTooltip}"/>
+
+                                            <TextBlock Grid.Column="4"
+                                                       Text="{Binding Description}"
+                                                       Foreground="{DynamicResource App.Foreground}"
+                                                       Style="{StaticResource EllipsizeWithTooltip}"/>
                                         </Grid>
                                     </DataTemplate>
                                 </ListBox.ItemTemplate>
@@ -354,7 +403,6 @@
                     <Border Grid.Row="1" Grid.Column="1" Style="{StaticResource Card}" Margin="8,0,0,0">
                         <StackPanel>
 
-                            <!-- Header + delete button -->
                             <Grid Margin="0,0,0,6">
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="*"/>
@@ -428,9 +476,21 @@
 
                                             <TextBlock Grid.Column="0" Text="{Binding DateDisplay}" Foreground="{DynamicResource App.Foreground}"/>
                                             <TextBlock Grid.Column="1" Text="{Binding AmountStr}" HorizontalAlignment="Right" Foreground="{DynamicResource App.Foreground}"/>
-                                            <TextBlock Grid.Column="2" Text="{Binding Category}" Foreground="{DynamicResource App.Foreground}" TextTrimming="CharacterEllipsis"/>
-                                            <TextBlock Grid.Column="3" Text="{Binding Account}" Foreground="{DynamicResource App.Foreground}" TextTrimming="CharacterEllipsis"/>
-                                            <TextBlock Grid.Column="4" Text="{Binding Description}" Foreground="{DynamicResource App.Foreground}" TextTrimming="CharacterEllipsis"/>
+
+                                            <TextBlock Grid.Column="2"
+                                                       Text="{Binding Category}"
+                                                       Foreground="{DynamicResource App.Foreground}"
+                                                       Style="{StaticResource EllipsizeWithTooltip}"/>
+
+                                            <TextBlock Grid.Column="3"
+                                                       Text="{Binding Account}"
+                                                       Foreground="{DynamicResource App.Foreground}"
+                                                       Style="{StaticResource EllipsizeWithTooltip}"/>
+
+                                            <TextBlock Grid.Column="4"
+                                                       Text="{Binding Description}"
+                                                       Foreground="{DynamicResource App.Foreground}"
+                                                       Style="{StaticResource EllipsizeWithTooltip}"/>
                                         </Grid>
                                     </DataTemplate>
                                 </ListBox.ItemTemplate>
@@ -447,35 +507,29 @@
                     </Border>
 
                     <!-- ================= WYKRESY KOŁOWE ================= -->
-<Border Grid.Row="2" Grid.Column="0" Style="{StaticResource Card}" Margin="0,12,8,0">
-    <StackPanel>
-        <TextBlock Text="Źródła przychodu — bieżący okres"
-                   Style="{StaticResource CardHeader}"
-                   Margin="0,0,0,8"/>
+                    <Border Grid.Row="2" Grid.Column="0" Style="{StaticResource Card}" Margin="0,12,8,0">
+                        <StackPanel>
+                            <TextBlock Text="Źródła przychodu — bieżący okres"
+                                       Style="{StaticResource CardHeader}"
+                                       Margin="0,0,0,8"/>
 
-        <!-- Donut z legendą po prawej (wbudowaną w kontrolkę) -->
-        <controls:DonutChartControl x:Name="IncomeDonut"
-                                    Height="240"
-                                    Title="Źródła przychodu"/>
+                            <controls:DonutChartControl x:Name="IncomeDonut"
+                                                        Height="240"
+                                                        Title="Źródła przychodu"/>
+                        </StackPanel>
+                    </Border>
 
-    </StackPanel>
-</Border>
+                    <Border Grid.Row="2" Grid.Column="1" Style="{StaticResource Card}" Margin="8,12,0,0">
+                        <StackPanel>
+                            <TextBlock Text="Wydatki wg kategorii — bieżący okres"
+                                       Style="{StaticResource CardHeader}"
+                                       Margin="0,0,0,8"/>
 
-
-<Border Grid.Row="2" Grid.Column="1" Style="{StaticResource Card}" Margin="8,12,0,0">
-    <StackPanel>
-        <TextBlock Text="Wydatki wg kategorii — bieżący okres"
-                   Style="{StaticResource CardHeader}"
-                   Margin="0,0,0,8"/>
-
-        <!-- Donut z legendą po prawej (wbudowaną w kontrolkę) -->
-        <controls:DonutChartControl x:Name="ExpenseDonut"
-                                    Height="240"
-                                    Title="Wydatki wg kategorii"/>
-
-    </StackPanel>
-</Border>
-
+                            <controls:DonutChartControl x:Name="ExpenseDonut"
+                                                        Height="240"
+                                                        Title="Wydatki wg kategorii"/>
+                        </StackPanel>
+                    </Border>
 
                     <!-- ================= Sekcja dolna 2x2 ================= -->
                     <Grid Grid.Row="3" Grid.ColumnSpan="2" Margin="0,12,0,0">
@@ -537,6 +591,7 @@
                                 <TextBlock Text="Najwyższe wydatki — kategorie"
                                            Style="{StaticResource CardHeader}"
                                            Margin="0,0,0,8"/>
+
                                 <ItemsControl x:Name="TopCategoryBars">
                                     <ItemsControl.ItemTemplate>
                                         <DataTemplate>
@@ -547,8 +602,14 @@
                                                         <ColumnDefinition Width="Auto"/>
                                                     </Grid.ColumnDefinitions>
 
-                                                    <TextBlock Text="{Binding Name}" Foreground="{DynamicResource App.Foreground}" Margin="0,0,8,2" TextTrimming="CharacterEllipsis"/>
-                                                    <TextBlock Grid.Column="1" Text="{Binding PercentStr}" Foreground="{DynamicResource App.Foreground}"/>
+                                                    <TextBlock Text="{Binding Name}"
+                                                               Foreground="{DynamicResource App.Foreground}"
+                                                               Margin="0,0,8,2"
+                                                               Style="{StaticResource EllipsizeWithTooltip}"/>
+
+                                                    <TextBlock Grid.Column="1"
+                                                               Text="{Binding PercentStr}"
+                                                               Foreground="{DynamicResource App.Foreground}"/>
                                                 </Grid>
 
                                                 <ProgressBar Minimum="0" Maximum="100" Height="10" Value="{Binding Percent}"/>
@@ -647,9 +708,22 @@
 
                                                 <TextBlock Grid.Column="0" Text="{Binding DateDisplay}" Foreground="{DynamicResource App.Foreground}"/>
                                                 <TextBlock Grid.Column="1" Text="{Binding AmountStr}" HorizontalAlignment="Right" Foreground="{DynamicResource App.Foreground}"/>
-                                                <TextBlock Grid.Column="2" Text="{Binding Category}" Foreground="{DynamicResource App.Foreground}" TextTrimming="CharacterEllipsis"/>
-                                                <TextBlock Grid.Column="3" Text="{Binding Account}" Foreground="{DynamicResource App.Foreground}" TextTrimming="CharacterEllipsis"/>
-                                                <TextBlock Grid.Column="4" Text="{Binding Description}" Foreground="{DynamicResource App.Foreground}" TextTrimming="CharacterEllipsis"/>
+
+                                                <TextBlock Grid.Column="2"
+                                                           Text="{Binding Category}"
+                                                           Foreground="{DynamicResource App.Foreground}"
+                                                           Style="{StaticResource EllipsizeWithTooltip}"/>
+
+                                                <TextBlock Grid.Column="3"
+                                                           Text="{Binding Account}"
+                                                           Foreground="{DynamicResource App.Foreground}"
+                                                           Style="{StaticResource EllipsizeWithTooltip}"/>
+
+                                                <TextBlock Grid.Column="4"
+                                                           Text="{Binding Description}"
+                                                           Foreground="{DynamicResource App.Foreground}"
+                                                           Style="{StaticResource EllipsizeWithTooltip}"/>
+
                                                 <TextBlock Grid.Column="5" Text="{Binding Kind}" Foreground="{DynamicResource App.Foreground}" FontWeight="SemiBold"/>
                                             </Grid>
                                         </DataTemplate>

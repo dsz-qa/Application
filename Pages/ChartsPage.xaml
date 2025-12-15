@@ -5,71 +5,91 @@
              xmlns:lvcwpf="clr-namespace:LiveChartsCore.SkiaSharpView.WPF;assembly=LiveChartsCore.SkiaSharpView.WPF"
              xmlns:vc="clr-namespace:Finly.Views.Controls">
 
-    <UserControl.Resources>
-        <Style x:Key="Card" TargetType="Border">
-            <Setter Property="Background" Value="{DynamicResource Surface.Background}"/>
-            <Setter Property="BorderBrush" Value="{DynamicResource Surface.Border}"/>
-            <Setter Property="BorderThickness" Value="1"/>
-            <Setter Property="CornerRadius" Value="10"/>
-            <Setter Property="Padding" Value="12"/>
-            <Setter Property="Margin" Value="0,0,0,12"/>
-        </Style>
+	<UserControl.Resources>
+		<Style x:Key="Card" TargetType="Border">
+			<Setter Property="Background" Value="{DynamicResource Surface.Background}"/>
+			<Setter Property="BorderBrush" Value="{DynamicResource Surface.Border}"/>
+			<Setter Property="BorderThickness" Value="1"/>
+			<Setter Property="CornerRadius" Value="10"/>
+			<Setter Property="Padding" Value="12"/>
+			<Setter Property="Margin" Value="0,0,0,12"/>
+		</Style>
 
-        <Style x:Key="CardHeader" TargetType="TextBlock">
-            <Setter Property="FontSize" Value="16"/>
-            <Setter Property="FontWeight" Value="Bold"/>
-            <Setter Property="Foreground" Value="{DynamicResource App.Foreground}"/>
-        </Style>
-    </UserControl.Resources>
+		<Style x:Key="CardHeader" TargetType="TextBlock">
+			<Setter Property="FontSize" Value="16"/>
+			<Setter Property="FontWeight" Value="Bold"/>
+			<Setter Property="Foreground" Value="{DynamicResource App.Foreground}"/>
+			<Setter Property="Margin" Value="0,0,0,8"/>
+		</Style>
+	</UserControl.Resources>
 
-    <ScrollViewer VerticalScrollBarVisibility="Auto"
+	<ScrollViewer VerticalScrollBarVisibility="Auto"
                   HorizontalScrollBarVisibility="Disabled">
-        <Grid Margin="16">
-            <Grid.RowDefinitions>
-                <RowDefinition Height="Auto"/>
-                <RowDefinition Height="*"/>
-            </Grid.RowDefinitions>
+		<Grid Margin="16">
+			<Grid.RowDefinitions>
+				<RowDefinition Height="Auto"/>
+				<RowDefinition Height="*"/>
+			</Grid.RowDefinitions>
 
-            <!-- GÓRNY PASEK: eksport + okres + tryby -->
-            <Border Grid.Row="0"
+			<!-- GÓRNY PASEK: eksport + okres + tryby -->
+			<Border Grid.Row="0"
                     Style="{StaticResource Card}"
                     Margin="0,0,0,12">
-                <Grid>
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="*"/>
-                        <ColumnDefinition Width="Auto"/>
-                        <ColumnDefinition Width="*"/>
-                    </Grid.ColumnDefinitions>
+				<Grid>
+					<Grid.ColumnDefinitions>
+						<ColumnDefinition Width="*"/>
+						<ColumnDefinition Width="Auto"/>
+						<ColumnDefinition Width="*"/>
+					</Grid.ColumnDefinitions>
 
-                    <!-- Eksport -->
-                    <StackPanel Grid.Column="0"
+					<!-- Eksport -->
+					<StackPanel Grid.Column="0"
                                 Orientation="Vertical"
                                 VerticalAlignment="Center"
                                 HorizontalAlignment="Center">
-                        <Button Content="Eksport do PDF"
+						<Button Content="Eksport do PDF"
                                 Click="ExportPdf_Click"
                                 Style="{StaticResource PrimaryButton}"
                                 Width="180"
                                 Height="42"
                                 Margin="0,0,0,8"/>
-                        <Button Content="Eksport do CSV"
+						<Button Content="Eksport do CSV"
                                 Click="ExportCsv_Click"
                                 Style="{StaticResource PrimaryButton}"
                                 Width="180"
                                 Height="42"/>
-                    </StackPanel>
+					</StackPanel>
 
-                    <!-- Pasek wyboru okresu -->
-                    <vc:PeriodBarControl Grid.Column="1"
+					<!-- Pasek wyboru okresu -->
+					<vc:PeriodBarControl Grid.Column="1"
                                          x:Name="PeriodBar"
                                          HorizontalAlignment="Center"/>
 
-                    <!-- Tryb: wydatki / przychody / transfer / cashflow -->
-                    <StackPanel Grid.Column="2"
+					<!-- Tryb: ALL / wydatki / przychody / transfer / cashflow -->
+					<StackPanel Grid.Column="2"
                                 Orientation="Vertical"
                                 VerticalAlignment="Center"
                                 HorizontalAlignment="Center">
-                        <Button x:Name="ModeExpensesBtn"
+
+						<!-- NOWE: Wszystkie transakcje -->
+						<Button x:Name="ModeAllBtn"
+                                Tag="All"
+                                Click="Mode_Click"
+                                Width="200"
+                                Height="56"
+                                Margin="0,0,0,10"
+                                Background="{DynamicResource Brand.Blue}"
+                                Foreground="White"
+                                BorderBrush="{DynamicResource Brand.Blue}"
+                                BorderThickness="1">
+							<StackPanel Orientation="Horizontal"
+                                        HorizontalAlignment="Center">
+								<TextBlock Text="Wszystkie transakcje"
+                                           FontWeight="SemiBold"/>
+							</StackPanel>
+						</Button>
+
+						<Button x:Name="ModeExpensesBtn"
                                 Tag="Expenses"
                                 Click="Mode_Click"
                                 Width="200"
@@ -79,19 +99,18 @@
                                 Foreground="White"
                                 BorderBrush="{DynamicResource Brand.Blue}"
                                 BorderThickness="1">
-                            <StackPanel Orientation="Horizontal"
+							<StackPanel Orientation="Horizontal"
                                         HorizontalAlignment="Center">
-                                <Image Source="/Assets/Icons/wydatki.png"
+								<Image Source="/Assets/Icons/wydatki.png"
                                        Width="22"
                                        Height="22"
                                        Stretch="Uniform"
                                        Margin="0,0,8,0"/>
-                                <TextBlock Text="Wydatki"
-                                           FontWeight="SemiBold"/>
-                            </StackPanel>
-                        </Button>
+								<TextBlock Text="Wydatki" FontWeight="SemiBold"/>
+							</StackPanel>
+						</Button>
 
-                        <Button x:Name="ModeIncomesBtn"
+						<Button x:Name="ModeIncomesBtn"
                                 Tag="Incomes"
                                 Click="Mode_Click"
                                 Width="200"
@@ -101,19 +120,18 @@
                                 Foreground="White"
                                 BorderBrush="{DynamicResource Brand.Blue}"
                                 BorderThickness="1">
-                            <StackPanel Orientation="Horizontal"
+							<StackPanel Orientation="Horizontal"
                                         HorizontalAlignment="Center">
-                                <Image Source="/Assets/Icons/przychody.png"
+								<Image Source="/Assets/Icons/przychody.png"
                                        Width="22"
                                        Height="22"
                                        Stretch="Uniform"
                                        Margin="0,0,8,0"/>
-                                <TextBlock Text="Przychody"
-                                           FontWeight="SemiBold"/>
-                            </StackPanel>
-                        </Button>
+								<TextBlock Text="Przychody" FontWeight="SemiBold"/>
+							</StackPanel>
+						</Button>
 
-                        <Button x:Name="ModeTransferBtn"
+						<Button x:Name="ModeTransferBtn"
                                 Tag="Transfer"
                                 Click="Mode_Click"
                                 Width="200"
@@ -123,19 +141,18 @@
                                 Foreground="White"
                                 BorderBrush="{DynamicResource Brand.Blue}"
                                 BorderThickness="1">
-                            <StackPanel Orientation="Horizontal"
+							<StackPanel Orientation="Horizontal"
                                         HorizontalAlignment="Center">
-                                <Image Source="/Assets/Icons/transfer.png"
+								<Image Source="/Assets/Icons/transfer.png"
                                        Width="22"
                                        Height="22"
                                        Stretch="Uniform"
                                        Margin="0,0,8,0"/>
-                                <TextBlock Text="Transfery"
-                                           FontWeight="SemiBold"/>
-                            </StackPanel>
-                        </Button>
+								<TextBlock Text="Transfery" FontWeight="SemiBold"/>
+							</StackPanel>
+						</Button>
 
-                        <Button x:Name="ModeCashflowBtn"
+						<Button x:Name="ModeCashflowBtn"
                                 Tag="Cashflow"
                                 Click="Mode_Click"
                                 Width="200"
@@ -144,184 +161,122 @@
                                 Foreground="White"
                                 BorderBrush="{DynamicResource Brand.Blue}"
                                 BorderThickness="1">
-                            <StackPanel Orientation="Horizontal"
+							<StackPanel Orientation="Horizontal"
                                         HorizontalAlignment="Center">
-                                <TextBlock Text="Cashflow"
-                                           FontWeight="SemiBold"/>
-                            </StackPanel>
-                        </Button>
-                    </StackPanel>
-                </Grid>
-            </Border>
+								<TextBlock Text="Cashflow" FontWeight="SemiBold"/>
+							</StackPanel>
+						</Button>
+					</StackPanel>
+				</Grid>
+			</Border>
 
-            <!-- DÓŁ: WYKRESY W SIATCE 4x2 -->
-            <Grid Grid.Row="1">
-                <Grid.RowDefinitions>
-                    <RowDefinition Height="Auto"/>
-                    <!-- rząd 1 -->
-                    <RowDefinition Height="Auto"/>
-                    <!-- rząd 2 -->
-                    <RowDefinition Height="Auto"/>
-                    <!-- rząd 3 -->
-                    <RowDefinition Height="Auto"/>
-                    <!-- rząd 4 -->
-                </Grid.RowDefinitions>
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="*"/>
-                    <ColumnDefinition Width="*"/>
-                </Grid.ColumnDefinitions>
+			<!-- DÓŁ: WYKRESY W SIATCE 4x2 -->
+			<Grid Grid.Row="1">
+				<Grid.RowDefinitions>
+					<RowDefinition Height="Auto"/>
+					<RowDefinition Height="Auto"/>
+					<RowDefinition Height="Auto"/>
+					<RowDefinition Height="Auto"/>
+				</Grid.RowDefinitions>
+				<Grid.ColumnDefinitions>
+					<ColumnDefinition Width="*"/>
+					<ColumnDefinition Width="*"/>
+				</Grid.ColumnDefinitions>
 
-                <!-- RZĄD 1 -->
-                <!-- PODZIAŁ WEDŁUG KATEGORII -->
-                <Border Grid.Row="0" Grid.Column="0" Style="{StaticResource Card}">
-                    <Grid>
-                        <Grid.ColumnDefinitions>
-                            <!-- lewa część: wykres, prawa: legenda -->
-                            <ColumnDefinition Width="2*" />
-                            <ColumnDefinition Width="*" />
-                        </Grid.ColumnDefinitions>
+				<!-- RZĄD 1 -->
+				<!-- PODZIAŁ WEDŁUG KATEGORII (DONUT Z DASHBOARD + LEGENDA) -->
+				<Border Grid.Row="0" Grid.Column="0" Style="{StaticResource Card}">
+					<StackPanel>
+						<TextBlock Text="Podział według kategorii"
+                                   Style="{StaticResource CardHeader}" />
 
-                        <!-- wykres kołowy – legenda wbudowana WYŁĄCZONA -->
-                        <StackPanel Grid.Column="0">
-                            <TextBlock Text="Podział według kategorii"
-                                       Style="{StaticResource CardHeader}" />
-                            <lvcwpf:PieChart x:Name="CategoriesPieChart"
-                                             Series="{Binding CategoriesSeries}"
-                                             LegendPosition="Hidden"
-                                             Height="260"
-                                             Background="Transparent"
-                                             Foreground="White" />
-                        </StackPanel>
+						<vc:DonutChartControl x:Name="CategoriesDonut"
+                                              Height="260"
+                                              Title="Wszystkie transakcje — podział"/>
+					</StackPanel>
+				</Border>
 
-                        <!-- własna legenda po prawej, z małą czcionką + scroll -->
-                        <StackPanel Grid.Column="1"
-                                    Margin="12,0,0,0">
-                            <TextBlock Text="Kategorie"
-                                       FontWeight="Bold"
-                                       Foreground="{DynamicResource App.Foreground}"
-                                       Margin="0,0,0,4"/>
-
-                            <ScrollViewer VerticalScrollBarVisibility="Auto"
-                                          MaxHeight="240">
-                                <ItemsControl ItemsSource="{Binding CategoriesSeries}">
-                                    <ItemsControl.ItemTemplate>
-                                        <DataTemplate>
-                                            <StackPanel Orientation="Horizontal"
-                                                        Margin="0,2">
-                                                <!-- kolorowa „kropka” -->
-                                                <TextBlock Text="●"
-                                                           Margin="0,0,6,0"
-                                                           VerticalAlignment="Center"
-                                                           FontSize="14"
-                                                           Foreground="White"/>
-                                                <!-- nazwa serii (kategorii) -->
-                                                <TextBlock Text="{Binding Name}"
-                                                           FontSize="11"
-                                                           Foreground="White" />
-                                            </StackPanel>
-                                        </DataTemplate>
-                                    </ItemsControl.ItemTemplate>
-                                </ItemsControl>
-                            </ScrollViewer>
-                        </StackPanel>
-                    </Grid>
-                </Border>
-
-                <Border Grid.Row="0" Grid.Column="1"
-                        Style="{StaticResource Card}">
-                    <StackPanel>
-                        <TextBlock Text="Trend w czasie"
-                                   Style="{StaticResource CardHeader}"/>
-                        <lvcwpf:CartesianChart Series="{Binding TrendSeries}"
+				<Border Grid.Row="0" Grid.Column="1" Style="{StaticResource Card}">
+					<StackPanel>
+						<TextBlock Text="Trend w czasie" Style="{StaticResource CardHeader}"/>
+						<lvcwpf:CartesianChart Series="{Binding TrendSeries}"
                                                XAxes="{Binding TrendXAxes}"
                                                Height="260"
                                                Background="Transparent"
-                                               Foreground="White"/>
-                    </StackPanel>
-                </Border>
+                                               Foreground="{DynamicResource App.Foreground}"/>
+					</StackPanel>
+				</Border>
 
-                <!-- RZĄD 2 -->
-                <Border Grid.Row="1" Grid.Column="0"
-                        Style="{StaticResource Card}">
-                    <StackPanel>
-                        <TextBlock Text="Według wolnej gotówki"
-                                   Style="{StaticResource CardHeader}"/>
-                        <lvcwpf:CartesianChart Series="{Binding FreeCashSeries}"
+				<!-- RZĄD 2 -->
+				<Border Grid.Row="1" Grid.Column="0" Style="{StaticResource Card}">
+					<StackPanel>
+						<TextBlock Text="Według wolnej gotówki" Style="{StaticResource CardHeader}"/>
+						<lvcwpf:CartesianChart Series="{Binding FreeCashSeries}"
                                                XAxes="{Binding FreeCashXAxes}"
                                                Height="200"
                                                Background="Transparent"
-                                               Foreground="White"/>
-                    </StackPanel>
-                </Border>
+                                               Foreground="{DynamicResource App.Foreground}"/>
+					</StackPanel>
+				</Border>
 
-                <Border Grid.Row="1" Grid.Column="1"
-                        Style="{StaticResource Card}">
-                    <StackPanel>
-                        <TextBlock Text="Według odłożonej gotówki"
-                                   Style="{StaticResource CardHeader}"/>
-                        <lvcwpf:CartesianChart Series="{Binding SavedCashSeries}"
+				<Border Grid.Row="1" Grid.Column="1" Style="{StaticResource Card}">
+					<StackPanel>
+						<TextBlock Text="Według odłożonej gotówki" Style="{StaticResource CardHeader}"/>
+						<lvcwpf:CartesianChart Series="{Binding SavedCashSeries}"
                                                XAxes="{Binding SavedCashXAxes}"
                                                Height="200"
                                                Background="Transparent"
-                                               Foreground="White"/>
-                    </StackPanel>
-                </Border>
+                                               Foreground="{DynamicResource App.Foreground}"/>
+					</StackPanel>
+				</Border>
 
-                <!-- RZĄD 3 -->
-                <Border Grid.Row="2" Grid.Column="0"
-                        Style="{StaticResource Card}">
-                    <StackPanel>
-                        <TextBlock Text="Według kont bankowych"
-                                   Style="{StaticResource CardHeader}"/>
-                        <lvcwpf:CartesianChart Series="{Binding BankAccountsSeries}"
+				<!-- RZĄD 3 -->
+				<Border Grid.Row="2" Grid.Column="0" Style="{StaticResource Card}">
+					<StackPanel>
+						<TextBlock Text="Według kont bankowych" Style="{StaticResource CardHeader}"/>
+						<lvcwpf:CartesianChart Series="{Binding BankAccountsSeries}"
                                                XAxes="{Binding BankAccountsXAxes}"
                                                Height="260"
                                                Background="Transparent"
-                                               Foreground="White"/>
-                    </StackPanel>
-                </Border>
+                                               Foreground="{DynamicResource App.Foreground}"/>
+					</StackPanel>
+				</Border>
 
-                <Border Grid.Row="2" Grid.Column="1"
-                        Style="{StaticResource Card}">
-                    <StackPanel>
-                        <TextBlock Text="Według kopert"
-                                   Style="{StaticResource CardHeader}"/>
-                        <lvcwpf:CartesianChart Series="{Binding EnvelopesSeries}"
+				<Border Grid.Row="2" Grid.Column="1" Style="{StaticResource Card}">
+					<StackPanel>
+						<TextBlock Text="Według kopert" Style="{StaticResource CardHeader}"/>
+						<lvcwpf:CartesianChart Series="{Binding EnvelopesSeries}"
                                                XAxes="{Binding EnvelopesXAxes}"
                                                Height="260"
                                                Background="Transparent"
-                                               Foreground="White"/>
-                    </StackPanel>
-                </Border>
+                                               Foreground="{DynamicResource App.Foreground}"/>
+					</StackPanel>
+				</Border>
 
-                <!-- RZĄD 4 -->
-                <Border Grid.Row="3" Grid.Column="0"
-                        Style="{StaticResource Card}">
-                    <StackPanel>
-                        <TextBlock Text="Według dnia tygodnia"
-                                   Style="{StaticResource CardHeader}"/>
-                        <lvcwpf:CartesianChart Series="{Binding WeekdaySeries}"
+				<!-- RZĄD 4 -->
+				<Border Grid.Row="3" Grid.Column="0" Style="{StaticResource Card}">
+					<StackPanel>
+						<TextBlock Text="Według dnia tygodnia" Style="{StaticResource CardHeader}"/>
+						<lvcwpf:CartesianChart Series="{Binding WeekdaySeries}"
                                                XAxes="{Binding WeekdayXAxes}"
                                                Height="260"
                                                Background="Transparent"
-                                               Foreground="White"/>
-                    </StackPanel>
-                </Border>
+                                               Foreground="{DynamicResource App.Foreground}"/>
+					</StackPanel>
+				</Border>
 
-                <Border Grid.Row="3" Grid.Column="1"
-                        Style="{StaticResource Card}">
-                    <StackPanel>
-                        <TextBlock Text="Liczba transakcji wg przedziału kwot"
-                                   Style="{StaticResource CardHeader}"/>
-                        <lvcwpf:CartesianChart Series="{Binding AmountBucketsSeries}"
+				<Border Grid.Row="3" Grid.Column="1" Style="{StaticResource Card}">
+					<StackPanel>
+						<TextBlock Text="Liczba transakcji wg przedziału kwot" Style="{StaticResource CardHeader}"/>
+						<lvcwpf:CartesianChart Series="{Binding AmountBucketsSeries}"
                                                XAxes="{Binding AmountBucketsXAxes}"
                                                YAxes="{Binding AmountBucketsYAxes}"
                                                Height="260"
                                                Background="Transparent"
-                                               Foreground="White"/>
-                    </StackPanel>
-                </Border>
-            </Grid>
-        </Grid>
-    </ScrollViewer>
+                                               Foreground="{DynamicResource App.Foreground}"/>
+					</StackPanel>
+				</Border>
+			</Grid>
+		</Grid>
+	</ScrollViewer>
 </UserControl>

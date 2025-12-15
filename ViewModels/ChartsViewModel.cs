@@ -25,7 +25,7 @@ namespace Finly.ViewModels
         private void Raise(string name) => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
 
         public enum Period { Today, Week, Month, Year, All }
-        public enum Mode { Expenses, Incomes, Transfer, Cashflow }
+        public enum Mode { All, Expenses, Incomes, Transfer, Cashflow }
 
         private Period _selectedPeriod = Period.Month;
         public Period SelectedPeriod
@@ -43,7 +43,7 @@ namespace Finly.ViewModels
             }
         }
 
-        private Mode _selectedMode = Mode.Expenses;
+        private Mode _selectedMode = Mode.All;
         public Mode SelectedMode
         {
             get => _selectedMode;
@@ -339,7 +339,7 @@ namespace Finly.ViewModels
                     NamePaint = white
                 });
 
-                // oœ Y tak, ¿eby wyraŸnie by³o widaæ 0 i s³upki nad / pod nim
+                // oœ Y tak, ¿eby wyraŸnie by³o widaæ 0 e s³upki nad / pod nim
                 var minWeekday = weekdayValues.Min();
                 var maxWeekday = weekdayValues.Max();
 
@@ -644,6 +644,7 @@ namespace Finly.ViewModels
                 var periodText = DescribePeriod(from, to);
                 var modeText = SelectedMode switch
                 {
+                    Mode.All => "Wszystkie transakcje",
                     Mode.Incomes => "Przychody",
                     Mode.Cashflow => "Cashflow",
                     Mode.Transfer => "Transfery",
@@ -926,6 +927,94 @@ namespace Finly.ViewModels
         {
             // aktualny snapshot œrodków – fallback dla gotówki i kopert
             var snapshot = DatabaseService.GetMoneySnapshot(_userId);
+
+            // ===== ALL (Wszystkie transakcje) =====
+            if (SelectedMode == Mode.All)
+            {
+                // wydatki
+                var expDt = DatabaseService.GetExpenses(_userId, from, to);
+                var expRows = expDt.AsEnumerable().Select(r => new
+                {
+                    Date = SafeDate(r["Date"]),
+                    Amount = Math.Abs(SafeDecimal(r["Amount"])),
+                    Category = (r.Table.Columns.Contains("CategoryName")
+                        ? (r["CategoryName"]?.ToString() ?? "(brak)")
+                        : "(brak)").Trim()
+                }).ToList();
+
+                // przychody (³¹cznie z tym co w tabeli Incomes, tak¿e przelewy)
+                var incDt = DatabaseService.GetIncomes(_userId, from, to);
+                var incRows = incDt.AsEnumerable().Select(r => new
+                {
+                    Date = SafeDate(r["Date"]),
+                    Amount = Math.Abs(SafeDecimal(r["Amount"])),
+                    Category = (r.Table.Columns.Contains("CategoryName")
+                        ? (r["CategoryName"]?.ToString() ?? "(brak)")
+                        : "(brak)").Trim(),
+                    Source = (r.Table.Columns.Contains("Source")
+                        ? (r["Source"]?.ToString() ?? "")
+                        : "").Trim()
+                }).ToList();
+
+                var incomeTotal = incRows.Sum(x => x.Amount);
+                var expenseTotal = expRows.Sum(x => x.Amount);
+
+                // Kategorie: rozdzielamy prefixami, ¿eby siê nie zlewa³y
+                var catDict = new Dictionary<string, decimal>(StringComparer.OrdinalIgnoreCase);
+
+                foreach (var r in incRows)
+                {
+                    var baseName = string.IsNullOrWhiteSpace(r.Category) ? "(brak)" : r.Category;
+                    var name = $"Przychody: {baseName}";
+                    catDict[name] = catDict.TryGetValue(name, out var cur) ? cur + r.Amount : r.Amount;
+                }
+
+                foreach (var r in expRows)
+                {
+                    var baseName = string.IsNullOrWhiteSpace(r.Category) ? "(brak)" : r.Category;
+                    var name = $"Wydatki: {baseName}";
+                    catDict[name] = catDict.TryGetValue(name, out var cur) ? cur + r.Amount : r.Amount;
+                }
+
+                var byCategory = catDict
+                    .Select(kv => (kv.Key, kv.Value))
+                    .OrderByDescending(x => x.Value)
+                    .ToList();
+
+                // Trend: netto (przychody dodatnie, wydatki ujemne)
+                var merged = new List<(DateTime Date, decimal Amount)>();
+                merged.AddRange(incRows.Select(x => (x.Date, x.Amount)));
+                merged.AddRange(expRows.Select(x => (x.Date, -x.Amount)));
+
+                var trend = BuildTrendList(merged, from, to, bucket, null);
+
+                // „konta/gotówka/koperty” – tu zostawiamy prosty snapshot (bo All to miks)
+                var byBankAccount = new List<(string Name, decimal Sum)>();
+                var byFreeCash = new List<(string Name, decimal Sum)>();
+                var bySavedCash = new List<(string Name, decimal Sum)>();
+                var byEnvelope = new List<(string Name, decimal Sum)>();
+
+                if (snapshot.Cash != 0m) byFreeCash.Add(("Wolna gotówka", Math.Abs(snapshot.Cash)));
+                if (snapshot.Saved != 0m) bySavedCash.Add(("Od³o¿ona gotówka", Math.Abs(snapshot.Saved)));
+                if (snapshot.Envelopes != 0m) byEnvelope.Add(("Koperty", Math.Abs(snapshot.Envelopes)));
+
+                var weekdays = GroupByWeekday(merged, null);
+                var order = new[]
+                {
+                    DayOfWeek.Monday, DayOfWeek.Tuesday, DayOfWeek.Wednesday,
+                    DayOfWeek.Thursday, DayOfWeek.Friday, DayOfWeek.Saturday, DayOfWeek.Sunday
+                };
+                var byWeekday = order
+                    .Select(d => (PolishShortDayName(d), weekdays.TryGetValue(d, out var v) ? v : 0m))
+                    .ToList();
+
+                var summaryNet = incomeTotal - expenseTotal;
+
+                return (summaryNet, incomeTotal, expenseTotal,
+                        byCategory, trend,
+                        byBankAccount, byFreeCash, bySavedCash,
+                        byEnvelope, byWeekday);
+            }
 
             // ===== CASHFLOW =====
             if (SelectedMode == Mode.Cashflow)
