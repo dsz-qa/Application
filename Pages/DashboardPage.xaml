@@ -74,8 +74,7 @@
             <Setter Property="Opacity" Value="0.8"/>
         </Style>
 
-        <!-- ====== BRAKUJĄCE STYLE (fallback, żeby XAML zawsze się kompilował) ====== -->
-
+        <!-- fallbacki -->
         <Style x:Key="FinancialAnalysisCardBorderStyle" TargetType="Border" BasedOn="{StaticResource Card}">
             <Setter Property="Padding" Value="16"/>
         </Style>
@@ -100,23 +99,17 @@
             <Setter Property="BorderBrush" Value="{DynamicResource Surface.Border}"/>
         </Style>
 
-        <!-- Prosty przycisk ikony (fallback). Jeśli masz globalny DeleteIconButton, to ten i tak zadziała. -->
-        <Style x:Key="DeleteIconButton" TargetType="Button">
-            <Setter Property="Background" Value="Transparent"/>
-            <Setter Property="BorderBrush" Value="{DynamicResource Surface.Border}"/>
-            <Setter Property="BorderThickness" Value="1"/>
-            <Setter Property="Foreground" Value="{DynamicResource App.Foreground}"/>
-            <Setter Property="Cursor" Value="Hand"/>
-            <Setter Property="Content" Value="🗑"/>
-            <Setter Property="FontSize" Value="14"/>
-            <Setter Property="Padding" Value="0"/>
-        </Style>
-
-        <!-- ====== Wspólny styl na długie teksty: utnij i pokaż tooltip ====== -->
+        <!-- Wspólny styl na długie teksty -->
         <Style x:Key="EllipsizeWithTooltip" TargetType="TextBlock">
             <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
             <Setter Property="TextWrapping" Value="NoWrap"/>
             <Setter Property="ToolTip" Value="{Binding RelativeSource={RelativeSource Self}, Path=Text}"/>
+        </Style>
+
+        <!-- Donut cards: większa przestrzeń na wykres + środek -->
+        <Style x:Key="DonutCard" TargetType="Border" BasedOn="{StaticResource Card}">
+            <Setter Property="Padding" Value="10"/>
+            <Setter Property="MinHeight" Value="360"/>
         </Style>
 
     </UserControl.Resources>
@@ -267,11 +260,8 @@
                 <Grid>
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto"/>
-                        <!-- Pasek okresu -->
                         <RowDefinition Height="Auto"/>
-                        <!-- Donuty -->
                         <RowDefinition Height="*"/>
-                        <!-- Dół 2x3 -->
                     </Grid.RowDefinitions>
 
                     <Grid.ColumnDefinitions>
@@ -291,25 +281,28 @@
                                 Margin="0,8,0,0"/>
                     </StackPanel>
 
-                    <!-- ================= WYKRESY KOŁOWE ================= -->
-                    <Border Grid.Row="1" Grid.Column="0" Style="{StaticResource Card}" Margin="0,0,8,0">
+                    <!-- ================= WYKRESY KOŁOWE (powiększone) ================= -->
+                    <Border Grid.Row="1" Grid.Column="0" Style="{StaticResource DonutCard}" Margin="0,0,8,0">
                         <StackPanel>
                             <TextBlock Text="Źródła przychodu — bieżący okres"
                                        Style="{StaticResource CardHeader}"
                                        Margin="0,0,0,8"/>
+
+                            <!-- większa wysokość = większy donut + środek -->
                             <controls:DonutChartControl x:Name="IncomeDonut"
-                                                        Height="240"
+                                                        Height="320"
                                                         Title="Źródła przychodu"/>
                         </StackPanel>
                     </Border>
 
-                    <Border Grid.Row="1" Grid.Column="1" Style="{StaticResource Card}" Margin="8,0,0,0">
+                    <Border Grid.Row="1" Grid.Column="1" Style="{StaticResource DonutCard}" Margin="8,0,0,0">
                         <StackPanel>
                             <TextBlock Text="Wydatki wg kategorii — bieżący okres"
                                        Style="{StaticResource CardHeader}"
                                        Margin="0,0,0,8"/>
+
                             <controls:DonutChartControl x:Name="ExpenseDonut"
-                                                        Height="240"
+                                                        Height="320"
                                                         Title="Wydatki wg kategorii"/>
                         </StackPanel>
                     </Border>
@@ -401,7 +394,7 @@
                             </StackPanel>
                         </Border>
 
-                        <!-- ================= PRZYCHODY (przeniesione pod Trend) ================= -->
+                        <!-- ================= PRZYCHODY ================= -->
                         <Border Grid.Row="1" Grid.Column="0" Style="{StaticResource Card}" Margin="0,0,8,8">
                             <StackPanel>
 
@@ -415,9 +408,9 @@
                                                Style="{StaticResource CardHeader}"
                                                VerticalAlignment="Center"/>
 
+                                    <!-- globalny styl DeleteIconButton -->
                                     <Button Grid.Column="1"
                                             Style="{StaticResource DeleteIconButton}"
-                                            Width="34" Height="34"
                                             HorizontalAlignment="Right"
                                             VerticalAlignment="Center"
                                             Panel.ZIndex="10"
@@ -511,7 +504,7 @@
                             </StackPanel>
                         </Border>
 
-                        <!-- ================= WYDATKI (przeniesione pod Top Categories) ================= -->
+                        <!-- ================= WYDATKI ================= -->
                         <Border Grid.Row="1" Grid.Column="1" Style="{StaticResource Card}" Margin="8,0,0,8">
                             <StackPanel>
 
@@ -527,7 +520,6 @@
 
                                     <Button Grid.Column="1"
                                             Style="{StaticResource DeleteIconButton}"
-                                            Width="34" Height="34"
                                             HorizontalAlignment="Right"
                                             VerticalAlignment="Center"
                                             Panel.ZIndex="10"
@@ -646,7 +638,6 @@
 
                                     <Button Grid.Column="1"
                                             Style="{StaticResource DeleteIconButton}"
-                                            Width="34" Height="34"
                                             HorizontalAlignment="Right"
                                             VerticalAlignment="Center"
                                             Panel.ZIndex="10"
