@@ -7,73 +7,80 @@
              d:DesignWidth="520"
              d:DesignHeight="240">
 
-	<Grid>
-		<Grid.ColumnDefinitions>
-			<ColumnDefinition Width="*"/>
-			<ColumnDefinition Width="220"/>
-		</Grid.ColumnDefinitions>
+    <Grid>
+        <Grid.ColumnDefinitions>
+            <!-- LEFT: donut -->
+            <ColumnDefinition Width="2*"/>
+            <!-- RIGHT: legend (wider) -->
+            <ColumnDefinition Width="420"/>
+        </Grid.ColumnDefinitions>
 
-		<!-- ===== LEFT: DONUT ===== -->
-		<Grid Grid.Column="0">
-			<Canvas x:Name="ChartCanvas"
-                    HorizontalAlignment="Stretch"
-                    VerticalAlignment="Stretch"
-                    Background="Transparent"
-                    ClipToBounds="True"/>
+        <!-- ===== LEFT: DONUT ===== -->
+        <Grid Grid.Column="0" Margin="0,0,30,0">
+            <Grid.RenderTransform>
+                <TranslateTransform X="-20"/>
+            </Grid.RenderTransform>
 
-			<!-- CENTER PANEL -->
-			<Border x:Name="CenterPanel"
-                    Background="{DynamicResource Surface.Background}"
-                    Opacity="0.92"
-                    HorizontalAlignment="Center"
+            <Canvas x:Name="ChartCanvas"
+            HorizontalAlignment="Stretch"
+            VerticalAlignment="Stretch"
+            Background="Transparent"
+            ClipToBounds="True"/>
+
+            <!-- CENTER PANEL -->
+            <Border x:Name="CenterPanel"
+            Background="{DynamicResource Surface.Background}"
+            Opacity="0.92"
+            HorizontalAlignment="Center"
+            VerticalAlignment="Center"
+            Visibility="Collapsed"
+            Panel.ZIndex="100">
+                <StackPanel HorizontalAlignment="Center"
                     VerticalAlignment="Center"
-                    Visibility="Collapsed"
-                    Panel.ZIndex="100">
-				<StackPanel HorizontalAlignment="Center"
-                            VerticalAlignment="Center"
-                            Margin="10">
-					<TextBlock x:Name="CenterTitleText"
-                               Text=""
-                               TextAlignment="Center"
-                               FontSize="13"
-                               FontWeight="SemiBold"
-                               Foreground="{DynamicResource App.Foreground}"
-                               Margin="6,0,6,6"
-                               TextWrapping="Wrap"
-                               TextTrimming="CharacterEllipsis"/>
-
-					<TextBlock x:Name="CenterValueText"
-                               Text=""
-                               TextAlignment="Center"
-                               FontSize="18"
-                               FontWeight="Bold"
-                               Foreground="{DynamicResource App.Foreground}"
-                               Margin="6,0,6,4"
-                               TextTrimming="CharacterEllipsis"/>
-
-					<TextBlock x:Name="CenterPercentText"
-                               Text=""
-                               TextAlignment="Center"
-                               FontSize="12"
-                               Opacity="0.85"
-                               Foreground="{DynamicResource App.Foreground}"
-                               Margin="6,0,6,0"
-                               TextTrimming="CharacterEllipsis"/>
-				</StackPanel>
-			</Border>
-
-			<!-- NO DATA -->
-			<TextBlock x:Name="NoDataText"
-                       Text="Brak danych"
-                       FontStyle="Italic"
+                    Margin="10">
+                    <TextBlock x:Name="CenterTitleText"
+                       Text=""
+                       TextAlignment="Center"
+                       FontSize="13"
+                       FontWeight="SemiBold"
                        Foreground="{DynamicResource App.Foreground}"
-                       HorizontalAlignment="Center"
-                       VerticalAlignment="Center"
-                       Visibility="Collapsed"/>
-		</Grid>
+                       Margin="6,0,6,6"
+                       TextWrapping="Wrap"
+                       TextTrimming="CharacterEllipsis"/>
 
-		<!-- ===== RIGHT: LEGEND ===== -->
-		<Border Grid.Column="1"
+                    <TextBlock x:Name="CenterValueText"
+                       Text=""
+                       TextAlignment="Center"
+                       FontSize="18"
+                       FontWeight="Bold"
+                       Foreground="{DynamicResource App.Foreground}"
+                       Margin="6,0,6,4"
+                       TextTrimming="CharacterEllipsis"/>
+
+                    <TextBlock x:Name="CenterPercentText"
+                       Text=""
+                       TextAlignment="Center"
+                       FontSize="12"
+                       Opacity="0.85"
+                       Foreground="{DynamicResource App.Foreground}"
+                       Margin="6,0,6,0"
+                       TextTrimming="CharacterEllipsis"/>
+                </StackPanel>
+            </Border>
+
+            <!-- NO DATA -->
+            <TextBlock x:Name="NoDataText"
+               Text="Brak danych"
+               FontStyle="Italic"
+               Foreground="{DynamicResource App.Foreground}"
+               HorizontalAlignment="Center"
+               VerticalAlignment="Center"
+               Visibility="Collapsed"/>
+        </Grid>
+
+
+        <!-- ===== RIGHT: LEGEND ===== -->
+        <Border Grid.Column="1"
                 Margin="12,0,0,0"
                 Background="Transparent"
                 BorderBrush="{DynamicResource Surface.Border}"
@@ -81,13 +88,13 @@
                 CornerRadius="10"
                 Padding="10">
 
-			<Grid>
-				<Grid.RowDefinitions>
-					<RowDefinition Height="Auto"/>
-					<RowDefinition Height="*"/>
-				</Grid.RowDefinitions>
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="*"/>
+                </Grid.RowDefinitions>
 
-				<TextBlock x:Name="LegendHeader"
+                <TextBlock x:Name="LegendHeader"
                            Text="Legenda"
                            FontSize="13"
                            FontWeight="SemiBold"
@@ -95,61 +102,74 @@
                            Opacity="0.9"
                            Margin="0,0,0,8"/>
 
-				<ScrollViewer Grid.Row="1"
+                <ScrollViewer Grid.Row="1"
                               VerticalScrollBarVisibility="Auto"
                               HorizontalScrollBarVisibility="Disabled">
-					<ItemsControl x:Name="LegendList">
-						<ItemsControl.ItemTemplate>
-							<DataTemplate>
-								<Border CornerRadius="8"
+
+                    <ItemsControl x:Name="LegendList">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <Border CornerRadius="8"
                                         Padding="6"
                                         Margin="0,0,0,6"
                                         Background="Transparent">
-									<Grid>
-										<Grid.ColumnDefinitions>
-											<ColumnDefinition Width="18"/>
-											<ColumnDefinition Width="*"/>
-											<ColumnDefinition Width="Auto"/>
-										</Grid.ColumnDefinitions>
 
-										<Ellipse Width="10" Height="10"
-                                                 VerticalAlignment="Center"
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="18"/>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+
+                                        <!-- dot -->
+                                        <Ellipse Width="10"
+                                                 Height="10"
+                                                 VerticalAlignment="Top"
+                                                 Margin="0,3,0,0"
                                                  Fill="{Binding Brush}"/>
 
-										<StackPanel Grid.Column="1" Margin="8,0,8,0">
-											<TextBlock Text="{Binding Name}"
+                                        <!-- name + percent -->
+                                        <StackPanel Grid.Column="1" Margin="8,0,8,0">
+                                            <TextBlock Text="{Binding Name}"
                                                        Foreground="{DynamicResource App.Foreground}"
-                                                       TextTrimming="CharacterEllipsis"/>
-											<TextBlock Text="{Binding PercentStr}"
+                                                       TextWrapping="Wrap"
+                                                       TextTrimming="None"
+                                                       LineHeight="14"
+                                                       LineStackingStrategy="BlockLineHeight"/>
+
+                                            <TextBlock Text="{Binding PercentStr}"
                                                        Foreground="{DynamicResource App.Foreground}"
                                                        Opacity="0.75"
-                                                       FontSize="11"/>
-										</StackPanel>
+                                                       FontSize="11"
+                                                       Margin="0,2,0,0"/>
+                                        </StackPanel>
 
-										<TextBlock Grid.Column="2"
+                                        <!-- amount -->
+                                        <TextBlock Grid.Column="2"
                                                    Text="{Binding AmountStr}"
                                                    Foreground="{DynamicResource App.Foreground}"
                                                    FontWeight="SemiBold"
-                                                   VerticalAlignment="Center"/>
-									</Grid>
+                                                   VerticalAlignment="Top"/>
+                                    </Grid>
 
-									<Border.Style>
-										<Style TargetType="Border">
-											<Setter Property="Opacity" Value="0.92"/>
-											<Style.Triggers>
-												<DataTrigger Binding="{Binding IsSelected}" Value="True">
-													<Setter Property="Opacity" Value="1"/>
-													<Setter Property="Background" Value="{DynamicResource Surface.Background}"/>
-												</DataTrigger>
-											</Style.Triggers>
-										</Style>
-									</Border.Style>
-								</Border>
-							</DataTemplate>
-						</ItemsControl.ItemTemplate>
-					</ItemsControl>
-				</ScrollViewer>
-			</Grid>
-		</Border>
-	</Grid>
+                                    <Border.Style>
+                                        <Style TargetType="Border">
+                                            <Setter Property="Opacity" Value="0.92"/>
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding IsSelected}" Value="True">
+                                                    <Setter Property="Opacity" Value="1"/>
+                                                    <Setter Property="Background" Value="{DynamicResource Surface.Background}"/>
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </Border.Style>
+                                </Border>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+
+                </ScrollViewer>
+            </Grid>
+        </Border>
+    </Grid>
 </UserControl>
