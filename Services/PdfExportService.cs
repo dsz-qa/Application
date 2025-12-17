@@ -58,6 +58,7 @@ namespace Finly.Services
                         col.Item().Element(c => KpiSection(c, vm));
 
                         // ===== WYKRES + LEGENDA =====
+                        // ===== WYKRES + LEGENDA =====
                         if (donutChartPng != null && donutChartPng.Length > 0)
                         {
                             col.Item().PaddingTop(6)
@@ -66,29 +67,16 @@ namespace Finly.Services
                                 .FontSize(13);
 
                             col.Item()
-                                .Border(1)
-                                .BorderColor(Colors.Grey.Lighten2)
-                                .CornerRadius(6)
-                                .Padding(10)
-                                .Row(row =>
-                                {
-                                    // LEWA: kontrolowany rozmiar wykresu (żeby nie robił "baneru")
-                                    row.ConstantItem(260)
-                                       .AlignMiddle()
-                                       .AlignCenter()
-                                       .Element(e => e
-                                           .Width(240)
-                                           .Height(200)
-                                           .Image(donutChartPng)
-                                           .FitArea()
-                                       );
+                               .Border(1)
+                               .BorderColor(Colors.Grey.Lighten2)
+                               .CornerRadius(6)
+                               .Padding(10)
+                               .Height(270)
+                               .Image(donutChartPng)
+                               .FitArea();
 
-                                    row.Spacing(12);
-
-                                    // PRAWA: legenda jako tabela
-                                    row.RelativeItem().Element(c => LegendSection(c, vm));
-                                });
                         }
+
 
                         col.Item().Element(c => CategoriesSection(c, vm));
                         col.Item().Element(c => TransactionsSection(c, vm));

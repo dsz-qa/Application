@@ -127,17 +127,38 @@ namespace Finly.Pages
 
             try
             {
+                var brushes = new System.Windows.Media.Brush[]
+                {
+            (System.Windows.Media.Brush)FindResource("Accent"),
+            System.Windows.Media.Brushes.MediumSeaGreen,
+            System.Windows.Media.Brushes.Orange,
+            System.Windows.Media.Brushes.CadetBlue,
+            System.Windows.Media.Brushes.MediumPurple
+                };
+
                 const int w = 900;
-                const int h = 600; // kluczowe: większa wysokość, żeby donut się zmieścił
+                const int h = 360;
 
+                var export = new Finly.Views.Controls.ReportDonutWithLegendExportControl
+                {
+                    Width = w,
+                    Height = h
+                };
 
-                MainChart.Measure(new Size(w, h));
-                MainChart.Arrange(new Rect(0, 0, w, h));
-                MainChart.UpdateLayout();
+                // 1) NAJPIERW rozkład (żeby kontrolka miała wymiary)
+                export.Measure(new Size(w, h));
+                export.Arrange(new Rect(0, 0, w, h));
+                export.UpdateLayout();
 
-                var chartPng = UiRenderHelper.RenderToPng(MainChart, w, h, dpi: 192);
+                // 2) DOPIERO TERAZ rysowanie (bo DonutChartControl ma już rozmiar)
+                export.Build(vm, brushes, maxItems: 9);
 
-                var path = PdfExportService.ExportReportsPdf(vm, chartPng);
+                // 3) I jeszcze raz layout po wypełnieniu legendy / rysowaniu
+                export.UpdateLayout();
+
+                var png = UiRenderHelper.RenderToPng(export, w, h, dpi: 192);
+
+                var path = PdfExportService.ExportReportsPdf(vm, png);
                 ToastService.Success($"Raport PDF zapisano na pulpicie: {path}");
             }
             catch (Exception ex)
@@ -145,6 +166,8 @@ namespace Finly.Pages
                 ToastService.Error($"Błąd eksportu PDF: {ex.Message}");
             }
         }
+
+
 
 
 

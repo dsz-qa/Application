@@ -1,20 +1,20 @@
-﻿using System;
+﻿using Finly.Helpers;
+using Finly.Models;
+using Finly.Pages; // for GoalVm
+using Finly.Services;
+using Finly.Services.Features;
+using Finly.Services.SpecificPages;
+using System;
+using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
+using System.Data;
 using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Text;
 using System.Windows;
 using System.Windows.Input;
-using Finly.Helpers;
-using Finly.Models;
-using Finly.Services;
-using System.Collections.Generic;
-using System.Data;
-using Finly.Services.Features;
-using Finly.Services.SpecificPages;
-using Finly.Pages; // for GoalVm
 
 namespace Finly.ViewModels
 {
@@ -1365,26 +1365,24 @@ namespace Finly.ViewModels
             {
                 var vm = this;
 
-                // Renderujemy CAŁĄ kontrolkę (donut + legenda po prawej)
-                var donut = new Finly.Views.Controls.DonutChartControl
+                var brushes = new System.Windows.Media.Brush[]
                 {
-                    Width = 740,   // 520 wykres + ~220 legenda
-                    Height = 320
+            System.Windows.Media.Brushes.DodgerBlue,
+            System.Windows.Media.Brushes.MediumSeaGreen,
+            System.Windows.Media.Brushes.Orange,
+            System.Windows.Media.Brushes.CadetBlue,
+            System.Windows.Media.Brushes.MediumPurple
                 };
 
-                // ChartBrushes nie istnieje => daj null (kontrolka ma fallback)
-                donut.Draw(vm.ChartTotals, vm.ChartTotalAll, null);
+                // Kontrolka eksportowa – tworzona tylko do renderu PNG (nie może mieć Parent)
+                var exportControl = new Finly.Views.Controls.ReportDonutWithLegendExportControl();
+                exportControl.Build(vm, brushes, maxItems: 9);
 
-                // UiRenderHelper zostaje w Helpers (tak jak chcesz)
-                byte[] donutPng = Finly.Helpers.UiRenderHelper.RenderToPng(
-                    donut,
-                    740,
-                    320,
-                    dpi: 192
-                );
+                // To jest "ramka" na wykres w raporcie – FIT zrobi skalowanie, więc nic nie utnie.
+                // Możesz to potem dopasować, ale na start będzie lepiej niż obecne cięcie.
+                byte[] png = UiRenderHelper.RenderToPngFit(exportControl, width: 900, height: 260, dpi: 192);
 
-                var path = PdfExportService.ExportReportsPdf(vm, donutPng);
-
+                var path = PdfExportService.ExportReportsPdf(vm, png);
                 ToastService.Success($"Raport PDF zapisano na pulpicie:\n{path}");
             }
             catch (Exception ex)
@@ -1392,6 +1390,8 @@ namespace Finly.ViewModels
                 ToastService.Error($"Błąd eksportu PDF: {ex.Message}");
             }
         }
+
+
 
 
 
