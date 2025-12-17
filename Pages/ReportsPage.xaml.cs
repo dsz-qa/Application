@@ -3,6 +3,8 @@ using Finly.ViewModels;
 using System.ComponentModel;
 using System.Windows;
 using Finly.Views.Controls; // add namespace for custom controls and event args
+using Finly.Services;
+using Finly.Helpers;
 
 namespace Finly.Pages
 {
@@ -117,20 +119,34 @@ namespace Finly.Pages
                 vm.BackToSummary();
         }
 
+
         private void ExportButton_Click(object sender, RoutedEventArgs e)
         {
-            if (DataContext is ReportsViewModel vm)
+            if (DataContext is not ReportsViewModel vm)
+                return;
+
+            try
             {
-                // Preferuj komendę VM jeśli dostępna
-                if (vm.ExportPdfCommand != null && vm.ExportPdfCommand.CanExecute(null))
-                {
-                    vm.ExportPdfCommand.Execute(null);
-                }
-                else if (vm.ExportCsvCommand != null && vm.ExportCsvCommand.CanExecute(null))
-                {
-                    vm.ExportCsvCommand.Execute(null);
-                }
+                const int w = 900;
+                const int h = 600; // kluczowe: większa wysokość, żeby donut się zmieścił
+
+
+                MainChart.Measure(new Size(w, h));
+                MainChart.Arrange(new Rect(0, 0, w, h));
+                MainChart.UpdateLayout();
+
+                var chartPng = UiRenderHelper.RenderToPng(MainChart, w, h, dpi: 192);
+
+                var path = PdfExportService.ExportReportsPdf(vm, chartPng);
+                ToastService.Success($"Raport PDF zapisano na pulpicie: {path}");
+            }
+            catch (Exception ex)
+            {
+                ToastService.Error($"Błąd eksportu PDF: {ex.Message}");
             }
         }
+
+
+
     }
 }

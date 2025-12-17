@@ -130,7 +130,7 @@ ORDER BY Date ASC";
             return dt;
         }
 
-        public static List<ReportItem> LoadReport(
+    public static List<ReportItem> LoadReport(
             int userId,
             string source,
             string category,

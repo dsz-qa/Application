@@ -1,4 +1,4 @@
-using System;
+Ôªøusing System;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Globalization;
@@ -36,9 +36,9 @@ namespace Finly.ViewModels
             Accounts = new ObservableCollection<string>();
             Categories = new ObservableCollection<string>();
             Envelopes = new ObservableCollection<string>();
-            Tags = new ObservableCollection<string> { "Brak", "PodrÛøe", "Praca" };
+            Tags = new ObservableCollection<string> { "Brak", "Podr√≥≈ºe", "Praca" };
             Currencies = new ObservableCollection<string> { "PLN", "EUR", "USD" };
-            Templates = new ObservableCollection<string> { "Domyúlny", "MiesiÍczny przeglπd" };
+            Templates = new ObservableCollection<string> { "Domy≈õlny", "Miesiƒôczny przeglƒÖd" };
 
             Insights = new ObservableCollection<string>();
             KPIList = new ObservableCollection<KeyValuePair<string, string>>();
@@ -60,7 +60,7 @@ namespace Finly.ViewModels
             // unified rows collection for KPI/exports
             Rows = new ObservableCollection<ReportsService.ReportItem>();
 
-            // podsumowania dla zak≥adki ÑKategorieî
+            // podsumowania dla zak≈Çadki ‚ÄûKategorie‚Äù
             ExpenseCategoriesSummary = new ObservableCollection<CategoryAmount>();
             IncomeCategoriesSummary = new ObservableCollection<CategoryAmount>();
 
@@ -73,11 +73,11 @@ namespace Finly.ViewModels
             LoadMoneyPlaces();
         }
 
-        // Podsumowania kategorii dla zak≥adki "Kategorie"
+        // Podsumowania kategorii dla zak≈Çadki "Kategorie"
         public ObservableCollection<CategoryAmount> ExpenseCategoriesSummary { get; }
         public ObservableCollection<CategoryAmount> IncomeCategoriesSummary { get; }
 
-        // NEW: budøety / cele / kredyty
+        // NEW: bud≈ºety / cele / kredyty
         public ObservableCollection<BudgetService.BudgetSummary> BudgetsSummary { get; }
         public ObservableCollection<GoalVm> GoalsList { get; }
         public ObservableCollection<LoanModel> LoansList { get; }
@@ -133,8 +133,8 @@ namespace Finly.ViewModels
         {
             return SelectedSource switch
             {
-                SourceType.FreeCash => "Wolna gotÛwka",
-                SourceType.SavedCash => "Od≥oøona gotÛwka",
+                SourceType.FreeCash => "Wolna got√≥wka",
+                SourceType.SavedCash => "Od≈Ço≈ºona got√≥wka",
                 SourceType.BankAccounts => "Konta bankowe",
                 SourceType.Envelopes => "Koperty",
                 _ => "Wszystko"
@@ -170,7 +170,7 @@ namespace Finly.ViewModels
         public string CurrentPeriodLabel => CurrentPeriodName;
         public string PreviousPeriodLabel => PreviousPeriodName;
 
-        // Teksty do kart po prawej (uøywane teø w PDF)
+        // Teksty do kart po prawej (u≈ºywane te≈º w PDF)
         private string _analyzedPeriodLabel = string.Empty;
         public string AnalyzedPeriodLabel
         {
@@ -229,15 +229,15 @@ namespace Finly.ViewModels
             return kind switch
             {
                 PeriodKind.Today => ("dzisiaj", "wczoraj"),
-                PeriodKind.ThisWeek => ("ten tydzieÒ", "poprzedni tydzieÒ"),
-                PeriodKind.ThisMonth => ("ten miesiπc", "poprzedni miesiπc"),
-                PeriodKind.ThisQuarter => ("ten kwarta≥", "poprzedni kwarta≥"),
+                PeriodKind.ThisWeek => ("ten tydzie≈Ñ", "poprzedni tydzie≈Ñ"),
+                PeriodKind.ThisMonth => ("ten miesiƒÖc", "poprzedni miesiƒÖc"),
+                PeriodKind.ThisQuarter => ("ten kwarta≈Ç", "poprzedni kwarta≈Ç"),
                 PeriodKind.ThisYear => ("ten rok", "poprzedni rok"),
                 _ => ("ten okres", "poprzedni okres")
             };
         }
 
-        // ========= zakres dat (powiπzany z PeriodBarControl) =========
+        // ========= zakres dat (powiƒÖzany z PeriodBarControl) =========
         private DateTime _fromDate;
         private DateTime _toDate;
 
@@ -267,7 +267,7 @@ namespace Finly.ViewModels
             }
         }
 
-        // ========= listy do filtrÛw =========
+        // ========= listy do filtr√≥w =========
         public ObservableCollection<string> Accounts { get; }
         public ObservableCollection<string> Categories { get; }
         public ObservableCollection<string> Envelopes { get; }
@@ -304,7 +304,7 @@ namespace Finly.ViewModels
             }
         }
 
-        // Lista konkretnych miejsc: gotÛwka, koperty, konta bankowe
+        // Lista konkretnych miejsc: got√≥wka, koperty, konta bankowe
         public ObservableCollection<string> MoneyPlaces { get; } = new();
 
         private string _selectedMoneyPlace = "Wszystko";
@@ -325,7 +325,7 @@ namespace Finly.ViewModels
             }
         }
 
-        // Czy combobox z kontem/kopertπ ma byÊ aktywny
+        // Czy combobox z kontem/kopertƒÖ ma byƒá aktywny
         private bool _isMoneyPlaceFilterEnabled;
         public bool IsMoneyPlaceFilterEnabled
         {
@@ -345,9 +345,9 @@ namespace Finly.ViewModels
             MoneyPlaces.Clear();
             MoneyPlaces.Add("Wszystko");
 
-            // sta≥e pozycje ñ wolna / od≥oøona gotÛwka
-            MoneyPlaces.Add("Wolna gotÛwka");
-            MoneyPlaces.Add("Od≥oøona gotÛwka");
+            // sta≈Çe pozycje ‚Äì wolna / od≈Ço≈ºona got√≥wka
+            MoneyPlaces.Add("Wolna got√≥wka");
+            MoneyPlaces.Add("Od≈Ço≈ºona got√≥wka");
 
             try
             {
@@ -398,7 +398,7 @@ namespace Finly.ViewModels
             }
         }
 
-        private string _selectedTemplate = "Domyúlny";
+        private string _selectedTemplate = "Domy≈õlny";
         public string SelectedTemplate
         {
             get => _selectedTemplate;
@@ -551,8 +551,8 @@ namespace Finly.ViewModels
             }
         }
 
-        // ====== opis úrodka wykresu (Przeglπd) ======
-        private string _selectedSliceInfo = "Kliknij kategoriÍ na wykresie";
+        // ====== opis ≈õrodka wykresu (PrzeglƒÖd) ======
+        private string _selectedSliceInfo = "Kliknij kategoriƒô na wykresie";
         public string SelectedSliceInfo
         {
             get => _selectedSliceInfo;
@@ -566,25 +566,25 @@ namespace Finly.ViewModels
             }
         }
 
-        // Metoda wo≥ana z ReportsPage.xaml.cs przy najechaniu/klikniÍciu na slice
+        // Metoda wo≈Çana z ReportsPage.xaml.cs przy najechaniu/klikniƒôciu na slice
         public void UpdateSelectedSliceInfo(params object[] args)
         {
             if (args == null || args.Length == 0)
             {
-                SelectedSliceInfo = "Kliknij kategoriÍ na wykresie";
+                SelectedSliceInfo = "Kliknij kategoriƒô na wykresie";
                 return;
             }
 
-            // SprÛbujmy z≥oøyÊ sensowny opis z przekazanych parametrÛw
-            // (np. kategoria, kwota, udzia≥ %)
+            // Spr√≥bujmy z≈Ço≈ºyƒá sensowny opis z przekazanych parametr√≥w
+            // (np. kategoria, kwota, udzia≈Ç %)
             var parts = args
                 .Where(a => a != null)
                 .Select(a => a.ToString())
                 .Where(s => !string.IsNullOrWhiteSpace(s));
 
-            var text = string.Join(" ï ", parts);
+            var text = string.Join(" ‚Ä¢ ", parts);
             if (string.IsNullOrWhiteSpace(text))
-                text = "Kliknij kategoriÍ na wykresie";
+                text = "Kliknij kategoriƒô na wykresie";
 
             SelectedSliceInfo = text;
         }
@@ -603,7 +603,7 @@ namespace Finly.ViewModels
         }
         public bool IsSummaryActive => !IsDrilldownActive;
 
-        // ======== PRZEGL•D ñ úrodek donuta + mini-podsumowanie ========
+        // ======== PRZEGLƒÑD ‚Äì ≈õrodek donuta + mini-podsumowanie ========
         private string _overviewCenterTitle = "Wszystkie transakcje";
         public string OverviewCenterTitle
         {
@@ -640,7 +640,7 @@ namespace Finly.ViewModels
             get
             {
                 var total = _transactionsSnapshot.Sum(t => t.Amount);
-                return total.ToString("N2", CultureInfo.CurrentCulture) + " z≥";
+                return total.ToString("N2", CultureInfo.CurrentCulture) + " z≈Ç";
             }
         }
 
@@ -658,11 +658,11 @@ namespace Finly.ViewModels
 
                 if (top == null) return "(brak danych)";
 
-                return $"{top.Name} ñ {top.Total.ToString("N2", CultureInfo.CurrentCulture)} z≥";
+                return $"{top.Name} ‚Äì {top.Total.ToString("N2", CultureInfo.CurrentCulture)} z≈Ç";
             }
         }
 
-        // ========= prawa kolumna: sumy bieøπcego okresu =========
+        // ========= prawa kolumna: sumy bie≈ºƒÖcego okresu =========
         private decimal _expensesTotal = 0m;
         public decimal ExpensesTotal
         {
@@ -677,7 +677,7 @@ namespace Finly.ViewModels
                 }
             }
         }
-        public string ExpensesTotalStr => ExpensesTotal.ToString("N2", CultureInfo.CurrentCulture) + " z≥";
+        public string ExpensesTotalStr => ExpensesTotal.ToString("N2", CultureInfo.CurrentCulture) + " z≈Ç";
 
         private decimal _incomesTotal = 0m;
         public decimal IncomesTotal
@@ -693,7 +693,7 @@ namespace Finly.ViewModels
                 }
             }
         }
-        public string IncomesTotalStr => IncomesTotal.ToString("N2", CultureInfo.CurrentCulture) + " z≥";
+        public string IncomesTotalStr => IncomesTotal.ToString("N2", CultureInfo.CurrentCulture) + " z≈Ç";
 
         private decimal _balanceTotal = 0m;
         public decimal BalanceTotal
@@ -709,9 +709,9 @@ namespace Finly.ViewModels
                 }
             }
         }
-        public string BalanceTotalStr => BalanceTotal.ToString("N2", CultureInfo.CurrentCulture) + " z≥";
+        public string BalanceTotalStr => BalanceTotal.ToString("N2", CultureInfo.CurrentCulture) + " z≈Ç";
 
-        // ========= poprzedni okres + rÛønice =========
+        // ========= poprzedni okres + r√≥≈ºnice =========
         private DateTime _previousFromDate;
         private DateTime _previousToDate;
 
@@ -726,7 +726,7 @@ namespace Finly.ViewModels
                 Raise(nameof(PreviousExpensesTotalStr));
             }
         }
-        public string PreviousExpensesTotalStr => PreviousExpensesTotal.ToString("N2", CultureInfo.CurrentCulture) + " z≥";
+        public string PreviousExpensesTotalStr => PreviousExpensesTotal.ToString("N2", CultureInfo.CurrentCulture) + " z≈Ç";
 
         private decimal _previousIncomesTotal;
         public decimal PreviousIncomesTotal
@@ -739,7 +739,7 @@ namespace Finly.ViewModels
                 Raise(nameof(PreviousIncomesTotalStr));
             }
         }
-        public string PreviousIncomesTotalStr => PreviousIncomesTotal.ToString("N2", CultureInfo.CurrentCulture) + " z≥";
+        public string PreviousIncomesTotalStr => PreviousIncomesTotal.ToString("N2", CultureInfo.CurrentCulture) + " z≈Ç";
 
         private decimal _previousBalanceTotal;
         public decimal PreviousBalanceTotal
@@ -752,7 +752,7 @@ namespace Finly.ViewModels
                 Raise(nameof(PreviousBalanceTotalStr));
             }
         }
-        public string PreviousBalanceTotalStr => PreviousBalanceTotal.ToString("N2", CultureInfo.CurrentCulture) + " z≥";
+        public string PreviousBalanceTotalStr => PreviousBalanceTotal.ToString("N2", CultureInfo.CurrentCulture) + " z≈Ç";
 
         private string _expensesChangePercentStr = "0%";
         public string ExpensesChangePercentStr
@@ -795,7 +795,7 @@ namespace Finly.ViewModels
         public string IncomesChangeStr => IncomesChangePercentStr;
         public string BalanceChangeStr => BalanceChangePercentStr;
 
-        // ========= pomocnicze metody agregujπce =========
+        // ========= pomocnicze metody agregujƒÖce =========
 
         private void PopulateFromDataTable(DataTable dt)
         {
@@ -862,10 +862,10 @@ namespace Finly.ViewModels
             foreach (var t in list)
                 FilteredTransactions.Add(t);
 
-            // Tekst w úrodku donuta ñ dla wybranej kategorii
+            // Tekst w ≈õrodku donuta ‚Äì dla wybranej kategorii
             var total = list.Sum(t => t.Amount);
             OverviewCenterTitle = category;
-            OverviewCenterSubtitle = $"{list.Count} transakcji ∑ {total.ToString("N2", CultureInfo.CurrentCulture)} z≥";
+            OverviewCenterSubtitle = $"{list.Count} transakcji ¬∑ {total.ToString("N2", CultureInfo.CurrentCulture)} z≈Ç";
 
             Raise(nameof(OverviewTransactionsCountStr));
             Raise(nameof(OverviewTotalAmountStr));
@@ -879,7 +879,7 @@ namespace Finly.ViewModels
             foreach (var t in _transactionsSnapshot.OrderByDescending(t => t.Date))
                 FilteredTransactions.Add(t);
 
-            // PowrÛt do widoku wszystkich transakcji
+            // Powr√≥t do widoku wszystkich transakcji
             OverviewCenterTitle = "Wszystkie transakcje";
             OverviewCenterSubtitle = $"{_transactionsSnapshot.Count} transakcje w wybranym okresie";
 
@@ -888,7 +888,7 @@ namespace Finly.ViewModels
             Raise(nameof(OverviewTopCategoryStr));
         }
 
-        // ==================== G£”WNE ODåWIEØANIE ====================
+        // ==================== G≈Å√ìWNE OD≈öWIE≈ªANIE ====================
         private void Refresh()
         {
             try
@@ -896,7 +896,7 @@ namespace Finly.ViewModels
                 var uid = UserService.GetCurrentUserId();
                 if (uid <= 0)
                 {
-                    MessageBox.Show("Brak zalogowanego uøytkownika.", "B≥πd",
+                    MessageBox.Show("Brak zalogowanego u≈ºytkownika.", "B≈ÇƒÖd",
                         MessageBoxButton.OK, MessageBoxImage.Warning);
                     return;
                 }
@@ -909,7 +909,7 @@ namespace Finly.ViewModels
                     accountId = SelectedBankAccount.Id;
                 }
 
-                // unified wiersze dla bieøπcego okresu
+                // unified wiersze dla bie≈ºƒÖcego okresu
                 var currentRows = ReportsService.LoadReport(
                     uid,
                     GetSourceString(),
@@ -920,7 +920,7 @@ namespace Finly.ViewModels
                     ToDate
                 ).ToList();
 
-                // ====== aktualny okres ñ DataTable z wydatkÛw do wykresu ======
+                // ====== aktualny okres ‚Äì DataTable z wydatk√≥w do wykresu ======
                 var currentDt = GetFilteredExpensesDataTable(uid, FromDate, ToDate, accountId);
 
                 Rows.Clear();
@@ -936,7 +936,7 @@ namespace Finly.ViewModels
                 IncomesTotal = totalIncomes;
                 BalanceTotal = totalIncomes - totalExpenses;
 
-                // ====== poprzedni okres o tej samej d≥ugoúci ======
+                // ====== poprzedni okres o tej samej d≈Çugo≈õci ======
                 var prev = GetPreviousPeriod(FromDate, ToDate);
                 _previousFromDate = prev.PrevFrom;
                 _previousToDate = prev.PrevTo;
@@ -960,39 +960,39 @@ namespace Finly.ViewModels
                 CurrentPeriodName = currentName;
                 PreviousPeriodName = previousName;
 
-                AnalyzedPeriodLabel = $"{CurrentPeriodName} ({FromDate:dd.MM.yyyy} ñ {ToDate:dd.MM.yyyy})";
-                ComparisonPeriodLabel = $"{PreviousPeriodName} ({prev.PrevFrom:dd.MM.yyyy} ñ {prev.PrevTo:dd.MM.yyyy})";
+                AnalyzedPeriodLabel = $"{CurrentPeriodName} ({FromDate:dd.MM.yyyy} ‚Äì {ToDate:dd.MM.yyyy})";
+                ComparisonPeriodLabel = $"{PreviousPeriodName} ({prev.PrevFrom:dd.MM.yyyy} ‚Äì {prev.PrevTo:dd.MM.yyyy})";
 
-                // ====== rÛønice procentowe ======
+                // ====== r√≥≈ºnice procentowe ======
                 ExpensesChangePercentStr = FormatPercentChange(PreviousExpensesTotal, ExpensesTotal);
                 IncomesChangePercentStr = FormatPercentChange(PreviousIncomesTotal, IncomesTotal);
                 BalanceChangePercentStr = FormatPercentChange(PreviousBalanceTotal, BalanceTotal);
 
                 IsDrilldownActive = false;
-                SelectedSliceInfo = "Kliknij kategoriÍ na wykresie";
+                SelectedSliceInfo = "Kliknij kategoriƒô na wykresie";
 
                 // ====== KPI & insighty ======
                 KPIList.Clear();
-                KPIList.Add(new KeyValuePair<string, string>($"Suma wydatkÛw ({CurrentPeriodName})", ExpensesTotalStr));
-                KPIList.Add(new KeyValuePair<string, string>($"Suma wydatkÛw ({PreviousPeriodName})", PreviousExpensesTotalStr));
-                KPIList.Add(new KeyValuePair<string, string>("Zmiana wydatkÛw", ExpensesChangePercentStr));
+                KPIList.Add(new KeyValuePair<string, string>($"Suma wydatk√≥w ({CurrentPeriodName})", ExpensesTotalStr));
+                KPIList.Add(new KeyValuePair<string, string>($"Suma wydatk√≥w ({PreviousPeriodName})", PreviousExpensesTotalStr));
+                KPIList.Add(new KeyValuePair<string, string>("Zmiana wydatk√≥w", ExpensesChangePercentStr));
 
-                KPIList.Add(new KeyValuePair<string, string>($"Suma przychodÛw ({CurrentPeriodName})", IncomesTotalStr));
-                KPIList.Add(new KeyValuePair<string, string>($"Suma przychodÛw ({PreviousPeriodName})", PreviousIncomesTotalStr));
-                KPIList.Add(new KeyValuePair<string, string>("Zmiana przychodÛw", IncomesChangePercentStr));
+                KPIList.Add(new KeyValuePair<string, string>($"Suma przychod√≥w ({CurrentPeriodName})", IncomesTotalStr));
+                KPIList.Add(new KeyValuePair<string, string>($"Suma przychod√≥w ({PreviousPeriodName})", PreviousIncomesTotalStr));
+                KPIList.Add(new KeyValuePair<string, string>("Zmiana przychod√≥w", IncomesChangePercentStr));
 
                 KPIList.Add(new KeyValuePair<string, string>($"Saldo ({CurrentPeriodName})", BalanceTotalStr));
                 KPIList.Add(new KeyValuePair<string, string>($"Saldo ({PreviousPeriodName})", PreviousBalanceTotalStr));
                 KPIList.Add(new KeyValuePair<string, string>("Zmiana salda", BalanceChangePercentStr));
 
                 Insights.Clear();
-                Insights.Add($"Filtrowanie: ürÛd≥o = {SelectedSource}, typ transakcji = {SelectedTransactionType}, miejsce = {SelectedMoneyPlace}");
+                Insights.Add($"Filtrowanie: ≈∫r√≥d≈Ço = {SelectedSource}, typ transakcji = {SelectedTransactionType}, miejsce = {SelectedMoneyPlace}");
                 Insights.Add($"Analizowany okres: {AnalyzedPeriodLabel}");
-                Insights.Add($"PorÛwnanie z okresem: {ComparisonPeriodLabel}");
-                Insights.Add($"Wydajesz {ExpensesChangePercentStr} {(ExpensesTotal > PreviousExpensesTotal ? "wiÍcej" : ExpensesTotal < PreviousExpensesTotal ? "mniej" : "(bez zmian)")} niø w {PreviousPeriodName}.");
-                Insights.Add($"Twoje przychody sπ {IncomesChangePercentStr} {(IncomesTotal > PreviousIncomesTotal ? "wyøsze" : IncomesTotal < PreviousIncomesTotal ? "niøsze" : "(bez zmian)")} niø w {PreviousPeriodName}.");
+                Insights.Add($"Por√≥wnanie z okresem: {ComparisonPeriodLabel}");
+                Insights.Add($"Wydajesz {ExpensesChangePercentStr} {(ExpensesTotal > PreviousExpensesTotal ? "wiƒôcej" : ExpensesTotal < PreviousExpensesTotal ? "mniej" : "(bez zmian)")} ni≈º w {PreviousPeriodName}.");
+                Insights.Add($"Twoje przychody sƒÖ {IncomesChangePercentStr} {(IncomesTotal > PreviousIncomesTotal ? "wy≈ºsze" : IncomesTotal < PreviousIncomesTotal ? "ni≈ºsze" : "(bez zmian)")} ni≈º w {PreviousPeriodName}.");
 
-                // ====== wykres i szczegÛ≥y kategorii ñ z wydatkÛw ======
+                // ====== wykres i szczeg√≥≈Çy kategorii ‚Äì z wydatk√≥w ======
                 var currentExpensesDt = GetFilteredExpensesDataTable(uid, FromDate, ToDate, accountId);
                 FilteredTransactions.Clear();
                 Details.Clear();
@@ -1096,7 +1096,7 @@ namespace Finly.ViewModels
                     foreach (var l in loans)
                     {
                         var monthly = LoansService.CalculateMonthlyPayment(l.Principal, l.InterestRate, l.TermMonths);
-                        string nextInfo = monthly.ToString("N2", CultureInfo.CurrentCulture) + " z≥";
+                        string nextInfo = monthly.ToString("N2", CultureInfo.CurrentCulture) + " z≈Ç";
                         try
                         {
                             var today = DateTime.Today;
@@ -1116,7 +1116,7 @@ namespace Finly.ViewModels
                                 }
                                 nextDate = candidate;
                             }
-                            nextInfo += " ∑ " + nextDate.ToString("dd.MM.yyyy");
+                            nextInfo += " ¬∑ " + nextDate.ToString("dd.MM.yyyy");
                         }
                         catch { }
 
@@ -1127,7 +1127,7 @@ namespace Finly.ViewModels
                             Principal = l.Principal,
                             InterestRate = l.InterestRate,
                             TermMonths = l.TermMonths,
-                            MonthlyPaymentStr = monthly.ToString("N2", CultureInfo.CurrentCulture) + " z≥",
+                            MonthlyPaymentStr = monthly.ToString("N2", CultureInfo.CurrentCulture) + " z≈Ç",
                             NextPaymentInfo = nextInfo
                         });
                     }
@@ -1147,8 +1147,8 @@ namespace Finly.ViewModels
             }
             catch (Exception ex)
             {
-                MessageBox.Show("B≥πd odczytu raportu: " + ex.Message,
-                    "B≥πd", MessageBoxButton.OK, MessageBoxImage.Error);
+                MessageBox.Show("B≈ÇƒÖd odczytu raportu: " + ex.Message,
+                    "B≈ÇƒÖd", MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
 
@@ -1217,7 +1217,7 @@ namespace Finly.ViewModels
                         foreach (var l in loans)
                         {
                             var monthly = LoansService.CalculateMonthlyPayment(l.Principal, l.InterestRate, l.TermMonths);
-                            string nextInfo = monthly.ToString("N2", CultureInfo.CurrentCulture) + " z≥";
+                            string nextInfo = monthly.ToString("N2", CultureInfo.CurrentCulture) + " z≈Ç";
                             try
                             {
                                 var today = DateTime.Today;
@@ -1237,7 +1237,7 @@ namespace Finly.ViewModels
                                     }
                                     nextDate = candidate;
                                 }
-                                nextInfo += " ∑ " + nextDate.ToString("dd.MM.yyyy");
+                                nextInfo += " ¬∑ " + nextDate.ToString("dd.MM.yyyy");
                             }
                             catch { }
 
@@ -1248,7 +1248,7 @@ namespace Finly.ViewModels
                                 Principal = l.Principal,
                                 InterestRate = l.InterestRate,
                                 TermMonths = l.TermMonths,
-                                MonthlyPaymentStr = monthly.ToString("N2", CultureInfo.CurrentCulture) + " z≥",
+                                MonthlyPaymentStr = monthly.ToString("N2", CultureInfo.CurrentCulture) + " z≈Ç",
                                 NextPaymentInfo = nextInfo
                             });
                         }
@@ -1330,8 +1330,8 @@ namespace Finly.ViewModels
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"B≥πd eksportu CSV: {ex.Message}",
-                    "B≥πd", MessageBoxButton.OK, MessageBoxImage.Error);
+                MessageBox.Show($"B≈ÇƒÖd eksportu CSV: {ex.Message}",
+                    "B≈ÇƒÖd", MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
 
@@ -1354,8 +1354,8 @@ namespace Finly.ViewModels
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"B≥πd eksportu Excel: {ex.Message}",
-                    "B≥πd", MessageBoxButton.OK, MessageBoxImage.Error);
+                MessageBox.Show($"B≈ÇƒÖd eksportu Excel: {ex.Message}",
+                    "B≈ÇƒÖd", MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
 
@@ -1363,16 +1363,39 @@ namespace Finly.ViewModels
         {
             try
             {
-                var path = PdfExportService.ExportReportsPdf(this);
-                ToastService.Success($"Raport PDF zapisano na pulpicie: {path}");
+                var vm = this;
+
+                // Renderujemy CA≈ÅƒÑ kontrolkƒô (donut + legenda po prawej)
+                var donut = new Finly.Views.Controls.DonutChartControl
+                {
+                    Width = 740,   // 520 wykres + ~220 legenda
+                    Height = 320
+                };
+
+                // ChartBrushes nie istnieje => daj null (kontrolka ma fallback)
+                donut.Draw(vm.ChartTotals, vm.ChartTotalAll, null);
+
+                // UiRenderHelper zostaje w Helpers (tak jak chcesz)
+                byte[] donutPng = Finly.Helpers.UiRenderHelper.RenderToPng(
+                    donut,
+                    740,
+                    320,
+                    dpi: 192
+                );
+
+                var path = PdfExportService.ExportReportsPdf(vm, donutPng);
+
+                ToastService.Success($"Raport PDF zapisano na pulpicie:\n{path}");
             }
             catch (Exception ex)
             {
-                ToastService.Error($"B≥πd eksportu PDF: {ex.Message}");
+                ToastService.Error($"B≈ÇƒÖd eksportu PDF: {ex.Message}");
             }
         }
 
-        // ======= pomocnicze: budowanie podsumowaÒ kategorii z Rows =======
+
+
+        // ======= pomocnicze: budowanie podsumowa≈Ñ kategorii z Rows =======
         private void RebuildCategorySummariesFromRows()
         {
             ExpenseCategoriesSummary.Clear();
@@ -1381,7 +1404,7 @@ namespace Finly.ViewModels
             if (Rows == null || Rows.Count == 0)
                 return;
 
-            // Wydatki wed≥ug kategorii
+            // Wydatki wed≈Çug kategorii
             var expenseGroups = Rows
                 .Where(r => r.Amount < 0m)
                 .GroupBy(r => string.IsNullOrWhiteSpace(r.Category) ? "(brak kategorii)" : r.Category);
@@ -1401,7 +1424,7 @@ namespace Finly.ViewModels
                 });
             }
 
-            // Przychody wed≥ug kategorii
+            // Przychody wed≈Çug kategorii
             var incomeGroups = Rows
                 .Where(r => r.Amount > 0m)
                 .GroupBy(r => string.IsNullOrWhiteSpace(r.Category) ? "(brak kategorii)" : r.Category);
@@ -1425,7 +1448,7 @@ namespace Finly.ViewModels
             Raise(nameof(IncomeCategoriesSummary));
         }
 
-        // ====== poprzedni okres o tej samej d≥ugoúci ======
+        // ====== poprzedni okres o tej samej d≈Çugo≈õci ======
         private (DateTime PrevFrom, DateTime PrevTo) GetPreviousPeriod(DateTime currentFrom, DateTime currentTo)
         {
             var from = currentFrom.Date;
@@ -1444,7 +1467,7 @@ namespace Finly.ViewModels
             return (prevFrom, prevTo);
         }
 
-        // ====== filtrowanie wydatkÛw do wykresu ======
+        // ====== filtrowanie wydatk√≥w do wykresu ======
         private DataTable GetFilteredExpensesDataTable(int uid, DateTime from, DateTime to, int? accountId)
         {
             DataTable dt = DatabaseService.GetExpenses(uid, from, to, null, null, accountId);
@@ -1490,7 +1513,7 @@ namespace Finly.ViewModels
             return sign + diffPct.ToString("N1", CultureInfo.CurrentCulture) + " %";
         }
 
-        // ====== Zak≥adki raportÛw (indeks) ======
+        // ====== Zak≈Çadki raport√≥w (indeks) ======
         private int _selectedTabIndex = 0;
         public int SelectedTabIndex
         {
@@ -1519,9 +1542,9 @@ namespace Finly.ViewModels
             public decimal Principal { get; set; }
             public decimal InterestRate { get; set; }
             public int TermMonths { get; set; }
-            public string PrincipalStr => Principal.ToString("N2", CultureInfo.CurrentCulture) + " z≥";
+            public string PrincipalStr => Principal.ToString("N2", CultureInfo.CurrentCulture) + " z≈Ç";
             public string InterestRateStr => InterestRate.ToString("N2", CultureInfo.CurrentCulture) + " %";
-            public string MonthlyPaymentStr { get; set; } = "0,00 z≥";
+            public string MonthlyPaymentStr { get; set; } = "0,00 z≈Ç";
             public string NextPaymentInfo { get; set; } = "-";
         }
 
@@ -1539,8 +1562,8 @@ namespace Finly.ViewModels
                     BudgetsSummary.Add(new BudgetService.BudgetSummary
                     {
                         Id = -1,
-                        Name = "Domowy budøet",
-                        Type = "MiesiÍczny",
+                        Name = "Domowy bud≈ºet",
+                        Type = "Miesiƒôczny",
                         StartDate = DateTime.Today.AddMonths(-1),
                         EndDate = DateTime.Today.AddMonths(1),
                         PlannedAmount = 5000m,
@@ -1558,7 +1581,7 @@ namespace Finly.ViewModels
                 // Loans view
                 if (LoansViewList.Count == 0)
                 {
-                    LoansViewList.Add(new ReportsLoanVm { Id = -1, Name = "Kredyt demo", Principal = 250000m, InterestRate = 3.6m, TermMonths = 360, MonthlyPaymentStr = LoansService.CalculateMonthlyPayment(250000m, 3.6m, 360).ToString("N2", CultureInfo.CurrentCulture) + " z≥", NextPaymentInfo = DateTime.Today.AddDays(14).ToString("dd.MM.yyyy") });
+                    LoansViewList.Add(new ReportsLoanVm { Id = -1, Name = "Kredyt demo", Principal = 250000m, InterestRate = 3.6m, TermMonths = 360, MonthlyPaymentStr = LoansService.CalculateMonthlyPayment(250000m, 3.6m, 360).ToString("N2", CultureInfo.CurrentCulture) + " z≈Ç", NextPaymentInfo = DateTime.Today.AddDays(14).ToString("dd.MM.yyyy") });
                 }
             }
             catch (Exception ex)

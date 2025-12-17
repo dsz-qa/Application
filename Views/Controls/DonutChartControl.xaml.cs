@@ -83,38 +83,51 @@ namespace Finly.Views.Controls
             NoDataText.Visibility = Visibility.Collapsed;
             CenterPanel.Visibility = Visibility.Visible;
 
+            // ====== rozmiar canvasu ======
             double width = ChartCanvas.ActualWidth;
             double height = ChartCanvas.ActualHeight;
 
+            // W scenariuszach eksportu (RenderToBitmap) czasem Actual* chwilowo bywa 0.
             if (width <= 0 || height <= 0)
             {
+                // spróbuj jeszcze raz po layout
                 Dispatcher?.BeginInvoke(new Action(Redraw), System.Windows.Threading.DispatcherPriority.Loaded);
                 return;
             }
 
+            // ====== SAFE AREA (¿eby nic nie by³o uciête) ======
+            // To NIE zmienia stylu wykresu, tylko daje mu bezpieczny margines.
+            const double pad = 18; // by³o ~10; 18 jest bezpieczne dla ³uków i joinów
+
+            double size = Math.Min(width, height);
+            double maxRadius = (size / 2.0) - pad;
+
+            // bardzo ma³e kontrolki – minimalna korekta (jak mia³aœ)
+            if (maxRadius < 30)
+                maxRadius = (size / 2.0) - 6;
+
+            // œrodek zawsze w œrodku canvasu
             double cx = width / 2.0;
             double cy = height / 2.0;
 
-            double outerRadius = Math.Min(width, height) / 2.0 - 10;
-            if (outerRadius < 30) outerRadius = Math.Min(width, height) / 2.0 - 4;
-
+            // promienie (zachowane proporcje jak teraz)
+            double outerRadius = maxRadius;
             double innerRadius = outerRadius * 0.58;
-            if (Math.Min(width, height) < 180)
+            if (size < 180)
                 innerRadius = outerRadius * 0.48;
 
-            // center size
+            // ====== panel œrodka (zachowane jak teraz) ======
             double centerDiameter = Math.Max(56, innerRadius * 1.6);
             CenterPanel.Width = centerDiameter;
             CenterPanel.Height = centerDiameter;
             CenterPanel.CornerRadius = new CornerRadius(centerDiameter / 2.0);
 
-            // order slices
+            // ====== sort slices ======
             var ordered = _data
                 .Where(kv => kv.Value > 0)
                 .OrderByDescending(kv => kv.Value)
                 .ToList();
 
-            // legend list
             var legend = new List<LegendItem>();
             int index = 0;
 
@@ -125,6 +138,7 @@ namespace Finly.Views.Controls
                 double sweepAngle = (double)(kv.Value / _total) * 360.0;
                 if (sweepAngle <= 0) continue;
 
+                // minimalne "odklejenie" segmentów (jak mia³aœ)
                 double epsilon = Math.Min(1.0, sweepAngle * 0.0025);
                 double drawSweep = Math.Max(0.6, sweepAngle - epsilon);
 
@@ -171,10 +185,10 @@ namespace Finly.Views.Controls
 
             LegendList.ItemsSource = legend;
 
-            // center default
             ShowAllInCenter();
             UpdateLegendSelection();
         }
+
 
         private void ShowAllInCenter()
         {
