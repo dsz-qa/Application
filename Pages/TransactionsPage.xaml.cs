@@ -11,6 +11,8 @@ using Finly.Services;
 using Finly.ViewModels;
 using Finly.Views.Controls;
 using Finly.Services.Features;
+using TransactionKind = Finly.ViewModels.TransactionsViewModel.TransactionKind;
+using TransactionCardVm = Finly.ViewModels.TransactionsViewModel.TransactionCardVm;
 
 namespace Finly.Pages
 {
@@ -214,6 +216,8 @@ namespace Finly.Pages
 
         private void DeleteConfirmNo_Click(object sender, RoutedEventArgs e)
             => HideAllDeletePanels();
+
+
 
         private void DeleteConfirmYes_Click(object sender, RoutedEventArgs e)
         {

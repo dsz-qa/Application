@@ -32,7 +32,11 @@ namespace Finly.ViewModels
  public decimal Amount { get; set; }
  public string AmountStr => Amount.ToString("N2", CultureInfo.CurrentCulture) + " z³";
  public string RawSource { get; set; } = string.Empty; // oryginalny tekst Ÿród³a z DB
- public void NormalizeAccount()
+
+public string FromAccount { get; set; } = string.Empty;
+public string ToAccount { get; set; } = string.Empty;
+
+public void NormalizeAccount()
  {
  if (string.IsNullOrWhiteSpace(Account) && !string.IsNullOrWhiteSpace(RawSource))
  {
@@ -234,115 +238,175 @@ namespace Finly.ViewModels
  catch { }
  }
 
- private void LoadPlannedTransactions(DateTime start, DateTime end)
- {
- try
- {
- var plannedIncome = new List<TransactionItem>();
- var plannedExpense = new List<TransactionItem>();
+        private void LoadPlannedTransactions(DateTime start, DateTime end)
+        {
+            try
+            {
+                var plannedIncome = new List<TransactionItem>();
+                var plannedExpense = new List<TransactionItem>();
 
- using (var con = DatabaseService.GetConnection())
- using (var cmd = con.CreateCommand())
- {
- cmd.CommandText = @"SELECT i.Id, i.Date, i.Amount, i.Description, i.Source, i.CategoryId, c.Name AS CategoryName
- FROM Incomes i
- LEFT JOIN Categories c ON c.Id = i.CategoryId
- WHERE i.UserId=@u AND i.IsPlanned=1 AND date(i.Date) >= date(@from) AND date(i.Date) <= date(@to);";
- cmd.Parameters.AddWithValue("@u", _userId);
- cmd.Parameters.AddWithValue("@from", start.Date.ToString("yyyy-MM-dd"));
- cmd.Parameters.AddWithValue("@to", end.Date.ToString("yyyy-MM-dd"));
- using var r = cmd.ExecuteReader();
- var dt = new DataTable(); dt.Load(r);
- foreach (DataRow row in dt.Rows)
- {
- var item = new TransactionItem
- {
- Id = SafeInt(row, "Id"),
- Date = SafeDate(row, "Date"),
- Category = SafeString(row, "CategoryName"),
- RawSource = SafeString(row, "Source"),
- Account = SafeString(row, "Source"),
- Description = SafeString(row, "Description"),
- Kind = "Przychód",
- Amount = Math.Abs(SafeDecimal(row, "Amount"))
- };
- item.NormalizeAccount();
- plannedIncome.Add(item);
- }
- }
+                // ===== PRZYCHODY ZAPLANOWANE =====
+                using (var con = DatabaseService.GetConnection())
+                using (var cmd = con.CreateCommand())
+                {
+                    cmd.CommandText = @"
+SELECT i.Id, i.Date, i.Amount, i.Description, i.Source, i.CategoryId, c.Name AS CategoryName
+FROM Incomes i
+LEFT JOIN Categories c ON c.Id = i.CategoryId
+WHERE i.UserId=@u
+  AND i.IsPlanned=1
+  AND date(i.Date) >= date(@from)
+  AND date(i.Date) <= date(@to)
+ORDER BY date(i.Date) DESC, i.Id DESC;";
 
- using (var con = DatabaseService.GetConnection())
- using (var cmd = con.CreateCommand())
- {
- cmd.CommandText = @"SELECT e.Id, e.Date, e.Amount, e.Description, e.CategoryId, e.AccountId, c.Name AS CategoryName
- FROM Expenses e
- LEFT JOIN Categories c ON c.Id = e.CategoryId
- WHERE e.UserId=@u AND e.IsPlanned=1 AND date(e.Date) >= date(@from) AND date(e.Date) <= date(@to);";
- cmd.Parameters.AddWithValue("@u", _userId);
- cmd.Parameters.AddWithValue("@from", start.Date.ToString("yyyy-MM-dd"));
- cmd.Parameters.AddWithValue("@to", end.Date.ToString("yyyy-MM-dd"));
- using var r = cmd.ExecuteReader();
- var dt = new DataTable(); dt.Load(r);
- foreach (DataRow row in dt.Rows)
- {
- var accountText = SafeInt(row, "AccountId") >0 ? "Konto bankowe" : "Gotówka";
- var item = new TransactionItem
- {
- Id = SafeInt(row, "Id"),
- Date = SafeDate(row, "Date"),
- Category = SafeString(row, "CategoryName"),
- RawSource = accountText,
- Account = accountText,
- Description = SafeString(row, "Description"),
- Kind = "Wydatek",
- Amount = Math.Abs(SafeDecimal(row, "Amount"))
- };
- item.NormalizeAccount();
- plannedExpense.Add(item);
- }
- }
+                    cmd.Parameters.AddWithValue("@u", _userId);
+                    cmd.Parameters.AddWithValue("@from", start.Date.ToString("yyyy-MM-dd"));
+                    cmd.Parameters.AddWithValue("@to", end.Date.ToString("yyyy-MM-dd"));
 
- // Wykryj potencjalne transfery: para (przychód Source='Przelew') + wydatek tego samego dnia i kwoty
- var transfers = new List<(TransactionItem inc, TransactionItem exp)>();
- foreach (var inc in plannedIncome.Where(i => i.Account.StartsWith("Przelew", StringComparison.OrdinalIgnoreCase)))
- {
- var match = plannedExpense.FirstOrDefault(e => e.Date.Date == inc.Date.Date && e.Amount == inc.Amount);
- if (match != null)
- {
- transfers.Add((inc, match));
- }
- }
- var usedExpenseIds = new HashSet<int>(transfers.Select(t => t.exp.Id));
- var usedIncomeIds = new HashSet<int>(transfers.Select(t => t.inc.Id));
+                    using var r = cmd.ExecuteReader();
+                    var dt = new DataTable();
+                    dt.Load(r);
 
- // Dodaj transfery jako pojedyncze wpisy
- foreach (var (inc, exp) in transfers)
- {
- PlannedTransactions.Add(new TransactionItem
- {
- Id = inc.Id, // reprezentatywny
- Date = inc.Date,
- Category = string.IsNullOrWhiteSpace(exp.Category) ? inc.Category : exp.Category,
- RawSource = "Transfer",
- Account = "Transfer",
- Description = string.IsNullOrWhiteSpace(inc.Description) ? exp.Description : inc.Description,
- Kind = "Transfer",
- Amount = inc.Amount
- });
- }
+                    foreach (DataRow row in dt.Rows)
+                    {
+                        var rawSource = SafeString(row, "Source");
 
- // Dodaj pozosta³e przychody
- foreach (var inc in plannedIncome.Where(i => !usedIncomeIds.Contains(i.Id)))
- PlannedTransactions.Add(inc);
+                        var item = new TransactionItem
+                        {
+                            Id = SafeInt(row, "Id"),
+                            Date = SafeDate(row, "Date"),
+                            Category = SafeString(row, "CategoryName"),
+                            RawSource = rawSource,
+                            Account = rawSource,
+                            Description = SafeString(row, "Description"),
+                            Kind = "Przychód",
+                            Amount = Math.Abs(SafeDecimal(row, "Amount")),
 
- // Dodaj pozosta³e wydatki
- foreach (var exp in plannedExpense.Where(e => !usedExpenseIds.Contains(e.Id)))
- PlannedTransactions.Add(exp);
- }
- catch { }
- }
+                            // dla zgodnoœci – dla przychodu "ToAccount" ma sens,
+                            // bo œrodki wp³ywaj¹ "na" konto/Ÿród³o
+                            FromAccount = "",
+                            ToAccount = rawSource
+                        };
 
- private DataTable LoadExpensesRaw(int userId, DateTime start, DateTime end)
+                        item.NormalizeAccount();
+                        // po normalizacji przepisz te¿ ToAccount, ¿eby by³o spójne w UI
+                        item.ToAccount = item.Account;
+
+                        plannedIncome.Add(item);
+                    }
+                }
+
+                // ===== WYDATKI ZAPLANOWANE =====
+                using (var con = DatabaseService.GetConnection())
+                using (var cmd = con.CreateCommand())
+                {
+                    cmd.CommandText = @"
+SELECT e.Id, e.Date, e.Amount, e.Description, e.CategoryId, e.AccountId, c.Name AS CategoryName
+FROM Expenses e
+LEFT JOIN Categories c ON c.Id = e.CategoryId
+WHERE e.UserId=@u
+  AND e.IsPlanned=1
+  AND date(e.Date) >= date(@from)
+  AND date(e.Date) <= date(@to)
+ORDER BY date(e.Date) DESC, e.Id DESC;";
+
+                    cmd.Parameters.AddWithValue("@u", _userId);
+                    cmd.Parameters.AddWithValue("@from", start.Date.ToString("yyyy-MM-dd"));
+                    cmd.Parameters.AddWithValue("@to", end.Date.ToString("yyyy-MM-dd"));
+
+                    using var r = cmd.ExecuteReader();
+                    var dt = new DataTable();
+                    dt.Load(r);
+
+                    foreach (DataRow row in dt.Rows)
+                    {
+                        // U Ciebie tu jest uproszczenie (konto bankowe vs gotówka).
+                        // Zostawiamy to, ¿eby nie ruszaæ DB.
+                        var accountText = SafeInt(row, "AccountId") > 0 ? "Konto bankowe" : "Gotówka";
+
+                        var item = new TransactionItem
+                        {
+                            Id = SafeInt(row, "Id"),
+                            Date = SafeDate(row, "Date"),
+                            Category = SafeString(row, "CategoryName"),
+                            RawSource = accountText,
+                            Account = accountText,
+                            Description = SafeString(row, "Description"),
+                            Kind = "Wydatek",
+                            Amount = Math.Abs(SafeDecimal(row, "Amount")),
+
+                            // dla wydatku "FromAccount" ma sens (œrodki schodz¹ z konta)
+                            FromAccount = accountText,
+                            ToAccount = ""
+                        };
+
+                        item.NormalizeAccount();
+                        item.FromAccount = item.Account;
+
+                        plannedExpense.Add(item);
+                    }
+                }
+
+                // ===== WYKRYCIE TRANSFERÓW (heurystyka) =====
+                // Warunek po stronie przychodu: Source/Account wygl¹da na przelew/transfer
+                static bool IsTransferLike(string s)
+                    => !string.IsNullOrWhiteSpace(s) &&
+                       (s.StartsWith("Przelew", StringComparison.OrdinalIgnoreCase) ||
+                        s.StartsWith("Transfer", StringComparison.OrdinalIgnoreCase));
+
+                // ¯eby nie ³¹czyæ wielokrotnie tej samej pozycji
+                var usedIncomeIds = new HashSet<int>();
+                var usedExpenseIds = new HashSet<int>();
+
+                // Prosta i stabilna heurystyka: tego samego dnia + ta sama kwota (po zaokr¹gleniu do 0,01)
+                foreach (var inc in plannedIncome.Where(i => IsTransferLike(i.RawSource) || IsTransferLike(i.Account)))
+                {
+                    if (usedIncomeIds.Contains(inc.Id)) continue;
+
+                    var match = plannedExpense.FirstOrDefault(e =>
+                        !usedExpenseIds.Contains(e.Id) &&
+                        e.Date.Date == inc.Date.Date &&
+                        Math.Round(e.Amount, 2) == Math.Round(inc.Amount, 2));
+
+                    if (match == null) continue;
+
+                    usedIncomeIds.Add(inc.Id);
+                    usedExpenseIds.Add(match.Id);
+
+                    PlannedTransactions.Add(new TransactionItem
+                    {
+                        Id = inc.Id, // reprezentatywny
+                        Date = inc.Date,
+                        Category = !string.IsNullOrWhiteSpace(match.Category) ? match.Category : inc.Category,
+                        Kind = "Transfer",
+                        Amount = inc.Amount,
+                        Description = string.IsNullOrWhiteSpace(inc.Description) ? match.Description : inc.Description,
+
+                        // Klucz: DWIE kolumny
+                        FromAccount = match.Account, // sk¹d zesz³o
+                        ToAccount = inc.Account,     // dok¹d wp³ynê³o
+
+                        // mo¿esz zostawiæ Account pusty, bo template transferu i tak nie korzysta z Account
+                        Account = "",
+                        RawSource = "Transfer"
+                    });
+                }
+
+                // ===== DODAJ RESZTÊ (bez tych u¿ytych w transferach) =====
+                foreach (var inc in plannedIncome.Where(i => !usedIncomeIds.Contains(i.Id)))
+                    PlannedTransactions.Add(inc);
+
+                foreach (var exp in plannedExpense.Where(e => !usedExpenseIds.Contains(e.Id)))
+                    PlannedTransactions.Add(exp);
+            }
+            catch
+            {
+                // celowo cicho – tak jak masz w innych miejscach
+            }
+        }
+
+
+        private DataTable LoadExpensesRaw(int userId, DateTime start, DateTime end)
  {
  var dt = new DataTable();
  try

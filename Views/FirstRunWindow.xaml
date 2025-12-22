@@ -171,7 +171,7 @@
                                        Opacity="0.8"
                                        TextAlignment="Center"
                                        Margin="0,0,0,6"/>
-                            <TextBlock Text="Te dane pomogą aplikacji poprawnie policzyć Twoje finanse od pierwszego dnia. W każdej chwili będziesz mogła je później zmienić w ustawieniach konta."
+                            <TextBlock Text="Te dane pomogą aplikacji poprawnie policzyć Twoje finanse od pierwszego dnia."
                                        TextWrapping="Wrap"
                                        Foreground="{DynamicResource App.Foreground}"
                                        Opacity="0.8"
@@ -208,7 +208,7 @@
                                      Text="0,00"
                                      GotFocus="AmountBox_GotFocus"
                                      LostFocus="AmountBox_LostFocus"/>
-                            <TextBlock Text="Na przykład: poduszka finansowa, nadpłata kredytu itp."
+                            <TextBlock Text="Na przykład: poduszka finansowa, wakacje itp."
                                        FontSize="11"
                                        Margin="0,4,0,0"
                                        Opacity="0.7"

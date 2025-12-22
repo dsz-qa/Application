@@ -26,20 +26,6 @@ namespace Finly.Pages
             // 2) Auto-login / animacje
             AutoLoginCheckBox.IsChecked = _autoLoginEnabled;
             AnimationsCheckBox.IsChecked = _animationsEnabled;
-
-            // 3) Wersja z assembly (jeśli się uda)
-            try
-            {
-                var ver = Assembly.GetExecutingAssembly()?.GetName()?.Version;
-                if (ver != null)
-                {
-                    LblVersion.Text = $"Wersja: {ver}";
-                }
-            }
-            catch
-            {
-                // jakby coś poszło nie tak, zostawiamy tekst domyślny z XAML
-            }
         }
 
         // =============== POWIADOMIENIA ===============

@@ -9,5 +9,6 @@
 		<ResourceDictionary Source="DataGrid.xaml"/>
 		<ResourceDictionary Source="SearchBox.xaml"/>
         <ResourceDictionary Source="FinancialAnalysisCards.xaml"/>
+        <ResourceDictionary Source="Lists.xaml"/>
 	</ResourceDictionary.MergedDictionaries>
 </ResourceDictionary>

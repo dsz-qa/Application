@@ -1,0 +1,147 @@
+﻿<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                    xmlns:sys="clr-namespace:System;assembly=mscorlib">
+
+    <!-- =========================================
+         Wspólne style "tabelopodobnych" list
+         ========================================= -->
+
+    <!-- Kontener nagłówka -->
+    <Style x:Key="FinlyListHeaderBar" TargetType="Border">
+        <Setter Property="Background" Value="{DynamicResource Surface.Background}"/>
+        <Setter Property="CornerRadius" Value="8"/>
+        <Setter Property="Padding" Value="8,6"/>
+        <Setter Property="Margin" Value="0,0,0,6"/>
+        <Setter Property="BorderBrush" Value="{DynamicResource Surface.Border}"/>
+        <Setter Property="BorderThickness" Value="1"/>
+    </Style>
+
+    <!-- Tekst nagłówka kolumn -->
+    <Style x:Key="FinlyListHeaderText" TargetType="TextBlock">
+        <Setter Property="FontSize" Value="11"/>
+        <Setter Property="FontWeight" Value="SemiBold"/>
+        <Setter Property="Foreground" Value="{DynamicResource App.Foreground}"/>
+        <Setter Property="Opacity" Value="0.80"/>
+        <Setter Property="VerticalAlignment" Value="Center"/>
+    </Style>
+
+    <!-- Tekst komórek -->
+    <Style x:Key="FinlyListCellText" TargetType="TextBlock">
+        <Setter Property="Foreground" Value="{DynamicResource App.Foreground}"/>
+        <Setter Property="VerticalAlignment" Value="Center"/>
+        <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
+        <Setter Property="TextWrapping" Value="NoWrap"/>
+        <Setter Property="ToolTip" Value="{Binding RelativeSource={RelativeSource Self}, Path=Text}"/>
+    </Style>
+
+    <!-- Tekst kwoty -->
+    <Style x:Key="FinlyListAmountText" TargetType="TextBlock" BasedOn="{StaticResource FinlyListCellText}">
+        <Setter Property="HorizontalAlignment" Value="Right"/>
+        <Setter Property="FontWeight" Value="SemiBold"/>
+    </Style>
+
+    <!-- ListBox jako "tabela" -->
+    <Style x:Key="FinlyListBox" TargetType="ListBox">
+        <Setter Property="Background" Value="Transparent"/>
+        <Setter Property="BorderThickness" Value="0"/>
+        <Setter Property="Padding" Value="0"/>
+        <Setter Property="ScrollViewer.VerticalScrollBarVisibility" Value="Auto"/>
+        <Setter Property="ScrollViewer.HorizontalScrollBarVisibility" Value="Disabled"/>
+        <Setter Property="VirtualizingPanel.IsVirtualizing" Value="True"/>
+        <Setter Property="VirtualizingPanel.VirtualizationMode" Value="Recycling"/>
+    </Style>
+
+    <!-- Wiersz (ListBoxItem) – hover/selected + "pigułka" -->
+    <Style x:Key="FinlyListRowItem" TargetType="ListBoxItem">
+        <Setter Property="Padding" Value="8,6"/>
+        <Setter Property="Margin" Value="0,2,0,2"/>
+        <Setter Property="Background" Value="Transparent"/>
+        <Setter Property="BorderBrush" Value="Transparent"/>
+        <Setter Property="BorderThickness" Value="1"/>
+        <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+        <Setter Property="VerticalContentAlignment" Value="Center"/>
+        <Setter Property="SnapsToDevicePixels" Value="True"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="ListBoxItem">
+                    <Border x:Name="Bd"
+                            Background="{TemplateBinding Background}"
+                            BorderBrush="{TemplateBinding BorderBrush}"
+                            BorderThickness="{TemplateBinding BorderThickness}"
+                            CornerRadius="8">
+                        <ContentPresenter />
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="Bd" Property="Background" Value="{DynamicResource Surface.Background}"/>
+                            <Setter TargetName="Bd" Property="BorderBrush" Value="{DynamicResource Surface.Border}"/>
+                        </Trigger>
+                        <Trigger Property="IsSelected" Value="True">
+                            <Setter TargetName="Bd" Property="Background" Value="{DynamicResource Brand.Blue}"/>
+                            <Setter TargetName="Bd" Property="BorderBrush" Value="{DynamicResource Brand.Blue}"/>
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- Alternating rows (opcjonalnie, subtelnie) -->
+    <Style x:Key="FinlyListRowItemWithAlternation" TargetType="ListBoxItem" BasedOn="{StaticResource FinlyListRowItem}">
+        <Style.Triggers>
+            <Trigger Property="ItemsControl.AlternationIndex" Value="1">
+                <Setter Property="Background" Value="{DynamicResource Surface.Background}"/>
+                <Setter Property="BorderBrush" Value="Transparent"/>
+            </Trigger>
+        </Style.Triggers>
+    </Style>
+
+	<DataTemplate x:Key="TransactionRowTemplate_5">
+		<Grid>
+			<Grid.ColumnDefinitions>
+				<ColumnDefinition Width="120"/>
+				<ColumnDefinition Width="90"/>
+				<ColumnDefinition Width="*"/>
+				<ColumnDefinition Width="160"/>
+				<ColumnDefinition Width="2*"/>
+			</Grid.ColumnDefinitions>
+
+			<TextBlock Grid.Column="0" Text="{Binding DateDisplay}" Style="{StaticResource FinlyListCellText}"/>
+			<TextBlock Grid.Column="1" Text="{Binding AmountStr}" Style="{StaticResource FinlyListAmountText}"/>
+			<TextBlock Grid.Column="2" Text="{Binding Category}" Style="{StaticResource FinlyListCellText}"/>
+			<TextBlock Grid.Column="3" Text="{Binding Account}" Style="{StaticResource FinlyListCellText}"/>
+			<TextBlock Grid.Column="4" Text="{Binding Description}" Style="{StaticResource FinlyListCellText}"/>
+		</Grid>
+	</DataTemplate>
+
+	<DataTemplate x:Key="TransactionRowTemplate_PlannedWithTransfer">
+		<Grid>
+			<Grid.ColumnDefinitions>
+				<ColumnDefinition Width="120"/>
+				<ColumnDefinition Width="90"/>
+				<ColumnDefinition Width="*"/>
+				<ColumnDefinition Width="160"/>
+				<!-- Z konta -->
+				<ColumnDefinition Width="160"/>
+				<!-- Na konto -->
+				<ColumnDefinition Width="2*"/>
+				<ColumnDefinition Width="120"/>
+			</Grid.ColumnDefinitions>
+
+			<TextBlock Grid.Column="0" Text="{Binding DateDisplay}" Style="{StaticResource FinlyListCellText}"/>
+			<TextBlock Grid.Column="1" Text="{Binding AmountStr}" Style="{StaticResource FinlyListAmountText}"/>
+			<TextBlock Grid.Column="2" Text="{Binding Category}" Style="{StaticResource FinlyListCellText}"/>
+
+			<!-- Z konta / Na konto -->
+			<TextBlock Grid.Column="3" Text="{Binding FromAccount}" Style="{StaticResource FinlyListCellText}"/>
+			<TextBlock Grid.Column="4" Text="{Binding ToAccount}" Style="{StaticResource FinlyListCellText}"/>
+
+			<TextBlock Grid.Column="5" Text="{Binding Description}" Style="{StaticResource FinlyListCellText}"/>
+			<TextBlock Grid.Column="6" Text="{Binding Kind}" Style="{StaticResource FinlyListCellText}" FontWeight="SemiBold"/>
+		</Grid>
+	</DataTemplate>
+
+
+
+</ResourceDictionary>
+

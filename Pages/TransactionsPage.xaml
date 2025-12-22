@@ -214,7 +214,7 @@
         <x:Array x:Key="AccountsForEditRes" Type="{x:Type sys:String}"/>
 
         <!-- Transaction card reusable template with Read/Edit modes -->
-        <DataTemplate x:Key="TransactionCardTemplate" DataType="{x:Type vm:TransactionCardVm}">
+        <DataTemplate x:Key="TransactionCardTemplate">
             <Border Background="{DynamicResource Surface.Background}"
                     BorderBrush="{DynamicResource Surface.Border}"
                     BorderThickness="1"

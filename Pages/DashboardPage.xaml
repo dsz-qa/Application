@@ -66,14 +66,6 @@
             <Setter Property="FontWeight" Value="Bold"/>
         </Style>
 
-        <!-- Nagłówek tabeli/listy -->
-        <Style x:Key="TableHeaderText" TargetType="TextBlock">
-            <Setter Property="FontSize" Value="11"/>
-            <Setter Property="FontWeight" Value="SemiBold"/>
-            <Setter Property="Foreground" Value="{DynamicResource App.Foreground}"/>
-            <Setter Property="Opacity" Value="0.8"/>
-        </Style>
-
         <!-- fallbacki -->
         <Style x:Key="FinancialAnalysisCardBorderStyle" TargetType="Border" BasedOn="{StaticResource Card}">
             <Setter Property="Padding" Value="16"/>
@@ -97,13 +89,6 @@
             <Setter Property="Foreground" Value="{DynamicResource App.Foreground}"/>
             <Setter Property="BorderThickness" Value="1"/>
             <Setter Property="BorderBrush" Value="{DynamicResource Surface.Border}"/>
-        </Style>
-
-        <!-- Wspólny styl na długie teksty -->
-        <Style x:Key="EllipsizeWithTooltip" TargetType="TextBlock">
-            <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
-            <Setter Property="TextWrapping" Value="NoWrap"/>
-            <Setter Property="ToolTip" Value="{Binding RelativeSource={RelativeSource Self}, Path=Text}"/>
         </Style>
 
         <!-- Donut cards: większa przestrzeń na wykres + środek -->
@@ -288,7 +273,6 @@
                                        Style="{StaticResource CardHeader}"
                                        Margin="0,0,0,8"/>
 
-                            <!-- większa wysokość = większy donut + środek -->
                             <controls:DonutChartControl x:Name="IncomeDonut"
                                                         Height="320"
                                                         Title="Źródła przychodu"/>
@@ -297,7 +281,7 @@
 
                     <Border Grid.Row="1" Grid.Column="1" Style="{StaticResource DonutCard}" Margin="8,0,0,0">
                         <StackPanel>
-                            <TextBlock Text="Wydatki wg kategorii — bieżący okres"
+                            <TextBlock Text="Wydatki według kategorii — bieżący okres"
                                        Style="{StaticResource CardHeader}"
                                        Margin="0,0,0,8"/>
 
@@ -354,7 +338,7 @@
                         <!-- Najwyższe wydatki -->
                         <Border Grid.Row="0" Grid.Column="1" Style="{StaticResource Card}" Margin="8,0,0,8">
                             <StackPanel>
-                                <TextBlock Text="Najwyższe wydatki — kategorie"
+                                <TextBlock Text="Najwyższe wydatki według kategorii - bieżący okres"
                                            Style="{StaticResource CardHeader}"
                                            Margin="0,0,0,8"/>
 
@@ -371,7 +355,8 @@
                                                     <TextBlock Text="{Binding Name}"
                                                                Foreground="{DynamicResource App.Foreground}"
                                                                Margin="0,0,8,2"
-                                                               Style="{StaticResource EllipsizeWithTooltip}"/>
+                                                               TextTrimming="CharacterEllipsis"
+                                                               ToolTip="{Binding Name}"/>
 
                                                     <TextBlock Grid.Column="1"
                                                                Text="{Binding PercentStr}"
@@ -408,7 +393,6 @@
                                                Style="{StaticResource CardHeader}"
                                                VerticalAlignment="Center"/>
 
-                                    <!-- globalny styl DeleteIconButton -->
                                     <Button Grid.Column="1"
                                             Style="{StaticResource DeleteIconButton}"
                                             HorizontalAlignment="Right"
@@ -437,62 +421,32 @@
                                             Style="{StaticResource SecondaryButton}"/>
                                 </StackPanel>
 
-                                <Border Margin="0,0,0,4"
-                                        Background="{DynamicResource Surface.Background}"
-                                        Padding="6,4">
+                                <!-- GLOBALNY NAGŁÓWEK -->
+                                <Border Style="{StaticResource FinlyListHeaderBar}">
                                     <Grid>
                                         <Grid.ColumnDefinitions>
                                             <ColumnDefinition Width="120"/>
                                             <ColumnDefinition Width="90"/>
                                             <ColumnDefinition Width="*"/>
-                                            <ColumnDefinition Width="140"/>
+                                            <ColumnDefinition Width="160"/>
                                             <ColumnDefinition Width="2*"/>
                                         </Grid.ColumnDefinitions>
 
-                                        <TextBlock Grid.Column="0" Text="Data" Style="{StaticResource TableHeaderText}"/>
-                                        <TextBlock Grid.Column="1" Text="Kwota" Style="{StaticResource TableHeaderText}" HorizontalAlignment="Right"/>
-                                        <TextBlock Grid.Column="2" Text="Kategoria" Style="{StaticResource TableHeaderText}"/>
-                                        <TextBlock Grid.Column="3" Text="Z/Na konto" Style="{StaticResource TableHeaderText}"/>
-                                        <TextBlock Grid.Column="4" Text="Opis" Style="{StaticResource TableHeaderText}"/>
+                                        <TextBlock Grid.Column="0" Text="Data" Style="{StaticResource FinlyListHeaderText}"/>
+                                        <TextBlock Grid.Column="1" Text="Kwota" Style="{StaticResource FinlyListHeaderText}" HorizontalAlignment="Right"/>
+                                        <TextBlock Grid.Column="2" Text="Kategoria" Style="{StaticResource FinlyListHeaderText}"/>
+                                        <TextBlock Grid.Column="3" Text="Z/Na konto" Style="{StaticResource FinlyListHeaderText}"/>
+                                        <TextBlock Grid.Column="4" Text="Opis" Style="{StaticResource FinlyListHeaderText}"/>
                                     </Grid>
                                 </Border>
 
+                                <!-- GLOBALNY LISTBOX + TEMPLATE -->
                                 <ListBox x:Name="IncomeTable"
+                                         Style="{StaticResource FinlyListBox}"
+                                         ItemContainerStyle="{StaticResource FinlyListRowItemWithAlternation}"
+                                         AlternationCount="2"
                                          ItemsSource="{Binding DataContext.Incomes, ElementName=Root}"
-                                         Background="Transparent"
-                                         BorderThickness="0">
-                                    <ListBox.ItemTemplate>
-                                        <DataTemplate>
-                                            <Grid Margin="0,2">
-                                                <Grid.ColumnDefinitions>
-                                                    <ColumnDefinition Width="120"/>
-                                                    <ColumnDefinition Width="90"/>
-                                                    <ColumnDefinition Width="*"/>
-                                                    <ColumnDefinition Width="140"/>
-                                                    <ColumnDefinition Width="2*"/>
-                                                </Grid.ColumnDefinitions>
-
-                                                <TextBlock Grid.Column="0" Text="{Binding DateDisplay}" Foreground="{DynamicResource App.Foreground}"/>
-                                                <TextBlock Grid.Column="1" Text="{Binding AmountStr}" HorizontalAlignment="Right" Foreground="{DynamicResource App.Foreground}"/>
-
-                                                <TextBlock Grid.Column="2"
-                                                           Text="{Binding Category}"
-                                                           Foreground="{DynamicResource App.Foreground}"
-                                                           Style="{StaticResource EllipsizeWithTooltip}"/>
-
-                                                <TextBlock Grid.Column="3"
-                                                           Text="{Binding Account}"
-                                                           Foreground="{DynamicResource App.Foreground}"
-                                                           Style="{StaticResource EllipsizeWithTooltip}"/>
-
-                                                <TextBlock Grid.Column="4"
-                                                           Text="{Binding Description}"
-                                                           Foreground="{DynamicResource App.Foreground}"
-                                                           Style="{StaticResource EllipsizeWithTooltip}"/>
-                                            </Grid>
-                                        </DataTemplate>
-                                    </ListBox.ItemTemplate>
-                                </ListBox>
+                                         ItemTemplate="{StaticResource TransactionRowTemplate_5}" />
 
                                 <TextBlock x:Name="IncomeEmptyText"
                                            Text="Brak danych w tym okresie"
@@ -543,62 +497,32 @@
                                             Style="{StaticResource SecondaryButton}"/>
                                 </StackPanel>
 
-                                <Border Margin="0,0,0,4"
-                                        Background="{DynamicResource Surface.Background}"
-                                        Padding="6,4">
+                                <!-- GLOBALNY NAGŁÓWEK -->
+                                <Border Style="{StaticResource FinlyListHeaderBar}">
                                     <Grid>
                                         <Grid.ColumnDefinitions>
                                             <ColumnDefinition Width="120"/>
                                             <ColumnDefinition Width="90"/>
                                             <ColumnDefinition Width="*"/>
-                                            <ColumnDefinition Width="140"/>
+                                            <ColumnDefinition Width="160"/>
                                             <ColumnDefinition Width="2*"/>
                                         </Grid.ColumnDefinitions>
 
-                                        <TextBlock Grid.Column="0" Text="Data" Style="{StaticResource TableHeaderText}"/>
-                                        <TextBlock Grid.Column="1" Text="Kwota" Style="{StaticResource TableHeaderText}" HorizontalAlignment="Right"/>
-                                        <TextBlock Grid.Column="2" Text="Kategoria" Style="{StaticResource TableHeaderText}"/>
-                                        <TextBlock Grid.Column="3" Text="Z/Na konto" Style="{StaticResource TableHeaderText}"/>
-                                        <TextBlock Grid.Column="4" Text="Opis" Style="{StaticResource TableHeaderText}"/>
+                                        <TextBlock Grid.Column="0" Text="Data" Style="{StaticResource FinlyListHeaderText}"/>
+                                        <TextBlock Grid.Column="1" Text="Kwota" Style="{StaticResource FinlyListHeaderText}" HorizontalAlignment="Right"/>
+                                        <TextBlock Grid.Column="2" Text="Kategoria" Style="{StaticResource FinlyListHeaderText}"/>
+                                        <TextBlock Grid.Column="3" Text="Z/Na konto" Style="{StaticResource FinlyListHeaderText}"/>
+                                        <TextBlock Grid.Column="4" Text="Opis" Style="{StaticResource FinlyListHeaderText}"/>
                                     </Grid>
                                 </Border>
 
+                                <!-- GLOBALNY LISTBOX + TEMPLATE -->
                                 <ListBox x:Name="ExpenseTable"
+                                         Style="{StaticResource FinlyListBox}"
+                                         ItemContainerStyle="{StaticResource FinlyListRowItemWithAlternation}"
+                                         AlternationCount="2"
                                          ItemsSource="{Binding DataContext.Expenses, ElementName=Root}"
-                                         Background="Transparent"
-                                         BorderThickness="0">
-                                    <ListBox.ItemTemplate>
-                                        <DataTemplate>
-                                            <Grid Margin="0,2">
-                                                <Grid.ColumnDefinitions>
-                                                    <ColumnDefinition Width="120"/>
-                                                    <ColumnDefinition Width="90"/>
-                                                    <ColumnDefinition Width="*"/>
-                                                    <ColumnDefinition Width="140"/>
-                                                    <ColumnDefinition Width="2*"/>
-                                                </Grid.ColumnDefinitions>
-
-                                                <TextBlock Grid.Column="0" Text="{Binding DateDisplay}" Foreground="{DynamicResource App.Foreground}"/>
-                                                <TextBlock Grid.Column="1" Text="{Binding AmountStr}" HorizontalAlignment="Right" Foreground="{DynamicResource App.Foreground}"/>
-
-                                                <TextBlock Grid.Column="2"
-                                                           Text="{Binding Category}"
-                                                           Foreground="{DynamicResource App.Foreground}"
-                                                           Style="{StaticResource EllipsizeWithTooltip}"/>
-
-                                                <TextBlock Grid.Column="3"
-                                                           Text="{Binding Account}"
-                                                           Foreground="{DynamicResource App.Foreground}"
-                                                           Style="{StaticResource EllipsizeWithTooltip}"/>
-
-                                                <TextBlock Grid.Column="4"
-                                                           Text="{Binding Description}"
-                                                           Foreground="{DynamicResource App.Foreground}"
-                                                           Style="{StaticResource EllipsizeWithTooltip}"/>
-                                            </Grid>
-                                        </DataTemplate>
-                                    </ListBox.ItemTemplate>
-                                </ListBox>
+                                         ItemTemplate="{StaticResource TransactionRowTemplate_5}" />
 
                                 <TextBlock x:Name="ExpenseEmptyText"
                                            Text="Brak danych w tym okresie"
@@ -661,67 +585,38 @@
                                             Style="{StaticResource SecondaryButton}"/>
                                 </StackPanel>
 
-                                <Border Margin="0,0,0,4"
-                                        Background="{DynamicResource Surface.Background}"
-                                        Padding="6,4">
+                                <!-- NAGŁÓWEK Z 2 KOLUMNAMI DLA TRANSFERU -->
+                                <Border Style="{StaticResource FinlyListHeaderBar}">
                                     <Grid>
                                         <Grid.ColumnDefinitions>
                                             <ColumnDefinition Width="120"/>
                                             <ColumnDefinition Width="90"/>
                                             <ColumnDefinition Width="*"/>
-                                            <ColumnDefinition Width="140"/>
+                                            <ColumnDefinition Width="160"/>
+                                            <!-- Z konta -->
+                                            <ColumnDefinition Width="160"/>
+                                            <!-- Na konto -->
                                             <ColumnDefinition Width="2*"/>
                                             <ColumnDefinition Width="120"/>
                                         </Grid.ColumnDefinitions>
 
-                                        <TextBlock Grid.Column="0" Text="Data" Style="{StaticResource TableHeaderText}"/>
-                                        <TextBlock Grid.Column="1" Text="Kwota" Style="{StaticResource TableHeaderText}" HorizontalAlignment="Right"/>
-                                        <TextBlock Grid.Column="2" Text="Kategoria" Style="{StaticResource TableHeaderText}"/>
-                                        <TextBlock Grid.Column="3" Text="Z/Na konto" Style="{StaticResource TableHeaderText}"/>
-                                        <TextBlock Grid.Column="4" Text="Opis" Style="{StaticResource TableHeaderText}"/>
-                                        <TextBlock Grid.Column="5" Text="Typ" Style="{StaticResource TableHeaderText}"/>
+                                        <TextBlock Grid.Column="0" Text="Data" Style="{StaticResource FinlyListHeaderText}"/>
+                                        <TextBlock Grid.Column="1" Text="Kwota" Style="{StaticResource FinlyListHeaderText}" HorizontalAlignment="Right"/>
+                                        <TextBlock Grid.Column="2" Text="Kategoria" Style="{StaticResource FinlyListHeaderText}"/>
+                                        <TextBlock Grid.Column="3" Text="Z konta" Style="{StaticResource FinlyListHeaderText}"/>
+                                        <TextBlock Grid.Column="4" Text="Na konto" Style="{StaticResource FinlyListHeaderText}"/>
+                                        <TextBlock Grid.Column="5" Text="Opis" Style="{StaticResource FinlyListHeaderText}"/>
+                                        <TextBlock Grid.Column="6" Text="Typ" Style="{StaticResource FinlyListHeaderText}"/>
                                     </Grid>
                                 </Border>
 
+                                <!-- GLOBALNY LISTBOX + TEMPLATE (obsługa Transfer) -->
                                 <ListBox x:Name="PlannedTransactionsList"
+                                         Style="{StaticResource FinlyListBox}"
+                                         ItemContainerStyle="{StaticResource FinlyListRowItemWithAlternation}"
+                                         AlternationCount="2"
                                          ItemsSource="{Binding DataContext.PlannedTransactions, ElementName=Root}"
-                                         Background="Transparent"
-                                         BorderThickness="0">
-                                    <ListBox.ItemTemplate>
-                                        <DataTemplate>
-                                            <Grid Margin="0,2">
-                                                <Grid.ColumnDefinitions>
-                                                    <ColumnDefinition Width="120"/>
-                                                    <ColumnDefinition Width="90"/>
-                                                    <ColumnDefinition Width="*"/>
-                                                    <ColumnDefinition Width="140"/>
-                                                    <ColumnDefinition Width="2*"/>
-                                                    <ColumnDefinition Width="120"/>
-                                                </Grid.ColumnDefinitions>
-
-                                                <TextBlock Grid.Column="0" Text="{Binding DateDisplay}" Foreground="{DynamicResource App.Foreground}"/>
-                                                <TextBlock Grid.Column="1" Text="{Binding AmountStr}" HorizontalAlignment="Right" Foreground="{DynamicResource App.Foreground}"/>
-
-                                                <TextBlock Grid.Column="2"
-                                                           Text="{Binding Category}"
-                                                           Foreground="{DynamicResource App.Foreground}"
-                                                           Style="{StaticResource EllipsizeWithTooltip}"/>
-
-                                                <TextBlock Grid.Column="3"
-                                                           Text="{Binding Account}"
-                                                           Foreground="{DynamicResource App.Foreground}"
-                                                           Style="{StaticResource EllipsizeWithTooltip}"/>
-
-                                                <TextBlock Grid.Column="4"
-                                                           Text="{Binding Description}"
-                                                           Foreground="{DynamicResource App.Foreground}"
-                                                           Style="{StaticResource EllipsizeWithTooltip}"/>
-
-                                                <TextBlock Grid.Column="5" Text="{Binding Kind}" Foreground="{DynamicResource App.Foreground}" FontWeight="SemiBold"/>
-                                            </Grid>
-                                        </DataTemplate>
-                                    </ListBox.ItemTemplate>
-                                </ListBox>
+                                         ItemTemplate="{StaticResource TransactionRowTemplate_PlannedWithTransfer}" />
 
                                 <TextBlock x:Name="PlannedEmptyText"
                                            Text="Brak zaplanowanych transakcji"
@@ -732,6 +627,7 @@
                                            FontStyle="Italic"/>
                             </StackPanel>
                         </Border>
+
                     </Grid>
                 </Grid>
             </Border>

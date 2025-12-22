@@ -157,10 +157,10 @@ namespace Finly.Pages
 
             CategoriesDonut.Title = mode switch
             {
-                "Expenses" => "Wydatki wg kategorii",
-                "Incomes" => "Przychody wg kategorii",
+                "Expenses" => "Wydatki według kategorii",
+                "Incomes" => "Przychody według kategorii",
                 "Transfer" => "Transfery",
-                "Cashflow" => "Cashflow wg kategorii",
+                "Cashflow" => "Cashflow według kategorii",
                 _ => "Wszystkie transakcje — podział"
             };
 

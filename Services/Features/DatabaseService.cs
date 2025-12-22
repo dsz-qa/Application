@@ -1403,6 +1403,9 @@ WHERE Id=@id AND UserId=@u;";
 
             bool hasAccountId = ColumnExists(con, "Expenses", "AccountId");
 
+            bool hasPk = ColumnExists(con, "Expenses", "PaymentKind");
+            bool hasPr = ColumnExists(con, "Expenses", "PaymentRefId");
+
             var sb = new StringBuilder(@"
 SELECT 
     e.Id,
@@ -1413,10 +1416,13 @@ SELECT
     e.CategoryId,
     COALESCE(c.Name,'(brak)') AS CategoryName,
     " + (hasAccountId ? "e.AccountId" : "NULL") + @" AS AccountId,
-    e.IsPlanned
+    e.IsPlanned,
+    " + (hasPk ? "e.PaymentKind" : "0") + @" AS PaymentKind,
+    " + (hasPr ? "e.PaymentRefId" : "NULL") + @" AS PaymentRefId
 FROM Expenses e
 LEFT JOIN Categories c ON c.Id = e.CategoryId
 WHERE e.UserId = @uid");
+
 
             cmd.Parameters.AddWithValue("@uid", userId);
 
@@ -1458,6 +1464,22 @@ WHERE e.UserId = @uid");
             dt.Load(r);
             return dt;
         }
+
+        public static void DeleteTransfer(int id)
+        {
+            if (id <= 0) return;
+
+            // Najlepiej delegowaæ do fasady, bo ona odwraca salda i ma logikê “planned”
+            try
+            {
+                TransactionsFacadeService.DeleteTransaction(id);
+            }
+            catch
+            {
+                // awaryjnie: jeœli coœ pójdzie nie tak, nie wysypuj UI
+            }
+        }
+
 
         public static List<ExpenseDisplayModel> GetExpensesWithCategory()
         {
@@ -1563,28 +1585,6 @@ LIMIT 1;";
             };
         }
 
-        private static int? TryResolveAccountIdFromExpenseAccountText(SqliteConnection c, int userId, string? accountText)
-        {
-            if (string.IsNullOrWhiteSpace(accountText)) return null;
-
-            var t = accountText.Trim();
-
-            if (t.StartsWith("Konto:", StringComparison.OrdinalIgnoreCase))
-            {
-                var name = t.Substring("Konto:".Length).Trim();
-                if (string.IsNullOrWhiteSpace(name)) return null;
-
-                using var cmd = c.CreateCommand();
-                cmd.CommandText = @"SELECT Id FROM BankAccounts WHERE UserId=@u AND AccountName=@n LIMIT 1;";
-                cmd.Parameters.AddWithValue("@u", userId);
-                cmd.Parameters.AddWithValue("@n", name);
-                var obj = cmd.ExecuteScalar();
-                return obj == null || obj == DBNull.Value ? null : Convert.ToInt32(obj);
-            }
-
-            return null;
-        }
-
         public static int InsertExpense(Expense e)
         {
             using var c = OpenAndEnsureSchema();
@@ -1596,7 +1596,10 @@ LIMIT 1;";
             bool hasPaymentKind = ColumnExists(c, "Expenses", "PaymentKind");
             bool hasPaymentRefId = ColumnExists(c, "Expenses", "PaymentRefId");
 
+            using var tx = c.BeginTransaction();
+
             using var cmd = c.CreateCommand();
+            cmd.Transaction = tx;
 
             var cols = new List<string> { "UserId", "Amount", "Date", "Description", "CategoryId", "IsPlanned" };
             var vals = new List<string> { "@u", "@a", "@d", "@desc", "@c", "@planned" };
@@ -1605,7 +1608,7 @@ LIMIT 1;";
             if (hasAccountText) { cols.Add("Account"); vals.Add("@accText"); }
             if (hasBudgetId) { cols.Add("BudgetId"); vals.Add("@budgetId"); }
 
-            // NOWE: stabilne pola
+            // Stabilne ksiêgowanie
             if (hasPaymentKind) { cols.Add("PaymentKind"); vals.Add("@pk"); }
             if (hasPaymentRefId) { cols.Add("PaymentRefId"); vals.Add("@pr"); }
 
@@ -1624,10 +1627,9 @@ SELECT last_insert_rowid();";
 
             cmd.Parameters.AddWithValue("@planned", e.IsPlanned ? 1 : 0);
 
-            // AccountId (legacy) – ustawiamy NULL, bo ju¿ nie parsujemy tekstu do ksiêgowania.
-            // Dla kompatybilnoœci mo¿esz zostawiæ próbê ustawienia AccountId dla banku:
+            // Legacy AccountId: dla kompatybilnoœci mo¿esz trzymaæ AccountId tylko dla banku
             int? legacyAccountId = null;
-            if (hasAccountId && e.PaymentKind == PaymentKind.BankAccount && e.PaymentRefId.HasValue)
+            if (hasAccountId && e.PaymentKind == Finly.Models.PaymentKind.BankAccount && e.PaymentRefId.HasValue)
                 legacyAccountId = e.PaymentRefId.Value;
 
             if (hasAccountId) cmd.Parameters.AddWithValue("@accId", (object?)legacyAccountId ?? DBNull.Value);
@@ -1637,43 +1639,20 @@ SELECT last_insert_rowid();";
             if (hasPaymentKind) cmd.Parameters.AddWithValue("@pk", (int)e.PaymentKind);
             if (hasPaymentRefId) cmd.Parameters.AddWithValue("@pr", (object?)e.PaymentRefId ?? DBNull.Value);
 
-            var rowId = (long)(cmd.ExecuteScalar() ?? 0L);
+            var rowId = Convert.ToInt32(cmd.ExecuteScalar() ?? 0);
 
-            // Ksiêgowanie TYLKO raz i TYLKO dla nieplanowanych
+            // Ksiêgowanie: TYLKO raz, TYLKO dla nieplanowanych, w tej samej transakcji i tym samym po³¹czeniu
             if (!e.IsPlanned)
             {
                 var amt = Convert.ToDecimal(e.Amount);
-
-                switch (e.PaymentKind)
-                {
-                    case PaymentKind.FreeCash:
-                        TransactionsFacadeService.SpendFromFreeCash(e.UserId, amt);
-                        break;
-
-                    case PaymentKind.SavedCash:
-                        TransactionsFacadeService.SpendFromSavedCash(e.UserId, amt);
-                        break;
-
-                    case PaymentKind.BankAccount:
-                        if (!e.PaymentRefId.HasValue)
-                            throw new InvalidOperationException("Brak PaymentRefId dla p³atnoœci z konta bankowego.");
-                        TransactionsFacadeService.SpendFromBankAccount(e.UserId, e.PaymentRefId.Value, amt);
-                        break;
-
-                    case PaymentKind.Envelope:
-                        if (!e.PaymentRefId.HasValue)
-                            throw new InvalidOperationException("Brak PaymentRefId dla p³atnoœci z koperty.");
-                        TransactionsFacadeService.SpendFromEnvelope(e.UserId, e.PaymentRefId.Value, amt);
-                        break;
-
-                    default:
-                        throw new InvalidOperationException("Nieznany PaymentKind.");
-                }
+                LedgerService.ApplyExpenseEffect(c, tx, e.UserId, amt, (int)e.PaymentKind, e.PaymentRefId);
             }
 
+            tx.Commit();
             RaiseDataChanged();
-            return (int)rowId;
+            return rowId;
         }
+
 
 
         public static void UpdateExpense(Expense e)
@@ -1684,98 +1663,68 @@ SELECT last_insert_rowid();";
             bool hasAccountText = ColumnExists(c, "Expenses", "Account"); // legacy
             bool hasBudgetId = ExpensesHasBudgetId(c);
 
-            var old = GetExpenseById(e.Id);
+            bool hasPaymentKind = ColumnExists(c, "Expenses", "PaymentKind");
+            bool hasPaymentRefId = ColumnExists(c, "Expenses", "PaymentRefId");
 
-            // 1) Cofnij wp³yw starego wydatku (jeœli by³ zrealizowany) – robimy to przez Ledger delete + reinsert?
-            // Stabilniejszy wariant: u¿yj Ledger usuwania + update rekordu? Nie – bo update ma zachowaæ Id.
-            // Tu robimy minimalnie: odwracamy saldo "rêcznie" tylko przez Ledger: usuwamy transakcjê i potem wstawiamy ponownie? odpada.
-            // Dlatego: cofniêcie realizujemy przez LedgerService.DeleteTransactionAndRevertBalance na KOPII rekordu?
-            // To usunê³oby wiersz. Nie.
-            //
-            // W praktyce: cofniêcie starego wp³ywu robimy lokalnie, ale TYLKO jako operacja ksiêgowa – bez duplikowania logiki transferów.
-            // U¿ywamy LedgerService jako prymitywów: dodajemy œrodki "w drug¹ stronê" nie mamy publicznych API.
-            // Dlatego w ETAPIE 1 zostawiamy mechanikê: jeœli old by³ zrealizowany, to najproœciej:
-            // - usuñ rekord i wstaw nowy (utrata Id) – odpada.
-            //
-            // Wniosek: na teraz utrzymujemy dotychczasowy bezpieczny mechanizm update:
-            // - odwrócenie starego wp³ywu robimy tu bez transferów, tylko jako "add back" (bank/cash),
-            // - na³o¿enie nowego wp³ywu robimy przez TransactionsFacadeService.Spend*.
-            //
-            // To NIE dubluje logiki (bo Transfery i DeleteTransaction s¹ w Ledger),
-            // a update expense to specyficzna operacja.
+            using var tx = c.BeginTransaction();
 
-            if (old != null && !old.IsPlanned)
+            // 1) Pobierz STARY rekord (do revert)
+            var oldInfo = ReadExpenseLedgerInfo(c, tx, e.Id);
+            if (oldInfo == null)
+                throw new InvalidOperationException("Nie znaleziono wydatku do aktualizacji.");
+
+            // 2) Revert starego wp³ywu (jeœli by³ zrealizowany)
+            if (!oldInfo.IsPlanned)
             {
-                int? oldAccId = null;
-
-                if (hasAccountId)
-                {
-                    using var cmdOldAcc = c.CreateCommand();
-                    cmdOldAcc.CommandText = "SELECT AccountId FROM Expenses WHERE Id=@id LIMIT 1;";
-                    cmdOldAcc.Parameters.AddWithValue("@id", e.Id);
-                    var raw = cmdOldAcc.ExecuteScalar();
-                    if (raw != null && raw != DBNull.Value)
-                        oldAccId = Convert.ToInt32(raw);
-                }
-
-                if (!oldAccId.HasValue && hasAccountText)
-                {
-                    using var cmdOldTxt = c.CreateCommand();
-                    cmdOldTxt.CommandText = "SELECT Account FROM Expenses WHERE Id=@id LIMIT 1;";
-                    cmdOldTxt.Parameters.AddWithValue("@id", e.Id);
-                    var txt = cmdOldTxt.ExecuteScalar()?.ToString();
-
-                    var resolved = TryResolveAccountIdFromExpenseAccountText(c, old.UserId, txt);
-                    if (resolved.HasValue)
-                        oldAccId = resolved.Value;
-                }
-
-                if (oldAccId.HasValue)
-                {
-                    using var addBack = c.CreateCommand();
-                    addBack.CommandText = @"UPDATE BankAccounts
-SET Balance = Balance + @a
-WHERE Id=@id AND UserId=@u;";
-                    addBack.Parameters.AddWithValue("@a", Convert.ToDecimal(old.Amount));
-                    addBack.Parameters.AddWithValue("@id", oldAccId.Value);
-                    addBack.Parameters.AddWithValue("@u", old.UserId);
-                    addBack.ExecuteNonQuery();
-                }
-                else
-                {
-                    using var addCash = c.CreateCommand();
-                    addCash.CommandText = @"
-INSERT INTO CashOnHand(UserId, Amount, UpdatedAt)
-VALUES (@u, @a, CURRENT_TIMESTAMP)
-ON CONFLICT(UserId) DO UPDATE
-SET Amount = CashOnHand.Amount + excluded.Amount,
-    UpdatedAt = CURRENT_TIMESTAMP;";
-                    addCash.Parameters.AddWithValue("@u", old.UserId);
-                    addCash.Parameters.AddWithValue("@a", Convert.ToDecimal(old.Amount));
-                    addCash.ExecuteNonQuery();
-                }
+                LedgerService.RevertExpenseEffect(c, tx, oldInfo.UserId, oldInfo.Amount, oldInfo.PaymentKind, oldInfo.PaymentRefId);
             }
 
-            int? newAccountId = null;
-            if (hasAccountId)
-                newAccountId = TryResolveAccountIdFromExpenseAccountText(c, e.UserId, e.Account);
+            // 3) Ustal NOWE PaymentKind/Ref (zapisujemy i ksiêgujemy spójnie)
+            int newPk;
+            int? newPr;
 
-            var setParts = new List<string>
+            if (hasPaymentKind)
             {
-                "UserId=@u",
-                "Amount=@a",
-                "Date=@d",
-                "Description=@desc",
-                "CategoryId=@c",
-                "IsPlanned=@planned"
-            };
+                newPk = (int)e.PaymentKind;      // Finly.Models.PaymentKind
+                newPr = e.PaymentRefId;
+            }
+            else
+            {
+                // legacy fallback
+                int? legacyAccId = null;
+
+                if (hasAccountId || hasAccountText)
+                    legacyAccId = TryResolveAccountIdFromExpenseAccountText(c, tx, e.UserId, e.Account);
+
+                newPk = legacyAccId.HasValue
+                    ? (int)Finly.Models.PaymentKind.BankAccount
+                    : (int)Finly.Models.PaymentKind.FreeCash;
+
+                newPr = legacyAccId;
+            }
+
+
+            // 4) Update rekordu w TEJ SAMEJ transakcji (w tym PaymentKind/PaymentRefId jeœli istniej¹)
+            var setParts = new List<string>
+    {
+        "UserId=@u",
+        "Amount=@a",
+        "Date=@d",
+        "Description=@desc",
+        "CategoryId=@c",
+        "IsPlanned=@planned"
+    };
 
             if (hasAccountId) setParts.Add("AccountId=@accId");
             if (hasAccountText) setParts.Add("Account=@accText");
             if (hasBudgetId) setParts.Add("BudgetId=@budgetId");
 
+            if (hasPaymentKind) setParts.Add("PaymentKind=@pk");
+            if (hasPaymentRefId) setParts.Add("PaymentRefId=@pr");
+
             using (var cmd = c.CreateCommand())
             {
+                cmd.Transaction = tx;
                 cmd.CommandText = $@"
 UPDATE Expenses SET
  {string.Join(",\n ", setParts)}
@@ -1787,28 +1736,37 @@ WHERE Id=@id;";
                 cmd.Parameters.AddWithValue("@d", ToIsoDate(e.Date));
                 cmd.Parameters.AddWithValue("@desc", (object?)e.Description ?? DBNull.Value);
 
-                if (e.CategoryId is int cid && cid > 0) cmd.Parameters.AddWithValue("@c", cid);
+                if (e.CategoryId > 0) cmd.Parameters.AddWithValue("@c", e.CategoryId);
                 else cmd.Parameters.AddWithValue("@c", DBNull.Value);
 
                 cmd.Parameters.AddWithValue("@planned", e.IsPlanned ? 1 : 0);
 
-                if (hasAccountId) cmd.Parameters.AddWithValue("@accId", (object?)newAccountId ?? DBNull.Value);
+                if (hasAccountId)
+                {
+                    int? accId = (newPk == (int)Finly.Models.PaymentKind.BankAccount) ? newPr : null;
+                    cmd.Parameters.AddWithValue("@accId", (object?)accId ?? DBNull.Value);
+                }
+
                 if (hasAccountText) cmd.Parameters.AddWithValue("@accText", (object?)e.Account ?? DBNull.Value);
                 if (hasBudgetId) cmd.Parameters.AddWithValue("@budgetId", (object?)e.BudgetId ?? DBNull.Value);
+
+                if (hasPaymentKind) cmd.Parameters.AddWithValue("@pk", newPk);
+                if (hasPaymentRefId) cmd.Parameters.AddWithValue("@pr", (object?)newPr ?? DBNull.Value);
 
                 cmd.ExecuteNonQuery();
             }
 
+            // 5) Apply nowego wp³ywu (jeœli nieplanowany)
             if (!e.IsPlanned)
             {
-                if (hasAccountId && newAccountId.HasValue)
-                    TransactionsFacadeService.SpendFromBankAccount(e.UserId, newAccountId.Value, Convert.ToDecimal(e.Amount));
-                else
-                    TransactionsFacadeService.SpendFromFreeCash(e.UserId, Convert.ToDecimal(e.Amount));
+                var amt = Convert.ToDecimal(e.Amount);
+                LedgerService.ApplyExpenseEffect(c, tx, e.UserId, amt, newPk, newPr);
             }
 
+            tx.Commit();
             RaiseDataChanged();
         }
+
 
         public static void AddExpense(Expense e) => _ = InsertExpense(e);
 
@@ -1855,7 +1813,7 @@ WHERE UserId=@u");
             return dt;
         }
 
-        public static void InsertTransfer(
+        internal static void InsertTransferRaw_NoLedger(
             int userId,
             DateTime date,
             decimal amount,
@@ -2163,6 +2121,119 @@ WHERE Id=@id AND UserId=@u;";
             cmd.ExecuteNonQuery();
             RaiseDataChanged();
         }
+
+
+        private sealed class ExpenseLedgerInfo
+        {
+            public int UserId { get; set; }
+            public decimal Amount { get; set; }
+            public bool IsPlanned { get; set; }
+            public int PaymentKind { get; set; }
+            public int? PaymentRefId { get; set; }
+        }
+
+        private static ExpenseLedgerInfo? ReadExpenseLedgerInfo(SqliteConnection c, SqliteTransaction tx, int expenseId)
+        {
+            if (!TableExists(c, "Expenses")) return null;
+
+            bool hasIsPlanned = ColumnExists(c, "Expenses", "IsPlanned");
+            bool hasPk = ColumnExists(c, "Expenses", "PaymentKind");
+            bool hasPr = ColumnExists(c, "Expenses", "PaymentRefId");
+            bool hasAccountId = ColumnExists(c, "Expenses", "AccountId");
+            bool hasAccountText = ColumnExists(c, "Expenses", "Account"); // legacy
+
+            // Minimalny SELECT po to, co potrzebne.
+            // Jeœli brak PaymentKind -> legacy fallback: BankAccount jeœli AccountId jest, inaczej FreeCash.
+            string sql = @"
+SELECT UserId,
+       Amount,
+       " + (hasIsPlanned ? "IsPlanned" : "0") + @" AS IsPlanned,
+       " + (hasPk ? "PaymentKind" : "NULL") + @" AS PaymentKind,
+       " + (hasPr ? "PaymentRefId" : "NULL") + @" AS PaymentRefId,
+       " + (hasAccountId ? "AccountId" : "NULL") + @" AS AccountId,
+       " + (hasAccountText ? "Account" : "NULL") + @" AS AccountText
+FROM Expenses
+WHERE Id=@id
+LIMIT 1;";
+
+            using var cmd = c.CreateCommand();
+            cmd.Transaction = tx;
+            cmd.CommandText = sql;
+            cmd.Parameters.AddWithValue("@id", expenseId);
+
+            using var r = cmd.ExecuteReader();
+            if (!r.Read()) return null;
+
+            int userId = r.IsDBNull(0) ? 0 : r.GetInt32(0);
+            decimal amount = r.IsDBNull(1) ? 0m : Convert.ToDecimal(r.GetValue(1));
+            bool isPlanned = !r.IsDBNull(2) && Convert.ToInt32(r.GetValue(2)) == 1;
+
+            int? pk = r.IsDBNull(3) ? (int?)null : Convert.ToInt32(r.GetValue(3));
+            int? pr = r.IsDBNull(4) ? (int?)null : Convert.ToInt32(r.GetValue(4));
+
+            int? accountId = r.IsDBNull(5) ? (int?)null : Convert.ToInt32(r.GetValue(5));
+            string? accountText = r.IsDBNull(6) ? null : r.GetValue(6)?.ToString();
+
+            if (pk.HasValue)
+            {
+                return new ExpenseLedgerInfo
+                {
+                    UserId = userId,
+                    Amount = amount,
+                    IsPlanned = isPlanned,
+                    PaymentKind = pk.Value,
+                    PaymentRefId = pr
+                };
+            }
+
+            // LEGACY fallback (spójny, choæ nie obs³u¿y kopert/saved w starych bazach):
+            // Jeœli mamy AccountId -> traktuj jako BankAccount, wpp FreeCash.
+            int legacyKind = accountId.HasValue
+    ? (int)Finly.Models.PaymentKind.BankAccount
+    : (int)Finly.Models.PaymentKind.FreeCash;
+
+            int? legacyRef = accountId;
+
+            // Dodatkowo: jeœli AccountId nie ma, ale jest tekst "Konto: ..." -> spróbuj zmapowaæ na bank
+            if (!legacyRef.HasValue && hasAccountText && !string.IsNullOrWhiteSpace(accountText))
+            {
+                var resolved = TryResolveAccountIdFromExpenseAccountText(c, tx, userId, accountText);
+                if (resolved.HasValue)
+                {
+                    legacyKind = (int)Finly.Models.PaymentKind.BankAccount;
+                    legacyRef = resolved;
+                }
+            }
+
+            return new ExpenseLedgerInfo
+            {
+                UserId = userId,
+                Amount = amount,
+                IsPlanned = isPlanned,
+                PaymentKind = legacyKind,
+                PaymentRefId = legacyRef
+            };
+        }
+
+        private static int? TryResolveAccountIdFromExpenseAccountText(SqliteConnection c, SqliteTransaction tx, int userId, string? accountText)
+        {
+            if (string.IsNullOrWhiteSpace(accountText)) return null;
+
+            var t = accountText.Trim();
+            if (!t.StartsWith("Konto:", StringComparison.OrdinalIgnoreCase)) return null;
+
+            var name = t.Substring("Konto:".Length).Trim();
+            if (string.IsNullOrWhiteSpace(name)) return null;
+
+            using var cmd = c.CreateCommand();
+            cmd.Transaction = tx;
+            cmd.CommandText = @"SELECT Id FROM BankAccounts WHERE UserId=@u AND AccountName=@n LIMIT 1;";
+            cmd.Parameters.AddWithValue("@u", userId);
+            cmd.Parameters.AddWithValue("@n", name);
+            var obj = cmd.ExecuteScalar();
+            return obj == null || obj == DBNull.Value ? null : Convert.ToInt32(obj);
+        }
+
 
     }
 }

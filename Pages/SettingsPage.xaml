@@ -43,16 +43,17 @@
                         </Grid.ColumnDefinitions>
 
                         <TextBlock Grid.Column="0"
-                                   Text="Pozycja toastów:"
+                                   Text="Pozycja powiadomień:"
                                    VerticalAlignment="Center"/>
 
                         <ComboBox x:Name="ToastPositionCombo"
                                   Grid.Column="1"
                                   Height="26"
                                   Margin="0,0,8,0"
+                                  Background="Transparent"
                                   SelectionChanged="ToastPositionCombo_SelectionChanged">
-                            <ComboBoxItem Content="Prawy górny"   Tag="TopRight"/>
-                            <ComboBoxItem Content="Prawy dolny"   Tag="BottomRight"/>
+                            <ComboBoxItem Content="Prawy górny" Tag="TopRight"/>
+                            <ComboBoxItem Content="Prawy dolny" Tag="BottomRight"/>
                             <ComboBoxItem Content="Środek na dole" Tag="BottomCenter"/>
                         </ComboBox>
 
@@ -60,6 +61,7 @@
                                 x:Name="BtnShowTestToast"
                                 Content="Wyświetl test"
                                 Height="26"
+                                Background="Transparent"
                                 Click="BtnShowTestToast_Click"/>
                     </Grid>
                 </StackPanel>
@@ -121,16 +123,21 @@
                                Foreground="White"
                                Margin="0,0,0,10"/>
 
-                    <TextBlock Text="Nazwa aplikacji: Finly"
-                               Margin="0,0,0,2"/>
-                    <TextBlock x:Name="LblVersion"
-                               Text="Wersja: 1.0.0"
-                               Margin="0,0,0,2"/>
-                    <TextBlock Text="Autor: Dominika Szymańska"
-                               Margin="0,0,0,2"/>
-                    <TextBlock Text="Opis: Aplikacja do zarządzania finansami osobistymi i firmowymi."
-                               TextWrapping="Wrap"
-                               Margin="0,4,0,0"/>
+                    <TextBlock Margin="0,0,0,2">
+                        <Run Text="Nazwa aplikacji: " FontWeight="Bold"/>
+                        <Run Text="Finly"/>
+                    </TextBlock>
+
+                    <TextBlock Margin="0,0,0,2">
+                        <Run Text="Autor: " FontWeight="Bold"/>
+                        <Run Text="Dominika Szymańska, Łukasz Wysocki, Anna Michaliszyn"/>
+                    </TextBlock>
+
+                    <TextBlock TextWrapping="Wrap"
+                               Margin="0,4,0,0">
+                        <Run Text="Opis: " FontWeight="Bold"/>
+                        <Run Text="Aplikacja do zarządzania finansami osobistymi i firmowymi."/>
+                    </TextBlock>
                 </StackPanel>
             </Border>
 

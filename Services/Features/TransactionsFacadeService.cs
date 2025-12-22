@@ -8,40 +8,81 @@ namespace Finly.Services.Features
     /// </summary>
     public static class TransactionsFacadeService
     {
+        // =========================
+        //  SET (ustawienia sald)
+        // =========================
 
         public static void SetCashOnHand(int userId, decimal amount)
         {
+            if (userId <= 0) throw new ArgumentException("Nieprawidłowy userId.", nameof(userId));
+            if (amount < 0) throw new ArgumentException("Kwota nie może być ujemna.", nameof(amount));
+
             using var con = DatabaseService.GetConnection();
+            DatabaseService.EnsureTables();
+
+            using var tx = con.BeginTransaction();
             using var cmd = con.CreateCommand();
+            cmd.Transaction = tx;
+
             cmd.CommandText = @"
-UPDATE CashOnHand SET Amount = @a WHERE UserId = @u;
-INSERT INTO CashOnHand(UserId, Amount)
-SELECT @u, @a
-WHERE (SELECT changes()) = 0;";
+INSERT INTO CashOnHand(UserId, Amount, UpdatedAt)
+VALUES (@u, @a, CURRENT_TIMESTAMP)
+ON CONFLICT(UserId) DO UPDATE
+SET Amount   = excluded.Amount,
+    UpdatedAt = CURRENT_TIMESTAMP;";
             cmd.Parameters.AddWithValue("@u", userId);
             cmd.Parameters.AddWithValue("@a", amount);
             cmd.ExecuteNonQuery();
+
+            tx.Commit();
+            DatabaseService.NotifyDataChanged();
         }
 
         public static void SetSavedCash(int userId, decimal amount)
         {
+            if (userId <= 0) throw new ArgumentException("Nieprawidłowy userId.", nameof(userId));
+            if (amount < 0) throw new ArgumentException("Kwota nie może być ujemna.", nameof(amount));
+
             using var con = DatabaseService.GetConnection();
+            DatabaseService.EnsureTables();
+
+            using var tx = con.BeginTransaction();
             using var cmd = con.CreateCommand();
+            cmd.Transaction = tx;
+
             cmd.CommandText = @"
-UPDATE SavedCash SET Amount = @a WHERE UserId = @u;
-INSERT INTO SavedCash(UserId, Amount)
-SELECT @u, @a
-WHERE (SELECT changes()) = 0;";
+INSERT INTO SavedCash(UserId, Amount, UpdatedAt)
+VALUES (@u, @a, CURRENT_TIMESTAMP)
+ON CONFLICT(UserId) DO UPDATE
+SET Amount   = excluded.Amount,
+    UpdatedAt = CURRENT_TIMESTAMP;";
             cmd.Parameters.AddWithValue("@u", userId);
             cmd.Parameters.AddWithValue("@a", amount);
             cmd.ExecuteNonQuery();
+
+            tx.Commit();
+            DatabaseService.NotifyDataChanged();
         }
 
-        // ===== Kasowanie transakcji z odwróceniem skutków =====
+
+        public static int TransferAnyPlanned(
+    int userId, decimal amount, DateTime date, string? desc,
+    string fromKind, int? fromRefId,
+    string toKind, int? toRefId)
+    => LedgerService.TransferAny(userId, amount, date, desc, fromKind, fromRefId, toKind, toRefId, isPlanned: true);
+
+
+        // =========================
+        //  Delete (jedyny punkt)
+        // =========================
+
         public static void DeleteTransaction(int id)
             => LedgerService.DeleteTransactionAndRevertBalance(id);
 
-        // ===== Wydatki (księgowanie) =====
+        // =========================
+        //  Wydatki – UI -> Ledger
+        // (zostawiasz jak masz)
+        // =========================
         public static void SpendFromFreeCash(int userId, decimal amount)
             => LedgerService.SpendFromFreeCash(userId, amount);
 
@@ -54,80 +95,75 @@ WHERE (SELECT changes()) = 0;";
         public static void SpendFromBankAccount(int userId, int accountId, decimal amount)
             => LedgerService.SpendFromBankAccount(userId, accountId, amount);
 
-        // ===== Transfery (podstawowe) =====
-        public static void TransferFreeToSaved(int userId, decimal amount)
-            => LedgerService.TransferFreeToSaved(userId, amount);
+        // =========================
+        //  Transfery – WSZYSTKIE kombinacje
+        //  Każdy transfer zapisuje rekord w Transfers + księguje saldo (atomowo).
+        // =========================
 
-        public static void TransferSavedToFree(int userId, decimal amount)
-            => LedgerService.TransferSavedToFree(userId, amount);
+        public static int TransferFreeToSaved(int userId, decimal amount, DateTime? date = null, string? desc = null)
+            => LedgerService.TransferFreeToSaved(userId, amount, date, desc);
 
-        public static void TransferSavedToBank(int userId, int accountId, decimal amount)
-            => LedgerService.TransferSavedToBank(userId, accountId, amount);
+        public static int TransferSavedToFree(int userId, decimal amount, DateTime? date = null, string? desc = null)
+            => LedgerService.TransferSavedToFree(userId, amount, date, desc);
 
-        public static void TransferBankToSaved(int userId, int accountId, decimal amount)
-            => LedgerService.TransferBankToSaved(userId, accountId, amount);
+        public static int TransferSavedToBank(int userId, int accountId, decimal amount, DateTime? date = null, string? desc = null)
+            => LedgerService.TransferSavedToBank(userId, accountId, amount, date, desc);
 
-        public static void TransferBankToBank(int userId, int fromAccountId, int toAccountId, decimal amount)
-            => LedgerService.TransferBankToBank(userId, fromAccountId, toAccountId, amount);
+        public static int TransferBankToSaved(int userId, int accountId, decimal amount, DateTime? date = null, string? desc = null)
+            => LedgerService.TransferBankToSaved(userId, accountId, amount, date, desc);
 
-        public static void TransferSavedToEnvelope(int userId, int envelopeId, decimal amount)
-            => LedgerService.TransferSavedToEnvelope(userId, envelopeId, amount);
+        public static int TransferBankToBank(int userId, int fromAccountId, int toAccountId, decimal amount, DateTime? date = null, string? desc = null)
+            => LedgerService.TransferBankToBank(userId, fromAccountId, toAccountId, amount, date, desc);
 
-        public static void TransferEnvelopeToSaved(int userId, int envelopeId, decimal amount)
-            => LedgerService.TransferEnvelopeToSaved(userId, envelopeId, amount);
+        public static int TransferSavedToEnvelope(int userId, int envelopeId, decimal amount, DateTime? date = null, string? desc = null)
+            => LedgerService.TransferSavedToEnvelope(userId, envelopeId, amount, date, desc);
 
-        public static void TransferFreeToEnvelope(int userId, int envelopeId, decimal amount)
-            => LedgerService.TransferFreeToEnvelope(userId, envelopeId, amount);
+        public static int TransferEnvelopeToSaved(int userId, int envelopeId, decimal amount, DateTime? date = null, string? desc = null)
+            => LedgerService.TransferEnvelopeToSaved(userId, envelopeId, amount, date, desc);
 
-        public static void TransferEnvelopeToFree(int userId, int envelopeId, decimal amount)
-            => LedgerService.TransferEnvelopeToFree(userId, envelopeId, amount);
+        public static int TransferFreeToEnvelope(int userId, int envelopeId, decimal amount, DateTime? date = null, string? desc = null)
+            => LedgerService.TransferFreeToEnvelope(userId, envelopeId, amount, date, desc);
 
-        // ===== Transfery „czytelne” pod UI (kompozycje) =====
+        public static int TransferEnvelopeToFree(int userId, int envelopeId, decimal amount, DateTime? date = null, string? desc = null)
+            => LedgerService.TransferEnvelopeToFree(userId, envelopeId, amount, date, desc);
 
-        /// <summary>
-        /// Bank -> wolna gotówka (CashOnHand rośnie, SavedCash bez zmian).
-        /// Realizacja: Bank -> Saved, potem Saved -> Free.
-        /// </summary>
-        public static void TransferBankToFreeCash(int userId, int accountId, decimal amount)
-        {
-            LedgerService.TransferBankToSaved(userId, accountId, amount);
-            LedgerService.TransferSavedToFree(userId, amount);
-        }
+        public static int TransferEnvelopeToEnvelope(int userId, int fromEnvelopeId, int toEnvelopeId, decimal amount, DateTime? date = null, string? desc = null)
+            => LedgerService.TransferEnvelopeToEnvelope(userId, fromEnvelopeId, toEnvelopeId, amount, date, desc);
 
-        /// <summary>
-        /// Wolna gotówka -> Bank (CashOnHand maleje, SavedCash bez zmian).
-        /// Realizacja: Free -> Saved, potem Saved -> Bank.
-        /// </summary>
-        public static void TransferFreeCashToBank(int userId, int accountId, decimal amount)
-        {
-            LedgerService.TransferFreeToSaved(userId, amount);
-            LedgerService.TransferSavedToBank(userId, accountId, amount);
-        }
+        // =========================
+        //  Kombinacje „czytelne” (bez 2 transakcji)
+        //  Zamiast 2 wywołań Ledgera – robimy 1 transfer Any (atomowo, 1 rekord).
+        // =========================
 
-        /// <summary>
-        /// Koperta -> Konto bankowe. Realizacja: Envelope -> Saved, potem Saved -> Bank.
-        /// </summary>
-        public static void TransferEnvelopeToBank(int userId, int envelopeId, int accountId, decimal amount)
-        {
-            LedgerService.TransferEnvelopeToSaved(userId, envelopeId, amount);
-            LedgerService.TransferSavedToBank(userId, accountId, amount);
-        }
+        public static int TransferBankToFreeCash(int userId, int accountId, decimal amount, DateTime? date = null, string? desc = null)
+            => LedgerService.TransferAny(
+                userId, amount, date ?? DateTime.Today, desc,
+                fromKind: "bank", fromRefId: accountId,
+                toKind: "freecash", toRefId: null,
+                isPlanned: false);
 
-        /// <summary>
-        /// Konto bankowe -> Koperta. Realizacja: Bank -> Saved, potem Saved -> Envelope.
-        /// </summary>
-        public static void TransferBankToEnvelope(int userId, int accountId, int envelopeId, decimal amount)
-        {
-            LedgerService.TransferBankToSaved(userId, accountId, amount);
-            LedgerService.TransferSavedToEnvelope(userId, envelopeId, amount);
-        }
+        public static int TransferFreeCashToBank(int userId, int accountId, decimal amount, DateTime? date = null, string? desc = null)
+            => LedgerService.TransferAny(
+                userId, amount, date ?? DateTime.Today, desc,
+                fromKind: "freecash", fromRefId: null,
+                toKind: "bank", toRefId: accountId,
+                isPlanned: false);
 
-        /// <summary>
-        /// Koperta -> Koperta (alokacje). SavedCash bez zmian.
-        /// </summary>
-        public static void TransferEnvelopeToEnvelope(int userId, int fromEnvelopeId, int toEnvelopeId, decimal amount)
-            => LedgerService.TransferEnvelopeToEnvelope(userId, fromEnvelopeId, toEnvelopeId, amount);
+        public static int TransferEnvelopeToBank(int userId, int envelopeId, int accountId, decimal amount, DateTime? date = null, string? desc = null)
+            => LedgerService.TransferAny(
+                userId, amount, date ?? DateTime.Today, desc,
+                fromKind: "envelope", fromRefId: envelopeId,
+                toKind: "bank", toRefId: accountId,
+                isPlanned: false);
+
+        public static int TransferBankToEnvelope(int userId, int accountId, int envelopeId, decimal amount, DateTime? date = null, string? desc = null)
+            => LedgerService.TransferAny(
+                userId, amount, date ?? DateTime.Today, desc,
+                fromKind: "bank", fromRefId: accountId,
+                toKind: "envelope", toRefId: envelopeId,
+                isPlanned: false);
     }
+
 
 
 }

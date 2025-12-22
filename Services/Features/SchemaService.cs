@@ -41,12 +41,13 @@ CREATE TABLE IF NOT EXISTS Budgets (
     Id            INTEGER PRIMARY KEY AUTOINCREMENT,
     UserId        INTEGER NOT NULL,
     Name          TEXT    NOT NULL,
-    Type          TEXT    NOT NULL,   -- 'Monthly', 'Yearly', itd. albo co tam masz w enumie
-    StartDate     TEXT    NOT NULL,   -- 'yyyy-MM-dd'
+    Type          TEXT    NOT NULL,
+    StartDate     TEXT    NOT NULL,
     EndDate       TEXT    NOT NULL,
-    PlannedAmount REAL    NOT NULL,   -- decimal -> REAL w SQLite
+    PlannedAmount REAL    NOT NULL,
     IsDeleted     INTEGER NOT NULL DEFAULT 0
 );
+
 CREATE TABLE IF NOT EXISTS Users(
     Id                      INTEGER PRIMARY KEY AUTOINCREMENT,
     Username                TEXT NOT NULL UNIQUE,
@@ -73,20 +74,39 @@ CREATE TABLE IF NOT EXISTS Incomes(
   Date TEXT NOT NULL,
   Description TEXT NULL,
   Source TEXT NULL,
+  CategoryId INTEGER NULL,
+  IsPlanned INTEGER NOT NULL DEFAULT 0,
+  BudgetId INTEGER NULL,
   FOREIGN KEY(UserId) REFERENCES Users(Id) ON DELETE CASCADE
 );
+
+CREATE TABLE IF NOT EXISTS Transfers(
+    Id        INTEGER PRIMARY KEY AUTOINCREMENT,
+    UserId    INTEGER NOT NULL,
+    Amount    NUMERIC NOT NULL,
+    Date      TEXT NOT NULL,
+    Description TEXT NULL,
+    FromKind  TEXT NOT NULL,
+    FromRefId INTEGER NULL,
+    ToKind    TEXT NOT NULL,
+    ToRefId   INTEGER NULL,
+    IsPlanned INTEGER NOT NULL DEFAULT 0,
+    FOREIGN KEY(UserId) REFERENCES Users(Id) ON DELETE CASCADE
+);
+
 
 CREATE TABLE IF NOT EXISTS Categories(
     Id          INTEGER PRIMARY KEY AUTOINCREMENT,
     UserId      INTEGER NOT NULL,
     Name        TEXT NOT NULL,
-    Type        INTEGER NOT NULL DEFAULT 0,   -- 0=Wydatek, 1=Przychód, 2=Obie
+    Type        INTEGER NOT NULL DEFAULT 0,
     Color       TEXT NULL,
     Icon        TEXT NULL,
     IsArchived  INTEGER NOT NULL DEFAULT 0,
     FOREIGN KEY(UserId) REFERENCES Users(Id) ON DELETE CASCADE
 );
 
+-- Expenses: dopięte pola do stabilnego księgowania + planned + opcjonalny BudgetId
 CREATE TABLE IF NOT EXISTS Expenses(
     Id          INTEGER PRIMARY KEY AUTOINCREMENT,
     UserId      INTEGER NOT NULL,
@@ -96,9 +116,13 @@ CREATE TABLE IF NOT EXISTS Expenses(
     Description TEXT    NULL,
     CategoryId  INTEGER NULL,
     AccountId   INTEGER NULL,
+    BudgetId    INTEGER NULL,
     Note        TEXT    NULL,
+    IsPlanned   INTEGER NOT NULL DEFAULT 0,
+    PaymentKind INTEGER NOT NULL DEFAULT 0,
+    PaymentRefId INTEGER NULL,
     FOREIGN KEY(UserId) REFERENCES Users(Id) ON DELETE CASCADE
-    -- CategoryId/AccountId bez FK (łatwiejsze migracje); logika w kodzie
+    -- CategoryId/AccountId/BudgetId bez FK (łatwiejsze migracje); logika w kodzie
 );
 
 CREATE TABLE IF NOT EXISTS Loans(
@@ -222,17 +246,22 @@ CREATE TABLE IF NOT EXISTS SavedCash(
                 AddColumnIfMissing(con, tx, "Expenses", "Description", "TEXT");
                 AddColumnIfMissing(con, tx, "Expenses", "CategoryId", "INTEGER");
                 AddColumnIfMissing(con, tx, "Expenses", "AccountId", "INTEGER");
+                AddColumnIfMissing(con, tx, "Expenses", "BudgetId", "INTEGER");
                 AddColumnIfMissing(con, tx, "Expenses", "Note", "TEXT");
+
                 // Flag for planned transactions
                 AddColumnIfMissing(con, tx, "Expenses", "IsPlanned", "INTEGER", "NOT NULL DEFAULT 0");
+
+                // Stabilne księgowanie (NOWE)
+                AddColumnIfMissing(con, tx, "Expenses", "PaymentKind", "INTEGER", "NOT NULL DEFAULT 0");
+                AddColumnIfMissing(con, tx, "Expenses", "PaymentRefId", "INTEGER");
 
                 // Incomes – dopilnuj Description / Source przy starych bazach
                 AddColumnIfMissing(con, tx, "Incomes", "Description", "TEXT");
                 AddColumnIfMissing(con, tx, "Incomes", "Source", "TEXT");
-                // NEW: CategoryId for linking income to category
                 AddColumnIfMissing(con, tx, "Incomes", "CategoryId", "INTEGER");
-                // Flag for planned incomes
                 AddColumnIfMissing(con, tx, "Incomes", "IsPlanned", "INTEGER", "NOT NULL DEFAULT 0");
+                AddColumnIfMissing(con, tx, "Incomes", "BudgetId", "INTEGER");
 
                 // Envelopes – gdy baza była starsza
                 AddColumnIfMissing(con, tx, "Envelopes", "Target", "NUMERIC", "NOT NULL DEFAULT 0");
@@ -246,7 +275,6 @@ CREATE TABLE IF NOT EXISTS SavedCash(
                 AddColumnIfMissing(con, tx, "Loans", "StartDate", "TEXT", "NOT NULL DEFAULT (date('now'))");
                 AddColumnIfMissing(con, tx, "Loans", "TermMonths", "INTEGER", "NOT NULL DEFAULT 0");
                 AddColumnIfMissing(con, tx, "Loans", "Note", "TEXT");
-                // Payment day of month for loan (1-31), 0 = unspecified
                 AddColumnIfMissing(con, tx, "Loans", "PaymentDay", "INTEGER", "NOT NULL DEFAULT 0");
 
                 // Backfill: Title = Description, jeśli Title puste
