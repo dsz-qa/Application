@@ -30,6 +30,7 @@ namespace Finly.Views.Controls
             get => (string)GetValue(TitleProperty);
             set => SetValue(TitleProperty, value);
         }
+
         public static readonly DependencyProperty TitleProperty =
             DependencyProperty.Register(nameof(Title), typeof(string), typeof(DonutChartControl),
                 new PropertyMetadata(string.Empty, (d, e) =>
@@ -83,46 +84,43 @@ namespace Finly.Views.Controls
             NoDataText.Visibility = Visibility.Collapsed;
             CenterPanel.Visibility = Visibility.Visible;
 
-            // ====== rozmiar canvasu ======
+            // rozmiar canvasu
             double width = ChartCanvas.ActualWidth;
             double height = ChartCanvas.ActualHeight;
 
-            // W scenariuszach eksportu (RenderToBitmap) czasem Actual* chwilowo bywa 0.
             if (width <= 0 || height <= 0)
             {
-                // spróbuj jeszcze raz po layout
                 Dispatcher?.BeginInvoke(new Action(Redraw), System.Windows.Threading.DispatcherPriority.Loaded);
                 return;
             }
 
-            // ====== SAFE AREA (¿eby nic nie by³o uciête) ======
-            // To NIE zmienia stylu wykresu, tylko daje mu bezpieczny margines.
-            const double pad = 18; // by³o ~10; 18 jest bezpieczne dla ³uków i joinów
+            // margines na stroke + ³adne krawêdzie + explode
+            const double pad = 14;
 
             double size = Math.Min(width, height);
-            double maxRadius = (size / 2.0) - pad;
 
-            // bardzo ma³e kontrolki – minimalna korekta (jak mia³aœ)
+            // odejmujemy explode, ¿eby przy hover nic nie by³o uciête
+            double maxRadius = (size / 2.0) - pad - ExplodeOffset;
+
             if (maxRadius < 30)
-                maxRadius = (size / 2.0) - 6;
+                maxRadius = Math.Max(24, (size / 2.0) - 10);
 
-            // œrodek zawsze w œrodku canvasu
             double cx = width / 2.0;
             double cy = height / 2.0;
 
-            // promienie (zachowane proporcje jak teraz)
             double outerRadius = maxRadius;
-            double innerRadius = outerRadius * 0.58;
-            if (size < 180)
+
+            // mniej dziury, wiêkszy czytelny ring
+            double innerRadius = outerRadius * 0.55;
+            if (size < 220)
                 innerRadius = outerRadius * 0.48;
 
-            // ====== panel œrodka (zachowane jak teraz) ======
-            double centerDiameter = Math.Max(56, innerRadius * 1.6);
+            // panel œrodka
+            double centerDiameter = Math.Max(72, innerRadius * 1.60);
             CenterPanel.Width = centerDiameter;
             CenterPanel.Height = centerDiameter;
             CenterPanel.CornerRadius = new CornerRadius(centerDiameter / 2.0);
 
-            // ====== sort slices ======
             var ordered = _data
                 .Where(kv => kv.Value > 0)
                 .OrderByDescending(kv => kv.Value)
@@ -138,9 +136,8 @@ namespace Finly.Views.Controls
                 double sweepAngle = (double)(kv.Value / _total) * 360.0;
                 if (sweepAngle <= 0) continue;
 
-                // minimalne "odklejenie" segmentów (jak mia³aœ)
                 double epsilon = Math.Min(1.0, sweepAngle * 0.0025);
-                double drawSweep = Math.Max(0.6, sweepAngle - epsilon);
+                double drawSweep = Math.Max(0.7, sweepAngle - epsilon);
 
                 Brush fill = (_brushes != null && _brushes.Length > 0)
                     ? _brushes[index % _brushes.Length]
@@ -159,9 +156,10 @@ namespace Finly.Views.Controls
                     StartAngle = startAngle,
                     SweepAngle = drawSweep
                 };
-                path.Tag = meta;
 
+                path.Tag = meta;
                 path.Cursor = Cursors.Hand;
+
                 path.MouseEnter += Slice_MouseEnter;
                 path.MouseLeave += Slice_MouseLeave;
                 path.MouseMove += Slice_MouseMove;
@@ -169,7 +167,7 @@ namespace Finly.Views.Controls
 
                 ChartCanvas.Children.Add(path);
 
-                var percent = _total > 0 ? (double)(kv.Value / _total) * 100.0 : 0.0;
+                var percent = (double)(kv.Value / _total) * 100.0;
                 legend.Add(new LegendItem
                 {
                     Name = kv.Key,
@@ -185,10 +183,13 @@ namespace Finly.Views.Controls
 
             LegendList.ItemsSource = legend;
 
-            ShowAllInCenter();
+            if (!string.IsNullOrWhiteSpace(_selectedKey) && _data.TryGetValue(_selectedKey, out var selectedVal))
+                ShowSliceInCenter(_selectedKey, selectedVal);
+            else
+                ShowAllInCenter();
+
             UpdateLegendSelection();
         }
-
 
         private void ShowAllInCenter()
         {
@@ -211,9 +212,10 @@ namespace Finly.Views.Controls
             if (LegendList.ItemsSource is not IEnumerable<LegendItem> items) return;
 
             foreach (var it in items)
-                it.IsSelected = (!string.IsNullOrWhiteSpace(_selectedKey) && string.Equals(it.Name, _selectedKey, StringComparison.OrdinalIgnoreCase));
+                it.IsSelected =
+                    (!string.IsNullOrWhiteSpace(_selectedKey) &&
+                     string.Equals(it.Name, _selectedKey, StringComparison.OrdinalIgnoreCase));
 
-            // wymuœ odœwie¿enie (ItemsControl bez ObservableCollection)
             LegendList.ItemsSource = items.ToList();
         }
 
@@ -226,8 +228,6 @@ namespace Finly.Views.Controls
             _hoveredPath = p;
 
             Explode(p, meta);
-
-            // hover = podgl¹d w centrum (bez zmiany selectedKey)
             ShowSliceInCenter(meta.Name, meta.Value);
 
             var percent = _total > 0 ? (double)(meta.Value / _total) * 100.0 : 0.0;
@@ -251,7 +251,6 @@ namespace Finly.Views.Controls
             {
                 ResetHoverVisual();
 
-                // po hover wróæ do klikniêtego, a jak nie ma – do „Wszystko”
                 if (!string.IsNullOrWhiteSpace(_selectedKey) && _data != null && _data.TryGetValue(_selectedKey, out var val))
                     ShowSliceInCenter(_selectedKey, val);
                 else
@@ -355,7 +354,6 @@ namespace Finly.Views.Controls
             public decimal Value { get; set; }
             public double Percent { get; set; }
             public Brush Brush { get; set; } = Brushes.Gray;
-
             public bool IsSelected { get; set; }
 
             public string AmountStr => Value.ToString("N2", CultureInfo.CurrentCulture) + " z³";

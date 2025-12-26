@@ -28,9 +28,31 @@ namespace Finly.Views.Dialogs
 
         private void Ok_Click(object sender, RoutedEventArgs e)
         {
-            // Budget.Type jest już ustawione przez binding z ComboBoxa
+            if (DataContext is not BudgetDialogViewModel vm)
+                return;
+
+            if (string.IsNullOrWhiteSpace(vm.Name))
+            {
+                MessageBox.Show("Podaj nazwę budżetu.", "Walidacja", MessageBoxButton.OK, MessageBoxImage.Warning);
+                return;
+            }
+
+            if (vm.StartDate == null)
+            {
+                MessageBox.Show("Wybierz datę startu.", "Walidacja", MessageBoxButton.OK, MessageBoxImage.Warning);
+                return;
+            }
+
+            if (vm.PlannedAmount < 0)
+            {
+                MessageBox.Show("Kwota planowana nie może być ujemna.", "Walidacja", MessageBoxButton.OK, MessageBoxImage.Warning);
+                return;
+            }
+
             DialogResult = true;
+            Close();
         }
+
 
         private void Cancel_Click(object sender, RoutedEventArgs e)
         {

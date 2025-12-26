@@ -44,92 +44,26 @@ namespace Finly.Pages
         // wybrana kategoria (dla szczegółów / porównania)
         private CategoryVm? _selectedCategory;
 
-        // Szczegóły do ramki po prawej
-        private string _selectedCategoryName = string.Empty;
-        public string SelectedCategoryName
-        {
-            get => _selectedCategoryName;
-            private set
-            {
-                _selectedCategoryName = value;
-                RaisePropertyChanged(nameof(SelectedCategoryName));
-            }
-        }
-
-        private Brush _selectedCategoryColorBrush = Brushes.Transparent;
-        public Brush SelectedCategoryColorBrush
-        {
-            get => _selectedCategoryColorBrush;
-            private set
-            {
-                _selectedCategoryColorBrush = value;
-                RaisePropertyChanged(nameof(SelectedCategoryColorBrush));
-            }
-        }
-
-        private string? _selectedCategoryDescriptionText;
-        public string? SelectedCategoryDescriptionText
-        {
-            get => _selectedCategoryDescriptionText;
-            private set
-            {
-                _selectedCategoryDescriptionText = value;
-                RaisePropertyChanged(nameof(SelectedCategoryDescriptionText));
-            }
-        }
-
-        // Tryb edycji w ramce szczegółów
-        private bool _isDetailsEditMode;
-        public bool IsDetailsEditMode
-        {
-            get => _isDetailsEditMode;
-            set
-            {
-                _isDetailsEditMode = value;
-                RaisePropertyChanged(nameof(IsDetailsEditMode));
-            }
-        }
-
-        public string EditCategoryName { get; set; } = string.Empty;
-        public string? EditCategoryDescription { get; set; }
-        public string? EditCategoryColorHex { get; set; }
-        public Brush EditCategoryColorBrush { get; set; } = Brushes.Transparent;
-
-        // kolor wybrany w panelu dodawania
-        private string _selectedColorHex = string.Empty;
-
-        // ===== STATYSTYKI DLA WYBRANEJ KATEGORII (środek) =====
+        // ===== STATYSTYKI DLA WYBRANEJ KATEGORII (Szczegóły) =====
         private decimal _selectedCategoryTotalAmount;
         public decimal SelectedCategoryTotalAmount
         {
             get => _selectedCategoryTotalAmount;
-            set
-            {
-                _selectedCategoryTotalAmount = value;
-                RaisePropertyChanged(nameof(SelectedCategoryTotalAmount));
-            }
+            set { _selectedCategoryTotalAmount = value; RaisePropertyChanged(nameof(SelectedCategoryTotalAmount)); }
         }
 
         private decimal _selectedCategoryAverageMonthly;
         public decimal SelectedCategoryAverageMonthly
         {
             get => _selectedCategoryAverageMonthly;
-            set
-            {
-                _selectedCategoryAverageMonthly = value;
-                RaisePropertyChanged(nameof(SelectedCategoryAverageMonthly));
-            }
+            set { _selectedCategoryAverageMonthly = value; RaisePropertyChanged(nameof(SelectedCategoryAverageMonthly)); }
         }
 
         private int _selectedCategoryTransactionCount;
         public int SelectedCategoryTransactionCount
         {
             get => _selectedCategoryTransactionCount;
-            set
-            {
-                _selectedCategoryTransactionCount = value;
-                RaisePropertyChanged(nameof(SelectedCategoryTransactionCount));
-            }
+            set { _selectedCategoryTransactionCount = value; RaisePropertyChanged(nameof(SelectedCategoryTransactionCount)); }
         }
 
         public ObservableCollection<CategoryTransactionRow> SelectedCategoryRecentTransactions { get; } = new();
@@ -139,125 +73,7 @@ namespace Finly.Pages
         public ObservableCollection<CategoryShareItem> TopCategories { get; } = new();
         public ObservableCollection<CategoryShareItem> BottomCategories { get; } = new();
 
-        private int _activeCategoriesCount;
-        public int ActiveCategoriesCount
-        {
-            get => _activeCategoriesCount;
-            set
-            {
-                _activeCategoriesCount = value;
-                RaisePropertyChanged(nameof(ActiveCategoriesCount));
-                RaisePropertyChanged(nameof(ActiveCategoriesSummary));
-            }
-        }
-
-        private int _inactiveCategoriesCount;
-        public int InactiveCategoriesCount
-        {
-            get => _inactiveCategoriesCount;
-            set
-            {
-                _inactiveCategoriesCount = value;
-                RaisePropertyChanged(nameof(InactiveCategoriesCount));
-            }
-        }
-
-        private int _totalCategoriesCount;
-        public int TotalCategoriesCount
-        {
-            get => _totalCategoriesCount;
-            set
-            {
-                _totalCategoriesCount = value;
-                RaisePropertyChanged(nameof(TotalCategoriesCount));
-                RaisePropertyChanged(nameof(ActiveCategoriesSummary));
-            }
-        }
-
-        public string ActiveCategoriesSummary =>
-            $"Aktywne kategorie w wybranym okresie: {ActiveCategoriesCount}/{TotalCategoriesCount}";
-
-        // Pokrycie kategorii i średnia liczba transakcji na aktywną kategorię
-        private double _coveragePercent;
-        public double CoveragePercent
-        {
-            get => _coveragePercent;
-            set
-            {
-                _coveragePercent = value;
-                RaisePropertyChanged(nameof(CoveragePercent));
-            }
-        }
-
-        private double _avgTransactionsPerActiveCategory;
-        public double AvgTransactionsPerActiveCategory
-        {
-            get => _avgTransactionsPerActiveCategory;
-            set
-            {
-                _avgTransactionsPerActiveCategory = value;
-                RaisePropertyChanged(nameof(AvgTransactionsPerActiveCategory));
-            }
-        }
-
-        // Transakcje bez kategorii w tym okresie
-        private int _uncategorizedCount;
-        public int UncategorizedCount
-        {
-            get => _uncategorizedCount;
-            set
-            {
-                _uncategorizedCount = value;
-                RaisePropertyChanged(nameof(UncategorizedCount));
-            }
-        }
-
-        private decimal _uncategorizedAmount;
-        public decimal UncategorizedAmount
-        {
-            get => _uncategorizedAmount;
-            set
-            {
-                _uncategorizedAmount = value;
-                RaisePropertyChanged(nameof(UncategorizedAmount));
-            }
-        }
-
-        // ===== PORÓWNANIE Z POPRZEDNIM OKRESEM (prawa-dół) =====
-        private decimal _currentPeriodAmount;
-        public decimal CurrentPeriodAmount
-        {
-            get => _currentPeriodAmount;
-            set
-            {
-                _currentPeriodAmount = value;
-                RaisePropertyChanged(nameof(CurrentPeriodAmount));
-                RaisePropertyChanged(nameof(AmountDifference));
-                RaisePropertyChanged(nameof(PercentageDifference));
-            }
-        }
-
-        private decimal _previousPeriodAmount;
-        public decimal PreviousPeriodAmount
-        {
-            get => _previousPeriodAmount;
-            set
-            {
-                _previousPeriodAmount = value;
-                RaisePropertyChanged(nameof(PreviousPeriodAmount));
-                RaisePropertyChanged(nameof(AmountDifference));
-                RaisePropertyChanged(nameof(PercentageDifference));
-            }
-        }
-
-        public decimal AmountDifference => CurrentPeriodAmount - PreviousPeriodAmount;
-
-        public double PercentageDifference =>
-            PreviousPeriodAmount == 0
-            ? 0
-            : (double)((CurrentPeriodAmount - PreviousPeriodAmount) / PreviousPeriodAmount) * 100.0;
-
-        // ===== KPI U GÓRY =====
+        // ===== KPI u góry =====
         private TextBlock? _mostUsedName;
         private TextBlock? _mostUsedCount;
         private Rectangle? _mostUsedColor;
@@ -270,6 +86,11 @@ namespace Finly.Pages
         private TextBlock? _totalCats;
         private TextBlock? _activeCats;
         private TextBlock? _inactiveCats;
+
+        // liczniki (KPI)
+        private int _activeCategoriesCount;
+        private int _inactiveCategoriesCount;
+        private int _totalCategoriesCount;
 
         // ===== INotifyPropertyChanged =====
         public event PropertyChangedEventHandler? PropertyChanged;
@@ -295,7 +116,6 @@ namespace Finly.Pages
         }
 
         // ========== FILTROWANIE LISTY KATEGORII (Szukaj) ==========
-
         private bool CategoryFilter(object obj)
         {
             if (obj is not CategoryVm vm) return false;
@@ -313,7 +133,6 @@ namespace Finly.Pages
         }
 
         // ========== ŻYCIE STRONY ==========
-
         private void CategoriesPage_Loaded(object sender, RoutedEventArgs e)
         {
             try
@@ -323,7 +142,7 @@ namespace Finly.Pages
                 LoadCategories();
                 UpdateCategoryKpis();
                 UpdateCategoryStats();
-                UpdateCategoryComparison();
+                LoadSelectedCategoryDetails();
             }
             catch (Exception ex)
             {
@@ -335,11 +154,9 @@ namespace Finly.Pages
         private void PeriodBar_RangeChanged(object? sender, EventArgs e)
         {
             EnsureKpiRefs();
-
-            UpdateCategoryKpis(); // górne trzy kafelki
-            UpdateCategoryStats(); // struktura wydatków + TOP/BOTTOM + aktywność
-            UpdateCategoryComparison(); // porównanie okresów dla wybranej kategorii
-            LoadSelectedCategoryDetails(); // szczegóły wybranej kategorii
+            UpdateCategoryKpis();
+            UpdateCategoryStats();
+            LoadSelectedCategoryDetails();
         }
 
         private void EnsureKpiRefs()
@@ -359,7 +176,6 @@ namespace Finly.Pages
         }
 
         // ========== KPI U GÓRY (zależne od okresu) ==========
-
         private void UpdateCategoryKpis()
         {
             EnsureKpiRefs();
@@ -369,11 +185,12 @@ namespace Finly.Pages
                 DateTime to = PeriodBar.EndDate;
                 if (from > to) (from, to) = (to, from);
 
-                // Expenses by category name
                 var dt = DatabaseService.GetExpenses(_uid, from, to, null, null, null);
+
                 var counts = new Dictionary<string, int>(StringComparer.CurrentCultureIgnoreCase);
                 var sums = new Dictionary<string, decimal>(StringComparer.CurrentCultureIgnoreCase);
                 decimal totalSum = 0m;
+
                 foreach (DataRow row in dt.Rows)
                 {
                     try
@@ -388,7 +205,7 @@ namespace Finly.Pages
                     catch { }
                 }
 
-                // Incomes aggregate by category – add to existing aggregates
+                // Incomes (dodaj do agregacji)
                 try
                 {
                     using var con = DatabaseService.GetConnection();
@@ -429,7 +246,7 @@ namespace Finly.Pages
                     if (_mostUsedColor != null) _mostUsedColor.Fill = Brushes.Transparent;
                 }
 
-                // Najdroższa (sumy wydatków+przychodów)
+                // Najdroższa
                 if (sums.Count > 0)
                 {
                     var mostExp = sums.OrderByDescending(kv => kv.Value).First();
@@ -447,25 +264,25 @@ namespace Finly.Pages
                     if (_mostExpPercentText != null) _mostExpPercentText.Text = string.Empty;
                 }
 
-                // Twoje kategorie – aktywne gdy mają jakiekolwiek tx (expense/income)
+                // Liczniki kategorii (KPI)
                 var allCats = DatabaseService.GetCategoriesByUser(_uid) ?? new List<string>();
-                int total = allCats.Count;
+                _totalCategoriesCount = allCats.Count;
+
                 var activeSet = new HashSet<string>(
                     sums.Where(kv => kv.Value > 0).Select(kv => kv.Key),
                     StringComparer.CurrentCultureIgnoreCase);
 
-                int active = allCats.Count(c => activeSet.Contains(c));
-                int inactive = Math.Max(0, total - active);
+                _activeCategoriesCount = allCats.Count(c => activeSet.Contains(c));
+                _inactiveCategoriesCount = Math.Max(0, _totalCategoriesCount - _activeCategoriesCount);
 
-                if (_totalCats != null) _totalCats.Text = total.ToString(CultureInfo.CurrentCulture);
-                if (_activeCats != null) _activeCats.Text = active.ToString(CultureInfo.CurrentCulture);
-                if (_inactiveCats != null) _inactiveCats.Text = inactive.ToString(CultureInfo.CurrentCulture);
+                if (_totalCats != null) _totalCats.Text = _totalCategoriesCount.ToString(CultureInfo.CurrentCulture);
+                if (_activeCats != null) _activeCats.Text = _activeCategoriesCount.ToString(CultureInfo.CurrentCulture);
+                if (_inactiveCats != null) _inactiveCats.Text = _inactiveCategoriesCount.ToString(CultureInfo.CurrentCulture);
             }
             catch { }
         }
 
         // ========== ŁADOWANIE LISTY KATEGORII (niezależne od okresu) ==========
-
         private void LoadCategories()
         {
             _categories.Clear();
@@ -475,13 +292,9 @@ namespace Finly.Pages
             {
                 Brush brush;
                 if (string.IsNullOrWhiteSpace(color))
-                {
                     brush = GetBrushForName(name);
-                }
                 else
-                {
                     brush = (Brush)(new BrushConverter().ConvertFromString(color)!);
-                }
 
                 var vm = new CategoryVm
                 {
@@ -502,8 +315,10 @@ namespace Finly.Pages
                 cmd.CommandText = "SELECT Id, Description, Color FROM Categories WHERE UserId=@u;";
                 cmd.Parameters.AddWithValue("@u", _uid);
                 using var reader = cmd.ExecuteReader();
+
                 var mapDesc = new Dictionary<int, string?>(256);
                 var mapColor = new Dictionary<int, string?>(256);
+
                 while (reader.Read())
                 {
                     var id = reader.GetInt32(0);
@@ -529,22 +344,22 @@ namespace Finly.Pages
             ClearAllDeleteConfirmPanels();
             RaisePropertyChanged(nameof(Categories));
 
-            // po każdej zmianie listy przelicz statystyki
             UpdateCategoryStats();
-            UpdateCategoryComparison();
         }
 
         // ========== DODAWANIE / EDYCJA / USUWANIE ==========
-
         private void AddCategoryTile_Click(object sender, RoutedEventArgs e)
         {
             AddPanelMessage.Text = string.Empty;
             AddNameBox.Text = string.Empty;
             AddDescriptionBox.Text = string.Empty;
             _selectedColorHex = string.Empty;
+
             AddPanel.Visibility = Visibility.Visible;
             try { AddPanel.UpdateLayout(); AddPanel.BringIntoView(); } catch { }
         }
+
+        private string _selectedColorHex = string.Empty;
 
         private void AddCategory_Click(object sender, RoutedEventArgs e)
         {
@@ -596,26 +411,21 @@ namespace Finly.Pages
             AddPanel.Visibility = Visibility.Collapsed;
         }
 
-        // kliknięcie ikony edycji – włączenie inline-edita pod kafelkiem
         private void EditCategory_Click(object sender, RoutedEventArgs e)
         {
             if ((sender as FrameworkElement)?.Tag is CategoryVm vm)
             {
                 _selectedCategory = vm;
 
-                // tylko jedna kategoria w trybie edycji
                 foreach (var c in _categories)
                     c.IsEditing = false;
 
                 vm.IsEditing = true;
 
                 LoadSelectedCategoryDetails();
-                UpdateCategoryComparison();
-                UpdateDetailsFrameFromSelection();
             }
         }
 
-        // wybór koloru w edycji inline
         private void InlineColorPick_Click(object sender, RoutedEventArgs e)
         {
             if (sender is Button b && b.DataContext is CategoryVm vm && b.Tag is string hex)
@@ -626,7 +436,6 @@ namespace Finly.Pages
             }
         }
 
-        // zapis edycji inline
         private void InlineSaveEdit_Click(object sender, RoutedEventArgs e)
         {
             if ((sender as FrameworkElement)?.Tag is not CategoryVm vm) return;
@@ -660,7 +469,6 @@ namespace Finly.Pages
 
                 LoadCategories();
                 UpdateCategoryKpis();
-                UpdateDetailsFrameFromSelection();
             }
             catch (Exception ex)
             {
@@ -669,15 +477,12 @@ namespace Finly.Pages
             }
         }
 
-        // anulowanie edycji inline
         private void InlineCancelEdit_Click(object sender, RoutedEventArgs e)
         {
             if ((sender as FrameworkElement)?.Tag is CategoryVm vm)
             {
                 vm.IsEditing = false;
-                // odśwież listę z bazy, żeby odrzucić lokalne zmiany
                 LoadCategories();
-                UpdateDetailsFrameFromSelection();
             }
         }
 
@@ -715,12 +520,10 @@ namespace Finly.Pages
                 if (id.HasValue)
                     DatabaseService.DeleteCategory(id.Value);
 
-                // zamiana MessageBox na toast
                 ToastService.Success("Kategoria usunięta.");
 
                 LoadCategories();
                 UpdateCategoryKpis();
-                UpdateDetailsFrameFromSelection();
             }
             catch (Exception ex)
             {
@@ -729,12 +532,10 @@ namespace Finly.Pages
             }
         }
 
-        // kliknięcie w cały kafelek kategorii – wybór do statystyk
         private void CategoryItem_Click(object sender, RoutedEventArgs e)
         {
             if (e.OriginalSource is FrameworkElement fe && fe.DataContext is CategoryVm vm)
             {
-                // zaznacz tylko jedną kartę: reset dla innych
                 foreach (var c in _categories)
                 {
                     if (ReferenceEquals(c, vm)) continue;
@@ -744,31 +545,10 @@ namespace Finly.Pages
 
                 _selectedCategory = vm;
                 LoadSelectedCategoryDetails();
-                UpdateCategoryComparison();
-                UpdateDetailsFrameFromSelection();
             }
         }
-
-        private void UpdateDetailsFrameFromSelection()
-        {
-            if (_selectedCategory == null)
-            {
-                SelectedCategoryName = string.Empty;
-                SelectedCategoryColorBrush = Brushes.Transparent;
-                SelectedCategoryDescriptionText = null;
-                IsDetailsEditMode = false;
-                return;
-            }
-
-            SelectedCategoryName = _selectedCategory.Name;
-            SelectedCategoryColorBrush = _selectedCategory.ColorBrush;
-            SelectedCategoryDescriptionText = _selectedCategory.Description;
-            IsDetailsEditMode = false;
-        }
-
 
         // ========== SZCZEGÓŁY WYBRANEJ KATEGORII (zależne od okresu) ==========
-
         private void LoadSelectedCategoryDetails()
         {
             SelectedCategoryTotalAmount = 0m;
@@ -785,9 +565,9 @@ namespace Finly.Pages
             DateTime to = PeriodBar.EndDate;
             if (from > to) (from, to) = (to, from);
 
-            // Expenses table
             DataTable? expensesDt = null;
             try { expensesDt = DatabaseService.GetExpenses(_uid, from, to, catId, null, null); } catch { }
+
             decimal sumExp = 0m; int countExp = 0;
             if (expensesDt != null)
             {
@@ -797,17 +577,17 @@ namespace Finly.Pages
                 }
             }
 
-            // Incomes for category
             var (sumInc, countInc) = SumIncomes(_uid, from, to, catId);
+
             var totalSum = sumExp + sumInc;
             var totalCount = countExp + countInc;
+
             SelectedCategoryTotalAmount = totalSum;
             SelectedCategoryTransactionCount = totalCount;
 
             double monthsSpan = Math.Max(1.0, (to - from).TotalDays / 30.0);
             SelectedCategoryAverageMonthly = monthsSpan <= 0 ? 0 : totalSum / (decimal)monthsSpan;
 
-            // Ostatnie transakcje
             try
             {
                 var txList = DatabaseService.GetLastTransactionsForCategory(_uid, catId.Value, 5);
@@ -826,7 +606,6 @@ namespace Finly.Pages
         }
 
         // ========== STRUKTURA KATEGORII (wydatki+przychody) ==========
-
         private void UpdateCategoryStats()
         {
             try
@@ -834,8 +613,6 @@ namespace Finly.Pages
                 DateTime from = PeriodBar.StartDate;
                 DateTime to = PeriodBar.EndDate;
                 if (from > to) (from, to) = (to, from);
-
-                TotalCategoriesCount = _categories.Count;
 
                 var list = new List<(string name, decimal amount, int count)>();
 
@@ -850,9 +627,9 @@ namespace Finly.Pages
                         continue;
                     }
 
-                    // expenses
                     DataTable? dt = null;
                     try { dt = DatabaseService.GetExpenses(_uid, from, to, catId, null, null); } catch { }
+
                     decimal sumExp = 0m;
                     int cntExp = 0;
 
@@ -864,7 +641,6 @@ namespace Finly.Pages
                         }
                     }
 
-                    // incomes
                     var (sumInc, cntInc) = SumIncomes(_uid, from, to, catId);
                     var total = sumExp + sumInc;
                     var cnt = cntExp + cntInc;
@@ -872,36 +648,20 @@ namespace Finly.Pages
                     list.Add((cat.Name, total, cnt));
                 }
 
-                // Aktywne / nieużyte kategorie + średnia liczba transakcji
-                ActiveCategoriesCount = list.Count(x => x.count > 0);
-                InactiveCategoriesCount = Math.Max(0, TotalCategoriesCount - ActiveCategoriesCount);
-
-                int totalTransactionsOnActive = list.Where(x => x.count > 0).Sum(x => x.count);
-
                 decimal totalAmount = list.Sum(x => x.amount);
 
-                CoveragePercent = TotalCategoriesCount > 0
-                    ? Math.Round((double)ActiveCategoriesCount / TotalCategoriesCount * 100.0, 1)
-                    : 0.0;
-
-                AvgTransactionsPerActiveCategory = ActiveCategoriesCount > 0
-                    ? Math.Round((double)totalTransactionsOnActive / ActiveCategoriesCount, 1)
-                    : 0.0;
-
-                // Struktura udziałów (CategoryShares)
                 CategoryShares.Clear();
                 if (totalAmount > 0)
                 {
                     foreach (var it in list.OrderByDescending(x => x.amount))
                     {
                         double pct = (double)(it.amount / totalAmount) * 100.0;
-
                         CategoryShares.Add(new CategoryShareItem
                         {
                             Name = it.name,
                             Amount = it.amount,
                             Percent = pct,
-                            Dominant = pct >= 20.0 // dominujące = min.20% wszystkich transakcji
+                            Dominant = pct >= 20.0
                         });
                     }
                 }
@@ -919,7 +679,6 @@ namespace Finly.Pages
                     }
                 }
 
-                // Top3 i Bottom3 (tylko dodatnie kwoty)
                 var positive = list.Where(x => x.amount > 0).ToList();
 
                 TopCategories.Clear();
@@ -946,34 +705,6 @@ namespace Finly.Pages
                     });
                 }
 
-                // Transakcje bez kategorii (tylko wydatki)
-                int uncCount = 0;
-                decimal uncAmount = 0m;
-                try
-                {
-                    DataTable? allDt = DatabaseService.GetExpenses(_uid, from, to, null, null, null);
-                    if (allDt != null)
-                    {
-                        foreach (DataRow row in allDt.Rows)
-                        {
-                            try
-                            {
-                                string catName = (row[6]?.ToString() ?? string.Empty).Trim();
-                                if (string.IsNullOrEmpty(catName) || catName == "(brak)")
-                                {
-                                    uncCount++;
-                                    uncAmount += Math.Abs(Convert.ToDecimal(row[3]));
-                                }
-                            }
-                            catch { }
-                        }
-                    }
-                }
-                catch { }
-
-                UncategorizedCount = uncCount;
-                UncategorizedAmount = uncAmount;
-
                 RaisePropertyChanged(nameof(CategoryShares));
                 RaisePropertyChanged(nameof(TopCategories));
                 RaisePropertyChanged(nameof(BottomCategories));
@@ -983,155 +714,10 @@ namespace Finly.Pages
                 CategoryShares.Clear();
                 TopCategories.Clear();
                 BottomCategories.Clear();
-                ActiveCategoriesCount = 0;
-                InactiveCategoriesCount = 0;
-                TotalCategoriesCount = _categories.Count;
-                CoveragePercent = 0;
-                AvgTransactionsPerActiveCategory = 0;
-                UncategorizedCount = 0;
-                UncategorizedAmount = 0m;
             }
-        }
-
-        // ========== PORÓWNANIE OKRESÓW (wydatki+przychody) ==========
-
-        private void UpdateCategoryComparison()
-        {
-            try
-            {
-                if (_selectedCategory == null)
-                {
-                    CurrentPeriodAmount = 0;
-                    PreviousPeriodAmount = 0;
-                    return;
-                }
-
-                int? catId = null;
-                try { catId = DatabaseService.GetCategoryIdByName(_uid, _selectedCategory.Name); } catch { }
-                if (!catId.HasValue)
-                {
-                    CurrentPeriodAmount = 0;
-                    PreviousPeriodAmount = 0;
-                    return;
-                }
-
-                DateTime from = PeriodBar.StartDate;
-                DateTime to = PeriodBar.EndDate;
-                if (from > to) (from, to) = (to, from);
-
-                var span = to - from;
-                DateTime prevTo = from;
-                DateTime prevFrom = from - span;
-
-                // current
-                decimal currExp = 0m;
-                DataTable? cdt = null;
-                try { cdt = DatabaseService.GetExpenses(_uid, from, to, catId, null, null); } catch { }
-                if (cdt != null)
-                {
-                    foreach (DataRow r in cdt.Rows)
-                    {
-                        try { currExp += Math.Abs(Convert.ToDecimal(r[3])); } catch { }
-                    }
-                }
-
-                var (currInc, _) = SumIncomes(_uid, from, to, catId);
-
-                // previous
-                decimal prevExp = 0m;
-                DataTable? pdt = null;
-                try { pdt = DatabaseService.GetExpenses(_uid, prevFrom, prevTo, catId, null, null); } catch { }
-                if (pdt != null)
-                {
-                    foreach (DataRow r in pdt.Rows)
-                    {
-                        try { prevExp += Math.Abs(Convert.ToDecimal(r[3])); } catch { }
-                    }
-                }
-
-                var (prevInc, _) = SumIncomes(_uid, prevFrom, prevTo, catId);
-
-                CurrentPeriodAmount = currExp + currInc;
-                PreviousPeriodAmount = prevExp + prevInc;
-            }
-            catch
-            {
-                CurrentPeriodAmount = 0;
-                PreviousPeriodAmount = 0;
-            }
-        }
-
-        // ===== Ramka szczegółów: akcje edycji =====
-        private void EditDetails_Click(object sender, RoutedEventArgs e)
-        {
-            if (_selectedCategory == null) return;
-            IsDetailsEditMode = true;
-            EditCategoryName = _selectedCategory.Name;
-            EditCategoryDescription = _selectedCategory.Description;
-            EditCategoryColorHex = _selectedCategory.ColorHex;
-            EditCategoryColorBrush = _selectedCategory.ColorBrush;
-            RaisePropertyChanged(nameof(EditCategoryName));
-            RaisePropertyChanged(nameof(EditCategoryDescription));
-            RaisePropertyChanged(nameof(EditCategoryColorHex));
-            RaisePropertyChanged(nameof(EditCategoryColorBrush));
-        }
-
-        private void SaveDetails_Click(object sender, RoutedEventArgs e)
-        {
-            if (_selectedCategory == null) return;
-            var newName = (EditCategoryName ?? string.Empty).Trim();
-            if (string.IsNullOrWhiteSpace(newName))
-            {
-                MessageBox.Show("Podaj nazwę kategorii.", "Błąd", MessageBoxButton.OK, MessageBoxImage.Warning);
-                return;
-            }
-            try
-            {
-                string? colorToSave = string.IsNullOrWhiteSpace(EditCategoryColorHex)
-                    ? _selectedCategory.ColorHex
-                    : EditCategoryColorHex;
-
-                DatabaseService.UpdateCategoryFull(_selectedCategory.Id, _uid, newName, colorToSave, _selectedCategory.Icon);
-                using var con = DatabaseService.GetConnection();
-                using var cmd = con.CreateCommand();
-                cmd.CommandText = "UPDATE Categories SET Description=@d WHERE Id=@id;";
-                cmd.Parameters.AddWithValue("@d", (object?)EditCategoryDescription ?? DBNull.Value);
-                cmd.Parameters.AddWithValue("@id", _selectedCategory.Id);
-                cmd.ExecuteNonQuery();
-
-                // Lokalnie zaktualizuj VM
-                _selectedCategory.Name = newName;
-                _selectedCategory.Description = EditCategoryDescription;
-                if (!string.IsNullOrWhiteSpace(colorToSave))
-                {
-                    _selectedCategory.ColorHex = colorToSave;
-                    try { _selectedCategory.ColorBrush = (Brush)(new BrushConverter().ConvertFromString(colorToSave)!); } catch { }
-                }
-
-                // Odśwież listę i detale
-                LoadCategories();
-                _selectedCategory = _categories.FirstOrDefault(c =>
-                    string.Equals(c.Name, newName, StringComparison.OrdinalIgnoreCase));
-                UpdateDetailsFrameFromSelection();
-                LoadSelectedCategoryDetails();
-                UpdateCategoryStats();
-                IsDetailsEditMode = false;
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show("Błąd zapisu: " + ex.Message, "Błąd",
-                                MessageBoxButton.OK, MessageBoxImage.Error);
-            }
-        }
-
-        private void CancelDetails_Click(object sender, RoutedEventArgs e)
-        {
-            IsDetailsEditMode = false;
-            UpdateDetailsFrameFromSelection();
         }
 
         // ========== POMOCNICZE ==========
-
         private Brush GetBrushForName(string name) => GetRandomBrush(name);
 
         private static Brush GetRandomBrush(string seed)
@@ -1160,15 +746,10 @@ namespace Finly.Pages
                 foreach (var c in defaultExpenses.Concat(defaultIncomes))
                 {
                     if (!existing.Any(e => string.Equals(e, c, StringComparison.OrdinalIgnoreCase)))
-                    {
                         DatabaseService.GetOrCreateCategoryId(_uid, c);
-                    }
                 }
             }
-            catch
-            {
-                // ignoruj
-            }
+            catch { }
         }
 
         private void ColorPick_Click(object sender, RoutedEventArgs e)
@@ -1183,13 +764,9 @@ namespace Finly.Pages
         private void ClearAllDeleteConfirmPanels()
         {
             foreach (var c in _categories)
-            {
-                if (c.IsDeleteConfirmVisible)
-                    c.IsDeleteConfirmVisible = false;
-            }
+                if (c.IsDeleteConfirmVisible) c.IsDeleteConfirmVisible = false;
         }
 
-        // Helper: sum incomes for user in range optionally for specific category
         private static (decimal sum, int count) SumIncomes(int userId, DateTime from, DateTime to, int? categoryId)
         {
             try
@@ -1203,8 +780,10 @@ namespace Finly.Pages
                 cmd.Parameters.AddWithValue("@from", from.ToString("yyyy-MM-dd"));
                 cmd.Parameters.AddWithValue("@to", to.ToString("yyyy-MM-dd"));
                 if (categoryId.HasValue) cmd.Parameters.AddWithValue("@cat", categoryId.Value);
+
                 using var r = cmd.ExecuteReader();
                 decimal sum = 0m; int count = 0;
+
                 while (r.Read())
                 {
                     try
@@ -1215,13 +794,13 @@ namespace Finly.Pages
                     }
                     catch { }
                 }
+
                 return (sum, count);
             }
             catch { return (0m, 0); }
         }
 
         // ===== MODELE WEWNĘTRZNE =====
-
         public class CategoryVm : INotifyPropertyChanged
         {
             private Brush _colorBrush = Brushes.Gray;
@@ -1237,24 +816,13 @@ namespace Finly.Pages
             public Brush ColorBrush
             {
                 get => _colorBrush;
-                set
-                {
-                    _colorBrush = value;
-                    OnPropertyChanged(nameof(ColorBrush));
-                    OnPropertyChanged(nameof(Color));
-                }
+                set { _colorBrush = value; OnPropertyChanged(nameof(ColorBrush)); OnPropertyChanged(nameof(Color)); }
             }
 
-            // dla XAML – to samo co ColorBrush
             public Brush Color
             {
                 get => _colorBrush;
-                set
-                {
-                    _colorBrush = value;
-                    OnPropertyChanged(nameof(Color));
-                    OnPropertyChanged(nameof(ColorBrush));
-                }
+                set { _colorBrush = value; OnPropertyChanged(nameof(Color)); OnPropertyChanged(nameof(ColorBrush)); }
             }
 
             public string? Icon { get; set; }
@@ -1271,14 +839,12 @@ namespace Finly.Pages
                 set { _isDeleteConfirmVisible = value; OnPropertyChanged(nameof(IsDeleteConfirmVisible)); }
             }
 
-            // czy wyświetlać panel edycji pod kafelkiem
             public bool IsEditing
             {
                 get => _isEditing;
                 set { _isEditing = value; OnPropertyChanged(nameof(IsEditing)); }
             }
 
-            // kolor w formie hex (do zapisu w bazie)
             public string? ColorHex
             {
                 get => _colorHex;
@@ -1308,11 +874,7 @@ namespace Finly.Pages
             public string Name { get; set; } = string.Empty;
             public double Percent { get; set; }
             public decimal Amount { get; set; }
-
-            // czy kategoria jest „dominująca” w analizowanym okresie
             public bool Dominant { get; set; }
         }
-
     }
-    // Dodaj brakujący nawias zamykający na końcu pliku
 }

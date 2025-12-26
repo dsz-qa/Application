@@ -1,50 +1,101 @@
 ﻿using System;
 using System.ComponentModel;
+using System.Runtime.CompilerServices;
+using Finly.Models;
 
-namespace Finly.ViewsModels
+namespace Finly.ViewModels
 {
     public class BudgetDialogViewModel : INotifyPropertyChanged
     {
         public event PropertyChangedEventHandler? PropertyChanged;
-        private void OnPropertyChanged(string name) =>
-            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
+        private void Raise([CallerMemberName] string? n = null)
+            => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(n));
 
         private string _name = string.Empty;
         public string Name
         {
             get => _name;
-            set { _name = value; OnPropertyChanged(nameof(Name)); }
+            set { _name = value; Raise(); }
         }
 
-        private string _type = "Miesięczny";
-        public string Type
+        private BudgetType _type = BudgetType.Monthly;
+        public BudgetType Type
         {
             get => _type;
-            set { _type = value; OnPropertyChanged(nameof(Type)); RecalculateEndDate(); }
+            set
+            {
+                if (_type == value) return;
+                _type = value;
+                Raise();
+                Raise(nameof(TypeDisplay));
+                RecalculateEndDate();
+            }
         }
 
-        public string TypeDisplay { get; set; } = string.Empty;
+        // Tylko do UI – źródłem prawdy jest enum
+        public string TypeDisplay => Type switch
+        {
+            BudgetType.Weekly => "Tygodniowy",
+            BudgetType.Monthly => "Miesięczny",
+            BudgetType.Yearly => "Roczny",
+            BudgetType.OneTime => "Jednorazowy",
+            BudgetType.Rollover => "Przenoszony",
+            _ => "Miesięczny"
+        };
 
         private DateTime? _startDate = DateTime.Today;
         public DateTime? StartDate
         {
             get => _startDate;
-            set { _startDate = value?.Date; OnPropertyChanged(nameof(StartDate)); RecalculateEndDate(); }
+            set
+            {
+                var v = value?.Date;
+                if (_startDate == v) return;
+                _startDate = v;
+                Raise();
+                RecalculateEndDate();
+            }
         }
 
         private DateTime? _endDate;
         public DateTime? EndDate
         {
             get => _endDate;
-            private set { _endDate = value?.Date; OnPropertyChanged(nameof(EndDate)); }
+            private set
+            {
+                var v = value?.Date;
+                if (_endDate == v) return;
+                _endDate = v;
+                Raise();
+            }
         }
 
-        public decimal PlannedAmount { get; set; }
-        public decimal SpentAmount { get; set; }
+        private decimal _plannedAmount;
+        public decimal PlannedAmount
+        {
+            get => _plannedAmount;
+            set
+            {
+                if (_plannedAmount == value) return;
+                _plannedAmount = value;
+                Raise();
+            }
+        }
+
+        private decimal _spentAmount;
+        public decimal SpentAmount
+        {
+            get => _spentAmount;
+            set
+            {
+                if (_spentAmount == value) return;
+                _spentAmount = value;
+                Raise();
+            }
+        }
 
         public BudgetDialogViewModel()
         {
-            //  Dzięki temu przy otwarciu okna od razu widać EndDate
             RecalculateEndDate();
         }
 
@@ -60,16 +111,16 @@ namespace Finly.ViewsModels
 
             EndDate = Type switch
             {
-                // ✅ 7 DNI (17 → 23)
-                "Tygodniowy" => s.AddDays(6),
+                BudgetType.Weekly => s.AddDays(6),
+                BudgetType.Monthly => s.AddMonths(1).AddDays(-1),
+                BudgetType.Yearly => s.AddYears(1).AddDays(-1),
 
-                // ✅ 1 MIESIĄC (17.01 → 16.02)
-                "Miesięczny" => s.AddMonths(1).AddDays(-1),
+                // Dla OneTime/Rollover – zależy od Twojej logiki.
+                // Dla bezpieczeństwa: OneTime = ten sam dzień, Rollover = miesiąc.
+                BudgetType.OneTime => s,
+                BudgetType.Rollover => s.AddMonths(1).AddDays(-1),
 
-                // ✅ 1 ROK (17.01.2026 → 16.01.2027)
-                "Roczny" => s.AddYears(1).AddDays(-1),
-
-                _ => s
+                _ => s.AddMonths(1).AddDays(-1)
             };
         }
     }

@@ -1,4 +1,7 @@
-﻿using System;
+﻿using Finly.Pages;
+using Finly.Services.Features;
+using Finly.Services.SpecificPages;
+using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Runtime.InteropServices;
@@ -8,10 +11,6 @@ using System.Windows.Controls.Primitives;
 using System.Windows.Input;
 using System.Windows.Interop;
 using System.Windows.Media;
-
-using Finly.Pages;
-using Finly.Services.Features;
-using Finly.Services.SpecificPages;
 
 namespace Finly.Views
 {
@@ -29,8 +28,9 @@ namespace Finly.Views
         protected override void OnSourceInitialized(EventArgs e)
         {
             base.OnSourceInitialized(e);
-            var src = (HwndSource)PresentationSource.FromVisual(this)!;
-            src.AddHook(WndProc);
+
+            if (PresentationSource.FromVisual(this) is HwndSource src)
+                src.AddHook(WndProc);
         }
 
         private IntPtr WndProc(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)
@@ -46,12 +46,12 @@ namespace Finly.Views
 
         private void WmGetMinMaxInfo(IntPtr hwnd, IntPtr lParam)
         {
-            MINMAXINFO mmi = Marshal.PtrToStructure<MINMAXINFO>(lParam);
+            var mmi = Marshal.PtrToStructure<MINMAXINFO>(lParam);
 
             IntPtr monitor = MonitorFromWindow(hwnd, MONITOR_DEFAULTTONEAREST);
             if (monitor != IntPtr.Zero)
             {
-                MONITORINFO mi = new MONITORINFO { cbSize = Marshal.SizeOf(typeof(MONITORINFO)) };
+                var mi = new MONITORINFO { cbSize = Marshal.SizeOf(typeof(MONITORINFO)) };
                 if (GetMonitorInfo(monitor, ref mi))
                 {
                     RECT wa = mi.rcWork;
@@ -72,6 +72,7 @@ namespace Finly.Views
         [DllImport("user32.dll", SetLastError = true)] private static extern bool GetMonitorInfo(IntPtr hMonitor, ref MONITORINFO lpmi);
 
         [StructLayout(LayoutKind.Sequential)] private struct POINT { public int x, y; }
+
         [StructLayout(LayoutKind.Sequential)]
         private struct MINMAXINFO
         {
@@ -81,7 +82,9 @@ namespace Finly.Views
             public POINT ptMinTrackSize;
             public POINT ptMaxTrackSize;
         }
+
         [StructLayout(LayoutKind.Sequential)] private struct RECT { public int left, top, right, bottom; }
+
         [StructLayout(LayoutKind.Sequential)]
         private struct MONITORINFO
         {
@@ -110,13 +113,12 @@ namespace Finly.Views
         // ===== Pasek tytułu =====
         private void TitleBar_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
         {
-            // Nie przeciągaj, jeśli kliknięto kontrolkę
             if (e.OriginalSource is DependencyObject d &&
                 (FindParent<Button>(d) != null || FindParent<TextBlock>(d) != null || FindParent<Image>(d) != null))
                 return;
 
             if (e.ClickCount == 2) { MaxRestore_Click(sender, e); return; }
-            try { DragMove(); } catch { /* ignoruj */ }
+            try { DragMove(); } catch { }
         }
 
         private void Minimize_Click(object s, RoutedEventArgs e) => WindowState = WindowState.Minimized;
@@ -179,7 +181,20 @@ namespace Finly.Views
             SidebarRoot.LayoutTransform = SidebarScale;
         }
 
-        // ===== Nawigacja wysokiego poziomu =====
+        // =====================================================================
+        // NAWIGACJA – JEDNO ŹRÓDŁO PRAWDY (MainFrame)
+        // =====================================================================
+
+        /// <summary>Nawigacja do konkretnej strony (UserControl) w MainFrame.</summary>
+        public void NavigateTo(UserControl page)
+        {
+            if (page == null) return;
+            if (MainFrame == null) return;
+
+            MainFrame.Navigate(page);
+        }
+
+        /// <summary>Nawigacja po "route" (string). Zwraca stronę i podpina do MainFrame.</summary>
         public void NavigateTo(string route)
         {
             var uid = UserService.CurrentUserId;
@@ -192,122 +207,125 @@ namespace Finly.Views
                 return;
             }
 
-            UserControl view = (route ?? string.Empty).ToLowerInvariant() switch
+            string r = (route ?? string.Empty).Trim().ToLowerInvariant();
+
+            UserControl view = r switch
             {
                 "dashboard" or "home" => new DashboardPage(uid),
-                "addexpense" => new AddExpensePage(uid),
-                "transactions" => new TransactionsPage(),
-                "budget" or "budgets" => new BudgetsPage(),
-                "categories" => new CategoriesPage(),
-                "goals" => new GoalsPage(),
-                "charts" => new ChartsPage(),
-                "reports" => new ReportsPage(),
-                "settings" => new SettingsPage(),
-                "banks" => new BanksPage(),
-                "envelopes" => new EnvelopesPage(uid),
-                "loans" => new LoansPage(),
-                "investments" => new InvestmentsPage(),
+
+                // AddExpensePage wymaga uid
+                "addexpense" or "add" => new AddExpensePage(uid),
+
+                // Transakcje bez uid
+                "transactions" or "transakcje" => new TransactionsPage(),
+
+                // ✅ KLUCZOWA POPRAWKA: BudgetsPage MUSI dostać uid
+                "budget" or "budgets" or "budzety" => new BudgetsPage(uid),
+
+                "categories" or "kategorie" => new CategoriesPage(),
+                "goals" or "cele" => new GoalsPage(),
+                "charts" or "statystyki" => new ChartsPage(),
+                "reports" or "raporty" => new ReportsPage(),
+                "settings" or "ustawienia" => new SettingsPage(),
+
+                "banks" or "kontabankowe" => new BanksPage(),
+
+                // EnvelopesPage wymaga uid
+                "envelopes" or "koperty" => new EnvelopesPage(uid),
+
+                "loans" or "kredyty" => new LoansPage(),
+                "investments" or "inwestycje" => new InvestmentsPage(),
+
                 _ => new DashboardPage(uid),
             };
 
-            RightHost.Content = view;
+            NavigateTo(view);
+            ApplyActiveHighlightForRoute(r);
         }
 
         private void GoHome()
         {
-            RightHost.Content = new DashboardPage(UserService.GetCurrentUserId());
-            SetActiveNav(NavHome);
+            NavigateTo("home");
             SetActiveFooter(null);
         }
 
         // ===== Kliknięcia NAV (lewy sidebar) =====
         private void Nav_Home_Click(object sender, RoutedEventArgs e)
         {
-            GoHome();
+            NavigateTo("home");
+            SetActiveFooter(null);
         }
 
         private void Nav_Add_Click(object s, RoutedEventArgs e)
         {
-            RightHost.Content = new AddExpensePage(UserService.CurrentUserId);
-            SetActiveNav(NavAdd);
+            NavigateTo("addexpense");
             SetActiveFooter(null);
         }
 
         private void Nav_Transactions_Click(object s, RoutedEventArgs e)
         {
-            RightHost.Content = new TransactionsPage();
-            SetActiveNav(NavTransactions);
+            NavigateTo("transactions");
             SetActiveFooter(null);
         }
 
         private void Nav_Charts_Click(object s, RoutedEventArgs e)
         {
-            RightHost.Content = new ChartsPage();
-            SetActiveNav(NavCharts);
+            NavigateTo("charts");
             SetActiveFooter(null);
         }
 
         private void Nav_Budgets_Click(object s, RoutedEventArgs e)
         {
-            RightHost.Content = new BudgetsPage();
-            SetActiveNav(NavBudgets);
+            NavigateTo("budgets");
             SetActiveFooter(null);
         }
 
         private void Nav_Goals_Click(object s, RoutedEventArgs e)
         {
-            RightHost.Content = new GoalsPage();
-            SetActiveNav(NavGoals);
+            NavigateTo("goals");
             SetActiveFooter(null);
         }
 
         private void Nav_Categories_Click(object s, RoutedEventArgs e)
         {
-            RightHost.Content = new CategoriesPage();
-            SetActiveNav(NavCategories);
+            NavigateTo("categories");
             SetActiveFooter(null);
         }
 
         private void Nav_Reports_Click(object s, RoutedEventArgs e)
         {
-            RightHost.Content = new ReportsPage();
-            SetActiveNav(NavReports);
+            NavigateTo("reports");
             SetActiveFooter(null);
         }
-
 
         private void Nav_Banks_Click(object s, RoutedEventArgs e)
         {
             NavigateTo("banks");
-            SetActiveNav(NavBanks);
             SetActiveFooter(null);
         }
 
         private void Nav_Envelopes_Click(object s, RoutedEventArgs e)
         {
             NavigateTo("envelopes");
-            SetActiveNav(NavEnvelopes);
             SetActiveFooter(null);
         }
 
         private void Nav_Loans_Click(object s, RoutedEventArgs e)
         {
-            RightHost.Content = new LoansPage();
-            SetActiveNav(NavLoans);
+            NavigateTo("loans");
             SetActiveFooter(null);
         }
 
         private void Nav_Investments_Click(object s, RoutedEventArgs e)
         {
-            RightHost.Content = new InvestmentsPage();
-            SetActiveNav(NavInvestments);
+            NavigateTo("investments");
             SetActiveFooter(null);
         }
 
         // ===== Stopka =====
         private void OpenProfile_Click(object s, RoutedEventArgs e)
         {
-            RightHost.Content = new AccountPage(UserService.CurrentUserId);
+            NavigateTo(new AccountPage(UserService.CurrentUserId));
             SetActiveNav(null);
             SetActiveFooter(FooterAccount);
         }
@@ -321,9 +339,7 @@ namespace Finly.Views
 
         private void Nav_Logout_Click(object sender, RoutedEventArgs e)
         {
-            // Po wylogowaniu nie auto-logujemy już tego użytkownika
             SettingsService.LastUserId = null;
-
             UserService.ClearCurrentUser();
 
             var auth = new AuthWindow();
@@ -333,7 +349,78 @@ namespace Finly.Views
             Close();
         }
 
-        // ===== Podświetlenia / pomocnicze =====
+        // =====================================================================
+        // PODŚWIETLANIA
+        // =====================================================================
+
+        private void ApplyActiveHighlightForRoute(string r)
+        {
+            SetActiveFooter(null);
+
+            switch (r)
+            {
+                case "dashboard":
+                case "home":
+                    SetActiveNav(NavHome);
+                    break;
+
+                case "addexpense":
+                case "add":
+                    SetActiveNav(NavAdd);
+                    break;
+
+                case "transactions":
+                case "transakcje":
+                    SetActiveNav(NavTransactions);
+                    break;
+
+                case "budgets":
+                case "budget":
+                case "budzety":
+                    SetActiveNav(NavBudgets);
+                    break;
+
+                case "categories":
+                case "kategorie":
+                    SetActiveNav(NavCategories);
+                    break;
+
+                case "charts":
+                case "statystyki":
+                    SetActiveNav(NavCharts);
+                    break;
+
+                case "reports":
+                case "raporty":
+                    SetActiveNav(NavReports);
+                    break;
+
+                case "loans":
+                case "kredyty":
+                    SetActiveNav(NavLoans);
+                    break;
+
+                case "investments":
+                case "inwestycje":
+                    SetActiveNav(NavInvestments);
+                    break;
+
+                case "banks":
+                case "kontabankowe":
+                    SetActiveNav(NavBanks);
+                    break;
+
+                case "envelopes":
+                case "koperty":
+                    SetActiveNav(NavEnvelopes);
+                    break;
+
+                default:
+                    SetActiveNav(NavHome);
+                    break;
+            }
+        }
+
         private void SetActiveNav(ToggleButton? active)
         {
             if (NavContainer == null) return;
@@ -347,7 +434,7 @@ namespace Finly.Views
                 return;
             }
 
-            if (RightHost.Content is DashboardPage && NavHome != null)
+            if (MainFrame?.Content is DashboardPage && NavHome != null)
                 NavHome.IsChecked = true;
         }
 
@@ -358,18 +445,16 @@ namespace Finly.Views
             if (FooterLogout != null) FooterLogout.IsChecked = false;
         }
 
-        private void UncheckAllNav()
-        {
-            SetActiveNav(null);
-        }
-
+        // ===== Helpery visual tree =====
         public static IEnumerable<T> FindVisualChildren<T>(DependencyObject depObj) where T : DependencyObject
         {
             if (depObj == null) yield break;
+
             for (int i = 0; i < VisualTreeHelper.GetChildrenCount(depObj); i++)
             {
                 var child = VisualTreeHelper.GetChild(depObj, i);
                 if (child is T match) yield return match;
+
                 foreach (var sub in FindVisualChildren<T>(child))
                     yield return sub;
             }

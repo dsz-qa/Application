@@ -657,14 +657,25 @@
             </Border>
 
             <!-- CONTENT -->
-            <Grid Grid.Column="1" Background="{DynamicResource App.Background}" ClipToBounds="True">
-                <ContentControl x:Name="RightHost" Panel.ZIndex="0" IsHitTestVisible="True"/>
-                <Canvas x:Name="ToastLayer" Panel.ZIndex="1000"
-                        HorizontalAlignment="Stretch"
-                        VerticalAlignment="Stretch"
-                        IsHitTestVisible="False"/>
-            </Grid>
-        </Grid>
+			<!-- CONTENT -->
+
+
+
+			<Grid Grid.Column="1" Background="{DynamicResource App.Background}" ClipToBounds="True">
+
+				<!-- TU: zamiast RightHost -->
+				<Frame x:Name="MainFrame"
+					   Panel.ZIndex="0"
+					   NavigationUIVisibility="Hidden"
+					   Background="{DynamicResource App.Background}"/>
+
+				<Canvas x:Name="ToastLayer" Panel.ZIndex="1000"
+						HorizontalAlignment="Stretch"
+						VerticalAlignment="Stretch"
+						IsHitTestVisible="False"/>
+			</Grid>
+
+		</Grid>
     </Grid>
 </Window>
 

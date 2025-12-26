@@ -1,249 +1,400 @@
-using System;
-using System.Collections.ObjectModel;
-using System.Globalization;
-using System.Linq;
-using System.Data;
-using System.ComponentModel;
-using System.Runtime.CompilerServices;
+using Finly.Services.Features;
+using Finly.Services.SpecificPages;
 using LiveChartsCore;
 using LiveChartsCore.SkiaSharpView;
 using LiveChartsCore.SkiaSharpView.Painting;
-using SkiaSharp;
 using Microsoft.Data.Sqlite;
-using Finly.Services.Features;
+using SkiaSharp;
+using System;
+using System.Collections.ObjectModel;
+using System.ComponentModel;
+using System.Data;
+using System.Globalization;
+using System.Linq;
+using System.Runtime.CompilerServices;
+
 
 namespace Finly.ViewModels
 {
- public sealed class ForecastModel
- {
- public decimal PredictedSpending { get; set; }
- public decimal PredictedFreeCash { get; set; }
- }
+    public sealed class ForecastModel
+    {
+        public decimal PredictedSpending { get; set; }
+        public decimal PredictedFreeCash { get; set; }
+    }
 
- public sealed class TransactionItem
- {
- public int Id { get; set; }
- public DateTime Date { get; set; }
- public string DateDisplay => Date.ToString("d");
- public string Category { get; set; } = string.Empty;
- public string Account { get; set; } = string.Empty; // sformatowane Ÿród³o
- public string Description { get; set; } = string.Empty;
- public string Kind { get; set; } = string.Empty; // Przychód/Wydatek/Transfer
- public decimal Amount { get; set; }
- public string AmountStr => Amount.ToString("N2", CultureInfo.CurrentCulture) + " z³";
- public string RawSource { get; set; } = string.Empty; // oryginalny tekst Ÿród³a z DB
+    public sealed class TransactionItem
+    {
+        public int Id { get; set; }
+        public DateTime Date { get; set; }
+        public string DateDisplay => Date == DateTime.MinValue ? "" : Date.ToString("d");
 
-public string FromAccount { get; set; } = string.Empty;
-public string ToAccount { get; set; } = string.Empty;
+        public string Category { get; set; } = string.Empty;
 
-public void NormalizeAccount()
- {
- if (string.IsNullOrWhiteSpace(Account) && !string.IsNullOrWhiteSpace(RawSource))
- {
- var s = RawSource.Trim();
- if (s.Equals("Wolna gotówka", StringComparison.OrdinalIgnoreCase)) Account = "Wolna gotówka";
- else if (s.Equals("Od³o¿ona gotówka", StringComparison.OrdinalIgnoreCase)) Account = "Od³o¿ona gotówka";
- else if (s.StartsWith("Konto", StringComparison.OrdinalIgnoreCase)) Account = s; // np. "Konto: mBank"
- else if (s.StartsWith("Koperta", StringComparison.OrdinalIgnoreCase)) Account = s; // np. "Koperta: Jedzenie"
- else Account = s; // fallback
- }
- }
- }
+        /// <summary>
+        /// Sformatowane Ÿród³o/konto (fallback dla prostych widoków).
+        /// </summary>
+        public string Account { get; set; } = string.Empty;
 
- public class DashboardViewModel : INotifyPropertyChanged
- {
- private readonly int _userId;
+        public string Description { get; set; } = string.Empty;
 
- public ObservableCollection<string> Insights { get; } = new();
- public ObservableCollection<string> Alerts { get; } = new();
- public ForecastModel Forecast { get; private set; } = new ForecastModel();
+        /// <summary>
+        /// "Przychód" / "Wydatek" / "Transfer"
+        /// </summary>
+        public string Kind { get; set; } = string.Empty;
 
- public ObservableCollection<TransactionItem> Incomes { get; } = new();
- public ObservableCollection<TransactionItem> Expenses { get; } = new();
- public ObservableCollection<TransactionItem> PlannedTransactions { get; } = new();
+        public decimal Amount { get; set; }
+        public string AmountStr => Amount.ToString("N2", CultureInfo.CurrentCulture) + " z³";
 
- // Legacy properties kept for backward compatibility
- private ISeries[] _pieExpenseSeries = Array.Empty<ISeries>();
- public ISeries[] PieExpenseSeries { get => _pieExpenseSeries; private set { _pieExpenseSeries = value; OnPropertyChanged(); } }
- private ISeries[] _pieIncomeSeries = Array.Empty<ISeries>();
- public ISeries[] PieIncomeSeries { get => _pieIncomeSeries; private set { _pieIncomeSeries = value; OnPropertyChanged(); } }
+        /// <summary>
+        /// Oryginalny tekst Ÿród³a z DB (np. Incomes.Source).
+        /// </summary>
+        public string RawSource { get; set; } = string.Empty;
 
- // New properties bound by XAML
- private ISeries[] _expensesByCategorySeries = Array.Empty<ISeries>();
- public ISeries[] ExpensesByCategorySeries { get => _expensesByCategorySeries; private set { _expensesByCategorySeries = value; OnPropertyChanged(); } }
- private ISeries[] _incomeBySourceSeries = Array.Empty<ISeries>();
- public ISeries[] IncomeBySourceSeries { get => _incomeBySourceSeries; private set { _incomeBySourceSeries = value; OnPropertyChanged(); } }
+        /// <summary>
+        /// Dla transferów/planowanych: sk¹d / dok¹d.
+        /// Dla wydatku: FromAccount; dla przychodu: ToAccount.
+        /// </summary>
+        public string FromAccount { get; set; } = string.Empty;
+        public string ToAccount { get; set; } = string.Empty;
 
- public DashboardViewModel(int userId) { _userId = userId; }
+        public void NormalizeAccount()
+        {
+            if (string.IsNullOrWhiteSpace(Account) && !string.IsNullOrWhiteSpace(RawSource))
+            {
+                var s = RawSource.Trim();
 
- // Palette for pie slices – visible on dark theme
- private static readonly SKColor[] PiePalette = new[]
- {
- SKColor.Parse("#ED7A1A"), // orange
- SKColor.Parse("#3FA7D6"), // blue
- SKColor.Parse("#7BC96F"), // green
- SKColor.Parse("#AF7AC5"), // purple
- SKColor.Parse("#F6BF26"), // yellow
- SKColor.Parse("#56C1A7"), // teal
- SKColor.Parse("#CE6A6B"), // red-ish
- SKColor.Parse("#9AA0A6") // gray
- };
+                if (s.Equals("Wolna gotówka", StringComparison.OrdinalIgnoreCase)) Account = "Wolna gotówka";
+                else if (s.Equals("Od³o¿ona gotówka", StringComparison.OrdinalIgnoreCase)) Account = "Od³o¿ona gotówka";
+                else if (s.StartsWith("Konto", StringComparison.OrdinalIgnoreCase)) Account = s;   // np. "Konto: mBank"
+                else if (s.StartsWith("Koperta", StringComparison.OrdinalIgnoreCase)) Account = s; // np. "Koperta: Jedzenie"
+                else Account = s;
+            }
+        }
+    }
 
- public void RefreshCharts(DateTime start, DateTime end)
- {
- try
- {
- // Build expense series from loaded transactions (ensure LoadTransactions called before this)
- var expenseGroups = Expenses
- .Where(t => t.Kind == "Wydatek" && t.Amount >0)
- .GroupBy(t => string.IsNullOrWhiteSpace(t.Category) ? "(brak kategorii)" : t.Category)
- .OrderByDescending(g => g.Sum(x => x.Amount))
- .ToList();
+    public sealed class DashboardViewModel : INotifyPropertyChanged
+    {
+        private readonly int _userId;
 
- var expSeries = expenseGroups.Select((g, i) => new PieSeries<double>
- {
- Name = g.Key,
- Values = new[] { (double)g.Sum(x => x.Amount) },
- InnerRadius =0, // full pie, not donut
- DataLabelsPaint = new SolidColorPaint(SKColors.White),
- DataLabelsSize =11,
- DataLabelsPosition = LiveChartsCore.Measure.PolarLabelsPosition.Middle,
- // label formatter with currency suffix
- DataLabelsFormatter = point => string.Format(CultureInfo.CurrentCulture, "{0:N2} z³", point.Coordinate.PrimaryValue),
- Fill = new SolidColorPaint(PiePalette[i % PiePalette.Length]),
- Stroke = null
- }).Cast<ISeries>().ToArray();
+        public ObservableCollection<string> Insights { get; } = new();
+        public ObservableCollection<string> Alerts { get; } = new();
 
- // If there are no transactions but aggregated service might still have data, fallback
- if (expSeries.Length ==0)
- {
- var exp = DatabaseService.GetSpendingByCategorySafe(_userId, start, end) ?? new System.Collections.Generic.List<DatabaseService.CategoryAmountDto>();
- expSeries = exp.Select((x, i) => new PieSeries<double>
- {
- Name = string.IsNullOrWhiteSpace(x.Name) ? "(brak kategorii)" : x.Name,
- Values = new[] { (double)Math.Abs(x.Amount) },
- InnerRadius =0,
- DataLabelsPaint = new SolidColorPaint(SKColors.White),
- DataLabelsSize =11,
- DataLabelsPosition = LiveChartsCore.Measure.PolarLabelsPosition.Middle,
- DataLabelsFormatter = point => string.Format(CultureInfo.CurrentCulture, "{0:N2} z³", point.Coordinate.PrimaryValue),
- Fill = new SolidColorPaint(PiePalette[i % PiePalette.Length]),
- Stroke = null
- }).Cast<ISeries>().ToArray();
- }
+        private ForecastModel _forecast = new ForecastModel();
+        public ForecastModel Forecast
+        {
+            get => _forecast;
+            private set { _forecast = value; OnPropertyChanged(); }
+        }
 
- ExpensesByCategorySeries = expSeries; // bound property
- PieExpenseSeries = expSeries; // legacy sync
+        public ObservableCollection<TransactionItem> Incomes { get; } = new();
+        public ObservableCollection<TransactionItem> Expenses { get; } = new();
+        public ObservableCollection<TransactionItem> PlannedTransactions { get; } = new();
 
- // Build income series from loaded transactions
- var incomeGroups = Incomes
- .Where(t => t.Kind == "Przychód" && t.Amount >0)
- .GroupBy(t => string.IsNullOrWhiteSpace(t.Category) ? "Przychody" : t.Category)
- .OrderByDescending(g => g.Sum(x => x.Amount))
- .ToList();
+        // Legacy properties kept for backward compatibility
+        private ISeries[] _pieExpenseSeries = Array.Empty<ISeries>();
+        public ISeries[] PieExpenseSeries
+        {
+            get => _pieExpenseSeries;
+            private set { _pieExpenseSeries = value; OnPropertyChanged(); }
+        }
 
- var incSeries = incomeGroups.Select((g, i) => new PieSeries<double>
- {
- Name = g.Key,
- Values = new[] { (double)g.Sum(x => x.Amount) },
- InnerRadius =0,
- DataLabelsPaint = new SolidColorPaint(SKColors.White),
- DataLabelsSize =11,
- DataLabelsPosition = LiveChartsCore.Measure.PolarLabelsPosition.Middle,
- DataLabelsFormatter = point => string.Format(CultureInfo.CurrentCulture, "{0:N2} z³", point.Coordinate.PrimaryValue),
- Fill = new SolidColorPaint(PiePalette[i % PiePalette.Length]),
- Stroke = null
- }).Cast<ISeries>().ToArray();
+        private ISeries[] _pieIncomeSeries = Array.Empty<ISeries>();
+        public ISeries[] PieIncomeSeries
+        {
+            get => _pieIncomeSeries;
+            private set { _pieIncomeSeries = value; OnPropertyChanged(); }
+        }
 
- if (incSeries.Length ==0)
- {
- var inc = DatabaseService.GetIncomeBySourceSafe(_userId, start, end) ?? new System.Collections.Generic.List<DatabaseService.CategoryAmountDto>();
- incSeries = inc.Select((x, i) => new PieSeries<double>
- {
- Name = string.IsNullOrWhiteSpace(x.Name) ? "Przychody" : x.Name,
- Values = new[] { (double)Math.Abs(x.Amount) },
- InnerRadius =0,
- DataLabelsPaint = new SolidColorPaint(SKColors.White),
- DataLabelsSize =11,
- DataLabelsPosition = LiveChartsCore.Measure.PolarLabelsPosition.Middle,
- DataLabelsFormatter = point => string.Format(CultureInfo.CurrentCulture, "{0:N2} z³", point.Coordinate.PrimaryValue),
- Fill = new SolidColorPaint(PiePalette[i % PiePalette.Length]),
- Stroke = null
- }).Cast<ISeries>().ToArray();
- }
+        // New properties bound by XAML
+        private ISeries[] _expensesByCategorySeries = Array.Empty<ISeries>();
+        public ISeries[] ExpensesByCategorySeries
+        {
+            get => _expensesByCategorySeries;
+            private set { _expensesByCategorySeries = value; OnPropertyChanged(); }
+        }
 
- IncomeBySourceSeries = incSeries;
- PieIncomeSeries = incSeries;
- }
- catch
- {
- ExpensesByCategorySeries = Array.Empty<ISeries>();
- IncomeBySourceSeries = Array.Empty<ISeries>();
- PieExpenseSeries = Array.Empty<ISeries>();
- PieIncomeSeries = Array.Empty<ISeries>();
- }
- }
+        private ISeries[] _incomeBySourceSeries = Array.Empty<ISeries>();
+        public ISeries[] IncomeBySourceSeries
+        {
+            get => _incomeBySourceSeries;
+            private set { _incomeBySourceSeries = value; OnPropertyChanged(); }
+        }
 
- public void LoadTransactions(DateTime start, DateTime end)
- {
- Incomes.Clear();
- Expenses.Clear();
- PlannedTransactions.Clear();
+        // ===== RangeStats (kafelek "Do ogarniêcia") =====
+        public sealed class RangeStatsVm : INotifyPropertyChanged
+        {
+            private int _total;
+            private int _missingCategory;
+            private int _planned;
+            private string _message = "Brak danych w tym okresie.";
+            private string _actionText = "PrzejdŸ do transakcji";
+            private bool _hasAction;
 
- try
- {
- // ===== PRZYCHODY =====
- var dtInc = LoadIncomesRaw(_userId, start, end);
- foreach (var r in ToRows(dtInc))
- {
- var rawSrc = SafeString(r, "Source");
- var item = new TransactionItem
- {
- Id = SafeInt(r, "Id"),
- Date = SafeDate(r, "Date"),
- Category = SafeString(r, "CategoryName"),
- RawSource = rawSrc,
- Account = rawSrc,
- Description = SafeString(r, "Description"),
- Kind = "Przychód",
- Amount = Math.Abs(SafeDecimal(r, "Amount"))
- };
- item.NormalizeAccount();
- Incomes.Add(item);
- }
+            public int Total { get => _total; set { _total = value; OnPropertyChanged(); } }
+            public int MissingCategory { get => _missingCategory; set { _missingCategory = value; OnPropertyChanged(); } }
+            public int Planned { get => _planned; set { _planned = value; OnPropertyChanged(); } }
 
- // ===== WYDATKI =====
- var dtExp = LoadExpensesRaw(_userId, start, end);
- foreach (var r in ToRows(dtExp))
- {
- var accountText = SafeInt(r, "AccountId") >0 ? "Konto bankowe" : "Gotówka";
- var item = new TransactionItem
- {
- Id = SafeInt(r, "Id"),
- Date = SafeDate(r, "Date"),
- Category = SafeString(r, "CategoryName"),
- RawSource = accountText,
- Account = accountText,
- Description = SafeString(r, "Description"),
- Kind = "Wydatek",
- Amount = Math.Abs(SafeDecimal(r, "Amount"))
- };
- item.NormalizeAccount();
- Expenses.Add(item);
- }
+            public string Message { get => _message; set { _message = value; OnPropertyChanged(); } }
+            public string ActionText { get => _actionText; set { _actionText = value; OnPropertyChanged(); } }
+            public bool HasAction { get => _hasAction; set { _hasAction = value; OnPropertyChanged(); } }
 
- // ===== ZAPLANOWANE (przychody + wydatki + wykrycie transferów) =====
- LoadPlannedTransactions(start, end);
- }
- catch { }
- }
+            public event PropertyChangedEventHandler? PropertyChanged;
+            private void OnPropertyChanged([CallerMemberName] string? n = null)
+                => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(n));
+        }
+
+        public RangeStatsVm RangeStats { get; } = new();
+
+        public DashboardViewModel(int userId)
+        {
+            _userId = userId;
+        }
+
+        // Palette for pie slices – visible on dark theme
+        private static readonly SKColor[] PiePalette = new[]
+        {
+            SKColor.Parse("#ED7A1A"), // orange
+            SKColor.Parse("#3FA7D6"), // blue
+            SKColor.Parse("#7BC96F"), // green
+            SKColor.Parse("#AF7AC5"), // purple
+            SKColor.Parse("#F6BF26"), // yellow
+            SKColor.Parse("#56C1A7"), // teal
+            SKColor.Parse("#CE6A6B"), // red-ish
+            SKColor.Parse("#9AA0A6")  // gray
+        };
+
+        public void RefreshCharts(DateTime start, DateTime end)
+        {
+            try
+            {
+                // ===== EXPENSE PIE =====
+                var expenseGroups = Expenses
+                    .Where(t => t.Kind == "Wydatek" && t.Amount > 0)
+                    .GroupBy(t => string.IsNullOrWhiteSpace(t.Category) ? "(brak kategorii)" : t.Category)
+                    .OrderByDescending(g => g.Sum(x => x.Amount))
+                    .ToList();
+
+                var expSeries = expenseGroups.Select((g, i) => new PieSeries<double>
+                {
+                    Name = g.Key,
+                    Values = new[] { (double)g.Sum(x => x.Amount) },
+                    InnerRadius = 0,
+                    DataLabelsPaint = new SolidColorPaint(SKColors.White),
+                    DataLabelsSize = 11,
+                    DataLabelsPosition = LiveChartsCore.Measure.PolarLabelsPosition.Middle,
+                    DataLabelsFormatter = p => string.Format(CultureInfo.CurrentCulture, "{0:N2} z³", p.Coordinate.PrimaryValue),
+                    Fill = new SolidColorPaint(PiePalette[i % PiePalette.Length]),
+                    Stroke = null
+                }).Cast<ISeries>().ToArray();
+
+                if (expSeries.Length == 0)
+                {
+                    var exp = DatabaseService.GetSpendingByCategorySafe(_userId, start, end)
+                              ?? new System.Collections.Generic.List<DatabaseService.CategoryAmountDto>();
+
+                    expSeries = exp.Select((x, i) => new PieSeries<double>
+                    {
+                        Name = string.IsNullOrWhiteSpace(x.Name) ? "(brak kategorii)" : x.Name,
+                        Values = new[] { (double)Math.Abs(x.Amount) },
+                        InnerRadius = 0,
+                        DataLabelsPaint = new SolidColorPaint(SKColors.White),
+                        DataLabelsSize = 11,
+                        DataLabelsPosition = LiveChartsCore.Measure.PolarLabelsPosition.Middle,
+                        DataLabelsFormatter = p => string.Format(CultureInfo.CurrentCulture, "{0:N2} z³", p.Coordinate.PrimaryValue),
+                        Fill = new SolidColorPaint(PiePalette[i % PiePalette.Length]),
+                        Stroke = null
+                    }).Cast<ISeries>().ToArray();
+                }
+
+                ExpensesByCategorySeries = expSeries;
+                PieExpenseSeries = expSeries;
+
+                // ===== INCOME PIE =====
+                var incomeGroups = Incomes
+                    .Where(t => t.Kind == "Przychód" && t.Amount > 0)
+                    .GroupBy(t => string.IsNullOrWhiteSpace(t.Category) ? "Przychody" : t.Category)
+                    .OrderByDescending(g => g.Sum(x => x.Amount))
+                    .ToList();
+
+                var incSeries = incomeGroups.Select((g, i) => new PieSeries<double>
+                {
+                    Name = g.Key,
+                    Values = new[] { (double)g.Sum(x => x.Amount) },
+                    InnerRadius = 0,
+                    DataLabelsPaint = new SolidColorPaint(SKColors.White),
+                    DataLabelsSize = 11,
+                    DataLabelsPosition = LiveChartsCore.Measure.PolarLabelsPosition.Middle,
+                    DataLabelsFormatter = p => string.Format(CultureInfo.CurrentCulture, "{0:N2} z³", p.Coordinate.PrimaryValue),
+                    Fill = new SolidColorPaint(PiePalette[i % PiePalette.Length]),
+                    Stroke = null
+                }).Cast<ISeries>().ToArray();
+
+                if (incSeries.Length == 0)
+                {
+                    var inc = DatabaseService.GetIncomeBySourceSafe(_userId, start, end)
+                              ?? new System.Collections.Generic.List<DatabaseService.CategoryAmountDto>();
+
+                    incSeries = inc.Select((x, i) => new PieSeries<double>
+                    {
+                        Name = string.IsNullOrWhiteSpace(x.Name) ? "Przychody" : x.Name,
+                        Values = new[] { (double)Math.Abs(x.Amount) },
+                        InnerRadius = 0,
+                        DataLabelsPaint = new SolidColorPaint(SKColors.White),
+                        DataLabelsSize = 11,
+                        DataLabelsPosition = LiveChartsCore.Measure.PolarLabelsPosition.Middle,
+                        DataLabelsFormatter = p => string.Format(CultureInfo.CurrentCulture, "{0:N2} z³", p.Coordinate.PrimaryValue),
+                        Fill = new SolidColorPaint(PiePalette[i % PiePalette.Length]),
+                        Stroke = null
+                    }).Cast<ISeries>().ToArray();
+                }
+
+                IncomeBySourceSeries = incSeries;
+                PieIncomeSeries = incSeries;
+            }
+            catch
+            {
+                ExpensesByCategorySeries = Array.Empty<ISeries>();
+                IncomeBySourceSeries = Array.Empty<ISeries>();
+                PieExpenseSeries = Array.Empty<ISeries>();
+                PieIncomeSeries = Array.Empty<ISeries>();
+            }
+        }
+
+        public void LoadTransactions(DateTime start, DateTime end)
+        {
+            Incomes.Clear();
+            Expenses.Clear();
+            PlannedTransactions.Clear();
+
+            try
+            {
+                // ===== PRZYCHODY =====
+                var dtInc = LoadIncomesRaw(_userId, start, end);
+                foreach (var r in ToRows(dtInc))
+                {
+                    var rawSrc = SafeString(r, "Source");
+
+                    var item = new TransactionItem
+                    {
+                        Id = SafeInt(r, "Id"),
+                        Date = SafeDate(r, "Date"),
+                        Category = SafeString(r, "CategoryName"),
+                        RawSource = rawSrc,
+                        Account = rawSrc,
+                        Description = SafeString(r, "Description"),
+                        Kind = "Przychód",
+                        Amount = Math.Abs(SafeDecimal(r, "Amount")),
+                        FromAccount = "",
+                        ToAccount = rawSrc
+                    };
+
+                    item.NormalizeAccount();
+                    item.ToAccount = item.Account;
+
+                    Incomes.Add(item);
+                }
+
+                // ===== WYDATKI =====
+                var dtExp = LoadExpensesRaw(_userId, start, end);
+                foreach (var r in ToRows(dtExp))
+                {
+                    var accountText = SafeInt(r, "AccountId") > 0 ? "Konto bankowe" : "Gotówka";
+
+                    var item = new TransactionItem
+                    {
+                        Id = SafeInt(r, "Id"),
+                        Date = SafeDate(r, "Date"),
+                        Category = SafeString(r, "CategoryName"),
+                        RawSource = accountText,
+                        Account = accountText,
+                        Description = SafeString(r, "Description"),
+                        Kind = "Wydatek",
+                        Amount = Math.Abs(SafeDecimal(r, "Amount")),
+                        FromAccount = accountText,
+                        ToAccount = ""
+                    };
+
+                    item.NormalizeAccount();
+                    item.FromAccount = item.Account;
+
+                    Expenses.Add(item);
+                }
+
+                // ===== ZAPLANOWANE =====
+                LoadPlannedTransactions(start, end);
+
+                // ===== KAFEL "Do ogarniêcia" =====
+                UpdateRangeStats();
+            }
+            catch
+            {
+                UpdateRangeStats(); // nawet jak b³¹d, ustaw sensowny stan UI
+            }
+        }
+
+        private void UpdateRangeStats()
+        {
+            try
+            {
+                var total = Incomes.Count + Expenses.Count;
+                var planned = PlannedTransactions.Count;
+
+                static bool IsMissingCategory(string? s)
+                    => string.IsNullOrWhiteSpace(s) || s.Trim().Equals("-", StringComparison.OrdinalIgnoreCase);
+
+                var missingCategory =
+                    Incomes.Count(x => IsMissingCategory(x.Category)) +
+                    Expenses.Count(x => IsMissingCategory(x.Category));
+
+                RangeStats.Total = total;
+                RangeStats.Planned = planned;
+                RangeStats.MissingCategory = missingCategory;
+
+                if (total == 0 && planned == 0)
+                {
+                    RangeStats.Message = "W tym okresie nie ma danych. Zmieñ zakres albo dodaj pierwsz¹ transakcjê.";
+                    RangeStats.ActionText = "Dodaj transakcjê";
+                    RangeStats.HasAction = true;
+                    return;
+                }
+
+                if (missingCategory > 0)
+                {
+                    RangeStats.Message = $"Masz {missingCategory} transakcji bez kategorii. Uzupe³nij je, ¿eby raporty by³y dok³adniejsze.";
+                    RangeStats.ActionText = "PrzejdŸ do transakcji";
+                    RangeStats.HasAction = true;
+                    return;
+                }
+
+                if (planned > 0)
+                {
+                    RangeStats.Message = $"Masz {planned} zaplanowanych transakcji. SprawdŸ, czy wszystko jest aktualne.";
+                    RangeStats.ActionText = "Zobacz zaplanowane";
+                    RangeStats.HasAction = true;
+                    return;
+                }
+
+                RangeStats.Message = "Dane wygl¹daj¹ dobrze. Mo¿esz przejœæ do raportów lub dodaæ nowe transakcje.";
+                RangeStats.ActionText = "Otwórz raporty";
+                RangeStats.HasAction = true;
+            }
+            catch
+            {
+                RangeStats.Total = 0;
+                RangeStats.Planned = 0;
+                RangeStats.MissingCategory = 0;
+                RangeStats.Message = "Nie uda³o siê podsumowaæ danych dla okresu.";
+                RangeStats.ActionText = "Odœwie¿";
+                RangeStats.HasAction = false;
+            }
+        }
 
         private void LoadPlannedTransactions(DateTime start, DateTime end)
         {
             try
             {
-                var plannedIncome = new List<TransactionItem>();
-                var plannedExpense = new List<TransactionItem>();
+                var plannedIncome = new System.Collections.Generic.List<TransactionItem>();
+                var plannedExpense = new System.Collections.Generic.List<TransactionItem>();
 
                 // ===== PRZYCHODY ZAPLANOWANE =====
                 using (var con = DatabaseService.GetConnection())
@@ -281,15 +432,11 @@ ORDER BY date(i.Date) DESC, i.Id DESC;";
                             Description = SafeString(row, "Description"),
                             Kind = "Przychód",
                             Amount = Math.Abs(SafeDecimal(row, "Amount")),
-
-                            // dla zgodnoœci – dla przychodu "ToAccount" ma sens,
-                            // bo œrodki wp³ywaj¹ "na" konto/Ÿród³o
                             FromAccount = "",
                             ToAccount = rawSource
                         };
 
                         item.NormalizeAccount();
-                        // po normalizacji przepisz te¿ ToAccount, ¿eby by³o spójne w UI
                         item.ToAccount = item.Account;
 
                         plannedIncome.Add(item);
@@ -320,8 +467,6 @@ ORDER BY date(e.Date) DESC, e.Id DESC;";
 
                     foreach (DataRow row in dt.Rows)
                     {
-                        // U Ciebie tu jest uproszczenie (konto bankowe vs gotówka).
-                        // Zostawiamy to, ¿eby nie ruszaæ DB.
                         var accountText = SafeInt(row, "AccountId") > 0 ? "Konto bankowe" : "Gotówka";
 
                         var item = new TransactionItem
@@ -334,8 +479,6 @@ ORDER BY date(e.Date) DESC, e.Id DESC;";
                             Description = SafeString(row, "Description"),
                             Kind = "Wydatek",
                             Amount = Math.Abs(SafeDecimal(row, "Amount")),
-
-                            // dla wydatku "FromAccount" ma sens (œrodki schodz¹ z konta)
                             FromAccount = accountText,
                             ToAccount = ""
                         };
@@ -348,17 +491,14 @@ ORDER BY date(e.Date) DESC, e.Id DESC;";
                 }
 
                 // ===== WYKRYCIE TRANSFERÓW (heurystyka) =====
-                // Warunek po stronie przychodu: Source/Account wygl¹da na przelew/transfer
                 static bool IsTransferLike(string s)
-                    => !string.IsNullOrWhiteSpace(s) &&
-                       (s.StartsWith("Przelew", StringComparison.OrdinalIgnoreCase) ||
-                        s.StartsWith("Transfer", StringComparison.OrdinalIgnoreCase));
+                    => !string.IsNullOrWhiteSpace(s)
+                       && (s.StartsWith("Przelew", StringComparison.OrdinalIgnoreCase)
+                           || s.StartsWith("Transfer", StringComparison.OrdinalIgnoreCase));
 
-                // ¯eby nie ³¹czyæ wielokrotnie tej samej pozycji
-                var usedIncomeIds = new HashSet<int>();
-                var usedExpenseIds = new HashSet<int>();
+                var usedIncomeIds = new System.Collections.Generic.HashSet<int>();
+                var usedExpenseIds = new System.Collections.Generic.HashSet<int>();
 
-                // Prosta i stabilna heurystyka: tego samego dnia + ta sama kwota (po zaokr¹gleniu do 0,01)
                 foreach (var inc in plannedIncome.Where(i => IsTransferLike(i.RawSource) || IsTransferLike(i.Account)))
                 {
                     if (usedIncomeIds.Contains(inc.Id)) continue;
@@ -375,24 +515,20 @@ ORDER BY date(e.Date) DESC, e.Id DESC;";
 
                     PlannedTransactions.Add(new TransactionItem
                     {
-                        Id = inc.Id, // reprezentatywny
+                        Id = inc.Id,
                         Date = inc.Date,
                         Category = !string.IsNullOrWhiteSpace(match.Category) ? match.Category : inc.Category,
                         Kind = "Transfer",
                         Amount = inc.Amount,
                         Description = string.IsNullOrWhiteSpace(inc.Description) ? match.Description : inc.Description,
-
-                        // Klucz: DWIE kolumny
-                        FromAccount = match.Account, // sk¹d zesz³o
-                        ToAccount = inc.Account,     // dok¹d wp³ynê³o
-
-                        // mo¿esz zostawiæ Account pusty, bo template transferu i tak nie korzysta z Account
+                        FromAccount = match.Account,
+                        ToAccount = inc.Account,
                         Account = "",
                         RawSource = "Transfer"
                     });
                 }
 
-                // ===== DODAJ RESZTÊ (bez tych u¿ytych w transferach) =====
+                // ===== DODAJ RESZTÊ =====
                 foreach (var inc in plannedIncome.Where(i => !usedIncomeIds.Contains(i.Id)))
                     PlannedTransactions.Add(inc);
 
@@ -401,152 +537,215 @@ ORDER BY date(e.Date) DESC, e.Id DESC;";
             }
             catch
             {
-                // celowo cicho – tak jak masz w innych miejscach
+                // celowo cicho – jak wczeœniej
+            }
+        }
+
+        private DataTable LoadExpensesRaw(int userId, DateTime start, DateTime end)
+        {
+            var dt = new DataTable();
+            try
+            {
+                using var con = DatabaseService.GetConnection();
+                using var cmd = con.CreateCommand();
+
+                cmd.CommandText = @"
+SELECT e.Id, e.Date, e.Amount, e.Description, e.CategoryId, e.AccountId, c.Name AS CategoryName
+FROM Expenses e
+LEFT JOIN Categories c ON c.Id = e.CategoryId
+WHERE e.UserId = @u
+  AND date(e.Date) >= date(@from)
+  AND date(e.Date) <= date(@to)
+ORDER BY date(e.Date) DESC, e.Id DESC;";
+
+                cmd.Parameters.AddWithValue("@u", userId);
+                cmd.Parameters.AddWithValue("@from", start.Date.ToString("yyyy-MM-dd"));
+                cmd.Parameters.AddWithValue("@to", end.Date.ToString("yyyy-MM-dd"));
+
+                using var r = cmd.ExecuteReader();
+                dt.Load(r);
+            }
+            catch { }
+            return dt;
+        }
+
+        private DataTable LoadIncomesRaw(int userId, DateTime start, DateTime end)
+        {
+            var dt = new DataTable();
+            try
+            {
+                using var con = DatabaseService.GetConnection();
+                using var cmd = con.CreateCommand();
+
+                cmd.CommandText = @"
+SELECT i.Id, i.Date, i.Amount, i.Description, i.Source, i.CategoryId, c.Name AS CategoryName
+FROM Incomes i
+LEFT JOIN Categories c ON c.Id = i.CategoryId
+WHERE i.UserId = @u
+  AND date(i.Date) >= date(@from)
+  AND date(i.Date) <= date(@to)
+ORDER BY date(i.Date) DESC, i.Id DESC;";
+
+                cmd.Parameters.AddWithValue("@u", userId);
+                cmd.Parameters.AddWithValue("@from", start.Date.ToString("yyyy-MM-dd"));
+                cmd.Parameters.AddWithValue("@to", end.Date.ToString("yyyy-MM-dd"));
+
+                using var r = cmd.ExecuteReader();
+                dt.Load(r);
+            }
+            catch { }
+            return dt;
+        }
+
+        public void GenerateInsights(DateTime start, DateTime end)
+        {
+            Insights.Clear();
+
+            try
+            {
+                // Wydatki w tym i poprzednim okresie – do porównania (to zostaje wydatkami)
+                var thisExp = ToRows(DatabaseService.GetExpenses(_userId, start, end));
+                var prevExp = ToRows(DatabaseService.GetExpenses(_userId, start.AddMonths(-1), end.AddMonths(-1)));
+
+                decimal sumThis = Sum(thisExp);
+                decimal sumPrev = Sum(prevExp);
+
+                if (sumPrev > 0m)
+                {
+                    var diffPct = (double)((sumPrev - sumThis) / sumPrev * 100m);
+                    Insights.Add($"W tym okresie wydajesz {diffPct:+0;-0;0}% wzglêdem poprzedniego.");
+                }
+                else
+                {
+                    Insights.Add("Brak danych do porównania z poprzednim okresem.");
+                }
+
+                // Najwiêkszy wydatek (tylko wydatki)
+                var top = thisExp
+                    .Select(r => Math.Abs(SafeDecimal(r, "Amount")))
+                    .DefaultIfEmpty(0m)
+                    .Max();
+
+                if (top > 0m)
+                    Insights.Add($"Najwiêkszy wydatek w tym okresie to {top.ToString("N2", CultureInfo.CurrentCulture)} z³.");
+
+                // POPRAWKA: liczba transakcji = przychody + wydatki (nieplanowane)
+                // U¿ywamy raw-ów z VM, bo to jest dok³adnie zakres z periodbara.
+                var expRaw = ToRows(LoadExpensesRaw(_userId, start, end));
+                var incRaw = ToRows(LoadIncomesRaw(_userId, start, end));
+
+                int count = expRaw.Count() + incRaw.Count();
+                Insights.Add($"Liczba transakcji: {count}.");
+            }
+            catch
+            {
+                Insights.Add("Nie uda³o siê wygenerowaæ insightów.");
             }
         }
 
 
-        private DataTable LoadExpensesRaw(int userId, DateTime start, DateTime end)
- {
- var dt = new DataTable();
- try
- {
- using var con = DatabaseService.GetConnection();
- using var cmd = con.CreateCommand();
- cmd.CommandText = @"SELECT e.Id, e.Date, e.Amount, e.Description, e.CategoryId, e.AccountId, c.Name AS CategoryName
- FROM Expenses e
- LEFT JOIN Categories c ON c.Id = e.CategoryId
- WHERE e.UserId = @u AND date(e.Date) >= date(@from) AND date(e.Date) <= date(@to)
- ORDER BY date(e.Date) DESC, e.Id DESC;";
- cmd.Parameters.AddWithValue("@u", userId);
- cmd.Parameters.AddWithValue("@from", start.Date.ToString("yyyy-MM-dd"));
- cmd.Parameters.AddWithValue("@to", end.Date.ToString("yyyy-MM-dd"));
- using var r = cmd.ExecuteReader();
- dt.Load(r);
- }
- catch { }
- return dt;
- }
+        public void GenerateAlerts(DateTime start, DateTime end)
+        {
+            Alerts.Clear();
 
- private DataTable LoadIncomesRaw(int userId, DateTime start, DateTime end)
- {
- var dt = new DataTable();
- try
- {
- using var con = DatabaseService.GetConnection();
- using var cmd = con.CreateCommand();
- cmd.CommandText = @"SELECT i.Id, i.Date, i.Amount, i.Description, i.Source, i.CategoryId, c.Name AS CategoryName
- FROM Incomes i
- LEFT JOIN Categories c ON c.Id = i.CategoryId
- WHERE i.UserId = @u AND date(i.Date) >= date(@from) AND date(i.Date) <= date(@to)
- ORDER BY date(i.Date) DESC, i.Id DESC;";
- cmd.Parameters.AddWithValue("@u", userId);
- cmd.Parameters.AddWithValue("@from", start.Date.ToString("yyyy-MM-dd"));
- cmd.Parameters.AddWithValue("@to", end.Date.ToString("yyyy-MM-dd"));
- using var r = cmd.ExecuteReader();
- dt.Load(r);
- }
- catch { }
- return dt;
- }
+            try
+            {
+                // 1) Alerty przekroczenia bud¿etów
+                var over = BudgetService.GetOverBudgetAlerts(_userId, start, end)
+                                        .OrderByDescending(x => x.OverAmount)
+                                        .ToList();
 
- public void GenerateInsights(DateTime start, DateTime end)
- {
- Insights.Clear();
- try
- {
- var thisRange = ToRows(DatabaseService.GetExpenses(_userId, start, end));
- var prevRange = ToRows(DatabaseService.GetExpenses(_userId, start.AddMonths(-1), end.AddMonths(-1)));
+                foreach (var b in over.Take(5))
+                {
+                    Alerts.Add($"Przekroczono bud¿et „{b.Name}” o {b.OverAmount:N2} z³ (okres: {b.Period}).");
+                }
 
- decimal sumThis = Sum(thisRange);
- decimal sumPrev = Sum(prevRange);
- if (sumPrev >0m)
- {
- var diffPct = (double)((sumPrev - sumThis) / sumPrev *100m);
- Insights.Add($"W tym okresie wydajesz {diffPct:+0;-0;0}% wzglêdem poprzedniego.");
- }
- else
- {
- Insights.Add("Brak danych do porównania z poprzednim okresem.");
- }
+                if (over.Count > 5)
+                    Alerts.Add($"+{over.Count - 5} kolejnych przekroczonych bud¿etów.");
 
- var top = thisRange
- .Select(r => SafeDecimal(r, "Amount"))
- .DefaultIfEmpty(0m)
- .Max();
- if (top >0m)
- Insights.Add($"Najwiêkszy wydatek w tym okresie to {top.ToString("N2", CultureInfo.CurrentCulture)} z³.");
+                // 2) Jeœli chcesz zostawiæ te¿ „bez kategorii” – zostaw.
+                // Jeœli NIE chcesz, to usuñ ca³y blok poni¿ej.
+                /*
+                var exp = ToRows(LoadExpensesRaw(_userId, start, end));
+                var inc = ToRows(LoadIncomesRaw(_userId, start, end));
+                int uncategorized =
+                    exp.Count(r => string.IsNullOrWhiteSpace(SafeString(r, "CategoryName"))) +
+                    inc.Count(r => string.IsNullOrWhiteSpace(SafeString(r, "CategoryName")));
+                if (uncategorized > 0)
+                    Alerts.Add($"{uncategorized} transakcji bez kategorii.");
+                */
 
- var count = thisRange.Count();
- Insights.Add($"Liczba transakcji: {count}.");
- }
- catch
- {
- Insights.Add("Nie uda³o siê wygenerowaæ insightów.");
- }
- }
+                if (!Alerts.Any())
+                    Alerts.Add("Brak alertów bud¿etowych w tym okresie.");
+            }
+            catch
+            {
+                Alerts.Add("Nie uda³o siê wygenerowaæ alertów bud¿etowych.");
+            }
+        }
 
- public void GenerateAlerts(DateTime start, DateTime end)
- {
- Alerts.Clear();
- try
- {
- var rows = ToRows(DatabaseService.GetExpenses(_userId, start, end));
- var uncategorized = rows.Count(r => string.IsNullOrWhiteSpace(SafeString(r, "CategoryName")));
- if (uncategorized >0)
- Alerts.Add($"{uncategorized} transakcji bez kategorii.");
 
- // Usuniêto alert zaplanowanych wydatków – brak implementacji zaplanowanych w tej wersji
- if (!Alerts.Any()) Alerts.Add("Brak alertów.");
- }
- catch
- {
- Alerts.Add("Nie uda³o siê wygenerowaæ alertów.");
- }
- }
+        public void GenerateForecast(DateTime start, DateTime end)
+        {
+            try
+            {
+                var rows = ToRows(DatabaseService.GetExpenses(_userId, start, end));
+                var days = Math.Max(1, (end.Date - start.Date).Days + 1);
+                var spent = Sum(rows);
+                var avgPerDay = spent / days;
 
- public void GenerateForecast(DateTime start, DateTime end)
- {
- try
- {
- var rows = ToRows(DatabaseService.GetExpenses(_userId, start, end));
- var days = Math.Max(1, (end.Date - start.Date).Days +1);
- var spent = Sum(rows);
- var avgPerDay = spent / days;
+                var monthEnd = new DateTime(end.Year, end.Month, DateTime.DaysInMonth(end.Year, end.Month));
+                var remainingDays = Math.Max(0, (monthEnd - end.Date).Days);
+                var predictedSpending = spent + (avgPerDay * remainingDays);
 
- var monthEnd = new DateTime(end.Year, end.Month, DateTime.DaysInMonth(end.Year, end.Month));
- var remainingDays = Math.Max(0, (monthEnd - end.Date).Days);
- var predictedSpending = spent + (avgPerDay * remainingDays);
+                var snap = DatabaseService.GetMoneySnapshot(_userId);
+                var predictedFreeCash = snap.Cash - predictedSpending;
 
- var snap = DatabaseService.GetMoneySnapshot(_userId);
- var predictedFreeCash = snap.Cash - predictedSpending;
+                Forecast = new ForecastModel
+                {
+                    PredictedSpending = predictedSpending,
+                    PredictedFreeCash = predictedFreeCash
+                };
+            }
+            catch
+            {
+                Forecast = new ForecastModel();
+            }
+        }
 
- Forecast = new ForecastModel
- {
- PredictedSpending = predictedSpending,
- PredictedFreeCash = predictedFreeCash
- };
- }
- catch
- {
- Forecast = new ForecastModel();
- }
- }
+        private static System.Collections.Generic.IEnumerable<DataRow> ToRows(DataTable? dt)
+            => dt == null ? Enumerable.Empty<DataRow>() : dt.Rows.Cast<DataRow>();
 
- private static System.Collections.Generic.IEnumerable<DataRow> ToRows(DataTable? dt)
- => dt == null ? Enumerable.Empty<DataRow>() : dt.Rows.Cast<DataRow>();
+        private static decimal Sum(System.Collections.Generic.IEnumerable<DataRow> rows)
+        {
+            decimal s = 0m;
+            foreach (var r in rows)
+            {
+                try
+                {
+                    var a = SafeDecimal(r, "Amount");
+                    s += Math.Abs(a);
+                }
+                catch { }
+            }
+            return s;
+        }
 
- private static decimal Sum(System.Collections.Generic.IEnumerable<DataRow> rows)
- {
- decimal s =0m; foreach (var r in rows) { try { var a = SafeDecimal(r, "Amount"); s += Math.Abs(a); } catch { } } return s;
- }
- private static string SafeString(DataRow r, string col) => r[col] == null || r[col] == System.DBNull.Value ? string.Empty : r[col]?.ToString() ?? string.Empty;
- private static decimal SafeDecimal(DataRow r, string col) => decimal.TryParse(r[col]?.ToString(), out var v) ? v :0m;
- private static int SafeInt(DataRow r, string col) => int.TryParse(r[col]?.ToString(), out var v) ? v :0;
- private static DateTime SafeDate(DataRow r, string col) => DateTime.TryParse(r[col]?.ToString(), out var v) ? v : DateTime.MinValue;
+        private static string SafeString(DataRow r, string col)
+            => r[col] == null || r[col] == DBNull.Value ? string.Empty : r[col]?.ToString() ?? string.Empty;
 
- public event PropertyChangedEventHandler? PropertyChanged;
- private void OnPropertyChanged([CallerMemberName] string? name = null)
- => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
- }
+        private static decimal SafeDecimal(DataRow r, string col)
+            => decimal.TryParse(r[col]?.ToString(), out var v) ? v : 0m;
+
+        private static int SafeInt(DataRow r, string col)
+            => int.TryParse(r[col]?.ToString(), out var v) ? v : 0;
+
+        private static DateTime SafeDate(DataRow r, string col)
+            => DateTime.TryParse(r[col]?.ToString(), out var v) ? v : DateTime.MinValue;
+
+        public event PropertyChangedEventHandler? PropertyChanged;
+
+        private void OnPropertyChanged([CallerMemberName] string? name = null)
+            => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
+    }
 }

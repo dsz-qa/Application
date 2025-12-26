@@ -6,6 +6,7 @@ using System;
 using System.Collections.Generic;
 using System.Data;
 using System.IO;
+using static Finly.Pages.BudgetRow;
 
 namespace Finly.Services.SpecificPages
 {
@@ -198,6 +199,97 @@ namespace Finly.Services.SpecificPages
 
             return result;
         }
+        public static List<BudgetOverAlert> GetOverBudgetAlerts(int userId, DateTime rangeFrom, DateTime rangeTo)
+        {
+            var result = new List<BudgetOverAlert>();
+
+            using var conn = DatabaseService.GetConnection();
+            conn.Open();
+
+            // bierzemy tylko budżety, które nachodzą na zakres
+            using var cmd = conn.CreateCommand();
+            cmd.CommandText = @"
+SELECT Id, Name, Type, StartDate, EndDate, PlannedAmount
+FROM Budgets
+WHERE UserId = @uid
+  AND date(EndDate) >= date(@from)
+  AND date(StartDate) <= date(@to)
+ORDER BY StartDate;";
+
+            cmd.Parameters.AddWithValue("@uid", userId);
+            cmd.Parameters.AddWithValue("@from", rangeFrom.ToString("yyyy-MM-dd"));
+            cmd.Parameters.AddWithValue("@to", rangeTo.ToString("yyyy-MM-dd"));
+
+            using var r = cmd.ExecuteReader();
+            while (r.Read())
+            {
+                var id = r.GetInt32(0);
+                var name = r.GetString(1);
+                var start = DateTime.Parse(r.GetString(3));
+                var end = DateTime.Parse(r.GetString(4));
+                var planned = Convert.ToDecimal(r.GetDouble(5));
+
+                // liczymy realnie w zakresie dashboardu (rangeFrom-rangeTo)
+                var spent = SumExpensesForBudget(conn, userId, id, rangeFrom, rangeTo);
+                var inc = SumIncomesForBudget(conn, userId, id, rangeFrom, rangeTo);
+
+                var alert = new BudgetOverAlert
+                {
+                    BudgetId = id,
+                    Name = name,
+                    StartDate = start,
+                    EndDate = end,
+                    PlannedAmount = planned,
+                    Spent = spent,
+                    Incomes = inc
+                };
+
+                if (alert.OverAmount > 0m)
+                    result.Add(alert);
+            }
+
+            return result;
+        }
+
+        private static decimal SumExpensesForBudget(SqliteConnection conn, int userId, int budgetId, DateTime from, DateTime to)
+        {
+            using var cmd = conn.CreateCommand();
+            cmd.CommandText = @"
+SELECT IFNULL(SUM(Amount), 0)
+FROM Expenses
+WHERE UserId = @uid
+  AND BudgetId = @bid
+  AND date(Date) >= date(@from)
+  AND date(Date) <= date(@to);";
+            cmd.Parameters.AddWithValue("@uid", userId);
+            cmd.Parameters.AddWithValue("@bid", budgetId);
+            cmd.Parameters.AddWithValue("@from", from.ToString("yyyy-MM-dd"));
+            cmd.Parameters.AddWithValue("@to", to.ToString("yyyy-MM-dd"));
+
+            var val = cmd.ExecuteScalar();
+            return val == null || val == DBNull.Value ? 0m : Convert.ToDecimal(val);
+        }
+
+        private static decimal SumIncomesForBudget(SqliteConnection conn, int userId, int budgetId, DateTime from, DateTime to)
+        {
+            using var cmd = conn.CreateCommand();
+            cmd.CommandText = @"
+SELECT IFNULL(SUM(Amount), 0)
+FROM Incomes
+WHERE UserId = @uid
+  AND BudgetId = @bid
+  AND date(Date) >= date(@from)
+  AND date(Date) <= date(@to);";
+            cmd.Parameters.AddWithValue("@uid", userId);
+            cmd.Parameters.AddWithValue("@bid", budgetId);
+            cmd.Parameters.AddWithValue("@from", from.ToString("yyyy-MM-dd"));
+            cmd.Parameters.AddWithValue("@to", to.ToString("yyyy-MM-dd"));
+
+            var val = cmd.ExecuteScalar();
+            return val == null || val == DBNull.Value ? 0m : Convert.ToDecimal(val);
+        }
+
+
 
         public static List<Budget> GetBudgetsForDate(int userId, DateTime date)
         {

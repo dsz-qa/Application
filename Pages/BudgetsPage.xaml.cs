@@ -21,12 +21,14 @@ namespace Finly.Pages
     {
         private readonly ObservableCollection<BudgetRow> _allBudgets = new();
         // TODO: tu później podepniesz id zalogowanego użytkownika
-        private readonly int _currentUserId = 1;
         private readonly ObservableCollection<BudgetOperationRow> _currentBudgetOps = new();
 
-        public BudgetsPage()
+        private readonly int _currentUserId;
+
+        public BudgetsPage(int userId)
         {
             InitializeComponent();
+            _currentUserId = userId;
 
             LoadBudgetsFromDatabase();
             SetupDefaultFilters();
@@ -36,6 +38,11 @@ namespace Finly.Pages
             CheckAndNotifyOverBudgets();
             BudgetOperationsGrid.ItemsSource = _currentBudgetOps;
         }
+
+
+        // (opcjonalnie) bezpieczny konstruktor domyślny, gdyby gdzieś jeszcze był używany
+        public BudgetsPage() : this(UserService.CurrentUserId) { }
+
 
         // =================== ŁADOWANIE Z TABELI BUDGETS ===================
 
@@ -93,8 +100,11 @@ namespace Finly.Pages
                     EndDate = Convert.ToDateTime(reader["EndDate"]),
                     PlannedAmount = reader.GetDecimal(reader.GetOrdinal("PlannedAmount")),
                     SpentAmount = reader.GetDecimal(reader.GetOrdinal("SpentAmount")),
-                    IncomeAmount = reader.GetDecimal(reader.GetOrdinal("IncomeAmount"))
+                    IncomeAmount = reader.GetDecimal(reader.GetOrdinal("IncomeAmount")),
+                    OverState = reader["OverState"] == DBNull.Value ? 0 : Convert.ToInt32(reader["OverState"]),
+                    OverNotifiedAt = reader["OverNotifiedAt"] == DBNull.Value ? null : reader["OverNotifiedAt"].ToString(),
                 };
+
 
                 row.Recalculate();
                 _allBudgets.Add(row);
@@ -796,6 +806,23 @@ WHERE Id = $id AND UserId = $uid;";
 
             public string Description { get; set; } = string.Empty;
         }
+
+        public class BudgetOverAlert
+        {
+            public int BudgetId { get; set; }
+            public string Name { get; set; } = "";
+            public DateTime StartDate { get; set; }
+            public DateTime EndDate { get; set; }
+            public decimal PlannedAmount { get; set; }
+            public decimal Spent { get; set; }
+            public decimal Incomes { get; set; }
+
+            public decimal Remaining => PlannedAmount + Incomes - Spent;
+            public decimal OverAmount => Remaining < 0 ? Math.Abs(Remaining) : 0m;
+
+            public string Period => $"{StartDate:dd.MM.yyyy} – {EndDate:dd.MM.yyyy}";
+        }
+
 
         public override string ToString()
         => Name;   //  TO DODAJ

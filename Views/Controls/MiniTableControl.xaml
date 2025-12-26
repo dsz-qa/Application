@@ -1,0 +1,30 @@
+﻿<UserControl x:Class="Finly.Views.Controls.MiniTableControl"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             x:Name="Root">
+
+	<Grid IsSharedSizeScope="True">
+		<Grid.RowDefinitions>
+			<RowDefinition Height="Auto"/>
+			<RowDefinition Height="*"/>
+		</Grid.RowDefinitions>
+
+		<!-- Header -->
+		<ContentPresenter Grid.Row="0"
+                          Content="{Binding RelativeSource={RelativeSource AncestorType=UserControl}}"
+                          ContentTemplate="{Binding HeaderTemplate, ElementName=Root}"/>
+
+		<!-- Rows -->
+		<ListBox x:Name="PART_List"
+                 Grid.Row="1"
+                 ItemsSource="{Binding ItemsSource, ElementName=Root}"
+                 ItemTemplate="{Binding RowTemplate, ElementName=Root}"
+                 Style="{StaticResource MiniTableListBox}"
+                 HorizontalContentAlignment="Stretch"
+                 SelectionMode="{Binding SelectionMode, ElementName=Root}"
+                 SelectedItem="{Binding SelectedItem, ElementName=Root, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                 SelectedIndex="{Binding SelectedIndex, ElementName=Root, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                 ScrollViewer.HorizontalScrollBarVisibility="{Binding HorizontalScrollBarVisibility, ElementName=Root}"
+                 ScrollViewer.VerticalScrollBarVisibility="{Binding VerticalScrollBarVisibility, ElementName=Root}"/>
+	</Grid>
+</UserControl>

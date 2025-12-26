@@ -2,6 +2,7 @@
 using Finly.Services;
 using Finly.Services.Features;
 using Finly.ViewModels;
+using Finly.Views;
 using Finly.Views.Dialogs;
 using System;
 using System.Collections.Generic;
@@ -45,7 +46,7 @@ namespace Finly.Pages
             _vm = new DashboardViewModel(_uid);
             DataContext = _vm;
 
-            // Hook PeriodBar events
+            // Hook PeriodBar events (gdyby XAML eventy nie zadziałały)
             if (FindName("PeriodBar") is Views.Controls.PeriodBarControl pb)
             {
                 pb.RangeChanged += PeriodBar_RangeChanged;
@@ -75,7 +76,6 @@ namespace Finly.Pages
                 };
             }
 
-            // ensure charts refreshed when loaded (layout established)
             Loaded += DashboardPage_Loaded;
 
             // Default preset: Ten miesiąc
@@ -186,7 +186,6 @@ namespace Finly.Pages
 
         private void UpdatePeriodLabel()
         {
-            // Sync PeriodBar control with current state
             if (FindName("PeriodBar") is Views.Controls.PeriodBarControl pb)
             {
                 if (_mode == DateRangeMode.Custom)
@@ -194,45 +193,6 @@ namespace Finly.Pages
                 else
                     pb.SetPreset(_mode);
             }
-
-            if (FindName("PeriodLabelText") is TextBlock label)
-            {
-                string text = _mode switch
-                {
-                    DateRangeMode.Day => "Dzisiaj",
-                    DateRangeMode.Week => "Ten tydzień",
-                    DateRangeMode.Month => "Ten miesiąc",
-                    DateRangeMode.Quarter => "Ten kwartał",
-                    DateRangeMode.Year => "Ten rok",
-                    DateRangeMode.Custom => $"{_startDate:dd.MM.yyyy} – {_endDate:dd.MM.yyyy}",
-                    _ => $"{_startDate:dd.MM.yyyy} – {_endDate:dd.MM.yyyy}"
-                };
-                label.Text = text;
-            }
-        }
-
-        private void PrevPeriod_Click(object sender, RoutedEventArgs e)
-        {
-            int idx = Array.IndexOf(PresetOrder, _mode);
-            if (idx < 0) idx = 0;
-
-            idx = (idx - 1 + PresetOrder.Length) % PresetOrder.Length;
-            ApplyPreset(PresetOrder[idx], DateTime.Today);
-
-            LoadCharts();
-            UpdateTablesVisibility();
-        }
-
-        private void NextPeriod_Click(object sender, RoutedEventArgs e)
-        {
-            int idx = Array.IndexOf(PresetOrder, _mode);
-            if (idx < 0) idx = 0;
-
-            idx = (idx + 1) % PresetOrder.Length;
-            ApplyPreset(PresetOrder[idx], DateTime.Today);
-
-            LoadCharts();
-            UpdateTablesVisibility();
         }
 
         private void PeriodBar_RangeChanged(object? sender, EventArgs e) => ReloadForPeriodBar(sender);
@@ -248,6 +208,7 @@ namespace Finly.Pages
             _vm.GenerateForecast(_startDate, _endDate);
             _vm.RefreshCharts(_startDate, _endDate);
 
+            RefreshMoneySummary();
             LoadCharts();
             UpdateTablesVisibility();
         }
@@ -266,6 +227,7 @@ namespace Finly.Pages
                 _vm.GenerateForecast(_startDate, _endDate);
                 _vm.RefreshCharts(_startDate, _endDate);
 
+                RefreshMoneySummary();
                 LoadCharts();
                 UpdateTablesVisibility();
             }
@@ -304,7 +266,6 @@ namespace Finly.Pages
             _vm.GenerateForecast(start, end);
             _vm.RefreshCharts(start, end);
 
-            // NEW: draw donuts via DonutChartControl
             DrawDonuts(expenses, incomes);
 
             // period summary
@@ -346,15 +307,6 @@ namespace Finly.Pages
             if (FindName("IncomeDonut") is Finly.Views.Controls.DonutChartControl incCtrl)
                 incCtrl.Draw(incDict, incTotal, palette);
         }
-        private static double FitFontSize(int textLength, double baseSize, double minSize = 10)
-        {
-            if (textLength <= 12) return baseSize;
-            var scale = 12.0 / textLength;              // im dłuższy tekst, tym mniejsza skala
-            return Math.Max(minSize, baseSize * scale);
-        }
-
-
-
 
         private void UpdateTablesVisibility()
         {
@@ -377,7 +329,7 @@ namespace Finly.Pages
         }
 
         // =====================================================================
-        // Tabelki
+        // Tabelki (TopCategoryBars + widoczność)
         // =====================================================================
         private void BindExpenseTable(IEnumerable<DatabaseService.CategoryAmountDto> data)
         {
@@ -408,7 +360,6 @@ namespace Finly.Pages
 
         private void BindIncomeTable(IEnumerable<DatabaseService.CategoryAmountDto> data)
         {
-            // tylko widoczność (lista przychodów jest bindowana do _vm.Incomes przez XAML)
             var detailedCount = _vm?.Incomes?.Count ?? 0;
 
             SetVisibility("IncomeEmptyText", detailedCount == 0);
@@ -661,12 +612,47 @@ namespace Finly.Pages
         private static Color Hex(string s) => (Color)ColorConverter.ConvertFromString(s)!;
 
         // =====================================================================
-        // Delete / Confirm (bez zmian)
+        // Akcja z "Do ogarnięcia"
         // =====================================================================
-        private TransactionItem? GetSelectedIncome() => (FindName("IncomeTable") as ListBox)?.SelectedItem as TransactionItem;
-        private TransactionItem? GetSelectedExpense() => (FindName("ExpenseTable") as ListBox)?.SelectedItem as TransactionItem;
-        private TransactionItem? GetSelectedPlanned() => (FindName("PlannedTransactionsList") as ListBox)?.SelectedItem as TransactionItem;
+        private void RangeStatsAction_Click(object sender, RoutedEventArgs e)
+        {
+            if (Window.GetWindow(this) is Finly.Views.ShellWindow shell)
+                shell.NavigateTo("transactions");
+        }
 
+        // =====================================================================
+        // SELEKCJA: MiniTableControl -> ListBox (w środku)
+        // =====================================================================
+        private static T? FindDescendant<T>(DependencyObject root) where T : DependencyObject
+        {
+            if (root == null) return null;
+
+            int count = VisualTreeHelper.GetChildrenCount(root);
+            for (int i = 0; i < count; i++)
+            {
+                var child = VisualTreeHelper.GetChild(root, i);
+                if (child is T t) return t;
+
+                var found = FindDescendant<T>(child);
+                if (found != null) return found;
+            }
+            return null;
+        }
+
+        private TransactionItem? GetSelectedFromMiniTable(string elementName)
+        {
+            if (FindName(elementName) is not DependencyObject host) return null;
+            var lb = FindDescendant<ListBox>(host);
+            return lb?.SelectedItem as TransactionItem;
+        }
+
+        private TransactionItem? GetSelectedIncome() => GetSelectedFromMiniTable("IncomeTable");
+        private TransactionItem? GetSelectedExpense() => GetSelectedFromMiniTable("ExpenseTable");
+        private TransactionItem? GetSelectedPlanned() => GetSelectedFromMiniTable("PlannedTransactionsList");
+
+        // =====================================================================
+        // Reload after edit/delete
+        // =====================================================================
         private void ReloadAfterEdit()
         {
             try
@@ -681,12 +667,16 @@ namespace Finly.Pages
                 _vm.LoadTransactions(_startDate, _endDate);
                 _vm.RefreshCharts(_startDate, _endDate);
 
+                RefreshMoneySummary();
                 LoadCharts();
                 UpdateTablesVisibility();
             }
             catch { }
         }
 
+        // =====================================================================
+        // Delete / Confirm
+        // =====================================================================
         private void ShowIncomeDeleteConfirm_Click(object sender, RoutedEventArgs e)
         {
             if (FindName("IncomeDeleteConfirmPanel") is FrameworkElement p) p.Visibility = Visibility.Visible;
@@ -753,7 +743,7 @@ namespace Finly.Pages
     }
 
     // =====================================================================
-    // Klasy pomocnicze (zostają, bo używasz ich w TopCategoryBars i trendzie)
+    // Klasy pomocnicze
     // =====================================================================
     public sealed class TableRow
     {

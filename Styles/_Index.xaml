@@ -10,5 +10,6 @@
 		<ResourceDictionary Source="SearchBox.xaml"/>
         <ResourceDictionary Source="FinancialAnalysisCards.xaml"/>
         <ResourceDictionary Source="Lists.xaml"/>
+		<ResourceDictionary Source="MiniTable.xaml"/>
 	</ResourceDictionary.MergedDictionaries>
 </ResourceDictionary>

@@ -6,6 +6,7 @@
         WindowStartupLocation="CenterOwner"
         SizeToContent="WidthAndHeight"
         ResizeMode="NoResize"
+		xmlns:models="clr-namespace:Finly.Models"
         Background="{DynamicResource App.Background}"
         Foreground="{DynamicResource App.Foreground}" Width="1730">
 
@@ -157,74 +158,68 @@
                        Margin="0,0,8,8"
                        VerticalAlignment="Center"
                        Text="Typ:"/>
-            <ComboBox Grid.Row="2"
-                      Grid.Column="1"
-                      Margin="0,0,0,8"
-                      SelectedItem="{Binding Type, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                      Style="{StaticResource DarkComboBox}">
-                <sys:String>Tygodniowy</sys:String>
-                <sys:String>Miesięczny</sys:String>
-                <sys:String>Roczny</sys:String>
-            </ComboBox>
+			<ComboBox Grid.Row="2"
+					  Grid.Column="1"
+					  Margin="0,0,0,8"
+					  SelectedValue="{Binding Type, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+					  SelectedValuePath="Tag"
+					  Style="{StaticResource DarkComboBox}">
+				<ComboBoxItem Content="Tygodniowy" Tag="{x:Static models:BudgetType.Weekly}" />
+				<ComboBoxItem Content="Miesięczny" Tag="{x:Static models:BudgetType.Monthly}" />
+				<ComboBoxItem Content="Roczny" Tag="{x:Static models:BudgetType.Yearly}" />
+			</ComboBox>
 
-            <!-- Okres -->
+
+			<!-- Okres -->
             <TextBlock Grid.Row="3"
                        Grid.Column="0"
                        Margin="0,0,8,8"
                        VerticalAlignment="Center"
                        Text="Okres:"/>
 
-            <StackPanel Grid.Row="3"
-                        Grid.Column="1"
-                        Orientation="Horizontal"
-                        Margin="0,0,-94,8">
+			<Grid Grid.Row="3" Grid.Column="1" Margin="0,0,0,8">
+				<Grid.ColumnDefinitions>
+					<ColumnDefinition Width="140"/>
+					<ColumnDefinition Width="Auto"/>
+					<ColumnDefinition Width="140"/>
+				</Grid.ColumnDefinitions>
 
-                <!-- Data od -->
-                <DatePicker Width="130"
-                            SelectedDate="{Binding StartDate,
-                                                   Mode=TwoWay,
-                                                   UpdateSourceTrigger=PropertyChanged}"/>
+				<DatePicker Grid.Column="0"
+							SelectedDate="{Binding StartDate, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
 
-                <TextBlock Text=" — "
-                           Margin="4,0"
-                           VerticalAlignment="Center"/>
+				<TextBlock Grid.Column="1" Text=" — " Margin="8,0" VerticalAlignment="Center"/>
 
-                <!-- Data do -->
-                <DatePicker SelectedDate="{Binding EndDate, Mode=OneWay}"
-                            IsEnabled="False" />
-            </StackPanel>
+				<DatePicker Grid.Column="2"
+							SelectedDate="{Binding EndDate, Mode=OneWay}"
+							IsEnabled="False"/>
+			</Grid>
 
-            <!-- Planowana kwota -->
+
+			<!-- Planowana kwota -->
             <TextBlock Grid.Row="4"
                        Grid.Column="0"
                        Margin="0,0,8,0"
                        VerticalAlignment="Center"
                        Text="Kwota planowana:"/>
 
-            <StackPanel Grid.Row="4"
-                        Grid.Column="1"
-                        Orientation="Horizontal"
-                        HorizontalAlignment="Left" Margin="10,0,-70,0" Width="344">
+			<Grid Grid.Row="4" Grid.Column="1">
+				<Grid.ColumnDefinitions>
+					<ColumnDefinition Width="160"/>
+					<ColumnDefinition Width="Auto"/>
+					<ColumnDefinition Width="Auto"/>
+				</Grid.ColumnDefinitions>
 
-                <!-- Używamy PlannedAmount (decimal) z VM -->
-                <TextBox Width="140"
-                         Text="{Binding PlannedAmount,
-                                        Mode=TwoWay,
-                                        UpdateSourceTrigger=PropertyChanged,
-                                        StringFormat=F2}"/>
+				<TextBox Grid.Column="0"
+						 Width="140"
+						 Text="{Binding PlannedAmount, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged, StringFormat=F2}"/>
 
-                <Button Content="OK"
-                        Width="80"
-                        Margin="12,0,0,0"
-                        IsDefault="True"
-                        Click="Ok_Click"/>
+				<Button Grid.Column="1" Content="OK" Width="80" Margin="12,0,0,0"
+						IsDefault="True" Click="Ok_Click"/>
 
-                <Button Content="Anuluj"
-                        Width="80"
-                        Margin="8,0,0,0"
-                        IsCancel="True"
-                        Click="Cancel_Click"/>
-            </StackPanel>
-        </Grid>
+				<Button Grid.Column="2" Content="Anuluj" Width="80" Margin="8,0,0,0"
+						IsCancel="True" Click="Cancel_Click"/>
+			</Grid>
+
+		</Grid>
     </Border>
 </Window>
