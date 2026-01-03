@@ -1,4 +1,4 @@
-using Finly.Services.Features;
+Ôªøusing Finly.Services.Features;
 using Finly.Services.SpecificPages;
 using LiveChartsCore;
 using LiveChartsCore.SkiaSharpView;
@@ -31,27 +31,27 @@ namespace Finly.ViewModels
         public string Category { get; set; } = string.Empty;
 
         /// <summary>
-        /// Sformatowane ürÛd≥o/konto (fallback dla prostych widokÛw).
+        /// Sformatowane ≈∫r√≥d≈Ço/konto (fallback dla prostych widok√≥w).
         /// </summary>
         public string Account { get; set; } = string.Empty;
 
         public string Description { get; set; } = string.Empty;
 
         /// <summary>
-        /// "PrzychÛd" / "Wydatek" / "Transfer"
+        /// "Przych√≥d" / "Wydatek" / "Transfer"
         /// </summary>
         public string Kind { get; set; } = string.Empty;
 
         public decimal Amount { get; set; }
-        public string AmountStr => Amount.ToString("N2", CultureInfo.CurrentCulture) + " z≥";
+        public string AmountStr => Amount.ToString("N2", CultureInfo.CurrentCulture) + " z≈Ç";
 
         /// <summary>
-        /// Oryginalny tekst ürÛd≥a z DB (np. Incomes.Source).
+        /// Oryginalny tekst ≈∫r√≥d≈Ça z DB (np. Incomes.Source).
         /// </summary>
         public string RawSource { get; set; } = string.Empty;
 
         /// <summary>
-        /// Dla transferÛw/planowanych: skπd / dokπd.
+        /// Dla transfer√≥w/planowanych: skƒÖd / dokƒÖd.
         /// Dla wydatku: FromAccount; dla przychodu: ToAccount.
         /// </summary>
         public string FromAccount { get; set; } = string.Empty;
@@ -63,8 +63,8 @@ namespace Finly.ViewModels
             {
                 var s = RawSource.Trim();
 
-                if (s.Equals("Wolna gotÛwka", StringComparison.OrdinalIgnoreCase)) Account = "Wolna gotÛwka";
-                else if (s.Equals("Od≥oøona gotÛwka", StringComparison.OrdinalIgnoreCase)) Account = "Od≥oøona gotÛwka";
+                if (s.Equals("Wolna got√≥wka", StringComparison.OrdinalIgnoreCase)) Account = "Wolna got√≥wka";
+                else if (s.Equals("Od≈Ço≈ºona got√≥wka", StringComparison.OrdinalIgnoreCase)) Account = "Od≈Ço≈ºona got√≥wka";
                 else if (s.StartsWith("Konto", StringComparison.OrdinalIgnoreCase)) Account = s;   // np. "Konto: mBank"
                 else if (s.StartsWith("Koperta", StringComparison.OrdinalIgnoreCase)) Account = s; // np. "Koperta: Jedzenie"
                 else Account = s;
@@ -120,15 +120,19 @@ namespace Finly.ViewModels
             private set { _incomeBySourceSeries = value; OnPropertyChanged(); }
         }
 
-        // ===== RangeStats (kafelek "Do ogarniÍcia") =====
+        // ===== RangeStats (kafelek "Do ogarniƒôcia") =====
         public sealed class RangeStatsVm : INotifyPropertyChanged
         {
             private int _total;
             private int _missingCategory;
             private int _planned;
             private string _message = "Brak danych w tym okresie.";
-            private string _actionText = "Przejdü do transakcji";
+            private string _actionText = "Przejd≈∫ do transakcji";
             private bool _hasAction;
+
+            // NEW: route dla ShellWindow.NavigateTo(...)
+            private string _actionRoute = "transactions";
+            public string ActionRoute { get => _actionRoute; set { _actionRoute = value; OnPropertyChanged(); } }
 
             public int Total { get => _total; set { _total = value; OnPropertyChanged(); } }
             public int MissingCategory { get => _missingCategory; set { _missingCategory = value; OnPropertyChanged(); } }
@@ -143,6 +147,8 @@ namespace Finly.ViewModels
                 => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(n));
         }
 
+
+
         public RangeStatsVm RangeStats { get; } = new();
 
         public DashboardViewModel(int userId)
@@ -150,7 +156,7 @@ namespace Finly.ViewModels
             _userId = userId;
         }
 
-        // Palette for pie slices ñ visible on dark theme
+        // Palette for pie slices ‚Äì visible on dark theme
         private static readonly SKColor[] PiePalette = new[]
         {
             SKColor.Parse("#ED7A1A"), // orange
@@ -182,7 +188,7 @@ namespace Finly.ViewModels
                     DataLabelsPaint = new SolidColorPaint(SKColors.White),
                     DataLabelsSize = 11,
                     DataLabelsPosition = LiveChartsCore.Measure.PolarLabelsPosition.Middle,
-                    DataLabelsFormatter = p => string.Format(CultureInfo.CurrentCulture, "{0:N2} z≥", p.Coordinate.PrimaryValue),
+                    DataLabelsFormatter = p => string.Format(CultureInfo.CurrentCulture, "{0:N2} z≈Ç", p.Coordinate.PrimaryValue),
                     Fill = new SolidColorPaint(PiePalette[i % PiePalette.Length]),
                     Stroke = null
                 }).Cast<ISeries>().ToArray();
@@ -200,7 +206,7 @@ namespace Finly.ViewModels
                         DataLabelsPaint = new SolidColorPaint(SKColors.White),
                         DataLabelsSize = 11,
                         DataLabelsPosition = LiveChartsCore.Measure.PolarLabelsPosition.Middle,
-                        DataLabelsFormatter = p => string.Format(CultureInfo.CurrentCulture, "{0:N2} z≥", p.Coordinate.PrimaryValue),
+                        DataLabelsFormatter = p => string.Format(CultureInfo.CurrentCulture, "{0:N2} z≈Ç", p.Coordinate.PrimaryValue),
                         Fill = new SolidColorPaint(PiePalette[i % PiePalette.Length]),
                         Stroke = null
                     }).Cast<ISeries>().ToArray();
@@ -211,7 +217,7 @@ namespace Finly.ViewModels
 
                 // ===== INCOME PIE =====
                 var incomeGroups = Incomes
-                    .Where(t => t.Kind == "PrzychÛd" && t.Amount > 0)
+                    .Where(t => t.Kind == "Przych√≥d" && t.Amount > 0)
                     .GroupBy(t => string.IsNullOrWhiteSpace(t.Category) ? "Przychody" : t.Category)
                     .OrderByDescending(g => g.Sum(x => x.Amount))
                     .ToList();
@@ -224,7 +230,7 @@ namespace Finly.ViewModels
                     DataLabelsPaint = new SolidColorPaint(SKColors.White),
                     DataLabelsSize = 11,
                     DataLabelsPosition = LiveChartsCore.Measure.PolarLabelsPosition.Middle,
-                    DataLabelsFormatter = p => string.Format(CultureInfo.CurrentCulture, "{0:N2} z≥", p.Coordinate.PrimaryValue),
+                    DataLabelsFormatter = p => string.Format(CultureInfo.CurrentCulture, "{0:N2} z≈Ç", p.Coordinate.PrimaryValue),
                     Fill = new SolidColorPaint(PiePalette[i % PiePalette.Length]),
                     Stroke = null
                 }).Cast<ISeries>().ToArray();
@@ -242,7 +248,7 @@ namespace Finly.ViewModels
                         DataLabelsPaint = new SolidColorPaint(SKColors.White),
                         DataLabelsSize = 11,
                         DataLabelsPosition = LiveChartsCore.Measure.PolarLabelsPosition.Middle,
-                        DataLabelsFormatter = p => string.Format(CultureInfo.CurrentCulture, "{0:N2} z≥", p.Coordinate.PrimaryValue),
+                        DataLabelsFormatter = p => string.Format(CultureInfo.CurrentCulture, "{0:N2} z≈Ç", p.Coordinate.PrimaryValue),
                         Fill = new SolidColorPaint(PiePalette[i % PiePalette.Length]),
                         Stroke = null
                     }).Cast<ISeries>().ToArray();
@@ -282,7 +288,7 @@ namespace Finly.ViewModels
                         RawSource = rawSrc,
                         Account = rawSrc,
                         Description = SafeString(r, "Description"),
-                        Kind = "PrzychÛd",
+                        Kind = "Przych√≥d",
                         Amount = Math.Abs(SafeDecimal(r, "Amount")),
                         FromAccount = "",
                         ToAccount = rawSrc
@@ -298,7 +304,7 @@ namespace Finly.ViewModels
                 var dtExp = LoadExpensesRaw(_userId, start, end);
                 foreach (var r in ToRows(dtExp))
                 {
-                    var accountText = SafeInt(r, "AccountId") > 0 ? "Konto bankowe" : "GotÛwka";
+                    var accountText = SafeInt(r, "AccountId") > 0 ? "Konto bankowe" : "Got√≥wka";
 
                     var item = new TransactionItem
                     {
@@ -323,12 +329,12 @@ namespace Finly.ViewModels
                 // ===== ZAPLANOWANE =====
                 LoadPlannedTransactions(start, end);
 
-                // ===== KAFEL "Do ogarniÍcia" =====
+                // ===== KAFEL "Do ogarniƒôcia" =====
                 UpdateRangeStats();
             }
             catch
             {
-                UpdateRangeStats(); // nawet jak b≥πd, ustaw sensowny stan UI
+                UpdateRangeStats(); // nawet jak b≈ÇƒÖd, ustaw sensowny stan UI
             }
         }
 
@@ -352,30 +358,34 @@ namespace Finly.ViewModels
 
                 if (total == 0 && planned == 0)
                 {
-                    RangeStats.Message = "W tym okresie nie ma danych. ZmieÒ zakres albo dodaj pierwszπ transakcjÍ.";
-                    RangeStats.ActionText = "Dodaj transakcjÍ";
+                    RangeStats.Message = "W tym okresie nie ma danych. Zmie≈Ñ zakres albo dodaj pierwszƒÖ transakcjƒô.";
+                    RangeStats.ActionText = "Dodaj transakcjƒô";
+                    RangeStats.ActionRoute = "addexpense";   // ‚úÖ AddExpensePage
                     RangeStats.HasAction = true;
                     return;
                 }
 
                 if (missingCategory > 0)
                 {
-                    RangeStats.Message = $"Masz {missingCategory} transakcji bez kategorii. Uzupe≥nij je, øeby raporty by≥y dok≥adniejsze.";
-                    RangeStats.ActionText = "Przejdü do transakcji";
+                    RangeStats.Message = $"Masz {missingCategory} transakcji bez kategorii. Uzupe≈Çnij je, ≈ºeby raporty by≈Çy dok≈Çadniejsze.";
+                    RangeStats.ActionText = "Przejd≈∫ do transakcji";
+                    RangeStats.ActionRoute = "transactions"; // ‚úÖ TransactionsPage
                     RangeStats.HasAction = true;
                     return;
                 }
 
                 if (planned > 0)
                 {
-                    RangeStats.Message = $"Masz {planned} zaplanowanych transakcji. Sprawdü, czy wszystko jest aktualne.";
+                    RangeStats.Message = $"Masz {planned} zaplanowanych transakcji. Sprawd≈∫, czy wszystko jest aktualne.";
                     RangeStats.ActionText = "Zobacz zaplanowane";
+                    RangeStats.ActionRoute = "transactions"; // ‚úÖ najpro≈õciej: planned sƒÖ w transakcjach
                     RangeStats.HasAction = true;
                     return;
                 }
 
-                RangeStats.Message = "Dane wyglπdajπ dobrze. Moøesz przejúÊ do raportÛw lub dodaÊ nowe transakcje.";
-                RangeStats.ActionText = "OtwÛrz raporty";
+                RangeStats.Message = "Dane wyglƒÖdajƒÖ dobrze. Mo≈ºesz przej≈õƒá do raport√≥w lub dodaƒá nowe transakcje.";
+                RangeStats.ActionText = "Otw√≥rz raporty";
+                RangeStats.ActionRoute = "reports";         // ‚úÖ ReportsPage
                 RangeStats.HasAction = true;
             }
             catch
@@ -383,11 +393,13 @@ namespace Finly.ViewModels
                 RangeStats.Total = 0;
                 RangeStats.Planned = 0;
                 RangeStats.MissingCategory = 0;
-                RangeStats.Message = "Nie uda≥o siÍ podsumowaÊ danych dla okresu.";
-                RangeStats.ActionText = "Odúwieø";
+                RangeStats.Message = "Nie uda≈Ço siƒô podsumowaƒá danych dla okresu.";
+                RangeStats.ActionText = "Od≈õwie≈º";
+                RangeStats.ActionRoute = "dashboard";       // fallback
                 RangeStats.HasAction = false;
             }
         }
+
 
         private void LoadPlannedTransactions(DateTime start, DateTime end)
         {
@@ -430,7 +442,7 @@ ORDER BY date(i.Date) DESC, i.Id DESC;";
                             RawSource = rawSource,
                             Account = rawSource,
                             Description = SafeString(row, "Description"),
-                            Kind = "PrzychÛd",
+                            Kind = "Przych√≥d",
                             Amount = Math.Abs(SafeDecimal(row, "Amount")),
                             FromAccount = "",
                             ToAccount = rawSource
@@ -467,7 +479,7 @@ ORDER BY date(e.Date) DESC, e.Id DESC;";
 
                     foreach (DataRow row in dt.Rows)
                     {
-                        var accountText = SafeInt(row, "AccountId") > 0 ? "Konto bankowe" : "GotÛwka";
+                        var accountText = SafeInt(row, "AccountId") > 0 ? "Konto bankowe" : "Got√≥wka";
 
                         var item = new TransactionItem
                         {
@@ -490,7 +502,7 @@ ORDER BY date(e.Date) DESC, e.Id DESC;";
                     }
                 }
 
-                // ===== WYKRYCIE TRANSFER”W (heurystyka) =====
+                // ===== WYKRYCIE TRANSFER√ìW (heurystyka) =====
                 static bool IsTransferLike(string s)
                     => !string.IsNullOrWhiteSpace(s)
                        && (s.StartsWith("Przelew", StringComparison.OrdinalIgnoreCase)
@@ -528,7 +540,7 @@ ORDER BY date(e.Date) DESC, e.Id DESC;";
                     });
                 }
 
-                // ===== DODAJ RESZT  =====
+                // ===== DODAJ RESZTƒò =====
                 foreach (var inc in plannedIncome.Where(i => !usedIncomeIds.Contains(i.Id)))
                     PlannedTransactions.Add(inc);
 
@@ -537,7 +549,7 @@ ORDER BY date(e.Date) DESC, e.Id DESC;";
             }
             catch
             {
-                // celowo cicho ñ jak wczeúniej
+                // celowo cicho ‚Äì jak wcze≈õniej
             }
         }
 
@@ -603,7 +615,7 @@ ORDER BY date(i.Date) DESC, i.Id DESC;";
 
             try
             {
-                // Wydatki w tym i poprzednim okresie ñ do porÛwnania (to zostaje wydatkami)
+                // Wydatki w tym i poprzednim okresie ‚Äì do por√≥wnania (to zostaje wydatkami)
                 var thisExp = ToRows(DatabaseService.GetExpenses(_userId, start, end));
                 var prevExp = ToRows(DatabaseService.GetExpenses(_userId, start.AddMonths(-1), end.AddMonths(-1)));
 
@@ -613,24 +625,24 @@ ORDER BY date(i.Date) DESC, i.Id DESC;";
                 if (sumPrev > 0m)
                 {
                     var diffPct = (double)((sumPrev - sumThis) / sumPrev * 100m);
-                    Insights.Add($"W tym okresie wydajesz {diffPct:+0;-0;0}% wzglÍdem poprzedniego.");
+                    Insights.Add($"W tym okresie wydajesz {diffPct:+0;-0;0}% wzglƒôdem poprzedniego.");
                 }
                 else
                 {
-                    Insights.Add("Brak danych do porÛwnania z poprzednim okresem.");
+                    Insights.Add("Brak danych do por√≥wnania z poprzednim okresem.");
                 }
 
-                // NajwiÍkszy wydatek (tylko wydatki)
+                // Najwiƒôkszy wydatek (tylko wydatki)
                 var top = thisExp
                     .Select(r => Math.Abs(SafeDecimal(r, "Amount")))
                     .DefaultIfEmpty(0m)
                     .Max();
 
                 if (top > 0m)
-                    Insights.Add($"NajwiÍkszy wydatek w tym okresie to {top.ToString("N2", CultureInfo.CurrentCulture)} z≥.");
+                    Insights.Add($"Najwiƒôkszy wydatek w tym okresie to {top.ToString("N2", CultureInfo.CurrentCulture)} z≈Ç.");
 
                 // POPRAWKA: liczba transakcji = przychody + wydatki (nieplanowane)
-                // Uøywamy raw-Ûw z VM, bo to jest dok≥adnie zakres z periodbara.
+                // U≈ºywamy raw-√≥w z VM, bo to jest dok≈Çadnie zakres z periodbara.
                 var expRaw = ToRows(LoadExpensesRaw(_userId, start, end));
                 var incRaw = ToRows(LoadIncomesRaw(_userId, start, end));
 
@@ -639,7 +651,7 @@ ORDER BY date(i.Date) DESC, i.Id DESC;";
             }
             catch
             {
-                Insights.Add("Nie uda≥o siÍ wygenerowaÊ insightÛw.");
+                Insights.Add("Nie uda≈Ço siƒô wygenerowaƒá insight√≥w.");
             }
         }
 
@@ -650,21 +662,21 @@ ORDER BY date(i.Date) DESC, i.Id DESC;";
 
             try
             {
-                // 1) Alerty przekroczenia budøetÛw
+                // 1) Alerty przekroczenia bud≈ºet√≥w
                 var over = BudgetService.GetOverBudgetAlerts(_userId, start, end)
                                         .OrderByDescending(x => x.OverAmount)
                                         .ToList();
 
                 foreach (var b in over.Take(5))
                 {
-                    Alerts.Add($"Przekroczono budøet Ñ{b.Name}î o {b.OverAmount:N2} z≥ (okres: {b.Period}).");
+                    Alerts.Add($"Przekroczono bud≈ºet ‚Äû{b.Name}‚Äù o {b.OverAmount:N2} z≈Ç (okres: {b.Period}).");
                 }
 
                 if (over.Count > 5)
-                    Alerts.Add($"+{over.Count - 5} kolejnych przekroczonych budøetÛw.");
+                    Alerts.Add($"+{over.Count - 5} kolejnych przekroczonych bud≈ºet√≥w.");
 
-                // 2) Jeúli chcesz zostawiÊ teø Ñbez kategoriiî ñ zostaw.
-                // Jeúli NIE chcesz, to usuÒ ca≥y blok poniøej.
+                // 2) Je≈õli chcesz zostawiƒá te≈º ‚Äûbez kategorii‚Äù ‚Äì zostaw.
+                // Je≈õli NIE chcesz, to usu≈Ñ ca≈Çy blok poni≈ºej.
                 /*
                 var exp = ToRows(LoadExpensesRaw(_userId, start, end));
                 var inc = ToRows(LoadIncomesRaw(_userId, start, end));
@@ -676,11 +688,11 @@ ORDER BY date(i.Date) DESC, i.Id DESC;";
                 */
 
                 if (!Alerts.Any())
-                    Alerts.Add("Brak alertÛw budøetowych w tym okresie.");
+                    Alerts.Add("Brak alert√≥w bud≈ºetowych w tym okresie.");
             }
             catch
             {
-                Alerts.Add("Nie uda≥o siÍ wygenerowaÊ alertÛw budøetowych.");
+                Alerts.Add("Nie uda≈Ço siƒô wygenerowaƒá alert√≥w bud≈ºetowych.");
             }
         }
 

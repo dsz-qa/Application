@@ -4,15 +4,14 @@ using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Data;
+using System.Windows.Input;
 using System.Windows.Media;
-using System.Windows.Input; // added for KeyEventArgs
-using Finly.Models;
 using Finly.Services;
+using Finly.Services.Features;
 using Finly.ViewModels;
 using Finly.Views.Controls;
-using Finly.Services.Features;
-using TransactionKind = Finly.ViewModels.TransactionsViewModel.TransactionKind;
 using TransactionCardVm = Finly.ViewModels.TransactionsViewModel.TransactionCardVm;
+using TransactionKind = Finly.ViewModels.TransactionsViewModel.TransactionKind;
 
 namespace Finly.Pages
 {
@@ -20,8 +19,10 @@ namespace Finly.Pages
     {
         private readonly TransactionsViewModel _vm;
         private PeriodBarControl? _periodBar;
-        // UID used for data queries and KPI refresh
         private int _uid;
+
+        // chroni przed callbackami po Unloaded
+        private bool _isAlive;
 
         public TransactionsPage()
         {
@@ -38,23 +39,95 @@ namespace Finly.Pages
 
         private void TransactionsPage_Loaded(object sender, RoutedEventArgs e)
         {
-            int uid = UserService.GetCurrentUserId();
+            if (_isAlive) return; // zabezpieczenie przed podwójnym loadem
+            _isAlive = true;
 
+            _uid = 0;
+
+            int uid;
+            try { uid = UserService.GetCurrentUserId(); }
+            catch { uid = 0; }
+
+            if (uid <= 0)
+                return;
+
+            _uid = uid;
+
+            // Inicjalizacja VM
             _vm.Initialize(uid);
 
+            // PeriodBar
             _periodBar = FindName("PeriodBar") as PeriodBarControl;
             if (_periodBar != null)
             {
-                _vm.SetPeriod(_periodBar.Mode, _periodBar.StartDate, _periodBar.EndDate);
+                _periodBar.RangeChanged -= PeriodBar_RangeChanged; // ważne jeśli WPF z jakiegoś powodu podwiesił
                 _periodBar.RangeChanged += PeriodBar_RangeChanged;
+
+                // ustaw okres startowy
+                _vm.SetPeriod(_periodBar.Mode, _periodBar.StartDate, _periodBar.EndDate);
             }
 
-            // źródła dla ComboBoxów w trybie edycji
+            // źródła dla ComboBoxów (jeśli nadal trzymasz je w Resources; w nowym XAML i tak bazujesz na VM.Available*)
+            LoadEditResources(uid);
+
+            // KPI
+            RefreshMoneySummary();
+
+            // auto-refresh po zmianach w bazie
+            DatabaseService.DataChanged -= DatabaseService_DataChanged;
+            DatabaseService.DataChanged += DatabaseService_DataChanged;
+        }
+
+        private void TransactionsPage_Unloaded(object sender, RoutedEventArgs e)
+        {
+            _isAlive = false;
+
+            try { DatabaseService.DataChanged -= DatabaseService_DataChanged; } catch { }
+            try
+            {
+                if (_periodBar != null)
+                    _periodBar.RangeChanged -= PeriodBar_RangeChanged;
+            }
+            catch { }
+
+            _periodBar = null;
+            _uid = 0;
+        }
+
+        private void DatabaseService_DataChanged(object? sender, EventArgs e)
+        {
+            if (!_isAlive) return;
+
+            Dispatcher.BeginInvoke(new Action(() =>
+            {
+                if (!_isAlive) return;
+
+                try
+                {
+                    _vm.ReloadAll();
+
+                    if (_periodBar != null)
+                        _vm.SetPeriod(_periodBar.Mode, _periodBar.StartDate, _periodBar.EndDate);
+
+                    RefreshMoneySummary();
+                }
+                catch
+                {
+                    // nie blokuj UI
+                }
+            }), System.Windows.Threading.DispatcherPriority.Background);
+        }
+
+        private void LoadEditResources(int uid)
+        {
+            // UWAGA:
+            // W Twoim aktualnym XAML ComboBoxy biorą ItemsSource z:
+            // DataContext.AvailableCategories / AvailableAccounts,
+            // więc te Resources są opcjonalne. Zostawiam je kompatybilnie.
             try
             {
                 var cats = DatabaseService.GetCategoriesByUser(uid)
                            ?? new System.Collections.Generic.List<string>();
-
                 Resources["CategoriesForEditRes"] = cats.ToArray();
             }
             catch
@@ -69,8 +142,8 @@ namespace Finly.Pages
                                .ToList()
                            ?? new System.Collections.Generic.List<string>();
 
-                accs.Add("Wolna gotówka");
-                accs.Add("Odłożona gotówka");
+                if (!accs.Contains("Wolna gotówka")) accs.Add("Wolna gotówka");
+                if (!accs.Contains("Odłożona gotówka")) accs.Add("Odłożona gotówka");
 
                 Resources["AccountsForEditRes"] = accs.ToArray();
             }
@@ -78,35 +151,10 @@ namespace Finly.Pages
             {
                 Resources["AccountsForEditRes"] = new[] { "Wolna gotówka", "Odłożona gotówka" };
             }
-
-            // store uid for later use and refresh KPI tiles
-            _uid = uid;
-            RefreshMoneySummary();
-
-            // subscribe to DB changes to auto-refresh KPI when data changes
-            DatabaseService.DataChanged += DatabaseService_DataChanged;
         }
 
-        private void TransactionsPage_Unloaded(object sender, RoutedEventArgs e)
-        {
-            try
-            {
-                DatabaseService.DataChanged -= DatabaseService_DataChanged;
-            }
-            catch { }
-        }
+        // ================== KPI ==================
 
-        private void DatabaseService_DataChanged(object? sender, EventArgs e)
-        {
-            // Refresh KPI on UI thread
-            Dispatcher.BeginInvoke(new Action(() =>
-            {
-                try { RefreshMoneySummary(); }
-                catch { }
-            }), System.Windows.Threading.DispatcherPriority.Background);
-        }
-
-        // Helper to set KPI TextBlocks by name
         private void SetKpiText(string name, decimal value)
         {
             if (FindName(name) is TextBlock tb)
@@ -117,21 +165,37 @@ namespace Finly.Pages
         {
             if (_uid <= 0) return;
 
-            var snap = DatabaseService.GetMoneySnapshot(_uid);
+            try
+            {
+                var snap = DatabaseService.GetMoneySnapshot(_uid);
 
-            SetKpiText("TotalWealthText", snap.Total);
-            SetKpiText("BanksText", snap.Banks);
-            SetKpiText("FreeCashDashboardText", snap.Cash);
-            SetKpiText("SavedToAllocateText", snap.SavedUnallocated);
-            SetKpiText("EnvelopesDashboardText", snap.Envelopes);
-            SetKpiText("InvestmentsText", 0m);
+                SetKpiText("TotalWealthText", snap.Total);
+                SetKpiText("BanksText", snap.Banks);
+                SetKpiText("FreeCashDashboardText", snap.Cash);
+                SetKpiText("SavedToAllocateText", snap.SavedUnallocated);
+                SetKpiText("EnvelopesDashboardText", snap.Envelopes);
+                SetKpiText("InvestmentsText", 0m);
+            }
+            catch
+            {
+                // nie blokuj UI
+            }
         }
+
+        // ================== PERIOD ==================
 
         private void PeriodBar_RangeChanged(object? sender, EventArgs e)
         {
             if (_periodBar == null) return;
 
-            _vm.SetPeriod(_periodBar.Mode, _periodBar.StartDate, _periodBar.EndDate);
+            try
+            {
+                _vm.SetPeriod(_periodBar.Mode, _periodBar.StartDate, _periodBar.EndDate);
+            }
+            catch
+            {
+                // nie blokuj UI
+            }
         }
 
         // ================== DRZEWO WIZUALNE – HELPERY ==================
@@ -144,7 +208,9 @@ namespace Finly.Pages
             int cnt = VisualTreeHelper.GetChildrenCount(start);
             for (int i = 0; i < cnt; i++)
             {
-                if (VisualTreeHelper.GetChild(start, i) is FrameworkElement fe)
+                var child = VisualTreeHelper.GetChild(start, i);
+
+                if (child is FrameworkElement fe)
                 {
                     if (fe is T t && t.Name == name)
                         return t;
@@ -153,23 +219,30 @@ namespace Finly.Pages
                     if (deeper != null)
                         return deeper;
                 }
+                else
+                {
+                    var deeper = FindDescendantByName<T>(child, name);
+                    if (deeper != null)
+                        return deeper;
+                }
             }
 
             return null;
         }
 
-        private T? FindAncestor<T>(DependencyObject? start) where T : DependencyObject
+        private static T? FindAncestor<T>(DependencyObject? start) where T : DependencyObject
         {
             var cur = start;
             while (cur != null && cur is not T)
-            {
                 cur = VisualTreeHelper.GetParent(cur);
-            }
 
             return cur as T;
         }
 
         // ================== USUWANIE ==================
+        // W nowym XAML usuwanie jest przez IsDeleteConfirmationVisible + Commandy w VM.
+        // Zostawiamy kompatybilnie metody oparte o "DeleteConfirmPanel",
+        // ale jeśli panel nie istnieje, to nic się nie stanie.
 
         private void HideAllDeletePanels()
         {
@@ -189,7 +262,6 @@ namespace Finly.Pages
             }
 
             CollapseInside(FindName("RealizedItems") as ItemsControl);
-            // Updated name to match XAML change
             CollapseInside(FindName("PlannedItemsList") as ItemsControl);
         }
 
@@ -217,8 +289,6 @@ namespace Finly.Pages
         private void DeleteConfirmNo_Click(object sender, RoutedEventArgs e)
             => HideAllDeletePanels();
 
-
-
         private void DeleteConfirmYes_Click(object sender, RoutedEventArgs e)
         {
             if (sender is not FrameworkElement fe)
@@ -235,20 +305,19 @@ namespace Finly.Pages
 
             try
             {
+                // Jedyny właściciel księgowania/usuwania
+                TransactionsFacadeService.DeleteTransaction(vmItem.Id);
+
                 switch (vmItem.Kind)
                 {
                     case TransactionKind.Expense:
-                        DatabaseService.DeleteExpense(vmItem.Id);
                         ToastService.Success("Usunięto wydatek.");
                         break;
-
                     case TransactionKind.Income:
-                        DatabaseService.DeleteIncome(vmItem.Id);
                         ToastService.Success("Usunięto przychód.");
                         break;
-
                     case TransactionKind.Transfer:
-                        ToastService.Info("Transfer usuń poprzez powiązane wpisy.");
+                        ToastService.Success("Usunięto transfer.");
                         break;
                 }
             }
@@ -260,12 +329,20 @@ namespace Finly.Pages
             {
                 HideAllDeletePanels();
 
-                if (_periodBar != null)
-                    _vm.SetPeriod(_periodBar.Mode, _periodBar.StartDate, _periodBar.EndDate);
+                try
+                {
+                    if (_periodBar != null)
+                        _vm.SetPeriod(_periodBar.Mode, _periodBar.StartDate, _periodBar.EndDate);
 
-                _vm.LoadFromDatabase();
-                // update KPI tiles after changes
-                RefreshMoneySummary();
+                    // VM sam czyta z DB – odśwież listy
+                    _vm.LoadFromDatabase();
+
+                    RefreshMoneySummary();
+                }
+                catch
+                {
+                    // nie blokuj UI
+                }
             }
         }
 
@@ -275,7 +352,14 @@ namespace Finly.Pages
         {
             if (sender is FrameworkElement fe && fe.DataContext is TransactionCardVm vm)
             {
-                _vm.StartEdit(vm);
+                try
+                {
+                    // zamknij ewentualne potwierdzenia usuwania
+                    vm.IsDeleteConfirmationVisible = false;
+
+                    _vm.StartEdit(vm);
+                }
+                catch { }
             }
         }
 
@@ -283,9 +367,14 @@ namespace Finly.Pages
         {
             if (sender is FrameworkElement fe && fe.DataContext is TransactionCardVm vm)
             {
-                _vm.SaveEdit(vm);
-                // ensure KPI tiles reflect saved changes (if SaveEdit doesn't trigger DataChanged)
-                try { RefreshMoneySummary(); } catch { }
+                try
+                {
+                    _vm.SaveEdit(vm);
+
+                    // Jeżeli Update*/Ledger nie wywoła DataChanged, to KPI i tak się odświeży:
+                    RefreshMoneySummary();
+                }
+                catch { }
             }
         }
 
@@ -293,8 +382,12 @@ namespace Finly.Pages
         {
             if (sender is FrameworkElement fe && fe.DataContext is TransactionCardVm vm)
             {
-                // Cancel inline edit without saving; return to read mode
-                vm.IsEditing = false;
+                try
+                {
+                    vm.IsEditing = false;
+                    vm.IsDeleteConfirmationVisible = false;
+                }
+                catch { }
             }
         }
 
@@ -302,8 +395,12 @@ namespace Finly.Pages
         {
             if (sender is TextBox tb)
             {
-                // wyczyść, aby ułatwić wpisanie nowej kwoty
-                tb.Clear();
+                // lepszy UX niż Clear(): pozwala nadpisać jednym wpisem,
+                // ale nie kasuje wartości, jeśli user tylko kliknął.
+                tb.SelectAll();
+
+                // Jeśli jednak chcesz “zawsze czyść”, odkomentuj:
+                // tb.Clear();
             }
         }
 
@@ -317,28 +414,18 @@ namespace Finly.Pages
         {
             if (sender is not FrameworkElement fe) return;
 
-            // znajdź kontener (StackPanel) z ukrytym DatePickerem "DateEditor"
-            var sp = FindAncestor<StackPanel>(fe);
-            if (sp == null)
-            {
-                // fallback: szukaj poziom wyżej
-                sp = FindAncestor<StackPanel>(VisualTreeHelper.GetParent(fe));
-            }
+            var sp = FindAncestor<StackPanel>(fe) ?? FindAncestor<StackPanel>(VisualTreeHelper.GetParent(fe));
             if (sp == null) return;
 
             var dp = FindDescendantByName<DatePicker>(sp, "DateEditor");
             if (dp != null)
-            {
                 dp.IsDropDownOpen = true;
-            }
         }
 
         // ================== PRZYCISKI "POKAŻ WSZYSTKO" ==================
 
         private void ShowAllTypes_Click(object sender, RoutedEventArgs e)
         {
-            if (_vm == null) return;
-
             _vm.ShowExpenses = true;
             _vm.ShowIncomes = true;
             _vm.ShowTransfers = true;
@@ -348,8 +435,6 @@ namespace Finly.Pages
 
         private void ShowAllCategories_Click(object sender, RoutedEventArgs e)
         {
-            if (_vm == null) return;
-
             foreach (var c in _vm.Categories)
                 c.IsSelected = true;
 
@@ -358,8 +443,6 @@ namespace Finly.Pages
 
         private void ShowAllAccounts_Click(object sender, RoutedEventArgs e)
         {
-            if (_vm == null) return;
-
             foreach (var a in _vm.Accounts)
                 a.IsSelected = true;
 
@@ -376,12 +459,18 @@ namespace Finly.Pages
                 tb.Focus();
         }
 
-        private void SearchBox_KeyDown(object sender, System.Windows.Input.KeyEventArgs e)
+        private void SearchBox_KeyDown(object sender, KeyEventArgs e)
         {
-            if (e.Key == System.Windows.Input.Key.Escape)
+            if (e.Key == Key.Escape)
             {
                 _vm.SearchQuery = string.Empty;
                 e.Handled = true;
+
+                if (sender is TextBox tb)
+                {
+                    tb.Focus();
+                    tb.SelectAll();
+                }
             }
         }
     }
@@ -400,15 +489,9 @@ namespace Finly.Pages
             if (string.IsNullOrWhiteSpace(s))
                 return string.Empty;
 
-            if (DateTime.TryParse(s,
-                                  CultureInfo.InvariantCulture,
-                                  DateTimeStyles.None,
-                                  out var dt))
-            {
+            if (DateTime.TryParse(s, CultureInfo.InvariantCulture, DateTimeStyles.None, out var dt))
                 return dt.ToString("dd.MM.yyyy");
-            }
 
-            // fallback – kultura systemowa
             if (DateTime.TryParse(s, out dt))
                 return dt.ToString("dd.MM.yyyy");
 

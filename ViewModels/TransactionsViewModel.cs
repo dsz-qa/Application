@@ -253,12 +253,15 @@ namespace Finly.ViewModels
             if (!_isToday && !_isYesterday && !_isThisWeek && !_isThisMonth && !_isPrevMonth && !_isThisYear)
                 IsThisMonth = true;
 
-            DatabaseService.DataChanged += (_, __) =>
-            {
-                LoadAvailableLists();
-                LoadFromDatabase();
-            };
         }
+
+        public void ReloadAll()
+        {
+            LoadLookupData();
+            LoadAvailableLists();
+            LoadFromDatabase();
+        }
+
 
         private void LoadLookupData()
         {

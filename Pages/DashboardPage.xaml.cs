@@ -617,8 +617,16 @@ namespace Finly.Pages
         private void RangeStatsAction_Click(object sender, RoutedEventArgs e)
         {
             if (Window.GetWindow(this) is Finly.Views.ShellWindow shell)
-                shell.NavigateTo("transactions");
+            {
+                var route = _vm?.RangeStats?.ActionRoute;
+
+                if (string.IsNullOrWhiteSpace(route))
+                    route = "transactions";
+
+                shell.NavigateTo(route);
+            }
         }
+
 
         // =====================================================================
         // SELEKCJA: MiniTableControl -> ListBox (w środku)
