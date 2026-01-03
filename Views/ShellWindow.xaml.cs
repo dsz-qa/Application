@@ -400,6 +400,11 @@ namespace Finly.Views
                     SetActiveNav(NavLoans);
                     break;
 
+                case "goals":
+                case "cele":
+                    SetActiveNav(NavGoals);
+                    break;
+
                 case "investments":
                 case "inwestycje":
                     SetActiveNav(NavInvestments);

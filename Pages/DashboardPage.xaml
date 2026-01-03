@@ -141,7 +141,9 @@
 			<Setter Property="FontWeight" Value="SemiBold"/>
 			<Setter Property="Foreground" Value="{DynamicResource App.Foreground}"/>
 			<Setter Property="Opacity" Value="0.8"/>
+			<Setter Property="Margin" Value="6,0,6,0"/>
 		</Style>
+
 
 		<!-- ===================== TEMPLATES: INCOME / EXPENSE / PLANNED ===================== -->
 
@@ -660,7 +662,6 @@
 
 									<Button Grid.Column="1"
                                             Style="{StaticResource DeleteIconButton}"
-                                            
                                             VerticalAlignment="Center"
                                             Panel.ZIndex="10"
                                             ToolTip="Usuń zaznaczony"
