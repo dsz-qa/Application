@@ -1,7 +1,7 @@
 ﻿using Microsoft.Data.Sqlite;
 using System;
 using System.Globalization;
-using System.Linq;
+using Finly.Models;
 
 namespace Finly.Services.Features
 {
@@ -12,17 +12,8 @@ namespace Finly.Services.Features
     /// </summary>
     public static class LedgerService
     {
-        // ====== KONWENCJE PaymentKind (STABILNE KSIĘGOWANIE) ======
-        // Jeśli masz enum w Models, docelowo warto ujednolicić i nie dublować.
-        private enum PaymentKind : int
-        {
-            FreeCash = 0,
-            SavedCash = 1,
-            Envelope = 2,
-            BankAccount = 3
-        }
-
-        private static string ToIsoDate(DateTime dt) => dt.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
+        private static string ToIsoDate(DateTime dt)
+            => dt.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
 
         private static void EnsureNonNegative(decimal amount, string paramName)
         {
@@ -174,6 +165,7 @@ SET Amount = CashOnHand.Amount + excluded.Amount,
         {
             var current = GetCashOnHand(c, tx, userId);
             if (current < amount) throw new InvalidOperationException("Za mało gotówki w portfelu.");
+
             using var cmd = c.CreateCommand();
             cmd.Transaction = tx;
             cmd.CommandText = @"UPDATE CashOnHand SET Amount = Amount - @a, UpdatedAt=CURRENT_TIMESTAMP WHERE UserId=@u;";
@@ -210,6 +202,7 @@ SET Amount = SavedCash.Amount + excluded.Amount,
         {
             var current = GetSavedCash(c, tx, userId);
             if (current < amount) throw new InvalidOperationException("Za mało odłożonej gotówki.");
+
             using var cmd = c.CreateCommand();
             cmd.Transaction = tx;
             cmd.CommandText = @"UPDATE SavedCash SET Amount = Amount - @a, UpdatedAt=CURRENT_TIMESTAMP WHERE UserId=@u;";
@@ -226,6 +219,7 @@ SET Amount = SavedCash.Amount + excluded.Amount,
             cmd.Parameters.AddWithValue("@a", amount);
             cmd.Parameters.AddWithValue("@id", accountId);
             cmd.Parameters.AddWithValue("@u", userId);
+
             var rows = cmd.ExecuteNonQuery();
             if (rows == 0) throw new InvalidOperationException("Nie znaleziono rachunku bankowego lub nie należy do użytkownika.");
         }
@@ -233,14 +227,18 @@ SET Amount = SavedCash.Amount + excluded.Amount,
         private static void SubBank(SqliteConnection c, SqliteTransaction tx, int userId, int accountId, decimal amount)
         {
             decimal current;
+
             using (var q = c.CreateCommand())
             {
                 q.Transaction = tx;
                 q.CommandText = @"SELECT COALESCE(Balance,0) FROM BankAccounts WHERE Id=@id AND UserId=@u LIMIT 1;";
                 q.Parameters.AddWithValue("@id", accountId);
                 q.Parameters.AddWithValue("@u", userId);
+
                 var obj = q.ExecuteScalar();
-                if (obj == null || obj == DBNull.Value) throw new InvalidOperationException("Nie znaleziono rachunku bankowego lub nie należy do użytkownika.");
+                if (obj == null || obj == DBNull.Value)
+                    throw new InvalidOperationException("Nie znaleziono rachunku bankowego lub nie należy do użytkownika.");
+
                 current = Convert.ToDecimal(obj);
             }
 
@@ -262,8 +260,10 @@ SET Amount = SavedCash.Amount + excluded.Amount,
             cmd.CommandText = @"SELECT COALESCE(Allocated,0) FROM Envelopes WHERE Id=@id AND UserId=@u LIMIT 1;";
             cmd.Parameters.AddWithValue("@id", envelopeId);
             cmd.Parameters.AddWithValue("@u", userId);
+
             var obj = cmd.ExecuteScalar();
             if (obj == null || obj == DBNull.Value) throw new InvalidOperationException("Nie znaleziono koperty.");
+
             return Convert.ToDecimal(obj);
         }
 
@@ -275,6 +275,7 @@ SET Amount = SavedCash.Amount + excluded.Amount,
             cmd.Parameters.AddWithValue("@a", amount);
             cmd.Parameters.AddWithValue("@id", envelopeId);
             cmd.Parameters.AddWithValue("@u", userId);
+
             var rows = cmd.ExecuteNonQuery();
             if (rows == 0) throw new InvalidOperationException("Nie znaleziono koperty.");
         }
@@ -283,6 +284,7 @@ SET Amount = SavedCash.Amount + excluded.Amount,
         {
             var current = GetEnvelopeAllocated(c, tx, userId, envelopeId);
             if (current < amount) throw new InvalidOperationException("W kopercie jest za mało środków.");
+
             using var cmd = c.CreateCommand();
             cmd.Transaction = tx;
             cmd.CommandText = @"UPDATE Envelopes SET Allocated = COALESCE(Allocated,0) - @a WHERE Id=@id AND UserId=@u;";
@@ -350,14 +352,14 @@ SET Amount = SavedCash.Amount + excluded.Amount,
                 return;
             }
 
-            // 5) Free -> Envelope (z wolnej gotówki robisz “odłożoną + alokację”, żeby free spadło, a distributable nie rosło)
+            // 5) Free -> Envelope (z wolnej gotówki robisz “odłożoną + alokację”, żeby free spadło)
             if (fromKind == KIND_FREE && toKind == KIND_ENV)
             {
                 if (!toRefId.HasValue) throw new InvalidOperationException("Brak ToRefId dla envelope.");
                 if (GetFree() < amount) throw new InvalidOperationException("Za mało wolnej gotówki.");
 
-                AddSaved(c, tx, userId, amount);                    // free spadnie (bo saved rośnie)
-                AddEnvelopeAllocated(c, tx, userId, toRefId.Value, amount); // alokacja w kopercie
+                AddSaved(c, tx, userId, amount); // free spadnie (bo saved rośnie)
+                AddEnvelopeAllocated(c, tx, userId, toRefId.Value, amount);
                 return;
             }
 
@@ -371,22 +373,19 @@ SET Amount = SavedCash.Amount + excluded.Amount,
                 return;
             }
 
-            // ====== FALLBACK DLA POZOSTAŁYCH (banki, envelope->envelope, bank<->cash, itp.) ======
-            // Tu zachowujemy klasyczny mechanizm: zdejmij z FROM, dodaj do TO.
+            // ====== FALLBACK DLA POZOSTAŁYCH (banki, env->env, bank<->cash itd.) ======
+            // Zdejmij z FROM, dodaj do TO.
             // Uwaga: KIND_FREE w fallbacku oznacza REALNĄ gotówkę w portfelu (CashOnHand) – czyli wpływa na total.
-            // Do banków takie zachowanie jest poprawne.
 
             // ---- FROM ----
             switch (fromKind)
             {
                 case KIND_FREE:
                     if (GetFree() < amount) throw new InvalidOperationException("Za mało wolnej gotówki.");
-                    SubCash(c, tx, userId, amount); // bank/świat zewnętrzny: total cash maleje
+                    SubCash(c, tx, userId, amount);
                     break;
 
                 case KIND_SAVED:
-                    // Jeśli robisz saved -> bank, to to jest wypłata z “odłożonej” i fizycznie cash total maleje.
-                    // Żeby utrzymać spójność: zmniejszamy i Saved, i CashOnHand.
                     SubSaved(c, tx, userId, amount);
                     SubCash(c, tx, userId, amount);
                     break;
@@ -417,7 +416,6 @@ SET Amount = SavedCash.Amount + excluded.Amount,
                     break;
 
                 case KIND_SAVED:
-                    // bank -> saved: fizycznie cash total rośnie, i saved rośnie
                     AddCash(c, tx, userId, amount);
                     AddSaved(c, tx, userId, amount);
                     break;
@@ -441,10 +439,8 @@ SET Amount = SavedCash.Amount + excluded.Amount,
             }
         }
 
-
         // =========================
-        //  EXPENSE EFFECT (zgodne z DatabaseService)
-        //  PaymentKind przychodzi jako int (Finly.Models.PaymentKind)
+        //  EXPENSE EFFECT (jedno źródło prawdy: Finly.Models.PaymentKind)
         // =========================
         public static void ApplyExpenseEffect(
             SqliteConnection c,
@@ -464,36 +460,37 @@ SET Amount = SavedCash.Amount + excluded.Amount,
                 return free < 0m ? 0m : free;
             }
 
-            switch (paymentKind)
+            if (!Enum.IsDefined(typeof(PaymentKind), paymentKind))
+                throw new InvalidOperationException($"Nieznany PaymentKind={paymentKind}.");
+
+            var pk = (PaymentKind)paymentKind;
+
+            switch (pk)
             {
-                // FreeCash
-                case 0:
+                case PaymentKind.FreeCash:
                     if (GetFree() < amount) throw new InvalidOperationException("Za mało wolnej gotówki.");
                     SubCash(c, tx, userId, amount);
                     break;
 
-                // SavedCash (wydatek z odłożonej: zmniejsza saved i zmniejsza total cash)
-                case 1:
+                case PaymentKind.SavedCash:
                     SubSaved(c, tx, userId, amount);
                     SubCash(c, tx, userId, amount);
                     break;
 
-                // Envelope (wydatek z koperty: zmniejsza kopertę, zmniejsza saved i zmniejsza total cash)
-                case 2:
+                case PaymentKind.BankAccount:
+                    if (!paymentRefId.HasValue) throw new InvalidOperationException("Brak PaymentRefId dla konta bankowego.");
+                    SubBank(c, tx, userId, paymentRefId.Value, amount);
+                    break;
+
+                case PaymentKind.Envelope:
                     if (!paymentRefId.HasValue) throw new InvalidOperationException("Brak PaymentRefId dla koperty.");
                     SubEnvelopeAllocated(c, tx, userId, paymentRefId.Value, amount);
                     SubSaved(c, tx, userId, amount);
                     SubCash(c, tx, userId, amount);
                     break;
 
-                // BankAccount
-                case 3:
-                    if (!paymentRefId.HasValue) throw new InvalidOperationException("Brak PaymentRefId dla konta bankowego.");
-                    SubBank(c, tx, userId, paymentRefId.Value, amount);
-                    break;
-
                 default:
-                    throw new InvalidOperationException($"Nieznany PaymentKind={paymentKind}.");
+                    throw new InvalidOperationException($"Nieobsługiwany PaymentKind={paymentKind}.");
             }
         }
 
@@ -507,40 +504,38 @@ SET Amount = SavedCash.Amount + excluded.Amount,
         {
             EnsureNonNegative(amount, nameof(amount));
 
-            switch (paymentKind)
+            if (!Enum.IsDefined(typeof(PaymentKind), paymentKind))
+                throw new InvalidOperationException($"Nieznany PaymentKind={paymentKind}.");
+
+            var pk = (PaymentKind)paymentKind;
+
+            switch (pk)
             {
-                // FreeCash
-                case 0:
+                case PaymentKind.FreeCash:
                     AddCash(c, tx, userId, amount);
                     break;
 
-                // SavedCash
-                case 1:
+                case PaymentKind.SavedCash:
                     AddSaved(c, tx, userId, amount);
                     AddCash(c, tx, userId, amount);
                     break;
 
-                // Envelope
-                case 2:
+                case PaymentKind.BankAccount:
+                    if (!paymentRefId.HasValue) throw new InvalidOperationException("Brak PaymentRefId dla konta bankowego.");
+                    AddBank(c, tx, userId, paymentRefId.Value, amount);
+                    break;
+
+                case PaymentKind.Envelope:
                     if (!paymentRefId.HasValue) throw new InvalidOperationException("Brak PaymentRefId dla koperty.");
                     AddEnvelopeAllocated(c, tx, userId, paymentRefId.Value, amount);
                     AddSaved(c, tx, userId, amount);
                     AddCash(c, tx, userId, amount);
                     break;
 
-                // BankAccount
-                case 3:
-                    if (!paymentRefId.HasValue) throw new InvalidOperationException("Brak PaymentRefId dla konta bankowego.");
-                    AddBank(c, tx, userId, paymentRefId.Value, amount);
-                    break;
-
                 default:
-                    throw new InvalidOperationException($"Nieznany PaymentKind={paymentKind}.");
+                    throw new InvalidOperationException($"Nieobsługiwany PaymentKind={paymentKind}.");
             }
         }
-
-
-
 
         // =========================
         //  Spend* (zgodne z TransactionsFacadeService)
@@ -551,7 +546,9 @@ SET Amount = SavedCash.Amount + excluded.Amount,
             using var c = DatabaseService.GetConnection();
             DatabaseService.EnsureTables();
             using var tx = c.BeginTransaction();
-            ApplyExpenseEffect(c, tx, userId, amount, paymentKind: 0, paymentRefId: null);
+
+            ApplyExpenseEffect(c, tx, userId, amount, (int)PaymentKind.FreeCash, paymentRefId: null);
+
             tx.Commit();
             DatabaseService.NotifyDataChanged();
         }
@@ -562,7 +559,9 @@ SET Amount = SavedCash.Amount + excluded.Amount,
             using var c = DatabaseService.GetConnection();
             DatabaseService.EnsureTables();
             using var tx = c.BeginTransaction();
-            ApplyExpenseEffect(c, tx, userId, amount, paymentKind: 1, paymentRefId: null);
+
+            ApplyExpenseEffect(c, tx, userId, amount, (int)PaymentKind.SavedCash, paymentRefId: null);
+
             tx.Commit();
             DatabaseService.NotifyDataChanged();
         }
@@ -573,7 +572,9 @@ SET Amount = SavedCash.Amount + excluded.Amount,
             using var c = DatabaseService.GetConnection();
             DatabaseService.EnsureTables();
             using var tx = c.BeginTransaction();
-            ApplyExpenseEffect(c, tx, userId, amount, paymentKind: 2, paymentRefId: envelopeId);
+
+            ApplyExpenseEffect(c, tx, userId, amount, (int)PaymentKind.Envelope, paymentRefId: envelopeId);
+
             tx.Commit();
             DatabaseService.NotifyDataChanged();
         }
@@ -584,17 +585,15 @@ SET Amount = SavedCash.Amount + excluded.Amount,
             using var c = DatabaseService.GetConnection();
             DatabaseService.EnsureTables();
             using var tx = c.BeginTransaction();
-            ApplyExpenseEffect(c, tx, userId, amount, paymentKind: 3, paymentRefId: accountId);
+
+            ApplyExpenseEffect(c, tx, userId, amount, (int)PaymentKind.BankAccount, paymentRefId: accountId);
+
             tx.Commit();
             DatabaseService.NotifyDataChanged();
         }
 
-
-
-
         // ============================================================
-        //  PUBLIC API – zachowujemy istniejące metody,
-        //  ale one TERAZ zapisują rekord Transfers
+        //  PUBLIC API – transfery (jak miałaś)
         // ============================================================
 
         public static int TransferFreeToSaved(int userId, decimal amount, DateTime? date = null, string? desc = null)
@@ -628,8 +627,7 @@ SET Amount = SavedCash.Amount + excluded.Amount,
             => TransferAny(userId, amount, date ?? DateTime.Today, desc, KIND_ENV, fromEnvelopeId, KIND_ENV, toEnvelopeId, isPlanned: false);
 
         // ============================================================
-        //  DELETE (jak miałaś) – tu zostawiamy Twoją logikę,
-        //  ale teraz transfery będą istnieć w Transfers, więc będą kasowalne i widoczne.
+        //  DELETE (transfery) – jak miałaś
         // ============================================================
 
         public static void DeleteTransactionAndRevertBalance(int transactionId)
@@ -685,7 +683,8 @@ SET Amount = SavedCash.Amount + excluded.Amount,
                 }
             }
 
-            // Jeśli nie jest transferem – zostaw resztę Twojej logiki (Expenses/Incomes)
+            // Jeśli nie jest transferem – reszta Twojej logiki (Expenses/Incomes) jest w innym miejscu
+            tx.Commit();
         }
     }
 }
