@@ -1364,27 +1364,36 @@ WHERE Id=@id AND UserId=@u;";
             public decimal Envelopes { get; set; }  // przydzielona do kopert
 
             public decimal SavedUnallocated => Saved - Envelopes;
-            public decimal Total => Banks + Cash + Saved;
+            public decimal Total => Banks + Cash + Saved + Envelopes;
         }
 
         public static MoneySnapshot GetMoneySnapshot(int userId)
         {
             var banks = GetTotalBanksBalance(userId);
 
-            var allCash = GetCashOnHand(userId);
-            var savedCash = GetSavedCash(userId);
+            // CashOnHand = CA£A gotówka w portfelu (free + saved).
+            var cashOnHandTotal = GetCashOnHand(userId);
 
-            var freeCash = Math.Max(0m, allCash - savedCash);
-            var allocated = GetTotalAllocatedInEnvelopesForUser(userId);
+            // SavedCash = od³o¿ona gotówka (pula), z której alokujesz koperty.
+            var savedTotal = GetSavedCash(userId);
+
+            // Koperty to czêœæ "Saved", wiêc licz je jako alokacjê (do UI/insightów),
+            // ale NIE jako dodatkowe pieni¹dze do Total.
+            var envelopesAllocated = GetTotalAllocatedInEnvelopesForUser(userId);
+
+            // Wolna gotówka = total cash - saved total (jak w EnvelopesPage)
+            var freeCash = cashOnHandTotal - savedTotal;
+            if (freeCash < 0m) freeCash = 0m;
 
             return new MoneySnapshot
             {
                 Banks = banks,
                 Cash = freeCash,
-                Saved = savedCash,
-                Envelopes = allocated
+                Saved = savedTotal,
+                Envelopes = envelopesAllocated
             };
         }
+
 
         // =========================================================
         // ========================= EXPENSES =======================

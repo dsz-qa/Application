@@ -306,26 +306,89 @@ SET Amount = SavedCash.Amount + excluded.Amount,
             fromKind = NormKind(fromKind);
             toKind = NormKind(toKind);
 
-            // identyczne źródło/cel -> nic nie rób
             if (fromKind == toKind && fromRefId == toRefId) return;
 
-            // ---- FROM side ----
+            // Helper: dostępna wolna gotówka (z modelu: free = cashOnHandTotal - savedTotal)
+            decimal GetFree()
+            {
+                var allCash = GetCashOnHand(c, tx, userId);
+                var saved = GetSavedCash(c, tx, userId);
+                var free = allCash - saved;
+                return free < 0m ? 0m : free;
+            }
+
+            // ====== SPECJALNE KOMBINACJE (Twoja logika kopert) ======
+
+            // 1) Free -> Saved (zmiana podziału, bez zmiany CashOnHand)
+            if (fromKind == KIND_FREE && toKind == KIND_SAVED)
+            {
+                if (GetFree() < amount) throw new InvalidOperationException("Za mało wolnej gotówki.");
+                AddSaved(c, tx, userId, amount);
+                return;
+            }
+
+            // 2) Saved -> Free (zmiana podziału, bez zmiany CashOnHand)
+            if (fromKind == KIND_SAVED && toKind == KIND_FREE)
+            {
+                SubSaved(c, tx, userId, amount);
+                return;
+            }
+
+            // 3) Saved -> Envelope (alokacja z puli Saved do koperty: Saved bez zmian, rośnie tylko Allocated)
+            if (fromKind == KIND_SAVED && toKind == KIND_ENV)
+            {
+                if (!toRefId.HasValue) throw new InvalidOperationException("Brak ToRefId dla envelope.");
+                AddEnvelopeAllocated(c, tx, userId, toRefId.Value, amount);
+                return;
+            }
+
+            // 4) Envelope -> Saved (od-alokowanie: maleje Allocated, Saved bez zmian)
+            if (fromKind == KIND_ENV && toKind == KIND_SAVED)
+            {
+                if (!fromRefId.HasValue) throw new InvalidOperationException("Brak FromRefId dla envelope.");
+                SubEnvelopeAllocated(c, tx, userId, fromRefId.Value, amount);
+                return;
+            }
+
+            // 5) Free -> Envelope (z wolnej gotówki robisz “odłożoną + alokację”, żeby free spadło, a distributable nie rosło)
+            if (fromKind == KIND_FREE && toKind == KIND_ENV)
+            {
+                if (!toRefId.HasValue) throw new InvalidOperationException("Brak ToRefId dla envelope.");
+                if (GetFree() < amount) throw new InvalidOperationException("Za mało wolnej gotówki.");
+
+                AddSaved(c, tx, userId, amount);                    // free spadnie (bo saved rośnie)
+                AddEnvelopeAllocated(c, tx, userId, toRefId.Value, amount); // alokacja w kopercie
+                return;
+            }
+
+            // 6) Envelope -> Free (odwrotność: zdejmujesz alokację i zmniejszasz Saved)
+            if (fromKind == KIND_ENV && toKind == KIND_FREE)
+            {
+                if (!fromRefId.HasValue) throw new InvalidOperationException("Brak FromRefId dla envelope.");
+
+                SubEnvelopeAllocated(c, tx, userId, fromRefId.Value, amount);
+                SubSaved(c, tx, userId, amount); // free wzrośnie, bo saved maleje
+                return;
+            }
+
+            // ====== FALLBACK DLA POZOSTAŁYCH (banki, envelope->envelope, bank<->cash, itp.) ======
+            // Tu zachowujemy klasyczny mechanizm: zdejmij z FROM, dodaj do TO.
+            // Uwaga: KIND_FREE w fallbacku oznacza REALNĄ gotówkę w portfelu (CashOnHand) – czyli wpływa na total.
+            // Do banków takie zachowanie jest poprawne.
+
+            // ---- FROM ----
             switch (fromKind)
             {
                 case KIND_FREE:
-                    // freecash = CashOnHand - SavedCash => realnie zdejmujemy z CashOnHand
-                    {
-                        var allCash = GetCashOnHand(c, tx, userId);
-                        var saved = GetSavedCash(c, tx, userId);
-                        var free = Math.Max(0m, allCash - saved);
-                        if (free < amount) throw new InvalidOperationException("Za mało wolnej gotówki.");
-                        SubCash(c, tx, userId, amount);
-                        break;
-                    }
+                    if (GetFree() < amount) throw new InvalidOperationException("Za mało wolnej gotówki.");
+                    SubCash(c, tx, userId, amount); // bank/świat zewnętrzny: total cash maleje
+                    break;
 
                 case KIND_SAVED:
-                    // savedcash to subset CashOnHand => zdejmujemy z SavedCash (CashOnHand bez zmian)
+                    // Jeśli robisz saved -> bank, to to jest wypłata z “odłożonej” i fizycznie cash total maleje.
+                    // Żeby utrzymać spójność: zmniejszamy i Saved, i CashOnHand.
                     SubSaved(c, tx, userId, amount);
+                    SubCash(c, tx, userId, amount);
                     break;
 
                 case KIND_ENV:
@@ -346,7 +409,7 @@ SET Amount = SavedCash.Amount + excluded.Amount,
                     throw new InvalidOperationException($"Nieznany FromKind: '{fromKind}'.");
             }
 
-            // ---- TO side ----
+            // ---- TO ----
             switch (toKind)
             {
                 case KIND_FREE:
@@ -354,6 +417,8 @@ SET Amount = SavedCash.Amount + excluded.Amount,
                     break;
 
                 case KIND_SAVED:
+                    // bank -> saved: fizycznie cash total rośnie, i saved rośnie
+                    AddCash(c, tx, userId, amount);
                     AddSaved(c, tx, userId, amount);
                     break;
 
@@ -376,6 +441,7 @@ SET Amount = SavedCash.Amount + excluded.Amount,
             }
         }
 
+
         // =========================
         //  EXPENSE EFFECT (zgodne z DatabaseService)
         //  PaymentKind przychodzi jako int (Finly.Models.PaymentKind)
@@ -390,29 +456,34 @@ SET Amount = SavedCash.Amount + excluded.Amount,
         {
             EnsureNonNegative(amount, nameof(amount));
 
+            decimal GetFree()
+            {
+                var allCash = GetCashOnHand(c, tx, userId);
+                var saved = GetSavedCash(c, tx, userId);
+                var free = allCash - saved;
+                return free < 0m ? 0m : free;
+            }
+
             switch (paymentKind)
             {
                 // FreeCash
                 case 0:
-                    {
-                        // wolna gotówka = CashOnHand - SavedCash, ale zdejmujemy z CashOnHand
-                        var allCash = GetCashOnHand(c, tx, userId);
-                        var saved = GetSavedCash(c, tx, userId);
-                        var free = Math.Max(0m, allCash - saved);
-                        if (free < amount) throw new InvalidOperationException("Za mało wolnej gotówki.");
-                        SubCash(c, tx, userId, amount);
-                        break;
-                    }
-
-                // SavedCash
-                case 1:
-                    SubSaved(c, tx, userId, amount);
+                    if (GetFree() < amount) throw new InvalidOperationException("Za mało wolnej gotówki.");
+                    SubCash(c, tx, userId, amount);
                     break;
 
-                // Envelope
+                // SavedCash (wydatek z odłożonej: zmniejsza saved i zmniejsza total cash)
+                case 1:
+                    SubSaved(c, tx, userId, amount);
+                    SubCash(c, tx, userId, amount);
+                    break;
+
+                // Envelope (wydatek z koperty: zmniejsza kopertę, zmniejsza saved i zmniejsza total cash)
                 case 2:
                     if (!paymentRefId.HasValue) throw new InvalidOperationException("Brak PaymentRefId dla koperty.");
                     SubEnvelopeAllocated(c, tx, userId, paymentRefId.Value, amount);
+                    SubSaved(c, tx, userId, amount);
+                    SubCash(c, tx, userId, amount);
                     break;
 
                 // BankAccount
@@ -446,12 +517,15 @@ SET Amount = SavedCash.Amount + excluded.Amount,
                 // SavedCash
                 case 1:
                     AddSaved(c, tx, userId, amount);
+                    AddCash(c, tx, userId, amount);
                     break;
 
                 // Envelope
                 case 2:
                     if (!paymentRefId.HasValue) throw new InvalidOperationException("Brak PaymentRefId dla koperty.");
                     AddEnvelopeAllocated(c, tx, userId, paymentRefId.Value, amount);
+                    AddSaved(c, tx, userId, amount);
+                    AddCash(c, tx, userId, amount);
                     break;
 
                 // BankAccount
@@ -464,6 +538,7 @@ SET Amount = SavedCash.Amount + excluded.Amount,
                     throw new InvalidOperationException($"Nieznany PaymentKind={paymentKind}.");
             }
         }
+
 
 
 
