@@ -47,8 +47,14 @@ namespace Finly.Views.Dialogs
         public DateTime? EndDate
         {
             get => _endDate;
-            private set { _endDate = value; OnPropertyChanged(); }
+            set
+            {
+                if (_endDate == value) return;
+                _endDate = value;
+                OnPropertyChanged();
+            }
         }
+
 
         public decimal PlannedAmount
         {
