@@ -74,6 +74,17 @@ namespace Finly.Services.Features
         /// <summary>
         /// Zapewnia, ¿e schemat i migracje zosta³y wykonane.
         /// </summary>
+        // ========================= SCHEMA INIT =========================
+
+        private static void EnsureSchemaInternal(SqliteConnection c)
+        {
+            // Jedyny w³aœciciel schematu/migracji/indeksów:
+            SchemaService.Ensure(c);
+        }
+
+        /// <summary>
+        /// Zapewnia, ¿e schemat i migracje zosta³y wykonane.
+        /// </summary>
         public static void EnsureTables()
         {
             lock (_schemaLock)
@@ -81,15 +92,7 @@ namespace Finly.Services.Features
                 if (_schemaInitialized) return;
 
                 using var c = GetConnection();
-
-                // 1) g³ówny schemat (tabele bazowe)
-                SchemaService.Ensure(c);
-
-                // 2) dodatkowe migracje/kolumny wymagane przez UI
-                EnsureBankAccountsSchema(c);
-                EnsureExpensesSchema(c);
-                EnsureBudgetsSchema(c);
-                EnsureIncomesSchema(c);
+                EnsureSchemaInternal(c);
 
                 _schemaInitialized = true;
             }
@@ -97,28 +100,22 @@ namespace Finly.Services.Features
 
         private static SqliteConnection OpenAndEnsureSchema()
         {
-            if (!_schemaInitialized)
+            var c = GetConnection();
+
+            if (_schemaInitialized) return c;
+
+            lock (_schemaLock)
             {
-                lock (_schemaLock)
+                if (!_schemaInitialized)
                 {
-                    if (!_schemaInitialized)
-                    {
-                        using var c0 = GetConnection();
-
-                        SchemaService.Ensure(c0);
-
-                        EnsureBankAccountsSchema(c0);
-                        EnsureExpensesSchema(c0);
-                        EnsureBudgetsSchema(c0);
-                        EnsureIncomesSchema(c0);
-
-                        _schemaInitialized = true;
-                    }
+                    EnsureSchemaInternal(c);
+                    _schemaInitialized = true;
                 }
             }
 
-            return GetConnection();
+            return c;
         }
+
 
         // =========================================================
         // ========================= HELPERS ========================
@@ -180,120 +177,6 @@ namespace Finly.Services.Features
         private static bool ExpensesHasBudgetId(SqliteConnection c)
             => TableExists(c, "Expenses") && ColumnExists(c, "Expenses", "BudgetId");
 
-        // =========================================================
-        // ========================= MIGRACJE =======================
-        // =========================================================
-
-        private static void EnsureBankAccountsSchema(SqliteConnection c)
-        {
-            try
-            {
-                if (!TableExists(c, "BankAccounts")) return;
-
-                if (!ColumnExists(c, "BankAccounts", "BankName"))
-                {
-                    using var alter = c.CreateCommand();
-                    alter.CommandText = "ALTER TABLE BankAccounts ADD COLUMN BankName TEXT NULL;";
-                    alter.ExecuteNonQuery();
-                }
-            }
-            catch { }
-        }
-
-        private static void EnsureExpensesSchema(SqliteConnection c)
-        {
-            try
-            {
-                if (!TableExists(c, "Expenses")) return;
-
-                if (!ColumnExists(c, "Expenses", "AccountId"))
-                {
-                    using var alter = c.CreateCommand();
-                    alter.CommandText = "ALTER TABLE Expenses ADD COLUMN AccountId INTEGER NULL;";
-                    alter.ExecuteNonQuery();
-                }
-
-                if (!ColumnExists(c, "Expenses", "BudgetId"))
-                {
-                    using var alterB = c.CreateCommand();
-                    alterB.CommandText = "ALTER TABLE Expenses ADD COLUMN BudgetId INTEGER NULL;";
-                    alterB.ExecuteNonQuery();
-                }
-
-                // NOWE kolumny dla stabilnego ksiêgowania
-                if (!ColumnExists(c, "Expenses", "PaymentKind"))
-                {
-                    using var alterPk = c.CreateCommand();
-                    alterPk.CommandText = "ALTER TABLE Expenses ADD COLUMN PaymentKind INTEGER NOT NULL DEFAULT 0;";
-                    alterPk.ExecuteNonQuery();
-                }
-
-                if (!ColumnExists(c, "Expenses", "PaymentRefId"))
-                {
-                    using var alterPr = c.CreateCommand();
-                    alterPr.CommandText = "ALTER TABLE Expenses ADD COLUMN PaymentRefId INTEGER NULL;";
-                    alterPr.ExecuteNonQuery();
-                }
-
-                // Indeksy (bezpieczne)
-                try
-                {
-                    using var idx1 = c.CreateCommand();
-                    idx1.CommandText = "CREATE INDEX IF NOT EXISTS IX_Expenses_UserId_AccountId ON Expenses(UserId, AccountId);";
-                    idx1.ExecuteNonQuery();
-                }
-                catch { }
-
-                try
-                {
-                    using var idx2 = c.CreateCommand();
-                    idx2.CommandText = "CREATE INDEX IF NOT EXISTS IX_Expenses_UserId_PaymentKind ON Expenses(UserId, PaymentKind);";
-                    idx2.ExecuteNonQuery();
-                }
-                catch { }
-            }
-            catch { }
-        }
-
-
-        private static void EnsureBudgetsSchema(SqliteConnection c)
-        {
-            try
-            {
-                if (!TableExists(c, "Budgets")) return;
-
-                if (!ColumnExists(c, "Budgets", "OverState"))
-                {
-                    using var alter = c.CreateCommand();
-                    alter.CommandText = "ALTER TABLE Budgets ADD COLUMN OverState INTEGER NOT NULL DEFAULT 0;";
-                    alter.ExecuteNonQuery();
-                }
-
-                if (!ColumnExists(c, "Budgets", "OverNotifiedAt"))
-                {
-                    using var alter = c.CreateCommand();
-                    alter.CommandText = "ALTER TABLE Budgets ADD COLUMN OverNotifiedAt TEXT NULL;";
-                    alter.ExecuteNonQuery();
-                }
-            }
-            catch { }
-        }
-
-        private static void EnsureIncomesSchema(SqliteConnection c)
-        {
-            try
-            {
-                if (!TableExists(c, "Incomes")) return;
-
-                if (!ColumnExists(c, "Incomes", "BudgetId"))
-                {
-                    using var alter = c.CreateCommand();
-                    alter.CommandText = "ALTER TABLE Incomes ADD COLUMN BudgetId INTEGER NULL;";
-                    alter.ExecuteNonQuery();
-                }
-            }
-            catch { }
-        }
 
         // =========================================================
         // ======================= USERS (CASCADE) ==================
@@ -1359,60 +1242,50 @@ WHERE Id=@id AND UserId=@u;";
         public sealed class MoneySnapshot
         {
             public decimal Banks { get; set; }
-            public decimal Cash { get; set; }       // wolna
-            public decimal Saved { get; set; }      // ca³a pula od³o¿onej
-            public decimal Envelopes { get; set; }  // przydzielona do kopert
+            public decimal Cash { get; set; }          // wolna gotówka
+            public decimal Saved { get; set; }         // od³o¿ona gotówka (pula)
+            public decimal Envelopes { get; set; }     // alokacja w kopertach (czêœæ Saved)
+            public decimal Investments { get; set; }   // SUM(CurrentAmount) z Investments
 
-            public decimal Investments { get; set; }
+            // opcjonalnie (jeœli masz kafelek "Ca³y maj¹tek")
+            public decimal SavedUnallocated => Math.Max(0m, Saved - Envelopes);
 
 
-            public decimal SavedUnallocated => Saved - Envelopes;
-            public decimal Total => Banks + Cash + Saved + Envelopes;
+            public decimal Total => Banks + Cash + Saved + Investments;
         }
+
 
         public static MoneySnapshot GetMoneySnapshot(int userId)
         {
-            // Bank accounts sum
-            var banks = GetTotalBanksBalance(userId);
+            // Banki
+            var banksTotal = GetTotalBanksBalance(userId);
 
-            // CashOnHand = CA£A gotówka w portfelu (free + saved).
+            // CA£A gotówka w portfelu (free + saved)
             var cashOnHandTotal = GetCashOnHand(userId);
 
-            // SavedCash = od³o¿ona gotówka (pula), z której alokujesz koperty.
+            // Od³o¿ona gotówka (pula), z której alokujesz koperty
             var savedTotal = GetSavedCash(userId);
 
-            // Koperty to czêœæ "Saved", wiêc licz je jako alokacjê (do UI/insightów),
-            // ale NIE jako dodatkowe pieni¹dze do Total.
+            // Koperty to alokacja z Saved (nie dodawaj do Total jako "nowe pieni¹dze")
             var envelopesAllocated = GetTotalAllocatedInEnvelopesForUser(userId);
 
-            // Investments
-            var investments = 0m;
-            try
-            {
-                investments = GetInvestmentsTotal(userId);
-            }
-            catch
-            {
-                investments = 0m;
-            }
+            // Inwestycje (SUM(CurrentAmount))
+            var investmentsTotal = GetInvestmentsTotal(userId);
 
-            // Wolna gotówka = total cash - saved total (jak w EnvelopesPage)
+            // Wolna gotówka = cash total - saved total
             var freeCash = cashOnHandTotal - savedTotal;
             if (freeCash < 0m) freeCash = 0m;
 
-            // Total maj¹tku: banki + wolna gotówka + saved + inwestycje
-            // (bez Envelopes, bo to czêœæ Saved)
-            var total = banks + freeCash + savedTotal + investments;
-
             return new MoneySnapshot
-            {                
-                Banks = banks,
+            {
+                Banks = banksTotal,
                 Cash = freeCash,
                 Saved = savedTotal,
                 Envelopes = envelopesAllocated,
-                Investments = investments       // wymaga pola Investments w MoneySnapshot
+                Investments = investmentsTotal
             };
         }
+
 
 
 
@@ -1510,18 +1383,27 @@ WHERE e.UserId = @uid");
             }
         }
 
-        public static decimal GetInvestmentsTotal(int uid)
+        public static decimal GetInvestmentsTotal(int userId)
         {
-            using var con = GetConnection();
+            if (userId <= 0) return 0m;
+
+            using var con = OpenAndEnsureSchema();
+
             using var cmd = con.CreateCommand();
+            cmd.CommandText = @"
+SELECT COALESCE(SUM(CurrentAmount), 0)
+FROM Investments
+WHERE UserId = @uid;";
+            cmd.Parameters.AddWithValue("@uid", userId);
 
-            // PRZYK£AD: tabela Investments(UserId, CurrentValue)
-            cmd.CommandText = @"SELECT IFNULL(SUM(CurrentValue), 0) FROM Investments WHERE UserId=@u;";
-            cmd.Parameters.AddWithValue("@u", uid);
+            var result = cmd.ExecuteScalar();
+            if (result == null || result == DBNull.Value) return 0m;
 
-            var obj = cmd.ExecuteScalar();
-            return obj == DBNull.Value ? 0m : Convert.ToDecimal(obj);
+            // SQLite mo¿e zwróciæ long/double/string – Convert.ToDecimal to ogarnie
+            return Convert.ToDecimal(result, CultureInfo.InvariantCulture);
         }
+
+
 
 
 
@@ -2092,9 +1974,40 @@ GROUP BY i.Source;";
         // ======================= INVESTMENTS ======================
         // =========================================================
 
+        private static decimal ReadDecimal(SqliteDataReader r, int ordinal)
+        {
+            if (r.IsDBNull(ordinal)) return 0m;
+
+            var v = r.GetValue(ordinal);
+
+            // SQLite potrafi zwróciæ: long, double, string, decimal…
+            return v switch
+            {
+                decimal d => d,
+                double d => Convert.ToDecimal(d, CultureInfo.InvariantCulture),
+                float f => Convert.ToDecimal(f, CultureInfo.InvariantCulture),
+                long l => l,
+                int i => i,
+                short s => s,
+                byte b => b,
+                string s => decimal.TryParse(s, NumberStyles.Number, CultureInfo.InvariantCulture, out var d)
+                                ? d
+                                : (decimal.TryParse(s, NumberStyles.Number, CultureInfo.CurrentCulture, out d) ? d : 0m),
+                _ => Convert.ToDecimal(v, CultureInfo.InvariantCulture)
+            };
+        }
+
+        private static int ReadInt32(SqliteDataReader r, int ordinal, int fallback = 0)
+            => r.IsDBNull(ordinal) ? fallback : r.GetInt32(ordinal);
+
+        private static string? ReadString(SqliteDataReader r, int ordinal)
+            => r.IsDBNull(ordinal) ? null : r.GetString(ordinal);
+
+
         public static List<InvestmentModel> GetInvestments(int userId)
         {
             var list = new List<InvestmentModel>();
+            if (userId <= 0) return list;
 
             using var c = OpenAndEnsureSchema();
 
@@ -2107,7 +2020,7 @@ SELECT Id, UserId, Name,
        {(hasType ? "Type" : "0")} AS Type,
        TargetAmount, CurrentAmount, TargetDate, Description
 FROM Investments
-WHERE UserId=@u
+WHERE UserId = @u
 ORDER BY Id DESC;";
             cmd.Parameters.AddWithValue("@u", userId);
 
@@ -2116,28 +2029,29 @@ ORDER BY Id DESC;";
             {
                 list.Add(new InvestmentModel
                 {
-                    Id = r.IsDBNull(0) ? 0 : r.GetInt32(0),
-                    UserId = r.IsDBNull(1) ? userId : r.GetInt32(1),
-                    Name = r.IsDBNull(2) ? string.Empty : r.GetString(2),
-                    Type = (InvestmentType)(r.IsDBNull(3) ? 0 : r.GetInt32(3)),
-                    TargetAmount = r.IsDBNull(4) ? 0m : Convert.ToDecimal(r.GetValue(4)),
-                    CurrentAmount = r.IsDBNull(5) ? 0m : Convert.ToDecimal(r.GetValue(5)),
-                    TargetDate = r.IsDBNull(6) ? null : r.GetString(6),
-                    Description = r.IsDBNull(7) ? null : r.GetString(7)
+                    Id = ReadInt32(r, 0),
+                    UserId = ReadInt32(r, 1, userId),
+                    Name = ReadString(r, 2) ?? string.Empty,
+                    Type = (InvestmentType)ReadInt32(r, 3, 0),
+                    TargetAmount = ReadDecimal(r, 4),
+                    CurrentAmount = ReadDecimal(r, 5),
+                    TargetDate = ReadString(r, 6),
+                    Description = ReadString(r, 7)
                 });
             }
 
             return list;
         }
 
-
         public static int InsertInvestment(InvestmentModel m)
         {
+            if (m == null) throw new ArgumentNullException(nameof(m));
+            if (m.UserId <= 0) throw new ArgumentException("Nieprawid³owy UserId.", nameof(m.UserId));
+
             using var c = OpenAndEnsureSchema();
             bool hasType = ColumnExists(c, "Investments", "Type");
 
             using var cmd = c.CreateCommand();
-
             cmd.CommandText = hasType
                 ? @"
 INSERT INTO Investments(UserId, Name, Type, TargetAmount, CurrentAmount, TargetDate, Description)
@@ -2149,7 +2063,7 @@ VALUES (@u,@n,@tgt,@cur,@d,@desc);
 SELECT last_insert_rowid();";
 
             cmd.Parameters.AddWithValue("@u", m.UserId);
-            cmd.Parameters.AddWithValue("@n", m.Name ?? "");
+            cmd.Parameters.AddWithValue("@n", (m.Name ?? string.Empty).Trim());
 
             if (hasType) cmd.Parameters.AddWithValue("@type", (int)m.Type);
 
@@ -2158,21 +2072,25 @@ SELECT last_insert_rowid();";
             cmd.Parameters.AddWithValue("@d", (object?)m.TargetDate ?? DBNull.Value);
             cmd.Parameters.AddWithValue("@desc", (object?)m.Description ?? DBNull.Value);
 
-            var id = Convert.ToInt32(cmd.ExecuteScalar() ?? 0);
+            var raw = cmd.ExecuteScalar();
+            var id = Convert.ToInt32(raw ?? 0, CultureInfo.InvariantCulture);
+
+            // Odœwie¿enia UI
             RaiseDataChanged();
-            NotifyDataChanged();
 
             return id;
         }
 
-
         public static void UpdateInvestment(InvestmentModel m)
         {
+            if (m == null) throw new ArgumentNullException(nameof(m));
+            if (m.UserId <= 0) throw new ArgumentException("Nieprawid³owy UserId.", nameof(m.UserId));
+            if (m.Id <= 0) throw new ArgumentException("Nieprawid³owe Id inwestycji.", nameof(m.Id));
+
             using var c = OpenAndEnsureSchema();
             bool hasType = ColumnExists(c, "Investments", "Type");
 
             using var cmd = c.CreateCommand();
-
             cmd.CommandText = hasType
                 ? @"
 UPDATE Investments
@@ -2185,7 +2103,7 @@ WHERE Id=@id AND UserId=@u;";
 
             cmd.Parameters.AddWithValue("@id", m.Id);
             cmd.Parameters.AddWithValue("@u", m.UserId);
-            cmd.Parameters.AddWithValue("@n", m.Name ?? "");
+            cmd.Parameters.AddWithValue("@n", (m.Name ?? string.Empty).Trim());
 
             if (hasType) cmd.Parameters.AddWithValue("@type", (int)m.Type);
 
@@ -2194,10 +2112,11 @@ WHERE Id=@id AND UserId=@u;";
             cmd.Parameters.AddWithValue("@d", (object?)m.TargetDate ?? DBNull.Value);
             cmd.Parameters.AddWithValue("@desc", (object?)m.Description ?? DBNull.Value);
 
-            cmd.ExecuteNonQuery();
-            RaiseDataChanged();
-            NotifyDataChanged();
+            var affected = cmd.ExecuteNonQuery();
+            if (affected <= 0)
+                throw new InvalidOperationException("Nie zaktualizowano inwestycji (brak rekordu lub brak uprawnieñ).");
 
+            RaiseDataChanged();
         }
 
         public static void DeleteInvestment(int userId, int investmentId)
@@ -2210,9 +2129,14 @@ WHERE Id=@id AND UserId=@u;";
             cmd.Parameters.AddWithValue("@id", investmentId);
             cmd.Parameters.AddWithValue("@u", userId);
 
-            cmd.ExecuteNonQuery();
+            var affected = cmd.ExecuteNonQuery();
+            if (affected <= 0)
+                throw new InvalidOperationException("Nie usuniêto inwestycji (brak rekordu lub brak uprawnieñ).");
+
+            // U Ciebie tego brakowa³o – przez to dashboard/kafelki mog³y nie odœwie¿aæ
             RaiseDataChanged();
         }
+
 
 
 

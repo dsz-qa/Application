@@ -353,14 +353,10 @@ namespace Finly.Pages
         // Lokalny DELETE – bo w Twoim DatabaseService nie ma DeleteInvestment(...)
         private static void DeleteInvestmentFromDb(int userId, int investmentId)
         {
-            using var con = DatabaseService.GetConnection();
-            con.Open();
+            using var con = DatabaseService.GetConnection(); // już otwarte
 
             using var cmd = con.CreateCommand();
-            cmd.CommandText = @"
-DELETE FROM Investments
-WHERE Id = $id AND UserId = $uid;
-";
+            cmd.CommandText = @"DELETE FROM Investments WHERE Id = $id AND UserId = $uid;";
             cmd.Parameters.AddWithValue("$id", investmentId);
             cmd.Parameters.AddWithValue("$uid", userId);
 
@@ -368,8 +364,10 @@ WHERE Id = $id AND UserId = $uid;
             if (affected <= 0)
                 throw new InvalidOperationException("Nie znaleziono inwestycji do usunięcia (lub brak uprawnień użytkownika).");
 
+            // To podbije event UI w całej apce
             try { DatabaseService.NotifyDataChanged(); } catch { }
         }
+
 
         // ========= Zapis =========
 
