@@ -1,28 +1,67 @@
-﻿using System;
+﻿using Microsoft.Data.Sqlite;
+using System;
 using System.Collections.ObjectModel;
+using System.ComponentModel;
 using System.Globalization;
-using System.IO;
 using System.Linq;
-using System.Reflection.PortableExecutable;
+using System.Runtime.CompilerServices;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Threading;
+using Finly.Models;
 using Finly.Services;
 using Finly.Services.Features;
-using Finly.Services.SpecificPages;
 
 namespace Finly.Pages
 {
-    public class InvestmentVm
+    // Stabilna baza pod stan UI (np. confirm delete)
+    public abstract class BindableBase : INotifyPropertyChanged
+    {
+        public event PropertyChangedEventHandler? PropertyChanged;
+
+        protected void Raise([CallerMemberName] string? name = null)
+            => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
+
+        protected bool Set<T>(ref T field, T value, [CallerMemberName] string? name = null)
+        {
+            if (Equals(field, value)) return false;
+            field = value;
+            Raise(name);
+            return true;
+        }
+    }
+
+    public sealed class InvestmentVm : BindableBase
     {
         public int Id { get; set; }
-        public string Name { get; set; } = "";
+
+        private string _name = "";
+        public string Name
+        {
+            get => _name;
+            set => Set(ref _name, value);
+        }
+
+        public InvestmentType Type { get; set; } = InvestmentType.Other;
+
         public decimal TargetAmount { get; set; }
         public decimal CurrentAmount { get; set; }
         public DateTime? TargetDate { get; set; }
         public string Description { get; set; } = "";
+
+        // Tylko do wyświetlania (WPF nie może do tego pisać TwoWay)
+        public string TypeDisplay => Type switch
+        {
+            InvestmentType.Stock => "Akcje",
+            InvestmentType.Bond => "Obligacje",
+            InvestmentType.Etf => "ETF",
+            InvestmentType.Fund => "Fundusz",
+            InvestmentType.Crypto => "Kryptowaluty",
+            InvestmentType.Deposit => "Lokata",
+            _ => "Inne"
+        };
 
         public decimal Remaining => Math.Max(0, TargetAmount - CurrentAmount);
 
@@ -34,6 +73,7 @@ namespace Finly.Pages
                 var today = DateTime.Today;
                 var d = TargetDate.Value.Date;
                 if (d <= today) return 0;
+
                 int months = (d.Year - today.Year) * 12 + (d.Month - today.Month);
                 if (d.Day > today.Day) months++;
                 if (months <= 0) months = 1;
@@ -63,6 +103,15 @@ namespace Finly.Pages
                 return Math.Round(pct, 1);
             }
         }
+
+        private bool _isDeleteConfirmVisible;
+        public bool IsDeleteConfirmVisible
+        {
+            get => _isDeleteConfirmVisible;
+            set => Set(ref _isDeleteConfirmVisible, value);
+        }
+
+        public void HideDeleteConfirm() => IsDeleteConfirmVisible = false;
     }
 
     public sealed class AddInvestmentTile { }
@@ -71,7 +120,7 @@ namespace Finly.Pages
     {
         private readonly ObservableCollection<InvestmentVm> _investments = new();
         private readonly ObservableCollection<object> _items = new();
-        private int _nextId = 1;
+
         private int? _editingId = null;
         private bool _initializedOk = false;
 
@@ -82,32 +131,27 @@ namespace Finly.Pages
                 InitializeComponent();
                 _initializedOk = true;
 
-                if (InvestmentsRepeater != null)
-                {
-                    try { InvestmentsRepeater.ItemsSource = _items; } catch { }
-                }
+                InvestmentsRepeater.ItemsSource = _items;
 
                 Loaded += InvestmentsPage_Loaded;
 
-                // Refresh when DB changes elsewhere in app
                 try { DatabaseService.DataChanged += DatabaseService_DataChanged; } catch { }
-
-                // Unsubscribe to avoid leaks when control unloaded
                 Unloaded += (_, _) => { try { DatabaseService.DataChanged -= DatabaseService_DataChanged; } catch { } };
 
-                try { if (FormBorder != null) FormBorder.Visibility = Visibility.Collapsed; } catch { }
+                FormBorder.Visibility = Visibility.Collapsed;
+
+                try { if (InvestmentTypeBox != null) InvestmentTypeBox.SelectedIndex = 0; } catch { }
             }
             catch (Exception ex)
             {
                 System.Diagnostics.Debug.WriteLine("InvestmentsPage init error: " + ex);
-                var tb = new TextBlock
+                this.Content = new TextBlock
                 {
                     Text = "Nie można załadować strony Inwestycje:\n" + ex.Message,
                     Foreground = Brushes.OrangeRed,
                     TextWrapping = TextWrapping.Wrap,
                     Margin = new Thickness(16)
                 };
-                this.Content = tb;
             }
         }
 
@@ -116,51 +160,51 @@ namespace Finly.Pages
             LoadInvestments();
         }
 
+        private int _uid => UserService.GetCurrentUserId();
+
         private void LoadInvestments()
         {
             try
             {
                 _investments.Clear();
 
-                try
+                var uid = _uid;
+                if (uid > 0)
                 {
-                    var uid = UserService.GetCurrentUserId();
-                    if (uid > 0)
+                    var rows = DatabaseService.GetInvestments(uid);
+                    foreach (var r in rows)
                     {
-                        var rows = DatabaseService.GetInvestments(uid);
-                        foreach (var r in rows)
+                        var vm = new InvestmentVm
                         {
-                            var vm = new InvestmentVm
-                            {
-                                Id = r.Id,
-                                Name = r.Name,
-                                TargetAmount = r.TargetAmount,
-                                CurrentAmount = r.CurrentAmount,
-                                TargetDate = string.IsNullOrWhiteSpace(r.TargetDate) ? null : DateTime.TryParse(r.TargetDate, out var d) ? d : (DateTime?)null,
-                                Description = r.Description ?? ""
-                            };
-                            _investments.Add(vm);
-                            if (r.Id >= _nextId) _nextId = r.Id + 1;
-                        }
+                            Id = r.Id,
+                            Name = r.Name,
+                            Type = r.Type,
+                            TargetAmount = r.TargetAmount,
+                            CurrentAmount = r.CurrentAmount,
+                            TargetDate = string.IsNullOrWhiteSpace(r.TargetDate)
+                                ? null
+                                : (DateTime.TryParse(r.TargetDate, out var d) ? d : (DateTime?)null),
+                            Description = r.Description ?? ""
+                        };
+
+                        _investments.Add(vm);
                     }
                 }
-                catch (Exception ex) { System.Diagnostics.Debug.WriteLine("LoadInvestments DB error: " + ex); try { File.AppendAllText(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Finly", "Logs", "investments_errors.log"), $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] LoadInvestments DB error: {ex}\n"); } catch { } }
 
                 RebuildItems();
                 RefreshKpis();
 
-                // hide any previous inline error
-                try { InvestmentsErrorText.Visibility = Visibility.Collapsed; } catch { }
+                InvestmentsErrorText.Visibility = Visibility.Collapsed;
             }
             catch (Exception ex)
             {
-                // Show a non-modal inline error on the page instead of forcing a MessageBox
                 try
                 {
                     InvestmentsErrorText.Text = "Błąd podczas ładowania inwestycji: " + ex.Message;
                     InvestmentsErrorText.Visibility = Visibility.Visible;
                 }
                 catch { }
+
                 System.Diagnostics.Debug.WriteLine("LoadInvestments error: " + ex);
             }
         }
@@ -183,33 +227,52 @@ namespace Finly.Pages
             TotalMonthlyText.Text = totalMonthly.ToString("N2") + " zł";
         }
 
-        // helpers wyszukiwania elementów w template
-        private static T? FindAncestor<T>(DependencyObject start) where T : DependencyObject
+        private static decimal ParseDecimal(string? text)
         {
-            var current = start;
-            while (current != null)
-            {
-                if (current is T t) return t;
-                current = VisualTreeHelper.GetParent(current);
-            }
-            return null;
+            if (string.IsNullOrWhiteSpace(text)) return 0m;
+            var raw = text.Replace(" ", "");
+
+            if (decimal.TryParse(raw, NumberStyles.Number, CultureInfo.CurrentCulture, out var d))
+                return d;
+            if (decimal.TryParse(raw, NumberStyles.Number, CultureInfo.InvariantCulture, out d))
+                return d;
+
+            return 0m;
         }
 
-        private static T? FindDescendantByName<T>(DependencyObject start, string name) where T : FrameworkElement
+        private InvestmentType ReadTypeFromForm()
         {
-            if (start == null) return null;
-            int childCount = VisualTreeHelper.GetChildrenCount(start);
-            for (int i = 0; i < childCount; i++)
+            var idx = InvestmentTypeBox?.SelectedIndex ?? 0;
+            return idx switch
             {
-                var child = VisualTreeHelper.GetChild(start, i);
-                if (child is T fe && fe.Name == name) return fe;
-                var found = FindDescendantByName<T>(child, name);
-                if (found != null) return found;
-            }
-            return null;
+                1 => InvestmentType.Stock,
+                2 => InvestmentType.Bond,
+                3 => InvestmentType.Etf,
+                4 => InvestmentType.Fund,
+                5 => InvestmentType.Crypto,
+                6 => InvestmentType.Deposit,
+                _ => InvestmentType.Other
+            };
         }
 
-        // Dodaj -> otwórz formularz
+        private void WriteTypeToForm(InvestmentType type)
+        {
+            if (InvestmentTypeBox == null) return;
+
+            InvestmentTypeBox.SelectedIndex = type switch
+            {
+                InvestmentType.Stock => 1,
+                InvestmentType.Bond => 2,
+                InvestmentType.Etf => 3,
+                InvestmentType.Fund => 4,
+                InvestmentType.Crypto => 5,
+                InvestmentType.Deposit => 6,
+                _ => 0
+            };
+        }
+
+        // ========= UI: Dodaj =========
+
         private void AddInvestmentCard_Click(object sender, MouseButtonEventArgs e)
         {
             if (!_initializedOk)
@@ -218,285 +281,180 @@ namespace Finly.Pages
                 return;
             }
 
-            try
-            {
-                _editingId = null;
-                if (FormHeader != null) FormHeader.Text = "Dodaj inwestycję";
-                if (InvestmentFormMessage != null) InvestmentFormMessage.Text = string.Empty;
-                if (FormBorder != null) FormBorder.Visibility = Visibility.Visible;
-                ClearInvestmentForm();
-            }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine("AddInvestmentCard_Click error: " + ex);
-                ToastService.Error("Nie można otworzyć formularza inwestycji: " + ex.Message);
-            }
+            _editingId = null;
+            FormHeader.Text = "Dodaj inwestycję";
+            InvestmentFormMessage.Text = string.Empty;
+            FormBorder.Visibility = Visibility.Visible;
+
+            ClearInvestmentForm();
         }
 
-        // Edycja
+        // ========= UI: Edycja =========
+
         private void EditInvestment_Click(object sender, RoutedEventArgs e)
         {
-            if (!_initializedOk)
-            {
-                ToastService.Error("Strona Inwestycje nie została poprawnie zainicjalizowana.");
-                return;
-            }
+            if ((sender as FrameworkElement)?.DataContext is not InvestmentVm vm) return;
 
-            try
-            {
-                if ((sender as FrameworkElement)?.DataContext is not InvestmentVm vm) return;
-                _editingId = vm.Id;
-                if (FormHeader != null) FormHeader.Text = "Edytuj inwestycję";
-                if (InvestmentFormMessage != null) InvestmentFormMessage.Text = string.Empty;
-                if (FormBorder != null) FormBorder.Visibility = Visibility.Visible;
+            // chowamy ewentualne panele confirm w innych kartach
+            foreach (var inv in _investments) inv.HideDeleteConfirm();
 
-                if (InvestmentNameBox != null) InvestmentNameBox.Text = vm.Name;
-                if (InvestmentTargetBox != null) InvestmentTargetBox.Text = vm.TargetAmount.ToString("N2");
-                if (InvestmentCurrentBox != null) InvestmentCurrentBox.Text = vm.CurrentAmount.ToString("N2");
-                if (InvestmentTargetDatePicker != null) InvestmentTargetDatePicker.SelectedDate = vm.TargetDate;
-                if (InvestmentDescriptionBox != null) InvestmentDescriptionBox.Text = vm.Description ?? "";
-            }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine("EditInvestment_Click error: " + ex);
-                ToastService.Error("Nie można otworzyć formularza edycji: " + ex.Message);
-            }
+            _editingId = vm.Id;
+            FormHeader.Text = "Edytuj inwestycję";
+            InvestmentFormMessage.Text = string.Empty;
+            FormBorder.Visibility = Visibility.Visible;
+
+            InvestmentNameBox.Text = vm.Name;
+            WriteTypeToForm(vm.Type);
+            InvestmentTargetBox.Text = vm.TargetAmount.ToString("N2");
+            InvestmentCurrentBox.Text = vm.CurrentAmount.ToString("N2");
+            InvestmentTargetDatePicker.SelectedDate = vm.TargetDate;
+            InvestmentDescriptionBox.Text = vm.Description ?? "";
         }
 
-        // Pokaż panel potwierdzenia usunięcia
+        // ========= Usuwanie (stabilnie) =========
+
         private void DeleteInvestment_Click(object sender, RoutedEventArgs e)
         {
-            if (sender is FrameworkElement fe)
-            {
-                var root = FindAncestor<Border>(fe);
-                if (root != null)
-                {
-                    var panel = FindDescendantByName<StackPanel>(root, "InvestmentDeleteConfirmPanel");
-                    if (panel != null) panel.Visibility = Visibility.Visible;
-                }
-            }
+            if ((sender as FrameworkElement)?.DataContext is not InvestmentVm vm) return;
+
+            // tylko jedna karta naraz w trybie confirm
+            foreach (var inv in _investments)
+                inv.IsDeleteConfirmVisible = false;
+
+            vm.IsDeleteConfirmVisible = true;
         }
 
         private void DeleteInvestmentCancel_Click(object sender, RoutedEventArgs e)
         {
-            if (sender is FrameworkElement fe)
-            {
-                var root = FindAncestor<Border>(fe);
-                if (root != null)
-                {
-                    var panel = FindDescendantByName<StackPanel>(root, "InvestmentDeleteConfirmPanel");
-                    if (panel != null) panel.Visibility = Visibility.Collapsed;
-                }
-            }
+            if ((sender as FrameworkElement)?.DataContext is InvestmentVm vm)
+                vm.IsDeleteConfirmVisible = false;
         }
 
         private void DeleteInvestmentConfirm_Click(object sender, RoutedEventArgs e)
         {
-            if ((sender as FrameworkElement)?.DataContext is not InvestmentVm vm)
-                return;
-
-            // TODO: jeśli chcesz usuwać w DB -> wywołaj tutaj DatabaseService.DeleteInvestment(vm.Id)
-            _investments.Remove(vm);
-            RebuildItems();
-            RefreshKpis();
-
-            if (sender is FrameworkElement fe)
-            {
-                var root = FindAncestor<Border>(fe);
-                if (root != null)
-                {
-                    var panel = FindDescendantByName<StackPanel>(root, "InvestmentDeleteConfirmPanel");
-                    if (panel != null) panel.Visibility = Visibility.Collapsed;
-                }
-            }
-        }
-
-        // Zapisz z formularza
-        private void AddInvestment_Click(object sender, RoutedEventArgs e)
-        {
-            if (!_initializedOk)
-            {
-                ToastService.Error("Strona Inwestycje nie została poprawnie zainicjalizowana.");
-                return;
-            }
+            if ((sender as FrameworkElement)?.DataContext is not InvestmentVm vm) return;
 
             try
             {
-                var name = (InvestmentNameBox?.Text ?? "").Trim();
-                if (string.IsNullOrWhiteSpace(name))
-                {
-                    if (InvestmentFormMessage != null) InvestmentFormMessage.Text = "Podaj nazwę inwestycji.";
-                    return;
-                }
+                DeleteInvestmentFromDb(_uid, vm.Id);
 
-                if (!decimal.TryParse(InvestmentTargetBox?.Text?.Replace(" ", ""), NumberStyles.Number, CultureInfo.CurrentCulture, out var target))
-                    target = 0m;
-                if (!decimal.TryParse(InvestmentCurrentBox?.Text?.Replace(" ", ""), NumberStyles.Number, CultureInfo.CurrentCulture, out var current))
-                    current = 0m;
+                _investments.Remove(vm);
+                RebuildItems();
+                RefreshKpis();
 
-                var date = InvestmentTargetDatePicker?.SelectedDate;
-                var desc = InvestmentDescriptionBox?.Text ?? "";
-
-                if (target <= 0)
-                {
-                    if (InvestmentFormMessage != null) InvestmentFormMessage.Text = "Wartość docelowa musi być większa niż0.";
-                    return;
-                }
-
-                if (current < 0)
-                {
-                    if (InvestmentFormMessage != null) InvestmentFormMessage.Text = "Aktualna wartość nie może być ujemna.";
-                    return;
-                }
-
-                if (current > target)
-                {
-                    if (InvestmentFormMessage != null) InvestmentFormMessage.Text = "Aktualna wartość nie może przekraczać wartości docelowej.";
-                    return;
-                }
-
-                if (!date.HasValue)
-                {
-                    if (InvestmentFormMessage != null) InvestmentFormMessage.Text = "Wybierz termin docelowy.";
-                    return;
-                }
-
-                if (_editingId.HasValue)
-                {
-                    var existing = _investments.FirstOrDefault(x => x.Id == _editingId.Value);
-                    if (existing != null)
-                    {
-                        existing.Name = name;
-                        existing.TargetAmount = target;
-                        existing.CurrentAmount = current;
-                        existing.TargetDate = date;
-                        existing.Description = desc;
-                        try
-                        {
-                            var m = new Models.InvestmentModel
-                            {
-                                Id = existing.Id,
-                                UserId = UserService.GetCurrentUserId(),
-                                Name = existing.Name,
-                                TargetAmount = existing.TargetAmount,
-                                CurrentAmount = existing.CurrentAmount,
-                                TargetDate = existing.TargetDate?.ToString("yyyy-MM-dd"),
-                                Description = existing.Description
-                            };
-                            DatabaseService.UpdateInvestment(m);
-                            ToastService.Success("Zaktualizowano inwestycję.");
-                        }
-                        catch (Exception ex)
-                        {
-                            System.Diagnostics.Debug.WriteLine("UpdateInvestment DB error: " + ex);
-                            try { if (InvestmentFormMessage != null) InvestmentFormMessage.Text = "Błąd zapisu do bazy: " + ex.Message; } catch { }
-                        }
-                    }
-                }
-                else
-                {
-                    var vm = new InvestmentVm
-                    {
-                        Id = _nextId++,
-                        Name = name,
-                        TargetAmount = target,
-                        CurrentAmount = current,
-                        TargetDate = date,
-                        Description = desc
-                    };
-                    try
-                    {
-                        var m = new Models.InvestmentModel
-                        {
-                            UserId = UserService.GetCurrentUserId(),
-                            Name = vm.Name,
-                            TargetAmount = vm.TargetAmount,
-                            CurrentAmount = vm.CurrentAmount,
-                            TargetDate = vm.TargetDate?.ToString("yyyy-MM-dd"),
-                            Description = vm.Description
-                        };
-                        var newId = DatabaseService.InsertInvestment(m);
-                        vm.Id = newId;
-                        _investments.Add(vm);
-                        ToastService.Success("Dodano inwestycję.");
-                        if (newId >= _nextId) _nextId = newId + 1;
-                    }
-                    catch (Exception ex)
-                    {
-                        System.Diagnostics.Debug.WriteLine("InsertInvestment DB error: " + ex);
-                        try { if (InvestmentFormMessage != null) InvestmentFormMessage.Text = "Błąd zapisu do bazy: " + ex.Message; } catch { }
-                        // Fallback: keep in-memory item so user doesn't lose data
-                        _investments.Add(vm);
-                    }
-                }
-
-                // After DB operation reload investments from DB to ensure UI shows persisted data immediately
-                try
-                {
-                    LoadInvestments();
-
-                    // Force ItemsControl to refresh binding to avoid stale visuals
-                    try
-                    {
-                        if (InvestmentsRepeater != null)
-                        {
-                            InvestmentsRepeater.ItemsSource = null;
-                            InvestmentsRepeater.ItemsSource = _items;
-                        }
-                    }
-                    catch { }
-
-                    RefreshKpis();
-                    ClearInvestmentForm();
-                    if (FormBorder != null) FormBorder.Visibility = Visibility.Collapsed;
-                    _editingId = null;
-                    if (InvestmentFormMessage != null) InvestmentFormMessage.Text = string.Empty;
-
-                    // Scroll the newly added/updated investment into view after layout
-                    Dispatcher.BeginInvoke(new Action(() =>
-                    {
-                        try
-                        {
-                            // find investment by name+target+date heuristic (new id may have changed)
-                            var last = _investments.OrderByDescending(i => i.Id).FirstOrDefault();
-                            if (last != null && InvestmentsRepeater != null)
-                            {
-                                var container = InvestmentsRepeater.ItemContainerGenerator.ContainerFromItem(last) as FrameworkElement;
-                                if (container != null)
-                                {
-                                    container.BringIntoView();
-                                }
-                                else
-                                {
-                                    try { InvestmentsRepeater.BringIntoView(); } catch { }
-                                }
-                            }
-                        }
-                        catch { }
-                    }), System.Windows.Threading.DispatcherPriority.Loaded);
-                }
-                catch (Exception ex)
-                {
-                    System.Diagnostics.Debug.WriteLine("AddInvestment post-update error: " + ex);
-                    try { if (InvestmentFormMessage != null) InvestmentFormMessage.Text = "Nie udało się odświeżyć listy: " + ex.Message; } catch { }
-                }
+                ToastService.Success("Usunięto inwestycję.");
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine("AddInvestment_Click error: " + ex);
-                // Log detailed info to file for diagnostics
-                try
-                {
-                    var logDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Finly", "Logs");
-                    Directory.CreateDirectory(logDir);
-                    var file = Path.Combine(logDir, "investments_errors.log");
-                    var info = $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] AddInvestment_Click error:\n{ex}\nForm values:\nName={InvestmentNameBox?.Text}\nTarget={InvestmentTargetBox?.Text}\nCurrent={InvestmentCurrentBox?.Text}\nDate={InvestmentTargetDatePicker?.SelectedDate}\nDescription={InvestmentDescriptionBox?.Text}\n\n";
-                    File.AppendAllText(file, info);
-                }
-                catch { }
+                ToastService.Error("Nie udało się usunąć inwestycji.\n" + ex.Message);
+            }
+        }
 
-                var msg = "Błąd zapisu inwestycji: " + ex.Message;
-                try { if (InvestmentFormMessage != null) InvestmentFormMessage.Text = msg; else ToastService.Error(msg); } catch { }
+        // Lokalny DELETE – bo w Twoim DatabaseService nie ma DeleteInvestment(...)
+        private static void DeleteInvestmentFromDb(int userId, int investmentId)
+        {
+            using var con = DatabaseService.GetConnection();
+            con.Open();
+
+            using var cmd = con.CreateCommand();
+            cmd.CommandText = @"
+DELETE FROM Investments
+WHERE Id = $id AND UserId = $uid;
+";
+            cmd.Parameters.AddWithValue("$id", investmentId);
+            cmd.Parameters.AddWithValue("$uid", userId);
+
+            var affected = cmd.ExecuteNonQuery();
+            if (affected <= 0)
+                throw new InvalidOperationException("Nie znaleziono inwestycji do usunięcia (lub brak uprawnień użytkownika).");
+
+            try { DatabaseService.NotifyDataChanged(); } catch { }
+        }
+
+        // ========= Zapis =========
+
+        private void AddInvestment_Click(object sender, RoutedEventArgs e)
+        {
+            // chowamy confirmy
+            foreach (var inv in _investments) inv.HideDeleteConfirm();
+
+            var name = (InvestmentNameBox.Text ?? "").Trim();
+            var type = ReadTypeFromForm();
+
+            var target = ParseDecimal(InvestmentTargetBox.Text);
+            var current = ParseDecimal(InvestmentCurrentBox.Text);
+
+            var date = InvestmentTargetDatePicker.SelectedDate;
+            var desc = (InvestmentDescriptionBox.Text ?? "").Trim();
+
+            if (string.IsNullOrWhiteSpace(name))
+            {
+                InvestmentFormMessage.Text = "Podaj nazwę inwestycji.";
+                return;
+            }
+
+            if (target <= 0)
+            {
+                InvestmentFormMessage.Text = "Wartość docelowa musi być większa od zera.";
+                return;
+            }
+
+            if (current < 0)
+            {
+                InvestmentFormMessage.Text = "Aktualna wartość nie może być ujemna.";
+                return;
+            }
+
+            if (current > target)
+            {
+                InvestmentFormMessage.Text = "Aktualna wartość nie może przekraczać wartości docelowej.";
+                return;
+            }
+
+            if (date == null)
+            {
+                InvestmentFormMessage.Text = "Wybierz termin docelowy.";
+                return;
+            }
+
+            var model = new InvestmentModel
+            {
+                Id = _editingId ?? 0,
+                UserId = _uid,
+                Name = name,
+                Type = type,
+                TargetAmount = target,
+                CurrentAmount = current,
+                TargetDate = date.Value.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
+                Description = desc
+            };
+
+            try
+            {
+                if (_editingId.HasValue)
+                {
+                    DatabaseService.UpdateInvestment(model);
+                    ToastService.Success("Zaktualizowano inwestycję.");
+                }
+                else
+                {
+                    DatabaseService.InsertInvestment(model);
+                    ToastService.Success("Dodano inwestycję.");
+                }
+
+                // Źródłem prawdy jest DB – po sukcesie zawsze odświeżamy z DB
+                LoadInvestments();
+
+                ClearInvestmentForm();
+                FormBorder.Visibility = Visibility.Collapsed;
+                _editingId = null;
+                InvestmentFormMessage.Text = string.Empty;
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine("Investment DB error: " + ex);
+                InvestmentFormMessage.Text = "Błąd zapisu do bazy: " + ex.Message;
+                // Formularz zostaje – użytkowniczka nie traci wpisanych danych.
             }
         }
 
@@ -511,11 +469,14 @@ namespace Finly.Pages
         private void ClearInvestmentForm()
         {
             InvestmentNameBox.Text = "";
+            if (InvestmentTypeBox != null) InvestmentTypeBox.SelectedIndex = 0;
             InvestmentTargetBox.Text = "0,00";
             InvestmentCurrentBox.Text = "0,00";
             InvestmentTargetDatePicker.SelectedDate = null;
             InvestmentDescriptionBox.Text = "";
         }
+
+        // ========= 0,00 input =========
 
         private void AmountBox_GotFocus(object sender, RoutedEventArgs e)
         {
@@ -529,10 +490,8 @@ namespace Finly.Pages
         {
             if (sender is TextBox tb)
             {
-                if (decimal.TryParse(tb.Text?.Replace(" ", ""), NumberStyles.Number, CultureInfo.CurrentCulture, out var d))
-                    tb.Text = d.ToString("N2");
-                else
-                    tb.Text = "0,00";
+                var val = ParseDecimal(tb.Text);
+                tb.Text = val.ToString("N2");
             }
         }
 
@@ -540,7 +499,7 @@ namespace Finly.Pages
         {
             try
             {
-                Dispatcher.BeginInvoke(new Action(() => LoadInvestments()), DispatcherPriority.Background);
+                Dispatcher.BeginInvoke(new Action(LoadInvestments), DispatcherPriority.Background);
             }
             catch { }
         }

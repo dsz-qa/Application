@@ -1363,12 +1363,16 @@ WHERE Id=@id AND UserId=@u;";
             public decimal Saved { get; set; }      // ca³a pula od³o¿onej
             public decimal Envelopes { get; set; }  // przydzielona do kopert
 
+            public decimal Investments { get; set; }
+
+
             public decimal SavedUnallocated => Saved - Envelopes;
             public decimal Total => Banks + Cash + Saved + Envelopes;
         }
 
         public static MoneySnapshot GetMoneySnapshot(int userId)
         {
+            // Bank accounts sum
             var banks = GetTotalBanksBalance(userId);
 
             // CashOnHand = CA£A gotówka w portfelu (free + saved).
@@ -1381,18 +1385,35 @@ WHERE Id=@id AND UserId=@u;";
             // ale NIE jako dodatkowe pieni¹dze do Total.
             var envelopesAllocated = GetTotalAllocatedInEnvelopesForUser(userId);
 
+            // Investments
+            var investments = 0m;
+            try
+            {
+                investments = GetInvestmentsTotal(userId);
+            }
+            catch
+            {
+                investments = 0m;
+            }
+
             // Wolna gotówka = total cash - saved total (jak w EnvelopesPage)
             var freeCash = cashOnHandTotal - savedTotal;
             if (freeCash < 0m) freeCash = 0m;
 
+            // Total maj¹tku: banki + wolna gotówka + saved + inwestycje
+            // (bez Envelopes, bo to czêœæ Saved)
+            var total = banks + freeCash + savedTotal + investments;
+
             return new MoneySnapshot
-            {
+            {                
                 Banks = banks,
                 Cash = freeCash,
                 Saved = savedTotal,
-                Envelopes = envelopesAllocated
+                Envelopes = envelopesAllocated,
+                Investments = investments       // wymaga pola Investments w MoneySnapshot
             };
         }
+
 
 
         // =========================================================
@@ -1488,6 +1509,20 @@ WHERE e.UserId = @uid");
                 // awaryjnie: jeœli coœ pójdzie nie tak, nie wysypuj UI
             }
         }
+
+        public static decimal GetInvestmentsTotal(int uid)
+        {
+            using var con = GetConnection();
+            using var cmd = con.CreateCommand();
+
+            // PRZYK£AD: tabela Investments(UserId, CurrentValue)
+            cmd.CommandText = @"SELECT IFNULL(SUM(CurrentValue), 0) FROM Investments WHERE UserId=@u;";
+            cmd.Parameters.AddWithValue("@u", uid);
+
+            var obj = cmd.ExecuteScalar();
+            return obj == DBNull.Value ? 0m : Convert.ToDecimal(obj);
+        }
+
 
 
         public static List<ExpenseDisplayModel> GetExpensesWithCategory()
@@ -2060,47 +2095,64 @@ GROUP BY i.Source;";
         public static List<InvestmentModel> GetInvestments(int userId)
         {
             var list = new List<InvestmentModel>();
-            try
-            {
-                using var c = OpenAndEnsureSchema();
-                using var cmd = c.CreateCommand();
-                cmd.CommandText = @"
-SELECT Id, UserId, Name, TargetAmount, CurrentAmount, TargetDate, Description
+
+            using var c = OpenAndEnsureSchema();
+
+            // jeœli ktoœ ma star¹ bazê bez kolumny Type – fallback na 0
+            bool hasType = ColumnExists(c, "Investments", "Type");
+
+            using var cmd = c.CreateCommand();
+            cmd.CommandText = $@"
+SELECT Id, UserId, Name,
+       {(hasType ? "Type" : "0")} AS Type,
+       TargetAmount, CurrentAmount, TargetDate, Description
 FROM Investments
 WHERE UserId=@u
 ORDER BY Id DESC;";
-                cmd.Parameters.AddWithValue("@u", userId);
+            cmd.Parameters.AddWithValue("@u", userId);
 
-                using var r = cmd.ExecuteReader();
-                while (r.Read())
+            using var r = cmd.ExecuteReader();
+            while (r.Read())
+            {
+                list.Add(new InvestmentModel
                 {
-                    list.Add(new InvestmentModel
-                    {
-                        Id = r.IsDBNull(0) ? 0 : r.GetInt32(0),
-                        UserId = r.IsDBNull(1) ? userId : r.GetInt32(1),
-                        Name = r.IsDBNull(2) ? string.Empty : r.GetString(2),
-                        TargetAmount = r.IsDBNull(3) ? 0m : Convert.ToDecimal(r.GetValue(3)),
-                        CurrentAmount = r.IsDBNull(4) ? 0m : Convert.ToDecimal(r.GetValue(4)),
-                        TargetDate = r.IsDBNull(5) ? null : r.GetString(5),
-                        Description = r.IsDBNull(6) ? null : r.GetString(6)
-                    });
-                }
+                    Id = r.IsDBNull(0) ? 0 : r.GetInt32(0),
+                    UserId = r.IsDBNull(1) ? userId : r.GetInt32(1),
+                    Name = r.IsDBNull(2) ? string.Empty : r.GetString(2),
+                    Type = (InvestmentType)(r.IsDBNull(3) ? 0 : r.GetInt32(3)),
+                    TargetAmount = r.IsDBNull(4) ? 0m : Convert.ToDecimal(r.GetValue(4)),
+                    CurrentAmount = r.IsDBNull(5) ? 0m : Convert.ToDecimal(r.GetValue(5)),
+                    TargetDate = r.IsDBNull(6) ? null : r.GetString(6),
+                    Description = r.IsDBNull(7) ? null : r.GetString(7)
+                });
             }
-            catch { }
 
             return list;
         }
 
+
         public static int InsertInvestment(InvestmentModel m)
         {
             using var c = OpenAndEnsureSchema();
+            bool hasType = ColumnExists(c, "Investments", "Type");
+
             using var cmd = c.CreateCommand();
-            cmd.CommandText = @"
+
+            cmd.CommandText = hasType
+                ? @"
+INSERT INTO Investments(UserId, Name, Type, TargetAmount, CurrentAmount, TargetDate, Description)
+VALUES (@u,@n,@type,@tgt,@cur,@d,@desc);
+SELECT last_insert_rowid();"
+                : @"
 INSERT INTO Investments(UserId, Name, TargetAmount, CurrentAmount, TargetDate, Description)
 VALUES (@u,@n,@tgt,@cur,@d,@desc);
 SELECT last_insert_rowid();";
+
             cmd.Parameters.AddWithValue("@u", m.UserId);
             cmd.Parameters.AddWithValue("@n", m.Name ?? "");
+
+            if (hasType) cmd.Parameters.AddWithValue("@type", (int)m.Type);
+
             cmd.Parameters.AddWithValue("@tgt", m.TargetAmount);
             cmd.Parameters.AddWithValue("@cur", m.CurrentAmount);
             cmd.Parameters.AddWithValue("@d", (object?)m.TargetDate ?? DBNull.Value);
@@ -2108,20 +2160,35 @@ SELECT last_insert_rowid();";
 
             var id = Convert.ToInt32(cmd.ExecuteScalar() ?? 0);
             RaiseDataChanged();
+            NotifyDataChanged();
+
             return id;
         }
+
 
         public static void UpdateInvestment(InvestmentModel m)
         {
             using var c = OpenAndEnsureSchema();
+            bool hasType = ColumnExists(c, "Investments", "Type");
+
             using var cmd = c.CreateCommand();
-            cmd.CommandText = @"
+
+            cmd.CommandText = hasType
+                ? @"
+UPDATE Investments
+SET Name=@n, Type=@type, TargetAmount=@tgt, CurrentAmount=@cur, TargetDate=@d, Description=@desc
+WHERE Id=@id AND UserId=@u;"
+                : @"
 UPDATE Investments
 SET Name=@n, TargetAmount=@tgt, CurrentAmount=@cur, TargetDate=@d, Description=@desc
 WHERE Id=@id AND UserId=@u;";
+
             cmd.Parameters.AddWithValue("@id", m.Id);
             cmd.Parameters.AddWithValue("@u", m.UserId);
             cmd.Parameters.AddWithValue("@n", m.Name ?? "");
+
+            if (hasType) cmd.Parameters.AddWithValue("@type", (int)m.Type);
+
             cmd.Parameters.AddWithValue("@tgt", m.TargetAmount);
             cmd.Parameters.AddWithValue("@cur", m.CurrentAmount);
             cmd.Parameters.AddWithValue("@d", (object?)m.TargetDate ?? DBNull.Value);
@@ -2129,7 +2196,24 @@ WHERE Id=@id AND UserId=@u;";
 
             cmd.ExecuteNonQuery();
             RaiseDataChanged();
+            NotifyDataChanged();
+
         }
+
+        public static void DeleteInvestment(int userId, int investmentId)
+        {
+            if (userId <= 0 || investmentId <= 0) return;
+
+            using var c = OpenAndEnsureSchema();
+            using var cmd = c.CreateCommand();
+            cmd.CommandText = "DELETE FROM Investments WHERE Id=@id AND UserId=@u;";
+            cmd.Parameters.AddWithValue("@id", investmentId);
+            cmd.Parameters.AddWithValue("@u", userId);
+
+            cmd.ExecuteNonQuery();
+            RaiseDataChanged();
+        }
+
 
 
         private sealed class ExpenseLedgerInfo

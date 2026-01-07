@@ -174,7 +174,7 @@ namespace Finly.Pages
                 SetKpiText("FreeCashDashboardText", snap.Cash);
                 SetKpiText("SavedToAllocateText", snap.SavedUnallocated);
                 SetKpiText("EnvelopesDashboardText", snap.Envelopes);
-                SetKpiText("InvestmentsText", 0m);
+                SetKpiText("InvestmentsText", snap.Investments);
             }
             catch
             {

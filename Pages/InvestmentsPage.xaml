@@ -4,120 +4,191 @@
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:local="clr-namespace:Finly.Pages"
-             mc:Ignorable="d">
+             mc:Ignorable="d"
+             Background="{DynamicResource App.Background}">
 
 	<UserControl.Resources>
-		<!-- Reuse tych samych stylów co w innych stronach -->
-		<!-- Lightweight card style with subtle shadow and no thick borders -->
+
+		<BooleanToVisibilityConverter x:Key="BoolToVisibility"/>
+
+		<!-- Styl jak w GoalsPage -->
 		<Style x:Key="Card" TargetType="Border">
-			<Setter Property="Background" Value="{DynamicResource Surface.Background}" />
-			<Setter Property="CornerRadius" Value="8" />
-			<Setter Property="Padding" Value="12" />
-			<Setter Property="Margin" Value="0,12,16,0" />
-			<Setter Property="SnapsToDevicePixels" Value="True" />
-			<Setter Property="Effect">
-				<Setter.Value>
-					<DropShadowEffect Color="#22000000" BlurRadius="8" ShadowDepth="2"/>
-				</Setter.Value>
-			</Setter>
+			<Setter Property="Background"      Value="{DynamicResource Surface.Background}"/>
+			<Setter Property="BorderBrush"     Value="{DynamicResource Surface.Border}"/>
+			<Setter Property="BorderThickness" Value="1"/>
+			<Setter Property="CornerRadius"    Value="10"/>
+			<Setter Property="Padding"         Value="12"/>
+			<Setter Property="Margin"          Value="0,12,16,0"/>
+			<Setter Property="SnapsToDevicePixels" Value="True"/>
 		</Style>
 
-		<!-- KPI tile variant: minimal border, compact height, unified look -->
-		<Style x:Key="KpiCard" TargetType="Border" BasedOn="{StaticResource Card}">
-			<Setter Property="Width" Value="Auto" />
-			<Setter Property="Padding" Value="10" />
-			<Setter Property="Margin" Value="0,8,12,0" />
+		<Style x:Key="AccentCard" TargetType="Border" BasedOn="{StaticResource Card}">
+			<Setter Property="BorderBrush"     Value="{DynamicResource Brand.Blue}"/>
+			<Setter Property="BorderThickness" Value="2"/>
+			<Setter Property="Margin"          Value="0,16,16,0"/>
 		</Style>
 
 		<Style x:Key="CardHeader" TargetType="TextBlock">
-			<Setter Property="FontSize"   Value="12"/>
+			<Setter Property="FontSize"   Value="13"/>
 			<Setter Property="FontWeight" Value="SemiBold"/>
 			<Setter Property="Foreground" Value="{DynamicResource App.Foreground}"/>
-			<Setter Property="Opacity"    Value="0.85"/>
+			<Setter Property="Opacity"    Value="0.9"/>
 		</Style>
 
 		<Style x:Key="KpiValueStyle" TargetType="TextBlock">
-			<Setter Property="FontSize"   Value="22"/>
+			<Setter Property="FontSize"   Value="20"/>
 			<Setter Property="FontWeight" Value="Bold"/>
-			<Setter Property="Margin"     Value="0,6,0,0"/>
+			<Setter Property="Margin"     Value="0,4,0,0"/>
 			<Setter Property="Foreground" Value="{DynamicResource App.Foreground}"/>
 		</Style>
 
-		<!-- thin elegant progress bar -->
-		<Style x:Key="ThinProgressBar" TargetType="ProgressBar">
-			<Setter Property="Height" Value="6" />
-			<Setter Property="Foreground" Value="{DynamicResource Brand.Blue}" />
-			<!-- subtle translucent background -->
-			<Setter Property="Background" Value="#20000000" />
-			<Setter Property="BorderThickness" Value="0" />
-		</Style>
-
-		<!-- DataTemplate dla inwestycji -->
+		<!-- KARTA INWESTYCJI -->
 		<DataTemplate DataType="{x:Type local:InvestmentVm}">
-			<Border Style="{StaticResource Card}" Width="340">
-				<Grid>
-					<Grid.RowDefinitions>
-						<RowDefinition Height="Auto"/>
-						<RowDefinition Height="Auto"/>
-						<RowDefinition Height="Auto"/>
-					</Grid.RowDefinitions>
+			<Border Style="{StaticResource Card}" MinWidth="320" MaxWidth="380">
+				<StackPanel>
 
-					<!-- Header: name + date -->
-					<StackPanel Grid.Row="0" Orientation="Horizontal" HorizontalAlignment="Stretch" VerticalAlignment="Center">
-						<TextBlock Text="{Binding Name}" FontSize="16" FontWeight="SemiBold" Foreground="{DynamicResource App.Foreground}" />
-						<TextBlock Text="•" Margin="8,0" Opacity="0.5" />
-						<TextBlock Text="{Binding TargetDate, StringFormat={}{0:dd.MM.yyyy}}" FontSize="12" Opacity="0.8" VerticalAlignment="Center"/>
+					<!-- Nagłówek -->
+					<Grid Margin="0,0,0,8">
+						<Grid.ColumnDefinitions>
+							<ColumnDefinition Width="Auto"/>
+							<ColumnDefinition Width="*"/>
+						</Grid.ColumnDefinitions>
+
+						<!-- Ikona -->
+						<Rectangle Grid.Column="0" Width="24" Height="24" Margin="0,0,8,0" VerticalAlignment="Top" Fill="{DynamicResource Brand.Orange}">
+							<Rectangle.OpacityMask>
+								<ImageBrush Stretch="Uniform" ImageSource="/Assets/Icons/inwestycje.png"/>
+							</Rectangle.OpacityMask>
+						</Rectangle>
+
+						<StackPanel Grid.Column="1">
+							<TextBlock FontSize="16"
+                                       FontWeight="Bold"
+                                       Foreground="{DynamicResource App.Foreground}"
+                                       TextWrapping="Wrap">
+								<Run Text="Inwestycja: "/>
+								<Run Text="{Binding Name}"/>
+							</TextBlock>
+
+							<TextBlock FontSize="12"
+                                       Opacity="0.85"
+                                       Foreground="{DynamicResource App.Foreground}"
+                                       TextWrapping="Wrap">
+								<Run Text="{Binding TypeDisplay, Mode=OneWay}"/>
+								<Run Text="  •  "/>
+								<Run Text="{Binding TargetDate, StringFormat={}{0:dd.MM.yyyy}, TargetNullValue=Brak terminu, Mode=OneWay}"/>
+							</TextBlock>
+						</StackPanel>
+					</Grid>
+
+					<!-- Docelowo -->
+					<TextBlock Text="Wartość docelowa" FontWeight="SemiBold" Foreground="{DynamicResource App.Foreground}" Opacity="0.9"/>
+					<TextBlock Text="{Binding TargetAmount, StringFormat={}{0:N2} zł, Mode=OneWay}"
+                               Margin="0,2,0,8"
+                               Foreground="{DynamicResource App.Foreground}"/>
+
+					<!-- Aktualnie -->
+					<TextBlock Text="Aktualna wartość" FontWeight="SemiBold" Foreground="{DynamicResource App.Foreground}" Opacity="0.9"/>
+					<TextBlock Text="{Binding CurrentAmount, StringFormat={}{0:N2} zł, Mode=OneWay}"
+                               Margin="0,2,0,8"
+                               Foreground="{DynamicResource App.Foreground}"/>
+
+					<!-- Pozostało -->
+					<TextBlock Text="Pozostało do celu" FontWeight="SemiBold" Foreground="{DynamicResource App.Foreground}" Opacity="0.9"/>
+					<TextBlock Text="{Binding Remaining, StringFormat={}{0:N2} zł, Mode=OneWay}"
+                               Margin="0,2,0,8"
+                               Foreground="{DynamicResource App.Foreground}"/>
+
+					<!-- Progres -->
+					<TextBlock Text="Zrealizowano" FontWeight="SemiBold" Foreground="{DynamicResource App.Foreground}" Opacity="0.9"/>
+					<StackPanel Margin="0,2,0,8">
+						<TextBlock Text="{Binding CompletionPercent, StringFormat={}{0:N0}%, Mode=OneWay}"
+                                   Foreground="{DynamicResource App.Foreground}"/>
+						<ProgressBar Height="6"
+                                     Margin="0,4,0,0"
+                                     Minimum="0"
+                                     Maximum="100"
+                                     Value="{Binding CompletionPercent, Mode=OneWay}"/>
 					</StackPanel>
 
-					<!-- Values block -->
-					<StackPanel Grid.Row="1" Orientation="Horizontal" Margin="0,8,0,0" HorizontalAlignment="Stretch">
-						<StackPanel Margin="0,0,12,0">
-							<TextBlock Text="Docelowo" FontSize="11" Opacity="0.8"/>
-							<TextBlock Text="{Binding TargetAmount, StringFormat={}{0:N2} zł}" FontWeight="Bold"/>
-						</StackPanel>
-						<StackPanel Margin="0,0,12,0">
-							<TextBlock Text="Aktualnie" FontSize="11" Opacity="0.8"/>
-							<TextBlock Text="{Binding CurrentAmount, StringFormat={}{0:N2} zł}" FontWeight="Bold"/>
-						</StackPanel>
+					<!-- Miesięcznie -->
+					<TextBlock Text="Miesięcznie potrzebujesz" FontWeight="SemiBold" Foreground="{DynamicResource App.Foreground}" Opacity="0.9"/>
+					<TextBlock Text="{Binding MonthlyNeeded, StringFormat={}{0:N2} zł, Mode=OneWay}"
+                               Margin="0,2,0,8"
+                               Foreground="{DynamicResource App.Foreground}"/>
+
+					<!-- Opis -->
+					<TextBlock Text="Opis" FontWeight="SemiBold" Foreground="{DynamicResource App.Foreground}" Opacity="0.9"/>
+					<TextBlock Text="{Binding Description, Mode=OneWay}"
+                               Margin="0,2,0,6"
+                               TextWrapping="Wrap"
+                               Foreground="{DynamicResource App.Foreground}"/>
+
+					<!-- Akcje -->
+					<StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,10,0,0">
+						<Button Click="EditInvestment_Click" Style="{StaticResource EditIconButton}" Margin="0,0,8,0"/>
+						<Button Click="DeleteInvestment_Click" Style="{StaticResource DeleteIconButton}"/>
+					</StackPanel>
+
+					<!-- Potwierdzenie usunięcia (sterowane stanem VM - stabilne) -->
+					<Border Margin="0,8,0,0"
+                            Padding="10"
+                            CornerRadius="8"
+                            BorderThickness="1"
+                            BorderBrush="{DynamicResource Surface.Border}"
+                            Background="{DynamicResource Surface.Background}"
+                            Visibility="{Binding IsDeleteConfirmVisible, Converter={StaticResource BoolToVisibility}}">
 						<StackPanel>
-							<TextBlock Text="Pozostało" FontSize="11" Opacity="0.8"/>
-							<TextBlock Text="{Binding Remaining, StringFormat={}{0:N2} zł}" FontWeight="Bold"/>
-						</StackPanel>
-					</StackPanel>
+							<TextBlock Text="Czy na pewno chcesz usunąć tę inwestycję?"
+                                       FontSize="12"
+                                       Foreground="{DynamicResource App.Foreground}"
+                                       Margin="0,0,0,8"
+                                       TextWrapping="Wrap"/>
 
-					<!-- Progress -->
-					<StackPanel Grid.Row="2" Margin="0,10,0,0">
-						<Grid>
-							<Grid.ColumnDefinitions>
-								<ColumnDefinition Width="*" />
-								<ColumnDefinition Width="Auto" />
-							</Grid.ColumnDefinitions>
-							<TextBlock Text="Progres" FontSize="12" Opacity="0.85" Grid.Column="0" />
-							<TextBlock Text="{Binding CompletionPercent, StringFormat={}{0:N0}%}" FontSize="12" Opacity="0.85" Grid.Column="1" />
-						</Grid>
-						<ProgressBar Style="{StaticResource ThinProgressBar}" Minimum="0" Maximum="100" Value="{Binding CompletionPercent, Mode=OneWay}" Margin="0,6,0,0"/>
-						<TextBlock Text="{Binding Description}" FontSize="12" Opacity="0.8" Margin="0,8,0,0" TextWrapping="Wrap"/>
-
-						<!-- Actions (plain buttons to avoid missing style resources) -->
-						<StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,10,0,0">
-							<Button Click="EditInvestment_Click" Margin="0,0,8,0" ToolTip="Edytuj">Edytuj</Button>
-							<Button Click="DeleteInvestment_Click" ToolTip="Usuń">Usuń</Button>
+							<StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+								<Button Content="Tak"
+                                        Margin="0,0,8,0"
+                                        Padding="10,4"
+                                        MinWidth="70"
+                                        Click="DeleteInvestmentConfirm_Click"/>
+								<Button Content="Nie"
+                                        Padding="10,4"
+                                        MinWidth="70"
+                                        Click="DeleteInvestmentCancel_Click"/>
+							</StackPanel>
 						</StackPanel>
-					</StackPanel>
-				</Grid>
+					</Border>
+
+				</StackPanel>
 			</Border>
 		</DataTemplate>
 
-		<!-- Kafelek Dodaj inwestycję -->
+		<!-- KAFEL „DODAJ INWESTYCJĘ” -->
 		<DataTemplate DataType="{x:Type local:AddInvestmentTile}">
-			<!-- Use existing Card style to avoid missing resource errors -->
-			<Border Style="{StaticResource Card}" Width="260" Cursor="Hand" MouseLeftButtonUp="AddInvestmentCard_Click">
-				<StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Margin="6">
-					<Border Width="32" Height="32" CornerRadius="6" Background="{DynamicResource Brand.Blue}" HorizontalAlignment="Center" VerticalAlignment="Center">
-						<TextBlock Text="+" Foreground="White" FontSize="18" FontWeight="Bold" HorizontalAlignment="Center" VerticalAlignment="Center" TextAlignment="Center"/>
-					</Border>
-					<TextBlock Text="Dodaj inwestycję" Margin="0,8,0,0" FontSize="13" FontWeight="SemiBold" HorizontalAlignment="Center"/>
-				</StackPanel>
+			<Border Style="{StaticResource Card}"
+                    MinWidth="260"
+                    MaxWidth="300"
+                    Cursor="Hand"
+                    MouseLeftButtonUp="AddInvestmentCard_Click">
+				<Grid>
+					<Border Margin="10"
+                            BorderThickness="1"
+                            CornerRadius="8"
+                            BorderBrush="{DynamicResource Surface.Border}"/>
+
+					<StackPanel HorizontalAlignment="Center"
+                                VerticalAlignment="Center"
+                                Margin="0,18,0,18">
+						<TextBlock Text="+" FontSize="28" FontWeight="Bold" HorizontalAlignment="Center"
+                                   Foreground="{DynamicResource App.Foreground}"/>
+						<TextBlock Text="Dodaj inwestycję"
+                                   Margin="0,6,0,0"
+                                   FontSize="13"
+                                   FontWeight="SemiBold"
+                                   Foreground="{DynamicResource App.Foreground}"
+                                   HorizontalAlignment="Center"/>
+					</StackPanel>
+				</Grid>
 			</Border>
 		</DataTemplate>
 
@@ -134,43 +205,69 @@
 			<!-- KPI -->
 			<Grid Grid.Row="0">
 				<Grid.ColumnDefinitions>
-					<ColumnDefinition Width="*" />
-					<ColumnDefinition Width="*" />
-					<ColumnDefinition Width="*" />
+					<ColumnDefinition Width="*"/>
+					<ColumnDefinition Width="*"/>
+					<ColumnDefinition Width="*"/>
 				</Grid.ColumnDefinitions>
 
-				<Border Grid.Column="0" Style="{StaticResource KpiCard}">
+				<Border Grid.Column="0" Style="{StaticResource AccentCard}">
 					<StackPanel>
-						<TextBlock Text="Wartość docelowa" Style="{StaticResource CardHeader}"/>
-						<TextBlock x:Name="TotalTargetText" Style="{StaticResource KpiValueStyle}"/>
-						<TextBlock Text="Suma wartości we wszystkich inwestycjach" FontSize="11" Opacity="0.7" Margin="0,6,0,0"/>
+						<TextBlock Text="Wartość docelowa (łącznie)"
+                                   Style="{StaticResource CardHeader}"
+                                   FontSize="18"
+                                   FontWeight="Bold"/>
+						<TextBlock x:Name="TotalTargetText"
+                                   Style="{StaticResource KpiValueStyle}"
+                                   FontSize="24"/>
 					</StackPanel>
 				</Border>
 
-				<Border Grid.Column="1" Style="{StaticResource KpiCard}">
+				<Border Grid.Column="1" Style="{StaticResource AccentCard}">
 					<StackPanel>
-						<TextBlock Text="Aktualna wartość" Style="{StaticResource CardHeader}"/>
-						<TextBlock x:Name="TotalCurrentText" Style="{StaticResource KpiValueStyle}"/>
-						<TextBlock Text="Aktualne saldo portfela inwestycyjnego" FontSize="11" Opacity="0.7" Margin="0,6,0,0"/>
+						<TextBlock Text="Aktualna wartość (łącznie)"
+                                   Style="{StaticResource CardHeader}"
+                                   FontSize="18"
+                                   FontWeight="Bold"/>
+						<TextBlock x:Name="TotalCurrentText"
+                                   Style="{StaticResource KpiValueStyle}"
+                                   FontSize="24"/>
 					</StackPanel>
 				</Border>
 
-				<Border Grid.Column="2" Style="{StaticResource KpiCard}">
+				<Border Grid.Column="2" Style="{StaticResource AccentCard}">
 					<StackPanel>
-						<TextBlock Text="Miesięcznie" Style="{StaticResource CardHeader}"/>
-						<TextBlock x:Name="TotalMonthlyText" Style="{StaticResource KpiValueStyle}"/>
-						<TextBlock Text="Suma miesięcznych wpłat potrzebnych, by dojść do celów" FontSize="11" Opacity="0.7" Margin="0,6,0,0"/>
+						<TextBlock Text="Łącznie miesięcznie potrzebujesz"
+                                   Style="{StaticResource CardHeader}"
+                                   FontSize="18"
+                                   FontWeight="Bold"/>
+						<TextBlock x:Name="TotalMonthlyText"
+                                   Style="{StaticResource KpiValueStyle}"
+                                   FontSize="24"/>
 					</StackPanel>
 				</Border>
 			</Grid>
 
-			<!-- Lista inwestycji + kafelek Dodaj -->
+			<!-- LISTA -->
 			<StackPanel Grid.Row="1" Margin="0,12,0,0">
-				<Separator Height="1" Background="{DynamicResource Surface.Border}" Opacity="0.8" Margin="0,0,0,8"/>
-				<TextBlock Text="Inwestycje" FontSize="24" FontWeight="Bold" Foreground="{DynamicResource App.Foreground}" Margin="0,4,0,12"/>
-				<!-- Inline error area to show load errors without crashing the app -->
-				<TextBlock x:Name="InvestmentsErrorText" Visibility="Collapsed" Foreground="OrangeRed" Margin="0,0,0,8" TextWrapping="Wrap"/>
-				<ItemsControl x:Name="InvestmentsRepeater" Margin="0,8,0,0">
+
+				<Separator Height="1"
+                           Background="{DynamicResource Surface.Border}"
+                           Opacity="0.8"
+                           Margin="0,0,0,10"/>
+
+				<TextBlock Text="Inwestycje"
+                           FontSize="24"
+                           FontWeight="Bold"
+                           Foreground="{DynamicResource App.Foreground}"
+                           Margin="0,4,0,12"/>
+
+				<TextBlock x:Name="InvestmentsErrorText"
+                           Visibility="Collapsed"
+                           Foreground="OrangeRed"
+                           Margin="0,0,0,8"
+                           TextWrapping="Wrap"/>
+
+				<ItemsControl x:Name="InvestmentsRepeater" Margin="0,6,0,0">
 					<ItemsControl.ItemsPanel>
 						<ItemsPanelTemplate>
 							<WrapPanel HorizontalAlignment="Stretch"/>
@@ -179,10 +276,25 @@
 				</ItemsControl>
 			</StackPanel>
 
-			<!-- Formularz Dodaj / Edytuj -->
-			<Border x:Name="FormBorder" Grid.Row="2" Margin="0,16,0,24" Background="Transparent" BorderBrush="{DynamicResource Surface.Border}" BorderThickness="1" CornerRadius="10" Padding="16" Visibility="Collapsed">
-				<StackPanel HorizontalAlignment="Center" MaxWidth="600">
-					<TextBlock x:Name="FormHeader" Text="Dodaj inwestycję" FontSize="18" FontWeight="SemiBold" HorizontalAlignment="Center" Foreground="{DynamicResource App.Foreground}"/>
+			<!-- FORM -->
+			<Border x:Name="FormBorder"
+                    Grid.Row="2"
+                    Margin="0,16,0,24"
+                    Background="Transparent"
+                    BorderBrush="{DynamicResource Surface.Border}"
+                    BorderThickness="1"
+                    CornerRadius="10"
+                    Padding="16"
+                    Visibility="Collapsed">
+
+				<StackPanel HorizontalAlignment="Center" MaxWidth="700">
+
+					<TextBlock x:Name="FormHeader"
+                               Text="Dodaj inwestycję"
+                               FontSize="18"
+                               FontWeight="SemiBold"
+                               HorizontalAlignment="Center"
+                               Foreground="{DynamicResource App.Foreground}"/>
 
 					<Grid Margin="0,12,0,0">
 						<Grid.RowDefinitions>
@@ -191,34 +303,89 @@
 							<RowDefinition Height="Auto"/>
 							<RowDefinition Height="Auto"/>
 							<RowDefinition Height="Auto"/>
+							<RowDefinition Height="Auto"/>
 						</Grid.RowDefinitions>
 						<Grid.ColumnDefinitions>
 							<ColumnDefinition Width="Auto"/>
-							<ColumnDefinition Width="260"/>
+							<ColumnDefinition Width="320"/>
 						</Grid.ColumnDefinitions>
 
-						<TextBlock Grid.Row="0" Grid.Column="0" Text="Nazwa:" Margin="0,4,8,4" VerticalAlignment="Center" Foreground="{DynamicResource App.Foreground}"/>
+						<TextBlock Grid.Row="0" Grid.Column="0" Text="Nazwa:"
+                                   Margin="0,4,10,8"
+                                   VerticalAlignment="Center"
+                                   Foreground="{DynamicResource App.Foreground}"/>
 						<TextBox x:Name="InvestmentNameBox" Grid.Row="0" Grid.Column="1"/>
 
-						<TextBlock Grid.Row="1" Grid.Column="0" Text="Wartość docelowa:" Margin="0,4,8,4" VerticalAlignment="Center" Foreground="{DynamicResource App.Foreground}"/>
-						<TextBox x:Name="InvestmentTargetBox" Grid.Row="1" Grid.Column="1" HorizontalContentAlignment="Right" Text="0,00" GotFocus="AmountBox_GotFocus" LostFocus="AmountBox_LostFocus"/>
+						<TextBlock Grid.Row="1" Grid.Column="0" Text="Typ inwestycji:"
+                                   Margin="0,4,10,8"
+                                   VerticalAlignment="Center"
+                                   Foreground="{DynamicResource App.Foreground}"/>
+						<ComboBox x:Name="InvestmentTypeBox" Grid.Row="1" Grid.Column="1" SelectedIndex="0">
+							<ComboBoxItem Content="Inne"/>
+							<ComboBoxItem Content="Akcje"/>
+							<ComboBoxItem Content="Obligacje"/>
+							<ComboBoxItem Content="ETF"/>
+							<ComboBoxItem Content="Fundusz"/>
+							<ComboBoxItem Content="Kryptowaluty"/>
+							<ComboBoxItem Content="Lokata"/>
+						</ComboBox>
 
-						<TextBlock Grid.Row="2" Grid.Column="0" Text="Aktualnie:" Margin="0,4,8,4" VerticalAlignment="Center" Foreground="{DynamicResource App.Foreground}"/>
-						<TextBox x:Name="InvestmentCurrentBox" Grid.Row="2" Grid.Column="1" HorizontalContentAlignment="Right" Text="0,00" GotFocus="AmountBox_GotFocus" LostFocus="AmountBox_LostFocus"/>
+						<TextBlock Grid.Row="2" Grid.Column="0" Text="Wartość docelowa:"
+                                   Margin="0,4,10,8"
+                                   VerticalAlignment="Center"
+                                   Foreground="{DynamicResource App.Foreground}"/>
+						<TextBox x:Name="InvestmentTargetBox"
+                                 Grid.Row="2" Grid.Column="1"
+                                 HorizontalContentAlignment="Right"
+                                 Text="0,00"
+                                 GotFocus="AmountBox_GotFocus"
+                                 LostFocus="AmountBox_LostFocus"/>
 
-						<TextBlock Grid.Row="3" Grid.Column="0" Text="Termin (data):" Margin="0,4,8,4" VerticalAlignment="Center" Foreground="{DynamicResource App.Foreground}"/>
-						<DatePicker x:Name="InvestmentTargetDatePicker" Grid.Row="3" Grid.Column="1"/>
+						<TextBlock Grid.Row="3" Grid.Column="0" Text="Aktualnie:"
+                                   Margin="0,4,10,8"
+                                   VerticalAlignment="Center"
+                                   Foreground="{DynamicResource App.Foreground}"/>
+						<TextBox x:Name="InvestmentCurrentBox"
+                                 Grid.Row="3" Grid.Column="1"
+                                 HorizontalContentAlignment="Right"
+                                 Text="0,00"
+                                 GotFocus="AmountBox_GotFocus"
+                                 LostFocus="AmountBox_LostFocus"/>
 
-						<TextBlock Grid.Row="4" Grid.Column="0" Text="Opis:" Margin="0,4,8,4" VerticalAlignment="Top" Foreground="{DynamicResource App.Foreground}"/>
-						<TextBox x:Name="InvestmentDescriptionBox" Grid.Row="4" Grid.Column="1" Height="60" TextWrapping="Wrap" AcceptsReturn="True"/>
+						<TextBlock Grid.Row="4" Grid.Column="0" Text="Termin (data):"
+                                   Margin="0,4,10,8"
+                                   VerticalAlignment="Center"
+                                   Foreground="{DynamicResource App.Foreground}"/>
+						<DatePicker x:Name="InvestmentTargetDatePicker" Grid.Row="4" Grid.Column="1"/>
+
+						<TextBlock Grid.Row="5" Grid.Column="0" Text="Opis:"
+                                   Margin="0,4,10,0"
+                                   VerticalAlignment="Top"
+                                   Foreground="{DynamicResource App.Foreground}"/>
+						<TextBox x:Name="InvestmentDescriptionBox"
+                                 Grid.Row="5" Grid.Column="1"
+                                 Height="70"
+                                 TextWrapping="Wrap"
+                                 AcceptsReturn="True"/>
 					</Grid>
 
-					<StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,12,0,0">
-						<Button Content="Zapisz" Width="110" Margin="0,0,8,0" Click="AddInvestment_Click"/>
-						<Button Content="Anuluj" Width="110" Click="ClearInvestmentForm_Click"/>
+					<StackPanel Orientation="Horizontal"
+                                HorizontalAlignment="Center"
+                                Margin="0,12,0,0">
+						<Button Content="Zapisz"
+                                Width="120"
+                                Margin="0,0,8,0"
+                                Click="AddInvestment_Click"/>
+						<Button Content="Anuluj"
+                                Width="120"
+                                Click="ClearInvestmentForm_Click"/>
 					</StackPanel>
 
-					<TextBlock x:Name="InvestmentFormMessage" Margin="0,8,0,0" HorizontalAlignment="Center" Foreground="OrangeRed"/>
+					<TextBlock x:Name="InvestmentFormMessage"
+                               Margin="0,10,0,0"
+                               HorizontalAlignment="Center"
+                               Foreground="OrangeRed"
+                               TextWrapping="Wrap"/>
 				</StackPanel>
 			</Border>
 

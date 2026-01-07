@@ -137,6 +137,19 @@ CREATE TABLE IF NOT EXISTS Loans(
     FOREIGN KEY(UserId) REFERENCES Users(Id) ON DELETE CASCADE
 );
 
+CREATE TABLE IF NOT EXISTS Investments(
+    Id            INTEGER PRIMARY KEY AUTOINCREMENT,
+    UserId        INTEGER NOT NULL,
+    Name          TEXT    NOT NULL,
+    Type          INTEGER NOT NULL DEFAULT 0,
+    TargetAmount  NUMERIC NOT NULL DEFAULT 0,
+    CurrentAmount NUMERIC NOT NULL DEFAULT 0,
+    TargetDate    TEXT    NULL,
+    Description   TEXT    NULL,
+    FOREIGN KEY(UserId) REFERENCES Users(Id) ON DELETE CASCADE
+);
+
+
 CREATE TABLE IF NOT EXISTS BankConnections(
     Id            INTEGER PRIMARY KEY AUTOINCREMENT,
     UserId        INTEGER NOT NULL,
@@ -277,6 +290,16 @@ CREATE TABLE IF NOT EXISTS SavedCash(
                 AddColumnIfMissing(con, tx, "Loans", "Note", "TEXT");
                 AddColumnIfMissing(con, tx, "Loans", "PaymentDay", "INTEGER", "NOT NULL DEFAULT 0");
 
+                // Investments – typ inwestycji (dla baz starszych / gdy tabela była bez tej kolumny)
+                AddColumnIfMissing(con, tx, "Investments", "UserId", "INTEGER", "NOT NULL DEFAULT 0");
+                AddColumnIfMissing(con, tx, "Investments", "Name", "TEXT");
+                AddColumnIfMissing(con, tx, "Investments", "Type", "INTEGER", "NOT NULL DEFAULT 0");
+                AddColumnIfMissing(con, tx, "Investments", "TargetAmount", "NUMERIC", "NOT NULL DEFAULT 0");
+                AddColumnIfMissing(con, tx, "Investments", "CurrentAmount", "NUMERIC", "NOT NULL DEFAULT 0");
+                AddColumnIfMissing(con, tx, "Investments", "TargetDate", "TEXT");
+                AddColumnIfMissing(con, tx, "Investments", "Description", "TEXT");
+
+
                 // Backfill: Title = Description, jeśli Title puste
                 if (ColExists("Expenses", "Title") && ColExists("Expenses", "Description"))
                 {
@@ -310,7 +333,12 @@ CREATE INDEX IF NOT EXISTS IX_Expenses_User_Category
     ON Expenses(UserId, CategoryId);
 
 CREATE INDEX IF NOT EXISTS IX_Envelopes_User
-    ON Envelopes(UserId);";
+    ON Envelopes(UserId);
+
+CREATE INDEX IF NOT EXISTS IX_Investments_User
+    ON Investments(UserId);";
+
+
                 idx.ExecuteNonQuery();
             }
         }
