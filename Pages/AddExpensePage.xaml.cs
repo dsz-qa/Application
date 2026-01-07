@@ -904,6 +904,83 @@ VALUES (@u, @a, @d, @desc, @s, @cat, @p, @b);";
             cmd.ExecuteNonQuery();
         }
 
+
+        private void CreateBudgetFromExpense_Click(object sender, RoutedEventArgs e)
+        {
+            var date = ExpenseDatePicker.SelectedDate ?? DateTime.Today;
+
+            var dlg = new Finly.Views.Dialogs.EditBudgetDialog
+            {
+                Owner = Window.GetWindow(this)
+            };
+
+            // wstępne ustawienie startu na wybraną datę (dialog sam policzy EndDate)
+            dlg.Budget.Name = "";
+            dlg.Budget.StartDate = date;
+            dlg.Budget.Type = "Monthly";
+            dlg.Budget.PlannedAmount = 0m;
+
+            var ok = dlg.ShowDialog();
+            if (ok != true) return;
+
+            var newId = BudgetService.InsertBudget(_uid, dlg.Budget);
+
+            LoadExpenseBudgetsForDate(date);
+
+            // ustaw zaznaczenie na nowo utworzony
+            if (ExpenseBudgetCombo.ItemsSource is System.Collections.IEnumerable src)
+            {
+                foreach (var item in src)
+                {
+                    if (item is Finly.Models.Budget b && b.Id == newId)
+                    {
+                        ExpenseBudgetCombo.SelectedItem = b;
+                        break;
+                    }
+                }
+            }
+
+            ToastService.Success("Dodano budżet.");
+        }
+
+        private void CreateBudgetFromIncome_Click(object sender, RoutedEventArgs e)
+        {
+            var date = IncomeDatePicker.SelectedDate ?? DateTime.Today;
+
+            var dlg = new Finly.Views.Dialogs.EditBudgetDialog
+            {
+                Owner = Window.GetWindow(this)
+            };
+
+            dlg.Budget.Name = "";
+            dlg.Budget.StartDate = date;
+            dlg.Budget.Type = "Monthly";
+            dlg.Budget.PlannedAmount = 0m;
+
+            var ok = dlg.ShowDialog();
+            if (ok != true) return;
+
+            var newId = BudgetService.InsertBudget(_uid, dlg.Budget);
+
+            LoadIncomeBudgetsForDate(date);
+
+            if (IncomeBudgetCombo.ItemsSource is System.Collections.IEnumerable src)
+            {
+                foreach (var item in src)
+                {
+                    if (item is Finly.Models.Budget b && b.Id == newId)
+                    {
+                        IncomeBudgetCombo.SelectedItem = b;
+                        break;
+                    }
+                }
+            }
+
+            ToastService.Success("Dodano budżet.");
+        }
+
+
+
         private void UpdateCashOnHand(int userId, decimal delta)
         {
             using var con = DatabaseService.GetConnection();

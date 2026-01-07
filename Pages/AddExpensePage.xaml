@@ -279,32 +279,48 @@
                                    Grid.Row="7" Grid.ColumnSpan="2"
                                    Style="{StaticResource PlannedInfoText}"/>
 
-                        <Grid x:Name="ExpenseBudgetRow"
-                              Grid.Row="9" Grid.ColumnSpan="2"
-                              Visibility="Collapsed"
-                              Margin="0,4,0,0">
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="220"/>
-                                <ColumnDefinition Width="*"/>
-                            </Grid.ColumnDefinitions>
-                            <TextBlock Grid.Column="0"
-                                       Text="Przypisz do budżetu (opcjonalnie):"
-                                       VerticalAlignment="Center"
-                                       Margin="0,0,8,0"/>
-                            <ComboBox x:Name="ExpenseBudgetCombo"
-                                      Grid.Column="1"
-                                      Height="28"
-                                      SelectedValuePath="Id"
-                                      SelectedIndex="-1">
-                                <ComboBox.ItemTemplate>
-                                    <DataTemplate>
-                                        <TextBlock Text="{Binding Name}"/>
-                                    </DataTemplate>
-                                </ComboBox.ItemTemplate>
-                            </ComboBox>
-                        </Grid>
+						<Grid x:Name="ExpenseBudgetRow"
+							  Grid.Row="9" Grid.ColumnSpan="2"
+							  Visibility="Collapsed"
+							  Margin="0,4,0,0">
+							<Grid.ColumnDefinitions>
+								<ColumnDefinition Width="220"/>
+								<ColumnDefinition Width="*"/>
+							</Grid.ColumnDefinitions>
 
-                        <TextBlock Grid.Row="11" Grid.Column="0" Text="Skąd płacisz:" VerticalAlignment="Center" Margin="0,0,8,0"/>
+							<TextBlock Grid.Column="0"
+									   Text="Przypisz do budżetu (opcjonalnie):"
+									   VerticalAlignment="Center"
+									   Margin="0,0,8,0"/>
+
+							<Grid Grid.Column="1">
+								<Grid.ColumnDefinitions>
+									<ColumnDefinition Width="*"/>
+									<ColumnDefinition Width="10"/>
+									<ColumnDefinition Width="Auto"/>
+								</Grid.ColumnDefinitions>
+
+								<ComboBox x:Name="ExpenseBudgetCombo"
+										  Grid.Column="0"
+										  Height="28"
+										  SelectedIndex="-1">
+									<ComboBox.ItemTemplate>
+										<DataTemplate>
+											<TextBlock Text="{Binding Name}"/>
+										</DataTemplate>
+									</ComboBox.ItemTemplate>
+								</ComboBox>
+
+								<Button Grid.Column="2"
+										Content="Nowy budżet"
+										Padding="12,4"
+										Style="{StaticResource PrimaryButton}"
+										Click="CreateBudgetFromExpense_Click"/>
+							</Grid>
+						</Grid>
+
+
+						<TextBlock Grid.Row="11" Grid.Column="0" Text="Skąd płacisz:" VerticalAlignment="Center" Margin="0,0,8,0"/>
                         <ComboBox x:Name="ExpenseSourceCombo"
                                   Grid.Row="11" Grid.Column="1"
                                   Height="28"
@@ -418,32 +434,49 @@
                                    Grid.Row="7" Grid.ColumnSpan="2"
                                    Style="{StaticResource PlannedInfoText}"/>
 
-                        <Grid x:Name="IncomeBudgetRow"
-                              Grid.Row="9"
-                              Grid.ColumnSpan="2"
-                              Visibility="Collapsed"
-                              Margin="0,4,0,0">
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="220"/>
-                                <ColumnDefinition Width="*"/>
-                            </Grid.ColumnDefinitions>
-                            <TextBlock Grid.Column="0"
-                                       Text="Przypisz do budżetu (opcjonalnie):"
-                                       VerticalAlignment="Center"
-                                       Margin="0,0,8,0"/>
-                            <ComboBox x:Name="IncomeBudgetCombo"
-                                      Grid.Column="1"
-                                      Height="28"
-                                      SelectedIndex="-1">
-                                <ComboBox.ItemTemplate>
-                                    <DataTemplate>
-                                        <TextBlock Text="{Binding Name}"/>
-                                    </DataTemplate>
-                                </ComboBox.ItemTemplate>
-                            </ComboBox>
-                        </Grid>
+						<Grid x:Name="IncomeBudgetRow"
+							  Grid.Row="9"
+							  Grid.ColumnSpan="2"
+							  Visibility="Collapsed"
+							  Margin="0,4,0,0">
+							<Grid.ColumnDefinitions>
+								<ColumnDefinition Width="220"/>
+								<ColumnDefinition Width="*"/>
+							</Grid.ColumnDefinitions>
 
-                        <TextBlock Grid.Row="11" Grid.Column="0" Text="Forma przychodu:" VerticalAlignment="Center" Margin="0,0,8,0"/>
+							<TextBlock Grid.Column="0"
+									   Text="Przypisz do budżetu (opcjonalnie):"
+									   VerticalAlignment="Center"
+									   Margin="0,0,8,0"/>
+
+							<Grid Grid.Column="1">
+								<Grid.ColumnDefinitions>
+									<ColumnDefinition Width="*"/>
+									<ColumnDefinition Width="10"/>
+									<ColumnDefinition Width="Auto"/>
+								</Grid.ColumnDefinitions>
+
+								<ComboBox x:Name="IncomeBudgetCombo"
+										  Grid.Column="0"
+										  Height="28"
+										  SelectedIndex="-1">
+									<ComboBox.ItemTemplate>
+										<DataTemplate>
+											<TextBlock Text="{Binding Name}"/>
+										</DataTemplate>
+									</ComboBox.ItemTemplate>
+								</ComboBox>
+
+								<Button Grid.Column="2"
+										Content="Nowy budżet"
+										Padding="12,4"
+										Style="{StaticResource PrimaryButton}"
+										Click="CreateBudgetFromIncome_Click"/>
+							</Grid>
+						</Grid>
+
+
+						<TextBlock Grid.Row="11" Grid.Column="0" Text="Forma przychodu:" VerticalAlignment="Center" Margin="0,0,8,0"/>
                         <ComboBox x:Name="IncomeFormTypeCombo"
                                   Grid.Row="11" Grid.Column="1"
                                   Height="28"
