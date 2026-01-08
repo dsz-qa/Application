@@ -34,9 +34,8 @@ namespace Finly.ViewModels
         // Kompatybilność ze starszym XAML
         public ObservableCollection<TransactionCardVm> FilteredTransactions => TransactionsList;
 
-        // Listy do edycji (ComboBox)
+        // Lista kategorii do edycji (ComboBox)
         public ObservableCollection<string> AvailableCategories { get; } = new();
-        public ObservableCollection<string> AvailableAccounts { get; } = new();
 
         private decimal _totalExpenses;
         public decimal TotalExpenses
@@ -235,10 +234,29 @@ namespace Finly.ViewModels
         {
             DeleteTransactionCommand = new DelegateCommand(obj =>
             {
-                if (obj is TransactionCardVm vm)
+                if (obj is not TransactionCardVm vm) return;
+
+                try
                 {
-                    DeleteTransaction(vm);
+                    var src = vm.Kind switch
+                    {
+                        TransactionKind.Transfer => LedgerService.TransactionSource.Transfer,
+                        TransactionKind.Expense => LedgerService.TransactionSource.Expense,
+                        TransactionKind.Income => LedgerService.TransactionSource.Income,
+                        _ => throw new InvalidOperationException("Nieznany typ transakcji.")
+                    };
+
+                    // Jedyny punkt kasowania: reversal + delete (planned bez reversal)
+                    TransactionsFacadeService.DeleteTransaction(src, vm.Id);
+                }
+                catch
+                {
+                    // opcjonalnie: komunikat dla UI
+                }
+                finally
+                {
                     vm.IsDeleteConfirmationVisible = false;
+                    LoadFromDatabase();
                 }
             });
         }
@@ -252,7 +270,6 @@ namespace Finly.ViewModels
 
             if (!_isToday && !_isYesterday && !_isThisWeek && !_isThisMonth && !_isPrevMonth && !_isThisYear)
                 IsThisMonth = true;
-
         }
 
         public void ReloadAll()
@@ -261,7 +278,6 @@ namespace Finly.ViewModels
             LoadAvailableLists();
             LoadFromDatabase();
         }
-
 
         private void LoadLookupData()
         {
@@ -337,20 +353,6 @@ namespace Finly.ViewModels
                 if (!AvailableCategories.Contains("(brak)")) AvailableCategories.Add("(brak)");
                 if (!AvailableCategories.Contains("Przychód")) AvailableCategories.Add("Przychód");
                 if (!AvailableCategories.Contains("Transfer")) AvailableCategories.Add("Transfer");
-            }
-            catch { }
-
-            AvailableAccounts.Clear();
-            try
-            {
-                var accs = DatabaseService.GetAccounts(UserId) ?? new List<BankAccountModel>();
-                foreach (var a in accs) AvailableAccounts.Add(a.AccountName);
-
-                var envs = DatabaseService.GetEnvelopesNames(UserId) ?? new List<string>();
-                foreach (var e in envs) AvailableAccounts.Add($"Koperta: {e}");
-
-                if (!AvailableAccounts.Contains("Wolna gotówka")) AvailableAccounts.Add("Wolna gotówka");
-                if (!AvailableAccounts.Contains("Odłożona gotówka")) AvailableAccounts.Add("Odłożona gotówka");
             }
             catch { }
         }
@@ -493,7 +495,6 @@ namespace Finly.ViewModels
                     ? (int?)Convert.ToInt32(r["PaymentRefId"])
                     : null;
 
-            // WYDATEK: “Z konta: ...”
             string fromName = ResolvePaymentDisplay(pk, pr, fallbackAccountId: accountId);
 
             AllTransactions.Add(new TransactionCardVm
@@ -508,15 +509,12 @@ namespace Finly.ViewModels
                 IsFuture = date.Date > DateTime.Today,
                 CategoryIcon = "?",
 
-                // kompatybilność / filtry (trzymamy w AccountName też tę nazwę)
                 AccountName = fromName,
-
                 FromAccountName = fromName,
                 ToAccountName = null,
 
+                // edycja tylko: opis, data, kategoria
                 SelectedCategory = string.IsNullOrWhiteSpace(catName) ? "(brak)" : catName,
-                SelectedAccount = fromName,
-                EditAmountText = amt.ToString("N2"),
                 EditDescription = desc,
                 EditDate = date
             });
@@ -538,10 +536,8 @@ namespace Finly.ViewModels
                 r["IsPlanned"] != DBNull.Value &&
                 Convert.ToInt32(r["IsPlanned"]) == 1;
 
-            // PRZYCHÓD: “Na konto: ...”
             string toName = string.Empty;
 
-            // 1) AccountId -> słownik
             if (r.Table.Columns.Contains("AccountId") && r["AccountId"] != DBNull.Value)
             {
                 var accId = Convert.ToInt32(r["AccountId"]);
@@ -549,7 +545,6 @@ namespace Finly.ViewModels
                     toName = accName;
             }
 
-            // 2) legacy Source
             if (string.IsNullOrWhiteSpace(toName) &&
                 r.Table.Columns.Contains("Source") &&
                 r["Source"] != DBNull.Value)
@@ -557,7 +552,6 @@ namespace Finly.ViewModels
                 toName = r["Source"]?.ToString() ?? string.Empty;
             }
 
-            // 3) default
             if (string.IsNullOrWhiteSpace(toName))
                 toName = "Wolna gotówka";
 
@@ -573,15 +567,12 @@ namespace Finly.ViewModels
                 IsFuture = date.Date > DateTime.Today,
                 CategoryIcon = "+",
 
-                // kompatybilność / filtry
                 AccountName = toName,
-
                 FromAccountName = null,
                 ToAccountName = toName,
 
+                // edycja tylko: opis, data, kategoria
                 SelectedCategory = string.IsNullOrWhiteSpace(catName) ? "Przychód" : catName,
-                SelectedAccount = toName,
-                EditAmountText = amt.ToString("N2"),
                 EditDescription = desc,
                 EditDate = date
             });
@@ -594,7 +585,6 @@ namespace Finly.ViewModels
             DateTime date = ParseDate(r["Date"]);
             string desc = r["Description"]?.ToString() ?? "Transfer";
 
-            // Transfery też mogą być planowane
             bool planned =
                 r.Table.Columns.Contains("IsPlanned") &&
                 r["IsPlanned"] != DBNull.Value &&
@@ -634,16 +624,12 @@ namespace Finly.ViewModels
                 IsFuture = date.Date > DateTime.Today,
                 CategoryIcon = "⇄",
 
-                // dla transferu AccountName nie jest istotne; ale dla filtrów i wyszukiwarki
-                // wygodnie dać “from -> to”
                 AccountName = $"{fromName} -> {toName}",
-
                 FromAccountName = fromName,
                 ToAccountName = toName,
 
+                // transferów nie edytujemy (żeby nie udawać zapisu bez update w DB)
                 SelectedCategory = "Transfer",
-                SelectedAccount = string.Empty,
-                EditAmountText = amt.ToString("N2"),
                 EditDescription = desc,
                 EditDate = date
             });
@@ -684,57 +670,23 @@ namespace Finly.ViewModels
             return 0m;
         }
 
-        public void DeleteTransaction(TransactionCardVm vm)
-        {
-            if (vm == null) return;
-
-            try
-            {
-                switch (vm.Kind)
-                {
-                    case TransactionKind.Expense:
-                        DatabaseService.DeleteExpense(vm.Id);
-                        break;
-
-                    case TransactionKind.Income:
-                        DatabaseService.DeleteIncome(vm.Id);
-                        break;
-
-                    case TransactionKind.Transfer:
-                        // Bezpiecznie: jeśli metoda istnieje, użyj. Jeśli nie – nie wywal UI.
-                        try
-                        {
-                            var m = typeof(DatabaseService).GetMethod("DeleteTransfer");
-                            if (m != null) m.Invoke(null, new object[] { vm.Id });
-                        }
-                        catch { }
-                        break;
-                }
-            }
-            catch { }
-
-            LoadFromDatabase();
-        }
-
-        // ------------------ INLINE EDIT (jak miałaś, bez rozwalania księgowania) ------------------
+        // ------------------ INLINE EDIT (tylko opis/data/kategoria) ------------------
 
         public void StartEdit(TransactionCardVm vm)
         {
             if (vm == null) return;
 
+            // Nie pozwalamy edytować transferów (brak update w DB w tym etapie)
+            if (vm.Kind == TransactionKind.Transfer) return;
+
             LoadAvailableLists();
 
             vm.EditDescription = vm.Description ?? string.Empty;
-            vm.EditAmountText = ParseAmountInternal(vm.AmountStr).ToString("N2");
             vm.EditDate = DateTime.TryParse(vm.DateDisplay, out var d) ? d : DateTime.Today;
 
             vm.SelectedCategory = string.IsNullOrWhiteSpace(vm.CategoryName)
-                ? (vm.Kind == TransactionKind.Income ? "Przychód" :
-                   vm.Kind == TransactionKind.Transfer ? "Transfer" : "(brak)")
+                ? (vm.Kind == TransactionKind.Income ? "Przychód" : "(brak)")
                 : vm.CategoryName;
-
-            // Transfer nie ma pojedynczego konta do edycji w tym VM
-            vm.SelectedAccount = vm.Kind == TransactionKind.Transfer ? string.Empty : (vm.AccountName ?? string.Empty);
 
             vm.IsEditing = true;
         }
@@ -743,60 +695,66 @@ namespace Finly.ViewModels
         {
             if (vm == null) return;
 
+            // Nie zapisujemy transferów w tej wersji
+            if (vm.Kind == TransactionKind.Transfer)
+            {
+                vm.IsEditing = false;
+                return;
+            }
+
             try
             {
-                var amount = ParseAmountInternal(vm.EditAmountText ?? string.Empty);
                 var date = vm.EditDate == default ? DateTime.Today : vm.EditDate;
                 var desc = vm.EditDescription ?? string.Empty;
                 var selectedCat = vm.SelectedCategory?.Trim();
-                var selectedAcc = vm.SelectedAccount?.Trim();
+
+                // Opcjonalnie: blokada „future” dla zrealizowanych
+                if (!vm.IsPlanned && date.Date > DateTime.Today)
+                    return;
 
                 switch (vm.Kind)
                 {
                     case TransactionKind.Expense:
                         {
                             var exp = DatabaseService.GetExpenseById(vm.Id);
-                            if (exp != null)
+                            if (exp == null) return;
+
+                            exp.UserId = UserId;
+                            exp.Date = date;
+                            exp.Description = desc;
+
+                            int catId = 0;
+                            if (!string.IsNullOrWhiteSpace(selectedCat) &&
+                                !string.Equals(selectedCat, "(brak)", StringComparison.CurrentCultureIgnoreCase))
                             {
-                                exp.UserId = UserId;
-                                exp.Amount = (double)amount;
-                                exp.Date = date;
-                                exp.Description = desc;
-
-                                int? cid = null;
-                                if (!string.IsNullOrWhiteSpace(selectedCat) &&
-                                    !string.Equals(selectedCat, "(brak)", StringComparison.CurrentCultureIgnoreCase))
+                                try
                                 {
-                                    try
-                                    {
-                                        var id = DatabaseService.GetOrCreateCategoryId(UserId, selectedCat!);
-                                        if (id > 0) cid = id;
-                                    }
-                                    catch { cid = null; }
+                                    var id = DatabaseService.GetOrCreateCategoryId(UserId, selectedCat!);
+                                    if (id > 0) catId = id;
                                 }
-                                exp.CategoryId = cid ?? 0;
-
-                                DatabaseService.UpdateExpense(exp);
+                                catch { catId = 0; }
                             }
 
-                            vm.AmountStr = amount.ToString("N2") + " zł";
+                            exp.CategoryId = catId;
+                            // NIE ruszamy: Amount / PaymentKind / PaymentRefId
+                            DatabaseService.UpdateExpense(exp);
+
                             vm.DateDisplay = date.ToString("yyyy-MM-dd");
                             vm.Description = desc;
                             vm.CategoryName = string.IsNullOrWhiteSpace(selectedCat) ? "(brak)" : selectedCat!;
-
-                            // UWAGA: tu nie zmieniamy księgowania (PaymentKind/Ref),
-                            // tylko tekst pomocniczy. Nie ruszamy sald.
-                            if (!string.IsNullOrWhiteSpace(selectedAcc))
-                            {
-                                vm.AccountName = selectedAcc!;
-                                vm.FromAccountName = selectedAcc!;
-                            }
-
+                            vm.SelectedCategory = vm.CategoryName;
                             break;
                         }
 
                     case TransactionKind.Income:
                         {
+                            // Brak GetIncomeById -> zachowujemy kwotę i konto bez zmian.
+                            var oldAmount = ParseAmountInternal(vm.AmountStr);
+
+                            string? sourceUnchanged =
+                                !string.IsNullOrWhiteSpace(vm.ToAccountName) ? vm.ToAccountName :
+                                (!string.IsNullOrWhiteSpace(vm.AccountName) ? vm.AccountName : null);
+
                             int? cid = null;
                             if (!string.IsNullOrWhiteSpace(selectedCat) &&
                                 !string.Equals(selectedCat, "Przychód", StringComparison.CurrentCultureIgnoreCase))
@@ -809,42 +767,27 @@ namespace Finly.ViewModels
                                 catch { cid = null; }
                             }
 
-                            string? source = string.IsNullOrWhiteSpace(selectedAcc) ? null : selectedAcc;
+                            // NIE ruszamy: amount (oldAmount), source (sourceUnchanged)
+                            DatabaseService.UpdateIncome(vm.Id, UserId, oldAmount, desc, null, date, cid, sourceUnchanged);
 
-                            // Zakładam Twoją sygnaturę UpdateIncome jak w kodzie bazowym.
-                            DatabaseService.UpdateIncome(vm.Id, UserId, amount, desc, null, date, cid, source);
-
-                            vm.AmountStr = amount.ToString("N2") + " zł";
                             vm.DateDisplay = date.ToString("yyyy-MM-dd");
                             vm.Description = desc;
                             vm.CategoryName = string.IsNullOrWhiteSpace(selectedCat) ? "Przychód" : selectedCat!;
-                            if (!string.IsNullOrWhiteSpace(source))
-                            {
-                                vm.AccountName = source!;
-                                vm.ToAccountName = source!;
-                            }
-
-                            break;
-                        }
-
-                    case TransactionKind.Transfer:
-                        {
-                            // Edycja transferów wymaga DB/Ledger – tu tylko UI.
-                            vm.AmountStr = amount.ToString("N2") + " zł";
-                            vm.DateDisplay = date.ToString("yyyy-MM-dd");
-                            vm.Description = desc;
+                            vm.SelectedCategory = vm.CategoryName;
                             break;
                         }
                 }
             }
             catch
             {
-                // nie blokuj UI
+                // opcjonalnie: komunikat
             }
             finally
             {
                 vm.IsEditing = false;
-                ApplyFilters();
+
+                // po zmianie daty może zmienić się kolumna (Planned vs normal)
+                LoadFromDatabase();
             }
         }
 
@@ -874,7 +817,6 @@ namespace Finly.ViewModels
             }
             else
             {
-                // dla wydatku/przychodu filtrujemy po AccountName
                 var n = Normalize(t.AccountName);
                 return set.Contains(n) || MatchesCash(n);
             }
@@ -1146,11 +1088,10 @@ namespace Finly.ViewModels
                 set { _isEditing = value; Raise(); }
             }
 
-            public string EditAmountText { get; set; } = "";
+            // Edycja tylko: opis, data, kategoria
             public string EditDescription { get; set; } = "";
             public DateTime EditDate { get; set; } = DateTime.Today;
             public string SelectedCategory { get; set; } = "";
-            public string SelectedAccount { get; set; } = "";
 
             private bool _isDeleteConfirmationVisible;
             public bool IsDeleteConfirmationVisible

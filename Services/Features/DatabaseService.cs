@@ -2310,18 +2310,17 @@ LIMIT 1;";
 
             using var tx = c.BeginTransaction();
 
-            void Insert(string name, string typeText)
+            void Insert(string name, int type)
             {
                 using var ins = c.CreateCommand();
                 ins.Transaction = tx;
 
-                // Uwaga: CHECK constraint wymaga tekstu: 'Expense'/'Income'/'Saving'
                 if (hasType)
                 {
                     ins.CommandText = @"
 INSERT OR IGNORE INTO Categories(UserId, Name, Type)
 VALUES(@u, @n, @t);";
-                    ins.Parameters.AddWithValue("@t", typeText);
+                    ins.Parameters.AddWithValue("@t", type);
                 }
                 else
                 {
@@ -2335,9 +2334,11 @@ VALUES(@u, @n);";
                 ins.ExecuteNonQuery();
             }
 
+
             // Domyœlne
-            foreach (var n in defaultsExpense) Insert(n, "Expense");
-            foreach (var n in defaultsIncome) Insert(n, "Income");
+            foreach (var n in defaultsExpense) Insert(n, 0); // Expense
+            foreach (var n in defaultsIncome) Insert(n, 1); // Income
+
 
             tx.Commit();
 

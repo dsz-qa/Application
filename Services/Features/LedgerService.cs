@@ -6,12 +6,20 @@ using Finly.Models;
 namespace Finly.Services.Features
 {
     /// <summary>
-    /// Jedyny właściciel księgowania w aplikacji.
-    /// Tu jest cała logika wpływu na salda (CashOnHand / SavedCash / Envelopes / BankAccounts)
-    /// oraz odwracanie transakcji przy usuwaniu.
+    /// Źródło prawdy księgowania w aplikacji:
+    /// - wpływ na salda (CashOnHand / SavedCash / Envelopes / BankAccounts)
+    /// - odwracanie skutków przy usuwaniu transakcji
     /// </summary>
     public static class LedgerService
     {
+        // Ujednolicony typ transakcji (eliminuje kolizję Id pomiędzy tabelami).
+        public enum TransactionSource
+        {
+            Transfer = 0,
+            Expense = 1,
+            Income = 2
+        }
+
         private static string ToIsoDate(DateTime dt)
             => dt.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
 
@@ -36,7 +44,7 @@ namespace Finly.Services.Features
 
         private static void EnsureTransfersTable(SqliteConnection c, SqliteTransaction tx)
         {
-            // Jeśli DatabaseService.EnsureTables() już to robi – to nie zaszkodzi.
+            // Jeśli SchemaService/DatabaseService już to robi – to nie zaszkodzi.
             using var cmd = c.CreateCommand();
             cmd.Transaction = tx;
             cmd.CommandText = @"
@@ -310,7 +318,7 @@ SET Amount = SavedCash.Amount + excluded.Amount,
 
             if (fromKind == toKind && fromRefId == toRefId) return;
 
-            // Helper: dostępna wolna gotówka (z modelu: free = cashOnHandTotal - savedTotal)
+            // Helper: dostępna wolna gotówka (free = cashOnHandTotal - savedTotal)
             decimal GetFree()
             {
                 var allCash = GetCashOnHand(c, tx, userId);
@@ -440,7 +448,7 @@ SET Amount = SavedCash.Amount + excluded.Amount,
         }
 
         // =========================
-        //  EXPENSE EFFECT (jedno źródło prawdy: Finly.Models.PaymentKind)
+        //  EXPENSE EFFECT (źródło prawdy: Finly.Models.PaymentKind)
         // =========================
         public static void ApplyExpenseEffect(
             SqliteConnection c,
@@ -538,6 +546,96 @@ SET Amount = SavedCash.Amount + excluded.Amount,
         }
 
         // =========================
+        //  INCOME EFFECT (NOWE – symetria do Expenses)
+        // =========================
+        public static void ApplyIncomeEffect(
+            SqliteConnection c,
+            SqliteTransaction tx,
+            int userId,
+            decimal amount,
+            int paymentKind,
+            int? paymentRefId)
+        {
+            EnsureNonNegative(amount, nameof(amount));
+
+            if (!Enum.IsDefined(typeof(PaymentKind), paymentKind))
+                throw new InvalidOperationException($"Nieznany PaymentKind={paymentKind}.");
+
+            var pk = (PaymentKind)paymentKind;
+
+            switch (pk)
+            {
+                case PaymentKind.FreeCash:
+                    AddCash(c, tx, userId, amount);
+                    break;
+
+                case PaymentKind.SavedCash:
+                    AddCash(c, tx, userId, amount);
+                    AddSaved(c, tx, userId, amount);
+                    break;
+
+                case PaymentKind.BankAccount:
+                    if (!paymentRefId.HasValue) throw new InvalidOperationException("Brak PaymentRefId dla konta bankowego.");
+                    AddBank(c, tx, userId, paymentRefId.Value, amount);
+                    break;
+
+                case PaymentKind.Envelope:
+                    if (!paymentRefId.HasValue) throw new InvalidOperationException("Brak PaymentRefId dla koperty.");
+                    // “przychód do koperty” = rośnie total cash + saved + allocated
+                    AddCash(c, tx, userId, amount);
+                    AddSaved(c, tx, userId, amount);
+                    AddEnvelopeAllocated(c, tx, userId, paymentRefId.Value, amount);
+                    break;
+
+                default:
+                    throw new InvalidOperationException($"Nieobsługiwany PaymentKind={paymentKind}.");
+            }
+        }
+
+        public static void RevertIncomeEffect(
+            SqliteConnection c,
+            SqliteTransaction tx,
+            int userId,
+            decimal amount,
+            int paymentKind,
+            int? paymentRefId)
+        {
+            EnsureNonNegative(amount, nameof(amount));
+
+            if (!Enum.IsDefined(typeof(PaymentKind), paymentKind))
+                throw new InvalidOperationException($"Nieznany PaymentKind={paymentKind}.");
+
+            var pk = (PaymentKind)paymentKind;
+
+            switch (pk)
+            {
+                case PaymentKind.FreeCash:
+                    SubCash(c, tx, userId, amount);
+                    break;
+
+                case PaymentKind.SavedCash:
+                    SubSaved(c, tx, userId, amount);
+                    SubCash(c, tx, userId, amount);
+                    break;
+
+                case PaymentKind.BankAccount:
+                    if (!paymentRefId.HasValue) throw new InvalidOperationException("Brak PaymentRefId dla konta bankowego.");
+                    SubBank(c, tx, userId, paymentRefId.Value, amount);
+                    break;
+
+                case PaymentKind.Envelope:
+                    if (!paymentRefId.HasValue) throw new InvalidOperationException("Brak PaymentRefId dla koperty.");
+                    SubEnvelopeAllocated(c, tx, userId, paymentRefId.Value, amount);
+                    SubSaved(c, tx, userId, amount);
+                    SubCash(c, tx, userId, amount);
+                    break;
+
+                default:
+                    throw new InvalidOperationException($"Nieobsługiwany PaymentKind={paymentKind}.");
+            }
+        }
+
+        // =========================
         //  Spend* (zgodne z TransactionsFacadeService)
         // =========================
         public static void SpendFromFreeCash(int userId, decimal amount)
@@ -627,9 +725,43 @@ SET Amount = SavedCash.Amount + excluded.Amount,
             => TransferAny(userId, amount, date ?? DateTime.Today, desc, KIND_ENV, fromEnvelopeId, KIND_ENV, toEnvelopeId, isPlanned: false);
 
         // ============================================================
-        //  DELETE (transfery) – jak miałaś
+        //  DELETE – typowane (bezpieczne) + kompatybilne (heurystyka)
         // ============================================================
 
+        public static void DeleteTransactionAndRevertBalance(TransactionSource src, int transactionId)
+        {
+            if (transactionId <= 0) return;
+
+            using var c = DatabaseService.GetConnection();
+            DatabaseService.EnsureTables();
+            using var tx = c.BeginTransaction();
+
+            switch (src)
+            {
+                case TransactionSource.Transfer:
+                    DeleteTransferInternal(c, tx, transactionId);
+                    break;
+
+                case TransactionSource.Expense:
+                    DeleteExpenseInternal(c, tx, transactionId);
+                    break;
+
+                case TransactionSource.Income:
+                    DeleteIncomeInternal(c, tx, transactionId);
+                    break;
+
+                default:
+                    throw new InvalidOperationException("Nieobsługiwany typ transakcji.");
+            }
+
+            tx.Commit();
+            DatabaseService.NotifyDataChanged();
+        }
+
+        /// <summary>
+        /// Kompatybilne API: próbuje po kolei Transfers -> Expenses -> Incomes.
+        /// (Id może kolidować między tabelami, więc docelowo UI powinno używać wersji typowanej.)
+        /// </summary>
         public static void DeleteTransactionAndRevertBalance(int transactionId)
         {
             if (transactionId <= 0) return;
@@ -638,53 +770,161 @@ SET Amount = SavedCash.Amount + excluded.Amount,
             DatabaseService.EnsureTables();
             using var tx = c.BeginTransaction();
 
-            // 1) TRANSFERS – reverse transfer
-            if (DatabaseService.TableExists(c, "Transfers"))
+            if (TryDeleteTransferInternal(c, tx, transactionId) ||
+                TryDeleteExpenseInternal(c, tx, transactionId) ||
+                TryDeleteIncomeInternal(c, tx, transactionId))
             {
-                using var get = c.CreateCommand();
-                get.Transaction = tx;
-
-                var hasPlanned = DatabaseService.ColumnExists(c, "Transfers", "IsPlanned");
-
-                get.CommandText = hasPlanned
-                    ? @"SELECT UserId, Amount, FromKind, FromRefId, ToKind, ToRefId, IsPlanned
-                        FROM Transfers WHERE Id=@id LIMIT 1;"
-                    : @"SELECT UserId, Amount, FromKind, FromRefId, ToKind, ToRefId, 0 as IsPlanned
-                        FROM Transfers WHERE Id=@id LIMIT 1;";
-
-                get.Parameters.AddWithValue("@id", transactionId);
-
-                using var r = get.ExecuteReader();
-                if (r.Read())
-                {
-                    var userId = r.GetInt32(0);
-                    var amount = Convert.ToDecimal(r.GetValue(1));
-                    var fromKind = r.IsDBNull(2) ? "" : r.GetString(2);
-                    var fromRef = r.IsDBNull(3) ? (int?)null : r.GetInt32(3);
-                    var toKind = r.IsDBNull(4) ? "" : r.GetString(4);
-                    var toRef = r.IsDBNull(5) ? (int?)null : r.GetInt32(5);
-                    var isPlanned = !r.IsDBNull(6) && Convert.ToInt32(r.GetValue(6)) == 1;
-
-                    if (!isPlanned)
-                    {
-                        // reverse = To -> From
-                        ApplyTransferEffect(c, tx, userId, toKind, toRef, fromKind, fromRef, amount);
-                    }
-
-                    using var del = c.CreateCommand();
-                    del.Transaction = tx;
-                    del.CommandText = "DELETE FROM Transfers WHERE Id=@id;";
-                    del.Parameters.AddWithValue("@id", transactionId);
-                    del.ExecuteNonQuery();
-
-                    tx.Commit();
-                    DatabaseService.NotifyDataChanged();
-                    return;
-                }
+                tx.Commit();
+                DatabaseService.NotifyDataChanged();
+                return;
             }
 
-            // Jeśli nie jest transferem – reszta Twojej logiki (Expenses/Incomes) jest w innym miejscu
             tx.Commit();
+        }
+
+        private static bool TryDeleteTransferInternal(SqliteConnection c, SqliteTransaction tx, int id)
+        {
+            if (!DatabaseService.TableExists(c, "Transfers")) return false;
+
+            using var get = c.CreateCommand();
+            get.Transaction = tx;
+
+            bool hasPlanned = DatabaseService.ColumnExists(c, "Transfers", "IsPlanned");
+
+            get.CommandText = hasPlanned
+                ? @"SELECT UserId, Amount, FromKind, FromRefId, ToKind, ToRefId, IsPlanned
+                    FROM Transfers WHERE Id=@id LIMIT 1;"
+                : @"SELECT UserId, Amount, FromKind, FromRefId, ToKind, ToRefId, 0 as IsPlanned
+                    FROM Transfers WHERE Id=@id LIMIT 1;";
+
+            get.Parameters.AddWithValue("@id", id);
+
+            using var r = get.ExecuteReader();
+            if (!r.Read()) return false;
+
+            var userId = r.GetInt32(0);
+            var amount = Convert.ToDecimal(r.GetValue(1));
+            var fromKind = r.IsDBNull(2) ? "" : r.GetString(2);
+            var fromRef = r.IsDBNull(3) ? (int?)null : r.GetInt32(3);
+            var toKind = r.IsDBNull(4) ? "" : r.GetString(4);
+            var toRef = r.IsDBNull(5) ? (int?)null : r.GetInt32(5);
+            var isPlanned = !r.IsDBNull(6) && Convert.ToInt32(r.GetValue(6)) == 1;
+
+            if (!isPlanned)
+            {
+                // reverse = To -> From
+                ApplyTransferEffect(c, tx, userId, toKind, toRef, fromKind, fromRef, amount);
+            }
+
+            using var del = c.CreateCommand();
+            del.Transaction = tx;
+            del.CommandText = "DELETE FROM Transfers WHERE Id=@id;";
+            del.Parameters.AddWithValue("@id", id);
+            del.ExecuteNonQuery();
+
+            return true;
+        }
+
+        private static void DeleteTransferInternal(SqliteConnection c, SqliteTransaction tx, int id)
+        {
+            if (!TryDeleteTransferInternal(c, tx, id))
+                throw new InvalidOperationException("Nie znaleziono transferu do usunięcia.");
+        }
+
+        private static bool TryDeleteExpenseInternal(SqliteConnection c, SqliteTransaction tx, int id)
+        {
+            if (!DatabaseService.TableExists(c, "Expenses")) return false;
+
+            bool hasPlanned = DatabaseService.ColumnExists(c, "Expenses", "IsPlanned");
+            bool hasPk = DatabaseService.ColumnExists(c, "Expenses", "PaymentKind");
+            bool hasPr = DatabaseService.ColumnExists(c, "Expenses", "PaymentRefId");
+
+            using var get = c.CreateCommand();
+            get.Transaction = tx;
+            get.CommandText = $@"
+SELECT UserId,
+       Amount,
+       {(hasPlanned ? "IsPlanned" : "0")} as IsPlanned,
+       {(hasPk ? "PaymentKind" : "0")} as PaymentKind,
+       {(hasPr ? "PaymentRefId" : "NULL")} as PaymentRefId
+FROM Expenses
+WHERE Id=@id
+LIMIT 1;";
+            get.Parameters.AddWithValue("@id", id);
+
+            using var r = get.ExecuteReader();
+            if (!r.Read()) return false;
+
+            var userId = Convert.ToInt32(r.GetValue(0));
+            var amount = Convert.ToDecimal(r.GetValue(1));
+            var isPlanned = Convert.ToInt32(r.GetValue(2)) == 1;
+            var pk = Convert.ToInt32(r.GetValue(3));
+            var pr = r.IsDBNull(4) ? (int?)null : Convert.ToInt32(r.GetValue(4));
+
+            if (!isPlanned)
+                RevertExpenseEffect(c, tx, userId, amount, pk, pr);
+
+            using var del = c.CreateCommand();
+            del.Transaction = tx;
+            del.CommandText = "DELETE FROM Expenses WHERE Id=@id;";
+            del.Parameters.AddWithValue("@id", id);
+            del.ExecuteNonQuery();
+
+            return true;
+        }
+
+        private static void DeleteExpenseInternal(SqliteConnection c, SqliteTransaction tx, int id)
+        {
+            if (!TryDeleteExpenseInternal(c, tx, id))
+                throw new InvalidOperationException("Nie znaleziono wydatku do usunięcia.");
+        }
+
+        private static bool TryDeleteIncomeInternal(SqliteConnection c, SqliteTransaction tx, int id)
+        {
+            if (!DatabaseService.TableExists(c, "Incomes")) return false;
+
+            bool hasPlanned = DatabaseService.ColumnExists(c, "Incomes", "IsPlanned");
+            bool hasPk = DatabaseService.ColumnExists(c, "Incomes", "PaymentKind");
+            bool hasPr = DatabaseService.ColumnExists(c, "Incomes", "PaymentRefId");
+
+            using var get = c.CreateCommand();
+            get.Transaction = tx;
+            get.CommandText = $@"
+SELECT UserId,
+       Amount,
+       {(hasPlanned ? "IsPlanned" : "0")} as IsPlanned,
+       {(hasPk ? "PaymentKind" : "0")} as PaymentKind,
+       {(hasPr ? "PaymentRefId" : "NULL")} as PaymentRefId
+FROM Incomes
+WHERE Id=@id
+LIMIT 1;";
+            get.Parameters.AddWithValue("@id", id);
+
+            using var r = get.ExecuteReader();
+            if (!r.Read()) return false;
+
+            var userId = Convert.ToInt32(r.GetValue(0));
+            var amount = Convert.ToDecimal(r.GetValue(1));
+            var isPlanned = Convert.ToInt32(r.GetValue(2)) == 1;
+            var pk = Convert.ToInt32(r.GetValue(3));
+            var pr = r.IsDBNull(4) ? (int?)null : Convert.ToInt32(r.GetValue(4));
+
+            if (!isPlanned)
+                RevertIncomeEffect(c, tx, userId, amount, pk, pr);
+
+            using var del = c.CreateCommand();
+            del.Transaction = tx;
+            del.CommandText = "DELETE FROM Incomes WHERE Id=@id;";
+            del.Parameters.AddWithValue("@id", id);
+            del.ExecuteNonQuery();
+
+            return true;
+        }
+
+        private static void DeleteIncomeInternal(SqliteConnection c, SqliteTransaction tx, int id)
+        {
+            if (!TryDeleteIncomeInternal(c, tx, id))
+                throw new InvalidOperationException("Nie znaleziono przychodu do usunięcia.");
         }
     }
 }

@@ -21,7 +21,6 @@ namespace Finly.Pages
         private PeriodBarControl? _periodBar;
         private int _uid;
 
-        // chroni przed callbackami po Unloaded
         private bool _isAlive;
 
         public TransactionsPage()
@@ -39,7 +38,7 @@ namespace Finly.Pages
 
         private void TransactionsPage_Loaded(object sender, RoutedEventArgs e)
         {
-            if (_isAlive) return; // zabezpieczenie przed podwójnym loadem
+            if (_isAlive) return;
             _isAlive = true;
 
             _uid = 0;
@@ -53,27 +52,21 @@ namespace Finly.Pages
 
             _uid = uid;
 
-            // Inicjalizacja VM
             _vm.Initialize(uid);
 
-            // PeriodBar
             _periodBar = FindName("PeriodBar") as PeriodBarControl;
             if (_periodBar != null)
             {
-                _periodBar.RangeChanged -= PeriodBar_RangeChanged; // ważne jeśli WPF z jakiegoś powodu podwiesił
+                _periodBar.RangeChanged -= PeriodBar_RangeChanged;
                 _periodBar.RangeChanged += PeriodBar_RangeChanged;
 
-                // ustaw okres startowy
                 _vm.SetPeriod(_periodBar.Mode, _periodBar.StartDate, _periodBar.EndDate);
             }
 
-            // źródła dla ComboBoxów (jeśli nadal trzymasz je w Resources; w nowym XAML i tak bazujesz na VM.Available*)
             LoadEditResources(uid);
 
-            // KPI
             RefreshMoneySummary();
 
-            // auto-refresh po zmianach w bazie
             DatabaseService.DataChanged -= DatabaseService_DataChanged;
             DatabaseService.DataChanged += DatabaseService_DataChanged;
         }
@@ -120,10 +113,8 @@ namespace Finly.Pages
 
         private void LoadEditResources(int uid)
         {
-            // UWAGA:
-            // W Twoim aktualnym XAML ComboBoxy biorą ItemsSource z:
-            // DataContext.AvailableCategories / AvailableAccounts,
-            // więc te Resources są opcjonalne. Zostawiam je kompatybilnie.
+            // kompatybilność: Twoje ComboBoxy jadą z VM.Available*,
+            // ale zostawiam zasoby gdyby gdzieś jeszcze były używane.
             try
             {
                 var cats = DatabaseService.GetCategoriesByUser(uid)
@@ -239,143 +230,45 @@ namespace Finly.Pages
             return cur as T;
         }
 
-        // ================== USUWANIE ==================
-        // W nowym XAML usuwanie jest przez IsDeleteConfirmationVisible + Commandy w VM.
-        // Zostawiamy kompatybilnie metody oparte o "DeleteConfirmPanel",
-        // ale jeśli panel nie istnieje, to nic się nie stanie.
+        // ================== EDYCJA INLINE ==================
+        // Wymaganie: edytujemy tylko Data + Kategoria + Opis.
+        // Transferów nie edytujemy inline.
 
-        private void HideAllDeletePanels()
-        {
-            void CollapseInside(ItemsControl? ic)
-            {
-                if (ic == null) return;
-
-                foreach (var item in ic.Items)
-                {
-                    var container = ic.ItemContainerGenerator.ContainerFromItem(item) as FrameworkElement;
-                    if (container == null) continue;
-
-                    var panel = FindDescendantByName<FrameworkElement>(container, "DeleteConfirmPanel");
-                    if (panel != null)
-                        panel.Visibility = Visibility.Collapsed;
-                }
-            }
-
-            CollapseInside(FindName("RealizedItems") as ItemsControl);
-            CollapseInside(FindName("PlannedItemsList") as ItemsControl);
-        }
-
-        private void ShowDeleteConfirm_Click(object sender, RoutedEventArgs e)
+        private void StartEdit_Click(object sender, RoutedEventArgs e)
         {
             if (sender is not FrameworkElement fe) return;
+            if (fe.DataContext is not TransactionCardVm vm) return;
 
-            HideAllDeletePanels();
+            // Transferów nie edytujemy inline
+            if (vm.Kind == TransactionKind.Transfer || vm.IsTransfer)
+                return;
 
-            FrameworkElement? container = fe;
-            while (container != null &&
-                   container is not ContentPresenter &&
-                   container is not Border)
+            try
             {
-                container = VisualTreeHelper.GetParent(container) as FrameworkElement;
+                vm.IsDeleteConfirmationVisible = false;
+                _vm.StartEdit(vm);
             }
-
-            if (container == null) return;
-
-            var panel = FindDescendantByName<FrameworkElement>(container, "DeleteConfirmPanel");
-            if (panel != null)
-                panel.Visibility = Visibility.Visible;
+            catch { }
         }
 
-        private void DeleteConfirmNo_Click(object sender, RoutedEventArgs e)
-            => HideAllDeletePanels();
-
-        private void DeleteConfirmYes_Click(object sender, RoutedEventArgs e)
+        private void SaveEdit_Click(object sender, RoutedEventArgs e)
         {
-            if (sender is not FrameworkElement fe)
-            {
-                HideAllDeletePanels();
-                return;
-            }
+            if (sender is not FrameworkElement fe) return;
+            if (fe.DataContext is not TransactionCardVm vm) return;
 
-            if (fe.DataContext is not TransactionCardVm vmItem)
+            // Bezpiecznik – transferu nie zapisujemy
+            if (vm.Kind == TransactionKind.Transfer || vm.IsTransfer)
             {
-                HideAllDeletePanels();
+                vm.IsEditing = false;
                 return;
             }
 
             try
             {
-                // Jedyny właściciel księgowania/usuwania
-                TransactionsFacadeService.DeleteTransaction(vmItem.Id);
-
-                switch (vmItem.Kind)
-                {
-                    case TransactionKind.Expense:
-                        ToastService.Success("Usunięto wydatek.");
-                        break;
-                    case TransactionKind.Income:
-                        ToastService.Success("Usunięto przychód.");
-                        break;
-                    case TransactionKind.Transfer:
-                        ToastService.Success("Usunięto transfer.");
-                        break;
-                }
+                _vm.SaveEdit(vm);
+                RefreshMoneySummary();
             }
-            catch (Exception ex)
-            {
-                ToastService.Error("Błąd usuwania.\n" + ex.Message);
-            }
-            finally
-            {
-                HideAllDeletePanels();
-
-                try
-                {
-                    if (_periodBar != null)
-                        _vm.SetPeriod(_periodBar.Mode, _periodBar.StartDate, _periodBar.EndDate);
-
-                    // VM sam czyta z DB – odśwież listy
-                    _vm.LoadFromDatabase();
-
-                    RefreshMoneySummary();
-                }
-                catch
-                {
-                    // nie blokuj UI
-                }
-            }
-        }
-
-        // ================== EDYCJA INLINE ==================
-
-        private void StartEdit_Click(object sender, RoutedEventArgs e)
-        {
-            if (sender is FrameworkElement fe && fe.DataContext is TransactionCardVm vm)
-            {
-                try
-                {
-                    // zamknij ewentualne potwierdzenia usuwania
-                    vm.IsDeleteConfirmationVisible = false;
-
-                    _vm.StartEdit(vm);
-                }
-                catch { }
-            }
-        }
-
-        private void SaveEdit_Click(object sender, RoutedEventArgs e)
-        {
-            if (sender is FrameworkElement fe && fe.DataContext is TransactionCardVm vm)
-            {
-                try
-                {
-                    _vm.SaveEdit(vm);
-
-                    // Jeżeli Update*/Ledger nie wywoła DataChanged, to KPI i tak się odświeży:
-                    RefreshMoneySummary();
-                }
-                catch { }
-            }
+            catch { }
         }
 
         private void CancelEdit_Click(object sender, RoutedEventArgs e)
@@ -391,35 +284,10 @@ namespace Finly.Pages
             }
         }
 
-        private void EditAmount_GotFocus(object sender, RoutedEventArgs e)
-        {
-            if (sender is TextBox tb)
-            {
-                // lepszy UX niż Clear(): pozwala nadpisać jednym wpisem,
-                // ale nie kasuje wartości, jeśli user tylko kliknął.
-                tb.SelectAll();
-
-                // Jeśli jednak chcesz “zawsze czyść”, odkomentuj:
-                // tb.Clear();
-            }
-        }
-
         private void EditDescription_GotFocus(object sender, RoutedEventArgs e)
         {
             if (sender is TextBox tb)
                 tb.SelectAll();
-        }
-
-        private void DateIcon_Click(object sender, RoutedEventArgs e)
-        {
-            if (sender is not FrameworkElement fe) return;
-
-            var sp = FindAncestor<StackPanel>(fe) ?? FindAncestor<StackPanel>(VisualTreeHelper.GetParent(fe));
-            if (sp == null) return;
-
-            var dp = FindDescendantByName<DatePicker>(sp, "DateEditor");
-            if (dp != null)
-                dp.IsDropDownOpen = true;
         }
 
         // ================== PRZYCISKI "POKAŻ WSZYSTKO" ==================

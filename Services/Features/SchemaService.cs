@@ -9,8 +9,6 @@ namespace Finly.Services.Features
     /// - migracje kolumn (ALTER TABLE ... ADD COLUMN)
     /// - przebudowy tabel, gdy wymagane (np. FK)
     /// - indeksy
-    ///
-    /// DatabaseService ma tylko: GetConnection + EnsureTables/OpenAndEnsureSchema + CRUD + DataChanged.
     /// </summary>
     public static class SchemaService
     {
@@ -95,7 +93,6 @@ CREATE TABLE IF NOT EXISTS BankConnections(
     FOREIGN KEY(UserId) REFERENCES Users(Id) ON DELETE CASCADE
 );
 
--- ConnectionId może być NULL; przy usunięciu połączenia ustawiamy NULL (ON DELETE SET NULL)
 CREATE TABLE IF NOT EXISTS BankAccounts(
     Id           INTEGER PRIMARY KEY AUTOINCREMENT,
     ConnectionId INTEGER NULL,
@@ -110,6 +107,7 @@ CREATE TABLE IF NOT EXISTS BankAccounts(
     FOREIGN KEY(ConnectionId) REFERENCES BankConnections(Id) ON DELETE SET NULL
 );
 
+-- Incomes: planned + stabilne księgowanie (PaymentKind/PaymentRefId)
 CREATE TABLE IF NOT EXISTS Incomes(
     Id INTEGER PRIMARY KEY AUTOINCREMENT,
     UserId INTEGER NOT NULL,
@@ -120,6 +118,8 @@ CREATE TABLE IF NOT EXISTS Incomes(
     CategoryId INTEGER NULL,
     IsPlanned INTEGER NOT NULL DEFAULT 0,
     BudgetId INTEGER NULL,
+    PaymentKind  INTEGER NOT NULL DEFAULT 0,
+    PaymentRefId INTEGER NULL,
     FOREIGN KEY(UserId) REFERENCES Users(Id) ON DELETE CASCADE
 );
 
@@ -180,7 +180,6 @@ CREATE TABLE IF NOT EXISTS Investments(
     FOREIGN KEY(UserId) REFERENCES Users(Id) ON DELETE CASCADE
 );
 
--- Koperty
 CREATE TABLE IF NOT EXISTS Envelopes(
     Id         INTEGER PRIMARY KEY AUTOINCREMENT,
     UserId     INTEGER NOT NULL,
@@ -189,13 +188,9 @@ CREATE TABLE IF NOT EXISTS Envelopes(
     Allocated  NUMERIC NOT NULL DEFAULT 0,
     Note       TEXT    NULL,
     CreatedAt  TEXT    NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    -- opcjonalne: jeśli kiedyś dodasz:
-    -- Deadline   TEXT NULL,
-    -- GoalText   TEXT NULL,
     FOREIGN KEY(UserId) REFERENCES Users(Id) ON DELETE CASCADE
 );
 
--- Gotówka (jeden wiersz na usera)
 CREATE TABLE IF NOT EXISTS CashOnHand(
     UserId     INTEGER PRIMARY KEY,
     Amount     NUMERIC NOT NULL DEFAULT 0,
@@ -276,6 +271,10 @@ CREATE TABLE IF NOT EXISTS CompanyProfiles(
                 AddColumnIfMissing(con, tx, "Incomes", "IsPlanned", "INTEGER", "NOT NULL DEFAULT 0");
                 AddColumnIfMissing(con, tx, "Incomes", "BudgetId", "INTEGER");
 
+                // NOWE: stabilne księgowanie przychodów
+                AddColumnIfMissing(con, tx, "Incomes", "PaymentKind", "INTEGER", "NOT NULL DEFAULT 0");
+                AddColumnIfMissing(con, tx, "Incomes", "PaymentRefId", "INTEGER");
+
                 // Expenses
                 AddColumnIfMissing(con, tx, "Expenses", "Title", "TEXT");
                 AddColumnIfMissing(con, tx, "Expenses", "Description", "TEXT");
@@ -343,6 +342,9 @@ CREATE INDEX IF NOT EXISTS IX_Expenses_User_PaymentKind
 CREATE INDEX IF NOT EXISTS IX_Incomes_User_Date
     ON Incomes(UserId, Date);
 
+CREATE INDEX IF NOT EXISTS IX_Incomes_User_PaymentKind
+    ON Incomes(UserId, PaymentKind);
+
 CREATE INDEX IF NOT EXISTS IX_Envelopes_User
     ON Envelopes(UserId);
 
@@ -354,6 +356,7 @@ CREATE INDEX IF NOT EXISTS IX_BankAccounts_User
 
 CREATE INDEX IF NOT EXISTS IX_BankConnections_User
     ON BankConnections(UserId);";
+
                 idx.ExecuteNonQuery();
             }
         }
@@ -441,8 +444,6 @@ SELECT Id, ConnectionId, UserId,
        CASE WHEN (SELECT 1) THEN BankName END,
        AccountName, Iban, Currency, Balance, LastSync
 FROM BankAccounts;";
-            // Uwaga: jeśli w starej tabeli nie było BankName, ta linia może wymagać dopasowania.
-            // Jeżeli masz bardzo stare bazy, daj znać – dorobię bezpieczny wariant wykrywania kolumn.
             cmd.ExecuteNonQuery();
 
             cmd.CommandText = "DROP TABLE BankAccounts;";

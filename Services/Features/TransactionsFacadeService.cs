@@ -64,24 +64,26 @@ SET Amount   = excluded.Amount,
             DatabaseService.NotifyDataChanged();
         }
 
-
         public static int TransferAnyPlanned(
-    int userId, decimal amount, DateTime date, string? desc,
-    string fromKind, int? fromRefId,
-    string toKind, int? toRefId)
-    => LedgerService.TransferAny(userId, amount, date, desc, fromKind, fromRefId, toKind, toRefId, isPlanned: true);
-
+            int userId, decimal amount, DateTime date, string? desc,
+            string fromKind, int? fromRefId,
+            string toKind, int? toRefId)
+            => LedgerService.TransferAny(userId, amount, date, desc, fromKind, fromRefId, toKind, toRefId, isPlanned: true);
 
         // =========================
         //  Delete (jedyny punkt)
         // =========================
 
+        // Bezpieczne API (docelowe): UI przekazuje typ.
+        public static void DeleteTransaction(LedgerService.TransactionSource src, int id)
+            => LedgerService.DeleteTransactionAndRevertBalance(src, id);
+
+        // Kompatybilne (awaryjne): heurystyka (transfer -> expense -> income).
         public static void DeleteTransaction(int id)
             => LedgerService.DeleteTransactionAndRevertBalance(id);
 
         // =========================
         //  Wydatki – UI -> Ledger
-        // (zostawiasz jak masz)
         // =========================
         public static void SpendFromFreeCash(int userId, decimal amount)
             => LedgerService.SpendFromFreeCash(userId, amount);
@@ -97,7 +99,6 @@ SET Amount   = excluded.Amount,
 
         // =========================
         //  Transfery – WSZYSTKIE kombinacje
-        //  Każdy transfer zapisuje rekord w Transfers + księguje saldo (atomowo).
         // =========================
 
         public static int TransferFreeToSaved(int userId, decimal amount, DateTime? date = null, string? desc = null)
@@ -131,8 +132,7 @@ SET Amount   = excluded.Amount,
             => LedgerService.TransferEnvelopeToEnvelope(userId, fromEnvelopeId, toEnvelopeId, amount, date, desc);
 
         // =========================
-        //  Kombinacje „czytelne” (bez 2 transakcji)
-        //  Zamiast 2 wywołań Ledgera – robimy 1 transfer Any (atomowo, 1 rekord).
+        //  Kombinacje „czytelne” (atomowo: 1 transfer Any)
         // =========================
 
         public static int TransferBankToFreeCash(int userId, int accountId, decimal amount, DateTime? date = null, string? desc = null)
@@ -163,7 +163,4 @@ SET Amount   = excluded.Amount,
                 toKind: "envelope", toRefId: envelopeId,
                 isPlanned: false);
     }
-
-
-
 }
