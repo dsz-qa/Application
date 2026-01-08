@@ -191,9 +191,16 @@ namespace Finly.Pages
                 else
                 {
                     // opis lub inne linie
-                    // jeżeli masz "Opis: ..." w Note, zostawiamy jak jest (żeby user widział)
-                    descLines.Add(line);
+                    // Jeśli linia zaczyna się od "Opis:", to usuwamy prefix,
+                    // bo nagłówek "Opis" i tak jest już w UI.
+                    if (line.StartsWith("Opis:", StringComparison.OrdinalIgnoreCase))
+                        line = line.Substring(5).Trim();
+
+                    // jeśli po ucięciu nic nie zostało – nie dodawaj
+                    if (!string.IsNullOrWhiteSpace(line))
+                        descLines.Add(line);
                 }
+
             }
 
             if (string.IsNullOrWhiteSpace(goalTitle))

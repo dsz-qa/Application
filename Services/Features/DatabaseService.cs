@@ -992,11 +992,7 @@ SELECT
 FROM Envelopes
 WHERE UserId = @u
   AND Target IS NOT NULL
-  AND Target > 0";
-
-            if (hasDeadline) sql += " AND Deadline IS NOT NULL";
-
-            sql += @"
+  AND Target > 0
 ORDER BY Name COLLATE NOCASE;";
 
             cmd.CommandText = sql;
@@ -1005,31 +1001,68 @@ ORDER BY Name COLLATE NOCASE;";
             using var r = cmd.ExecuteReader();
             while (r.Read())
             {
+                // Kolumny:
+                // 0 Id, 1 Name, 2 Target, 3 Allocated, 4 Deadline/NULL, 5 GoalText/Note
                 var dto = new EnvelopeGoalDto
                 {
                     EnvelopeId = r.GetInt32(0),
                     Name = GetStringSafe(r, 1),
                     Target = r.IsDBNull(2) ? 0m : Convert.ToDecimal(r.GetValue(2)),
                     Allocated = r.IsDBNull(3) ? 0m : Convert.ToDecimal(r.GetValue(3)),
-                    GoalText = GetNullableString(r, 5)
+                    Deadline = null,
+                    GoalText = r.IsDBNull(5) ? null : r.GetValue(5)?.ToString()
                 };
 
+                // 1) Deadline z kolumny (jeœli istnieje)
                 if (hasDeadline)
                 {
                     var dt = GetDate(r, 4);
                     dto.Deadline = dt == DateTime.MinValue ? null : dt;
                 }
 
+                // 2) Jeœli brak deadline w kolumnie, próbuj wyci¹gn¹æ z NOTE/GoalText
                 if (dto.Deadline == null && !string.IsNullOrWhiteSpace(dto.GoalText))
                 {
                     dto.Deadline = TryParseDeadlineFromGoalText(dto.GoalText);
                 }
 
-                list.Add(dto);
+                // 3) Tytu³ celu musi istnieæ (Cel: ...)
+                var goalTitle = TryParseGoalTitleFromGoalText(dto.GoalText);
+
+                // 4) Do zak³adki „Cele” wpuszczamy TYLKO:
+                //    - ma Cel: ...
+                //    - ma Termin (deadline)
+                if (!string.IsNullOrWhiteSpace(goalTitle) && dto.Deadline != null)
+                {
+                    list.Add(dto);
+                }
             }
 
             return list;
         }
+
+
+        private static string? TryParseGoalTitleFromGoalText(string? text)
+        {
+            if (string.IsNullOrWhiteSpace(text))
+                return null;
+
+            var lines = text.Split(new[] { '\n' }, StringSplitOptions.RemoveEmptyEntries);
+
+            foreach (var rawLine in lines)
+            {
+                var line = rawLine.Trim();
+
+                if (line.StartsWith("Cel:", StringComparison.OrdinalIgnoreCase))
+                {
+                    var title = line.Substring(4).Trim();
+                    return string.IsNullOrWhiteSpace(title) ? null : title;
+                }
+            }
+
+            return null;
+        }
+
 
         private static DateTime? TryParseDeadlineFromGoalText(string? text)
         {

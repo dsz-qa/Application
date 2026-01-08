@@ -454,14 +454,28 @@ namespace Finly.Pages
                 return;
             }
 
-            // >>>>>> TU JEST KONKRETNE MIEJSCE WALIDACJI ŚRODKÓW <<<<<<
+            // >>>>>> WALIDACJA ŚRODKÓW (zostaje jak było) <<<<<<
             if (!ValidateAllocationAgainstSavedCash(_userId, _editingId, allocated, out var fundsMsg))
             {
                 FormMessage.Text = fundsMsg;
                 return;
             }
 
-            var note = BuildNote(goal, description, deadline);
+            // Cel ma się tworzyć TYLKO gdy:
+            // - jest nazwa celu
+            // - jest termin
+            // - target > 0
+            bool shouldCreateGoal =
+                !string.IsNullOrWhiteSpace(goal) &&
+                deadline.HasValue &&
+                target > 0m;
+
+            // Jeżeli nie tworzymy celu, to nie zapisujemy terminu w NOTE,
+            // żeby koperta nie była traktowana jako "cel" w innych miejscach.
+            var effectiveDeadline = shouldCreateGoal ? deadline : null;
+
+            // NOTE zawsze zapisujemy (opis może być bez celu)
+            var note = BuildNote(goal, description, effectiveDeadline);
 
             try
             {
@@ -479,15 +493,15 @@ namespace Finly.Pages
                     FormMessage.Text = "Dodano kopertę.";
                 }
 
-                // Zapis celu/terminu dla zakładki „Cele”
-                if (deadline.HasValue)
+                // Aktualizacja danych celu dla zakładki „Cele” TYLKO gdy spełnione warunki
+                if (shouldCreateGoal)
                 {
                     DatabaseService.UpdateEnvelopeGoal(
                         _userId,
                         envelopeId,
                         target,
                         allocated,
-                        deadline.Value,
+                        deadline!.Value,
                         note
                     );
                 }
@@ -501,6 +515,7 @@ namespace Finly.Pages
                 FormMessage.Text = "Błąd zapisu: " + ex.Message;
             }
         }
+
 
 
 
