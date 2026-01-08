@@ -2265,6 +2265,87 @@ LIMIT 1;";
             };
         }
 
+        public static void EnsureDefaultCategories(int userId)
+        {
+            if (userId <= 0) return;
+
+            using var c = OpenAndEnsureSchema();
+
+            // uwzglêdnij archiwizacjê jeœli kolumna istnieje
+            bool hasArchived = ColumnExists(c, "Categories", "IsArchived");
+            bool hasType = ColumnExists(c, "Categories", "Type");
+
+            // Jeœli u¿ytkownik ma ju¿ jakiekolwiek (niearchiwalne) kategorie, nie dok³adamy domyœlnych
+            using (var chk = c.CreateCommand())
+            {
+                chk.CommandText = hasArchived
+                    ? "SELECT COUNT(*) FROM Categories WHERE UserId=@u AND IsArchived=0;"
+                    : "SELECT COUNT(*) FROM Categories WHERE UserId=@u;";
+                chk.Parameters.AddWithValue("@u", userId);
+
+                var count = Convert.ToInt32(chk.ExecuteScalar() ?? 0);
+                if (count > 0) return;
+            }
+
+            // Minimalny, sensowny zestaw startowy
+            var defaultsExpense = new[]
+            {
+        "Jedzenie",
+        "Dom",
+        "Transport",
+        "Zdrowie",
+        "Ubrania",
+        "Rozrywka",
+        "Rachunki",
+        "Inne"
+    };
+
+            var defaultsIncome = new[]
+            {
+        "Wyp³ata",
+        "Premia",
+        "Zwrot",
+        "Inne"
+    };
+
+            using var tx = c.BeginTransaction();
+
+            void Insert(string name, string typeText)
+            {
+                using var ins = c.CreateCommand();
+                ins.Transaction = tx;
+
+                // Uwaga: CHECK constraint wymaga tekstu: 'Expense'/'Income'/'Saving'
+                if (hasType)
+                {
+                    ins.CommandText = @"
+INSERT OR IGNORE INTO Categories(UserId, Name, Type)
+VALUES(@u, @n, @t);";
+                    ins.Parameters.AddWithValue("@t", typeText);
+                }
+                else
+                {
+                    ins.CommandText = @"
+INSERT OR IGNORE INTO Categories(UserId, Name)
+VALUES(@u, @n);";
+                }
+
+                ins.Parameters.AddWithValue("@u", userId);
+                ins.Parameters.AddWithValue("@n", name);
+                ins.ExecuteNonQuery();
+            }
+
+            // Domyœlne
+            foreach (var n in defaultsExpense) Insert(n, "Expense");
+            foreach (var n in defaultsIncome) Insert(n, "Income");
+
+            tx.Commit();
+
+            RaiseDataChanged();
+        }
+
+
+
         private static int? TryResolveAccountIdFromExpenseAccountText(SqliteConnection c, SqliteTransaction tx, int userId, string? accountText)
         {
             if (string.IsNullOrWhiteSpace(accountText)) return null;

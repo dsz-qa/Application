@@ -52,7 +52,9 @@ namespace Finly.Pages
                 ModeTabs.SelectedIndex = -1;
                 ShowPanels(null);
 
+                DatabaseService.EnsureDefaultCategories(_uid);
                 LoadCategories();
+
                 LoadTransferItems();
                 LoadEnvelopes();
                 LoadIncomeAccounts();
@@ -149,7 +151,16 @@ namespace Finly.Pages
             ExpenseCategoryBox.ItemsSource = cats;
             IncomeCategoryBox.ItemsSource = cats;
             TransferCategoryBox.ItemsSource = cats;
+
+            if (cats.Count > 0)
+            {
+                if (ExpenseCategoryBox.SelectedIndex < 0) ExpenseCategoryBox.SelectedIndex = 0;
+                if (IncomeCategoryBox.SelectedIndex < 0) IncomeCategoryBox.SelectedIndex = 0;
+                if (TransferCategoryBox.SelectedIndex < 0) TransferCategoryBox.SelectedIndex = 0;
+            }
         }
+
+
 
         private void LoadEnvelopes()
         {
