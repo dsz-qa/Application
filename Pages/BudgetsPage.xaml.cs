@@ -6,8 +6,10 @@ using LiveChartsCore.SkiaSharpView;
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
+using System.ComponentModel;
 using System.Globalization;
 using System.Linq;
+using System.Runtime.CompilerServices;
 using System.Windows;
 using System.Windows.Controls;
 
@@ -77,7 +79,6 @@ namespace Finly.Pages
             if (string.Equals(s, "Monthly", StringComparison.OrdinalIgnoreCase)) return "Monthly";
             if (string.Equals(s, "Yearly", StringComparison.OrdinalIgnoreCase)) return "Yearly";
 
-            // bezpieczny default
             return "Monthly";
         }
 
@@ -145,6 +146,8 @@ ORDER BY b.StartDate;";
 
                     OverState = reader["OverState"] == DBNull.Value ? 0 : Convert.ToInt32(reader["OverState"]),
                     OverNotifiedAt = reader["OverNotifiedAt"] == DBNull.Value ? null : reader["OverNotifiedAt"].ToString(),
+
+                    IsDeleteConfirmVisible = false
                 };
 
                 row.Recalculate();
@@ -229,10 +232,9 @@ ORDER BY b.StartDate;";
 
         private void BudgetsList_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
-            var selected = GetSelectedBudgetFromList();
-            UpdateDetailsPanel(selected);
-
-            // TODO: docelowo doładujesz transakcje pod tabelą
+            HideAllDeleteConfirms();
+            UpdateDetailsPanel(GetSelectedBudgetFromList());
+            // TODO: transakcje pod tabelą
         }
 
         // =================== KPI OGÓLNE (góra) ===================
@@ -254,43 +256,38 @@ ORDER BY b.StartDate;";
             KpiOverActiveText.Text = $"{overCount} | {overAmount:N2} zł";
         }
 
-        // =================== PANEL PRAWA STRONA ===================
+        // =================== PANEL (kafelki u góry) ===================
 
         private void UpdateDetailsPanel(BudgetRow? b)
         {
             if (b == null)
             {
                 BudgetNameText.Text = "(wybierz budżet)";
-
-                // nowy UI: osobne pola
                 BudgetTypeText.Text = "—";
                 BudgetPeriodText.Text = "—";
-
                 BudgetPlannedText.Text = "0,00 zł";
-
-                // zostawiamy ukryte pole kompatybilności (nieużywane)
+                BudgetSpentText.Text = "0,00 zł";
+                BudgetOverText.Text = "0,00 zł";
                 BudgetMetaText.Text = string.Empty;
 
                 LoadBudgetHistoryChart(null);
-                BudgetInsightsList.ItemsSource = Array.Empty<string>();
+                BudgetInsightsList.ItemsSource = new[] { "Brak danych." };
                 return;
             }
 
             BudgetNameText.Text = b.Name;
-
-            // nowy UI: osobno
             BudgetTypeText.Text = b.TypeDisplay;
             BudgetPeriodText.Text = b.Period;
 
-            // kompatybilność (niewidoczne)
-            BudgetMetaText.Text = $"{b.TypeDisplay} | {b.Period}";
-
             BudgetPlannedText.Text = $"{b.PlannedAmount:N2} zł";
+            BudgetSpentText.Text = $"{b.SpentAmount:N2} zł";
+            BudgetOverText.Text = b.IsOverBudget ? $"{b.OverAmount:N2} zł" : "0,00 zł";
+
+            BudgetMetaText.Text = $"{b.TypeDisplay} | {b.Period}";
 
             LoadBudgetHistoryChart(b);
             BudgetInsightsList.ItemsSource = BuildInsights(b);
         }
-
 
         private IList<string> BuildInsights(BudgetRow b)
         {
@@ -323,20 +320,25 @@ ORDER BY b.StartDate;";
             }
 
             if (b.IsOverBudget)
-                list.Add($"Uwaga: budżet przekroczony o {b.OverAmount:N2} zł.");
+                list.Add($"Przekroczono o: {b.OverAmount:N2} zł.");
             else
-                list.Add($"Bufor: {b.RemainingAmount:N2} zł.");
+                list.Add($"Bufor (na dziś): {b.RemainingAmount:N2} zł.");
 
-            if (daysPassed > 0)
+            // PROGNOZA: ma być zawsze "jako sekcja", ale gdy nie ma danych -> "Brak danych"
+            // sensowne minimum: musimy mieć choć 1 dzień i jakiekolwiek wydatki, żeby prognozować
+            if (daysPassed <= 0 || totalDays <= 0 || b.SpentAmount <= 0)
             {
-                var forecastSpent = avgSpentPerDay * totalDays;
-                var forecastRemaining = (b.PlannedAmount + b.IncomeAmount) - forecastSpent;
-
-                if (forecastRemaining < 0)
-                    list.Add($"Prognoza: przy tym tempie przekroczysz o {Math.Abs(forecastRemaining):N2} zł.");
-                else
-                    list.Add($"Prognoza: przy tym tempie zostanie ok. {forecastRemaining:N2} zł.");
+                list.Add("Prognoza na koniec: Brak danych.");
+                return list;
             }
+
+            var forecastSpent = avgSpentPerDay * totalDays;
+            var forecastRemaining = totalBudget - forecastSpent;
+
+            if (forecastRemaining < 0)
+                list.Add($"Prognoza na koniec: przekroczysz o {Math.Abs(forecastRemaining):N2} zł.");
+            else
+                list.Add($"Prognoza na koniec: zostanie ok. {forecastRemaining:N2} zł.");
 
             return list;
         }
@@ -490,9 +492,7 @@ ORDER BY Date;";
             var vm = dialog.Budget;
             vm.Type = ToDbType(vm.Type);
 
-            // ważne: bierzemy zwrócone ID, żeby precyzyjnie zaznaczyć
             var newId = BudgetService.InsertBudget(_currentUserId, vm);
-
             ReloadAndReselect(newId);
         }
 
@@ -527,8 +527,15 @@ ORDER BY Date;";
             };
 
             BudgetService.UpdateBudget(updated);
-
             ReloadAndReselect(row.Id);
+        }
+
+        // ======= INLINE DELETE =======
+
+        private void HideAllDeleteConfirms()
+        {
+            foreach (var b in _allBudgets)
+                b.IsDeleteConfirmVisible = false;
         }
 
         private void DeleteBudget_Click(object sender, RoutedEventArgs e)
@@ -536,17 +543,26 @@ ORDER BY Date;";
             if (sender is not FrameworkElement fe || fe.DataContext is not BudgetRow row)
                 return;
 
-            var confirm = MessageBox.Show(
-                $"Czy na pewno chcesz usunąć budżet „{row.Name}”?",
-                "Usuń budżet",
-                MessageBoxButton.YesNo,
-                MessageBoxImage.Warning);
+            HideAllDeleteConfirms();
+            row.IsDeleteConfirmVisible = true;
+        }
 
-            if (confirm != MessageBoxResult.Yes)
+        private void DeleteBudgetConfirmNo_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is not FrameworkElement fe || fe.DataContext is not BudgetRow row)
+                return;
+
+            row.IsDeleteConfirmVisible = false;
+        }
+
+        private void DeleteBudgetConfirmYes_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is not FrameworkElement fe || fe.DataContext is not BudgetRow row)
                 return;
 
             BudgetService.DeleteBudget(row.Id, _currentUserId);
 
+            HideAllDeleteConfirms();
             ReloadAndReselect(null);
         }
 
@@ -577,8 +593,22 @@ ORDER BY Date;";
 
     // =================== MODEL UI ===================
 
-    public class BudgetRow
+    public class BudgetRow : INotifyPropertyChanged
     {
+        public event PropertyChangedEventHandler? PropertyChanged;
+
+        private bool _isDeleteConfirmVisible;
+        public bool IsDeleteConfirmVisible
+        {
+            get => _isDeleteConfirmVisible;
+            set
+            {
+                if (_isDeleteConfirmVisible == value) return;
+                _isDeleteConfirmVisible = value;
+                OnPropertyChanged();
+            }
+        }
+
         public int Id { get; set; }
         public string Name { get; set; } = string.Empty;
 
@@ -605,12 +635,21 @@ ORDER BY Date;";
         public bool IsOverBudget => RemainingAmount < 0;
         public decimal OverAmount => IsOverBudget ? Math.Abs(RemainingAmount) : 0m;
 
+        // DO BINDINGU w liście: zawsze liczba (0 jeśli nieprzekroczone)
+        public decimal OverDisplayAmount => OverAmount;
+
         public void Recalculate()
         {
             var total = PlannedAmount + IncomeAmount;
             RemainingAmount = total - SpentAmount;
+
+            // jeśli kiedykolwiek będziesz odświeżać pojedynczy wiersz, przyda się:
+            // OnPropertyChanged(nameof(OverDisplayAmount));
         }
 
         public override string ToString() => Name;
+
+        private void OnPropertyChanged([CallerMemberName] string? name = null)
+            => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
     }
 }

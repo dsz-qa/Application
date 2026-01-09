@@ -1,9 +1,13 @@
 ﻿using System;
 using System.Globalization;
+using System.Linq;
+using System.Text;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using Finly.Pages; // BudgetRow
+using Finly.Helpers.Converters;
+
 
 namespace Finly.Views.Dialogs
 {
@@ -33,7 +37,10 @@ namespace Finly.Views.Dialogs
                 HideInlineError();
 
                 RecalcEndDateIfNeeded();
-                EnsurePlannedNotEmpty();
+
+                // ponieważ PlannedAmountTextBox NIE ma bindingu w XAML,
+                // musimy go wypełnić ręcznie na starcie
+                EnsurePlannedTextFromVm();
             };
         }
 
@@ -67,7 +74,9 @@ namespace Finly.Views.Dialogs
             HideInlineError();
 
             RecalcEndDateIfNeeded();
-            EnsurePlannedNotEmpty();
+
+            // ustaw textbox kwoty wg VM (bez dziwnych formatów)
+            EnsurePlannedTextFromVm();
         }
 
         // ======= TitleBar (drag + close) =======
@@ -88,7 +97,6 @@ namespace Finly.Views.Dialogs
 
         private void NameTextBox_TextChanged(object sender, TextChangedEventArgs e)
         {
-            // Jeśli użytkownik zaczyna pisać, chowamy błąd
             if (!string.IsNullOrWhiteSpace(NameTextBox.Text))
                 HideInlineError();
         }
@@ -172,6 +180,14 @@ namespace Finly.Views.Dialogs
 
         // ===================== KWOTA =====================
 
+        private void EnsurePlannedTextFromVm()
+        {
+            if (PlannedAmountTextBox == null) return;
+
+            var val = Budget?.PlannedAmount ?? 0m;
+            PlannedAmountTextBox.Text = val.ToString("0.00", CultureInfo.CurrentCulture);
+        }
+
         private void PlannedAmount_PreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
         {
             var tb = (TextBox)sender;
@@ -189,41 +205,52 @@ namespace Finly.Views.Dialogs
             var tb = (TextBox)sender;
             var t = (tb.Text ?? string.Empty).Trim();
 
-            if (t == "0" || t == "0,00" || t == "0.00")
+            // usuń spacje (formaty tysięcy)
+            t = t.Replace(" ", "").Replace("\u00A0", "").Replace("\u202F", "").Replace("'", "");
+
+            // Jeśli to format "X,00" lub "X.00" -> pokaż "X"
+            if (t.EndsWith(",00", StringComparison.Ordinal) || t.EndsWith(".00", StringComparison.Ordinal))
+                t = t.Substring(0, t.Length - 3);
+
+            if (t == "0" || t == "0," || t == "0." || string.IsNullOrWhiteSpace(t))
                 tb.Clear();
+            else
+                tb.Text = t;
 
             tb.SelectAll();
         }
 
         private void PlannedAmount_LostFocus(object sender, RoutedEventArgs e)
         {
-            EnsurePlannedNotEmpty();
+            EnsurePlannedNotEmptyAndNormalize();
         }
 
-        private void EnsurePlannedNotEmpty()
+        private void EnsurePlannedNotEmptyAndNormalize()
         {
             if (PlannedAmountTextBox == null) return;
 
-            if (string.IsNullOrWhiteSpace(PlannedAmountTextBox.Text))
+            var raw = (PlannedAmountTextBox.Text ?? string.Empty).Trim();
+
+            if (string.IsNullOrWhiteSpace(raw))
             {
-                PlannedAmountTextBox.Text = "0,00";
                 Budget.PlannedAmount = 0m;
+                PlannedAmountTextBox.Text = 0m.ToString("0.00", CultureInfo.CurrentCulture);
                 return;
             }
 
-            var text = PlannedAmountTextBox.Text.Trim();
-
-            if (decimal.TryParse(text, NumberStyles.Number, CultureInfo.CurrentCulture, out var val) ||
-                decimal.TryParse(text, NumberStyles.Number, CultureInfo.InvariantCulture, out val))
+            if (FlexibleDecimalConverter.TryParseFlexibleDecimal(raw, out var val))
             {
+                // w budżecie i tak chcesz 2 miejsca po przecinku
+                val = Math.Round(val, 2, MidpointRounding.AwayFromZero);
+
                 Budget.PlannedAmount = val;
                 PlannedAmountTextBox.Text = val.ToString("0.00", CultureInfo.CurrentCulture);
+                return;
             }
-            else
-            {
-                Budget.PlannedAmount = 0m;
-                PlannedAmountTextBox.Text = "0,00";
-            }
+
+            // fallback
+            Budget.PlannedAmount = 0m;
+            PlannedAmountTextBox.Text = 0m.ToString("0.00", CultureInfo.CurrentCulture);
         }
 
         // ===================== ZAPIS / ANULUJ =====================
@@ -235,6 +262,9 @@ namespace Finly.Views.Dialogs
 
             HideInlineError();
 
+            // upewnij się, że textbox -> VM jest zsynchronizowany
+            EnsurePlannedNotEmptyAndNormalize();
+
             if (string.IsNullOrWhiteSpace(vm.Name))
             {
                 ShowInlineError("Podaj nazwę budżetu.", NameTextBox);
@@ -243,7 +273,6 @@ namespace Finly.Views.Dialogs
 
             if (vm.StartDate == null)
             {
-                // inline, bez okienek
                 ShowInlineError("Wybierz datę startu.", StartDatePicker);
                 return;
             }
@@ -283,4 +312,6 @@ namespace Finly.Views.Dialogs
             Close();
         }
     }
+
+
 }

@@ -5,7 +5,6 @@
 	<Style x:Key="SearchBoxStyle"
            TargetType="TextBox">
 
-		<!-- bazowe -->
 		<Setter Property="Height" Value="32"/>
 		<Setter Property="Background" Value="Transparent"/>
 		<Setter Property="Foreground" Value="{DynamicResource App.Foreground}"/>
@@ -41,13 +40,12 @@
 
 							<!-- TEKST -->
 							<Grid Grid.Column="1">
-								<!-- CONTENT -->
 								<ScrollViewer x:Name="PART_ContentHost"
                                               VerticalAlignment="Center"/>
 
 								<!-- PLACEHOLDER -->
 								<TextBlock x:Name="PlaceholderText"
-                                           Text="Szukaj"
+                                           Text="Szukaj po nazwie lub typie"
                                            Foreground="#777"
                                            VerticalAlignment="Center"
                                            IsHitTestVisible="False"/>
@@ -55,10 +53,8 @@
 						</Grid>
 					</Border>
 
-					<!-- LOGIKA PLACEHOLDERA -->
 					<ControlTemplate.Triggers>
 
-						<!-- gdy coś wpisane → ukryj -->
 						<Trigger Property="Text" Value="">
 							<Setter TargetName="PlaceholderText"
                                     Property="Visibility"
@@ -71,7 +67,6 @@
                                     Value="Visible"/>
 						</Trigger>
 
-						<!-- gdy focus → ukryj -->
 						<Trigger Property="IsKeyboardFocused" Value="True">
 							<Setter TargetName="PlaceholderText"
                                     Property="Visibility"
@@ -81,14 +76,12 @@
                                     Value="{DynamicResource Brand.Blue}"/>
 						</Trigger>
 
-						<!-- hover -->
 						<Trigger Property="IsMouseOver" Value="True">
 							<Setter TargetName="OuterBorder"
                                     Property="BorderBrush"
                                     Value="{DynamicResource Brand.Blue}"/>
 						</Trigger>
 
-						<!-- disabled -->
 						<Trigger Property="IsEnabled" Value="False">
 							<Setter Property="Opacity" Value="0.6"/>
 						</Trigger>

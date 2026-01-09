@@ -98,7 +98,7 @@
 						<ColumnDefinition Width="*"/>
 					</Grid.ColumnDefinitions>
 
-					<!-- HEADER: bez logo -->
+					<!-- HEADER -->
 					<Grid Grid.Row="0" Grid.ColumnSpan="2" Margin="0,0,0,6">
 						<StackPanel>
 							<TextBlock x:Name="HeaderTitleText"
@@ -124,7 +124,6 @@
                                  Text="{Binding Name, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                                  TextChanged="NameTextBox_TextChanged"/>
 
-						<!-- Walidacja inline -->
 						<TextBlock x:Name="NameErrorText"
                                    Text=""
                                    Foreground="Tomato"
@@ -192,10 +191,10 @@
                                VerticalAlignment="Center"
                                Margin="0,10,10,0"/>
 
+					<!-- UWAGA: brak StringFormat, parsowanie/formatowanie robimy ręcznie w code-behind -->
 					<TextBox x:Name="PlannedAmountTextBox"
                              Grid.Row="6" Grid.Column="1"
                              Margin="0,10,0,0"
-                             Text="{Binding PlannedAmount, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged, StringFormat=F2}"
                              PreviewMouseLeftButtonDown="PlannedAmount_PreviewMouseLeftButtonDown"
                              GotFocus="PlannedAmount_GotFocus"
                              LostFocus="PlannedAmount_LostFocus"
