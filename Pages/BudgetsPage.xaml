@@ -40,6 +40,20 @@
 			<Setter Property="Foreground" Value="{DynamicResource App.Foreground}"/>
 		</Style>
 
+		<!-- Dashboard-like mini label/value -->
+		<Style x:Key="MiniLabel" TargetType="TextBlock">
+			<Setter Property="Foreground" Value="{DynamicResource App.Foreground}"/>
+			<Setter Property="Opacity" Value="0.85"/>
+			<Setter Property="FontWeight" Value="SemiBold"/>
+			<Setter Property="FontSize" Value="11"/>
+		</Style>
+
+		<Style x:Key="MiniValue" TargetType="TextBlock">
+			<Setter Property="Foreground" Value="{DynamicResource App.Foreground}"/>
+			<Setter Property="FontWeight" Value="Bold"/>
+			<Setter Property="FontSize" Value="14"/>
+		</Style>
+
 		<Style x:Key="MiniTableHeaderBorder" TargetType="Border">
 			<Setter Property="Background" Value="{DynamicResource Surface.Background}"/>
 			<Setter Property="Padding" Value="6,4"/>
@@ -145,18 +159,23 @@
 
 			<!-- Separator + tytuł -->
 			<Separator Grid.Row="1" Height="1" Background="{DynamicResource Surface.Border}" Opacity="0.8" Margin="0,0,0,8"/>
-			<TextBlock Grid.Row="1" Text="Budżety" FontSize="24" FontWeight="Bold"
-                       Foreground="{DynamicResource App.Foreground}" Margin="0,4,0,12"/>
+			<TextBlock Grid.Row="1"
+                       Text="Budżety"
+                       FontSize="24"
+                       FontWeight="Bold"
+                       Foreground="{DynamicResource App.Foreground}"
+                       Margin="0,4,0,12"/>
 
-			<!-- 2 kolumny -->
+			<!-- 2 kolumny: LEWA SZERSZA, PRAWA WĘŻSZA -->
 			<Grid Grid.Row="2">
 				<Grid.ColumnDefinitions>
-					<ColumnDefinition Width="*"/>
-					<ColumnDefinition Width="*"/>
+					<!-- było * i * -->
+					<ColumnDefinition Width="1.35*"/>
+					<ColumnDefinition Width="0.65*"/>
 				</Grid.ColumnDefinitions>
 
 				<!-- LEWA -->
-				<Border Grid.Column="0" Style="{StaticResource Card}" Margin="0,0,8,0">
+				<Border Grid.Column="0" Style="{StaticResource Card}" Margin="0,0,10,0">
 					<StackPanel>
 
 						<TextBlock Text="Wybierz budżet, aby zobaczyć szczegóły"
@@ -166,7 +185,7 @@
 
 						<Grid Margin="0,0,0,10">
 							<Grid.ColumnDefinitions>
-								<ColumnDefinition Width="220"/>
+								<ColumnDefinition Width="240"/>
 								<ColumnDefinition Width="10"/>
 								<ColumnDefinition Width="*"/>
 							</Grid.ColumnDefinitions>
@@ -202,24 +221,26 @@
 							</StackPanel>
 						</Border>
 
-						<!-- Header (4 kolumny) -->
+						<!-- Header (5 kolumn) -->
 						<Border Style="{StaticResource MiniTableHeaderBorder}">
 							<Grid>
 								<Grid.ColumnDefinitions>
 									<ColumnDefinition Width="*"/>
+									<ColumnDefinition Width="160"/>
 									<ColumnDefinition Width="150"/>
-									<ColumnDefinition Width="140"/>
-									<ColumnDefinition Width="220"/>
+									<ColumnDefinition Width="260"/>
+									<ColumnDefinition Width="70"/>
 								</Grid.ColumnDefinitions>
 
 								<TextBlock Grid.Column="0" Text="Nazwa" Style="{StaticResource MiniTableHeaderText}"/>
 								<TextBlock Grid.Column="1" Text="Limit" Style="{StaticResource MiniTableHeaderText}" HorizontalAlignment="Right"/>
 								<TextBlock Grid.Column="2" Text="Typ" Style="{StaticResource MiniTableHeaderText}"/>
 								<TextBlock Grid.Column="3" Text="Okres" Style="{StaticResource MiniTableHeaderText}"/>
+								<TextBlock Grid.Column="4" Text="" Style="{StaticResource MiniTableHeaderText}"/>
 							</Grid>
 						</Border>
 
-						<!-- Lista (4 kolumny) -->
+						<!-- Lista (5 kolumn) -->
 						<ListBox x:Name="BudgetsList"
                                  ItemContainerStyle="{StaticResource BudgetListItemStyle}"
                                  SelectionChanged="BudgetsList_SelectionChanged"
@@ -229,59 +250,124 @@
 
 							<ListBox.ItemTemplate>
 								<DataTemplate>
-									<Grid MinHeight="28" Margin="2,2">
+									<Grid MinHeight="34" Margin="2,2">
 										<Grid.ColumnDefinitions>
 											<ColumnDefinition Width="*"/>
+											<ColumnDefinition Width="160"/>
 											<ColumnDefinition Width="150"/>
-											<ColumnDefinition Width="140"/>
-											<ColumnDefinition Width="220"/>
+											<ColumnDefinition Width="260"/>
+											<ColumnDefinition Width="70"/>
 										</Grid.ColumnDefinitions>
 
-										<TextBlock Grid.Column="0" Text="{Binding Name}" Style="{StaticResource MiniTableCellText}"/>
-										<TextBlock Grid.Column="1" Text="{Binding PlannedAmount, StringFormat={}{0:N2} zł}" Style="{StaticResource AmountPlanned}"/>
-										<TextBlock Grid.Column="2" Text="{Binding TypeDisplay}" Style="{StaticResource MiniTableCellText}"/>
-										<TextBlock Grid.Column="3" Text="{Binding Period}" Style="{StaticResource MiniTableCellText}"/>
+										<TextBlock Grid.Column="0"
+                                                   Text="{Binding Name}"
+                                                   Style="{StaticResource MiniTableCellText}"/>
+
+										<TextBlock Grid.Column="1"
+                                                   Text="{Binding PlannedAmount, StringFormat={}{0:N2} zł}"
+                                                   Style="{StaticResource AmountPlanned}"/>
+
+										<TextBlock Grid.Column="2"
+                                                   Text="{Binding TypeDisplay}"
+                                                   Style="{StaticResource MiniTableCellText}"/>
+
+										<TextBlock Grid.Column="3"
+                                                   Text="{Binding Period}"
+                                                   Style="{StaticResource MiniTableCellText}"/>
+
+										<!-- akcje -->
+										<StackPanel Grid.Column="4"
+                                                    Orientation="Horizontal"
+                                                    HorizontalAlignment="Right"
+                                                    VerticalAlignment="Center"
+                                                    Margin="0,0,6,0">
+											<Button Style="{StaticResource EditIconButton}"
+                                                    Width="26"
+                                                    Height="26"
+                                                    Margin="0,0,6,0"
+                                                    Click="EditBudget_Click"/>
+											<Button Style="{StaticResource DeleteIconButton}"
+                                                    Width="26"
+                                                    Height="26"
+                                                    Click="DeleteBudget_Click"/>
+										</StackPanel>
 									</Grid>
 								</DataTemplate>
 							</ListBox.ItemTemplate>
 						</ListBox>
 
-						<!-- TU W KOLEJNYM KROKU wstawimy tabelę transakcji pod listą (wymaga danych) -->
+						<!-- w kolejnym kroku: tabela transakcji pod listą -->
 
 					</StackPanel>
 				</Border>
 
-				<!-- PRAWA -->
-				<StackPanel Grid.Column="1" Margin="8,0,0,0">
+				<!-- PRAWA (węższa) -->
+				<StackPanel Grid.Column="1" Margin="10,0,0,0">
 
-					<!-- Budżet (pomarańczowa ramka) -->
+					<!-- Budżet: Dashboard-like labels -->
 					<Border Style="{StaticResource OrangeCard}" Margin="0,0,0,10">
-						<StackPanel>
-							<TextBlock x:Name="BudgetNameText"
-                                       Text="(wybierz budżet)"
-                                       FontSize="18"
-                                       FontWeight="Bold"
-                                       Foreground="{DynamicResource App.Foreground}"/>
+						<Grid>
+							<Grid.RowDefinitions>
+								<RowDefinition Height="Auto"/>
+								<RowDefinition Height="12"/>
+								<RowDefinition Height="Auto"/>
+							</Grid.RowDefinitions>
 
+							<Grid Grid.Row="0">
+								<Grid.ColumnDefinitions>
+									<ColumnDefinition Width="*"/>
+									<ColumnDefinition Width="*"/>
+								</Grid.ColumnDefinitions>
+
+								<StackPanel Grid.Column="0" Margin="0,0,10,0">
+									<TextBlock Text="Nazwa budżetu" Style="{StaticResource MiniLabel}"/>
+									<TextBlock x:Name="BudgetNameText"
+                                               Text="(wybierz budżet)"
+                                               FontSize="18"
+                                               FontWeight="Bold"
+                                               Foreground="{DynamicResource App.Foreground}"
+                                               TextTrimming="CharacterEllipsis"/>
+								</StackPanel>
+
+								<StackPanel Grid.Column="1">
+									<TextBlock Text="Limit" Style="{StaticResource MiniLabel}"/>
+									<TextBlock x:Name="BudgetPlannedText"
+                                               Style="{StaticResource MiniValue}"
+                                               Foreground="{DynamicResource Brand.Blue}"
+                                               FontSize="16"/>
+								</StackPanel>
+							</Grid>
+
+							<Grid Grid.Row="2">
+								<Grid.ColumnDefinitions>
+									<ColumnDefinition Width="*"/>
+									<ColumnDefinition Width="*"/>
+								</Grid.ColumnDefinitions>
+
+								<StackPanel Grid.Column="0" Margin="0,0,10,0">
+									<TextBlock Text="Typ" Style="{StaticResource MiniLabel}"/>
+									<TextBlock x:Name="BudgetTypeText"
+                                               Style="{StaticResource MiniValue}"
+                                               Text="—"/>
+								</StackPanel>
+
+								<StackPanel Grid.Column="1">
+									<TextBlock Text="Okres" Style="{StaticResource MiniLabel}"/>
+									<TextBlock x:Name="BudgetPeriodText"
+                                               Style="{StaticResource MiniValue}"
+                                               Text="—"
+                                               TextWrapping="Wrap"/>
+								</StackPanel>
+							</Grid>
+
+							<!-- Zachowane dla kompatybilności (jeśli coś jeszcze to ustawia),
+                                 ale ukryte, bo nowy layout już tego nie używa -->
 							<TextBlock x:Name="BudgetMetaText"
-                                       Foreground="{DynamicResource App.Foreground}"
-                                       Opacity="0.85"
-                                       Margin="0,2,0,10"/>
-
-							<!-- Tylko Limit (zaplanowano) -->
-							<StackPanel>
-								<TextBlock Text="Limit (maksymalnie do wydania)"
-                                           Foreground="{DynamicResource App.Foreground}"
-                                           Opacity="0.85"/>
-								<TextBlock x:Name="BudgetPlannedText"
-                                           Foreground="{DynamicResource Brand.Blue}"
-                                           FontWeight="Bold"
-                                           FontSize="16"/>
-							</StackPanel>
-						</StackPanel>
+                                       Visibility="Collapsed"/>
+						</Grid>
 					</Border>
 
-					<!-- Historia (pomarańczowa ramka + ciemny wykres) -->
+					<!-- Historia -->
 					<Border Style="{StaticResource OrangeCard}" Margin="0,0,0,10">
 						<StackPanel>
 							<TextBlock Text="Historia budżetu" Style="{StaticResource CardHeader}" Margin="0,0,0,8"/>
@@ -291,7 +377,7 @@
 						</StackPanel>
 					</Border>
 
-					<!-- Analiza (pomarańczowa ramka) -->
+					<!-- Analiza -->
 					<Border Style="{StaticResource OrangeCard}">
 						<StackPanel>
 							<TextBlock Text="Analiza budżetu" Style="{StaticResource CardHeader}" Margin="0,0,0,8"/>

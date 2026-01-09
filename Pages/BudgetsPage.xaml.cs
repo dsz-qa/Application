@@ -77,6 +77,7 @@ namespace Finly.Pages
             if (string.Equals(s, "Monthly", StringComparison.OrdinalIgnoreCase)) return "Monthly";
             if (string.Equals(s, "Yearly", StringComparison.OrdinalIgnoreCase)) return "Yearly";
 
+            // bezpieczny default
             return "Monthly";
         }
 
@@ -156,7 +157,6 @@ ORDER BY b.StartDate;";
             var ordinal = reader.GetOrdinal(column);
             if (reader.IsDBNull(ordinal)) return 0m;
 
-            // SQLite potrafi zwrócić double nawet jeśli logicznie to decimal
             var obj = reader.GetValue(ordinal);
             return obj switch
             {
@@ -177,7 +177,6 @@ ORDER BY b.StartDate;";
 
         private void ApplyFilters()
         {
-            // zapamiętaj ID selekcji zanim podmienisz ItemsSource
             var previouslySelectedId = (BudgetsList.SelectedItem as BudgetRow)?.Id;
 
             var selectedTypeItem = TypeFilterCombo.SelectedItem as ComboBoxItem;
@@ -213,7 +212,6 @@ ORDER BY b.StartDate;";
                 return;
             }
 
-            // spróbuj zachować poprzednią selekcję po ID
             if (previouslySelectedId.HasValue)
             {
                 var stillThere = result.FirstOrDefault(x => x.Id == previouslySelectedId.Value);
@@ -234,8 +232,7 @@ ORDER BY b.StartDate;";
             var selected = GetSelectedBudgetFromList();
             UpdateDetailsPanel(selected);
 
-            // TODO: tutaj docelowo doładujesz transakcje pod tabelą:
-            // LoadBudgetTransactions(selected);
+            // TODO: docelowo doładujesz transakcje pod tabelą
         }
 
         // =================== KPI OGÓLNE (góra) ===================
@@ -264,10 +261,15 @@ ORDER BY b.StartDate;";
             if (b == null)
             {
                 BudgetNameText.Text = "(wybierz budżet)";
-                BudgetMetaText.Text = string.Empty;
 
-                // w nowym UI po prawej pokazujemy tylko limit
+                // nowy UI: osobne pola
+                BudgetTypeText.Text = "—";
+                BudgetPeriodText.Text = "—";
+
                 BudgetPlannedText.Text = "0,00 zł";
+
+                // zostawiamy ukryte pole kompatybilności (nieużywane)
+                BudgetMetaText.Text = string.Empty;
 
                 LoadBudgetHistoryChart(null);
                 BudgetInsightsList.ItemsSource = Array.Empty<string>();
@@ -275,26 +277,30 @@ ORDER BY b.StartDate;";
             }
 
             BudgetNameText.Text = b.Name;
+
+            // nowy UI: osobno
+            BudgetTypeText.Text = b.TypeDisplay;
+            BudgetPeriodText.Text = b.Period;
+
+            // kompatybilność (niewidoczne)
             BudgetMetaText.Text = $"{b.TypeDisplay} | {b.Period}";
 
-            // limit (planowane)
             BudgetPlannedText.Text = $"{b.PlannedAmount:N2} zł";
 
             LoadBudgetHistoryChart(b);
             BudgetInsightsList.ItemsSource = BuildInsights(b);
         }
 
+
         private IList<string> BuildInsights(BudgetRow b)
         {
             var list = new List<string>();
 
             var today = DateTime.Today;
-
             var start = b.StartDate.Date;
             var end = b.EndDate.Date;
 
             var totalDays = Math.Max(1, (end - start).Days + 1);
-
             var daysPassed = today < start ? 0 : Math.Min(totalDays, (today - start).Days + 1);
             var daysLeft = Math.Max(0, totalDays - daysPassed);
 
@@ -484,16 +490,88 @@ ORDER BY Date;";
             var vm = dialog.Budget;
             vm.Type = ToDbType(vm.Type);
 
-            BudgetService.InsertBudget(_currentUserId, vm);
+            // ważne: bierzemy zwrócone ID, żeby precyzyjnie zaznaczyć
+            var newId = BudgetService.InsertBudget(_currentUserId, vm);
 
+            ReloadAndReselect(newId);
+        }
+
+        private void EditBudget_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is not FrameworkElement fe || fe.DataContext is not BudgetRow row)
+                return;
+
+            var dialog = new Views.Dialogs.EditBudgetDialog
+            {
+                Owner = Window.GetWindow(this)
+            };
+
+            dialog.LoadBudget(row);
+
+            var result = dialog.ShowDialog();
+            if (result != true || dialog.Budget == null)
+                return;
+
+            var vm = dialog.Budget;
+            vm.Type = ToDbType(vm.Type);
+
+            var updated = new Budget
+            {
+                Id = row.Id,
+                UserId = _currentUserId,
+                Name = vm.Name,
+                Type = vm.Type,
+                StartDate = (vm.StartDate ?? row.StartDate).Date,
+                EndDate = (vm.EndDate ?? row.EndDate).Date,
+                PlannedAmount = vm.PlannedAmount
+            };
+
+            BudgetService.UpdateBudget(updated);
+
+            ReloadAndReselect(row.Id);
+        }
+
+        private void DeleteBudget_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is not FrameworkElement fe || fe.DataContext is not BudgetRow row)
+                return;
+
+            var confirm = MessageBox.Show(
+                $"Czy na pewno chcesz usunąć budżet „{row.Name}”?",
+                "Usuń budżet",
+                MessageBoxButton.YesNo,
+                MessageBoxImage.Warning);
+
+            if (confirm != MessageBoxResult.Yes)
+                return;
+
+            BudgetService.DeleteBudget(row.Id, _currentUserId);
+
+            ReloadAndReselect(null);
+        }
+
+        private void ReloadAndReselect(int? preferredId)
+        {
             LoadBudgetsFromDatabase();
             ApplyFilters();
             UpdateTopKpis();
 
-            // po dodaniu: spróbuj zaznaczyć nowo dodany (po nazwie+starcie)
-            var inserted = (_allBudgets.OrderByDescending(b => b.StartDate).FirstOrDefault());
-            if (inserted != null)
-                BudgetsList.SelectedItem = (BudgetsList.ItemsSource as IEnumerable<BudgetRow>)?.FirstOrDefault(x => x.Id == inserted.Id);
+            var list = BudgetsList.ItemsSource as IEnumerable<BudgetRow>;
+            if (list == null)
+            {
+                UpdateDetailsPanel(null);
+                return;
+            }
+
+            BudgetRow? select = null;
+
+            if (preferredId.HasValue)
+                select = list.FirstOrDefault(x => x.Id == preferredId.Value);
+
+            select ??= list.FirstOrDefault();
+
+            BudgetsList.SelectedItem = select;
+            UpdateDetailsPanel(select);
         }
     }
 
