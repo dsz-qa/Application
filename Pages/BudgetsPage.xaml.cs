@@ -19,11 +19,23 @@ namespace Finly.Pages
     {
         private readonly ObservableCollection<BudgetRow> _allBudgets = new();
         private readonly int _currentUserId;
+        private bool _isInitialized;
 
         public BudgetsPage(int userId)
         {
             InitializeComponent();
             _currentUserId = userId;
+
+            // WAŻNE: nie dotykamy BudgetsList/TypeFilterCombo/SearchBox przed Loaded
+            Loaded += BudgetsPage_Loaded;
+        }
+
+        public BudgetsPage() : this(UserService.CurrentUserId) { }
+
+        private void BudgetsPage_Loaded(object sender, RoutedEventArgs e)
+        {
+            if (_isInitialized) return;
+            _isInitialized = true;
 
             InitTypeFilterCombo();
 
@@ -31,39 +43,51 @@ namespace Finly.Pages
             ApplyFilters();
             UpdateTopKpis();
 
-            Loaded += (_, __) =>
-            {
-                if (BudgetsList.SelectedItem == null && BudgetsList.Items.Count > 0)
-                    BudgetsList.SelectedIndex = 0;
+            if (BudgetsList != null && BudgetsList.SelectedItem == null && BudgetsList.Items.Count > 0)
+                BudgetsList.SelectedIndex = 0;
 
-                UpdateDetailsPanel(GetSelectedBudgetFromList());
-            };
+            UpdateDetailsPanel(GetSelectedBudgetFromList());
         }
-
-        public BudgetsPage() : this(UserService.CurrentUserId) { }
 
         // =================== TYPY ===================
 
         private void InitTypeFilterCombo()
         {
+            if (TypeFilterCombo == null) return;
+
             TypeFilterCombo.Items.Clear();
 
-            TypeFilterCombo.Items.Add(new ComboBoxItem { Content = "Wszystkie", Tag = "Wszystkie" });
+            // Tag = "" oznacza brak filtra
+            TypeFilterCombo.Items.Add(new ComboBoxItem { Content = "Wszystkie", Tag = "" });
             TypeFilterCombo.Items.Add(new ComboBoxItem { Content = "Tygodniowy", Tag = "Weekly" });
             TypeFilterCombo.Items.Add(new ComboBoxItem { Content = "Miesięczny", Tag = "Monthly" });
             TypeFilterCombo.Items.Add(new ComboBoxItem { Content = "Roczny", Tag = "Yearly" });
+            TypeFilterCombo.Items.Add(new ComboBoxItem { Content = "Inny (własny zakres)", Tag = "Custom" });
 
+            // Jeżeli w XAML masz SelectedValuePath="Tag" (masz), to korzystamy z SelectedValue
             TypeFilterCombo.SelectedIndex = 0;
+        }
+
+        private static string NormalizeDbType(string? dbType)
+        {
+            var t = (dbType ?? "Monthly").Trim();
+            if (t.Equals("Inny", StringComparison.OrdinalIgnoreCase)) return "Custom";
+            if (t.Equals("Custom", StringComparison.OrdinalIgnoreCase)) return "Custom";
+            if (t.Equals("Weekly", StringComparison.OrdinalIgnoreCase)) return "Weekly";
+            if (t.Equals("Monthly", StringComparison.OrdinalIgnoreCase)) return "Monthly";
+            if (t.Equals("Yearly", StringComparison.OrdinalIgnoreCase)) return "Yearly";
+            return "Monthly";
         }
 
         private static string ToPlType(string? dbType)
         {
-            return (dbType ?? "").Trim() switch
+            return NormalizeDbType(dbType) switch
             {
                 "Weekly" => "Tygodniowy",
                 "Monthly" => "Miesięczny",
                 "Yearly" => "Roczny",
-                _ => dbType ?? ""
+                "Custom" => "Inny",
+                _ => "Miesięczny"
             };
         }
 
@@ -71,13 +95,18 @@ namespace Finly.Pages
         {
             var s = (anyType ?? "").Trim();
 
-            if (string.Equals(s, "Tygodniowy", StringComparison.OrdinalIgnoreCase)) return "Weekly";
-            if (string.Equals(s, "Miesięczny", StringComparison.OrdinalIgnoreCase)) return "Monthly";
-            if (string.Equals(s, "Roczny", StringComparison.OrdinalIgnoreCase)) return "Yearly";
+            // PL -> DB
+            if (s.Equals("Tygodniowy", StringComparison.OrdinalIgnoreCase)) return "Weekly";
+            if (s.Equals("Miesięczny", StringComparison.OrdinalIgnoreCase)) return "Monthly";
+            if (s.Equals("Roczny", StringComparison.OrdinalIgnoreCase)) return "Yearly";
+            if (s.Equals("Inny", StringComparison.OrdinalIgnoreCase)) return "Custom";
 
-            if (string.Equals(s, "Weekly", StringComparison.OrdinalIgnoreCase)) return "Weekly";
-            if (string.Equals(s, "Monthly", StringComparison.OrdinalIgnoreCase)) return "Monthly";
-            if (string.Equals(s, "Yearly", StringComparison.OrdinalIgnoreCase)) return "Yearly";
+            // DB -> DB (normalizacja)
+            if (s.Equals("Weekly", StringComparison.OrdinalIgnoreCase)) return "Weekly";
+            if (s.Equals("Monthly", StringComparison.OrdinalIgnoreCase)) return "Monthly";
+            if (s.Equals("Yearly", StringComparison.OrdinalIgnoreCase)) return "Yearly";
+            if (s.Equals("Custom", StringComparison.OrdinalIgnoreCase)) return "Custom";
+            if (s.Equals("Inny", StringComparison.OrdinalIgnoreCase)) return "Custom";
 
             return "Monthly";
         }
@@ -127,15 +156,16 @@ ORDER BY b.StartDate;";
             using var reader = cmd.ExecuteReader();
             while (reader.Read())
             {
-                var rawType = reader["Type"]?.ToString() ?? "Monthly";
+                var rawType = reader["Type"]?.ToString();
+                var normalizedType = NormalizeDbType(rawType);
 
                 var row = new BudgetRow
                 {
                     Id = Convert.ToInt32(reader["Id"]),
                     Name = reader["Name"]?.ToString() ?? string.Empty,
 
-                    Type = rawType,
-                    TypeDisplay = ToPlType(rawType),
+                    Type = normalizedType,
+                    TypeDisplay = ToPlType(normalizedType),
 
                     StartDate = Convert.ToDateTime(reader["StartDate"]),
                     EndDate = Convert.ToDateTime(reader["EndDate"]),
@@ -180,17 +210,24 @@ ORDER BY b.StartDate;";
 
         private void ApplyFilters()
         {
+            if (BudgetsList == null || TypeFilterCombo == null || SearchBox == null)
+                return;
+
             var previouslySelectedId = (BudgetsList.SelectedItem as BudgetRow)?.Id;
 
-            var selectedTypeItem = TypeFilterCombo.SelectedItem as ComboBoxItem;
-            var typeValue = selectedTypeItem?.Tag as string ?? "Wszystkie";
+            // Ponieważ masz SelectedValuePath="Tag" w XAML – korzystamy z SelectedValue
+            var typeValue = TypeFilterCombo.SelectedValue as string ?? "";
 
             IEnumerable<BudgetRow> query = _allBudgets;
 
-            if (!string.IsNullOrWhiteSpace(typeValue) &&
-                !string.Equals(typeValue, "Wszystkie", StringComparison.OrdinalIgnoreCase))
+            // typeValue == "" -> "Wszystkie"
+            if (!string.IsNullOrWhiteSpace(typeValue))
             {
-                query = query.Where(b => string.Equals(b.Type, typeValue, StringComparison.OrdinalIgnoreCase));
+                query = query.Where(b =>
+                    string.Equals(b.Type, typeValue, StringComparison.OrdinalIgnoreCase)
+                    // asekuracja na stare dane:
+                    || (typeValue.Equals("Custom", StringComparison.OrdinalIgnoreCase)
+                        && string.Equals(b.Type, "Inny", StringComparison.OrdinalIgnoreCase)));
             }
 
             var search = (SearchBox.Text ?? string.Empty).Trim();
@@ -228,13 +265,15 @@ ORDER BY b.StartDate;";
             BudgetsList.SelectedIndex = 0;
         }
 
-        private BudgetRow? GetSelectedBudgetFromList() => BudgetsList.SelectedItem as BudgetRow;
+        private BudgetRow? GetSelectedBudgetFromList()
+            => BudgetsList?.SelectedItem as BudgetRow;
 
         private void BudgetsList_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
             HideAllDeleteConfirms();
             UpdateDetailsPanel(GetSelectedBudgetFromList());
-            // TODO: transakcje pod tabelą
+
+            // TODO: podpiąć transakcje po prawej
         }
 
         // =================== KPI OGÓLNE (góra) ===================
@@ -251,42 +290,44 @@ ORDER BY b.StartDate;";
             var overCount = over.Count;
             var overAmount = over.Sum(b => b.OverAmount);
 
-            KpiActiveBudgetsText.Text = activeCount.ToString(CultureInfo.InvariantCulture);
-            KpiPlannedActiveText.Text = $"{planned:N2} zł";
-            KpiOverActiveText.Text = $"{overCount} | {overAmount:N2} zł";
+            if (KpiActiveBudgetsText != null) KpiActiveBudgetsText.Text = activeCount.ToString(CultureInfo.InvariantCulture);
+            if (KpiPlannedActiveText != null) KpiPlannedActiveText.Text = $"{planned:N2} zł";
+            if (KpiOverActiveText != null) KpiOverActiveText.Text = $"{overCount} | {overAmount:N2} zł";
         }
 
         // =================== PANEL (kafelki u góry) ===================
 
         private void UpdateDetailsPanel(BudgetRow? b)
         {
+            if (BudgetNameText == null) return;
+
             if (b == null)
             {
                 BudgetNameText.Text = "(wybierz budżet)";
-                BudgetTypeText.Text = "—";
-                BudgetPeriodText.Text = "—";
-                BudgetPlannedText.Text = "0,00 zł";
-                BudgetSpentText.Text = "0,00 zł";
-                BudgetOverText.Text = "0,00 zł";
-                BudgetMetaText.Text = string.Empty;
+                if (BudgetTypeText != null) BudgetTypeText.Text = "—";
+                if (BudgetPeriodText != null) BudgetPeriodText.Text = "—";
+                if (BudgetPlannedText != null) BudgetPlannedText.Text = "0,00 zł";
+                if (BudgetSpentText != null) BudgetSpentText.Text = "0,00 zł";
+                if (BudgetOverText != null) BudgetOverText.Text = "0,00 zł";
+                if (BudgetMetaText != null) BudgetMetaText.Text = string.Empty;
 
                 LoadBudgetHistoryChart(null);
-                BudgetInsightsList.ItemsSource = new[] { "Brak danych." };
+                if (BudgetInsightsList != null) BudgetInsightsList.ItemsSource = new[] { "Brak danych." };
                 return;
             }
 
             BudgetNameText.Text = b.Name;
-            BudgetTypeText.Text = b.TypeDisplay;
-            BudgetPeriodText.Text = b.Period;
+            if (BudgetTypeText != null) BudgetTypeText.Text = b.TypeDisplay;
+            if (BudgetPeriodText != null) BudgetPeriodText.Text = b.Period;
 
-            BudgetPlannedText.Text = $"{b.PlannedAmount:N2} zł";
-            BudgetSpentText.Text = $"{b.SpentAmount:N2} zł";
-            BudgetOverText.Text = b.IsOverBudget ? $"{b.OverAmount:N2} zł" : "0,00 zł";
+            if (BudgetPlannedText != null) BudgetPlannedText.Text = $"{b.PlannedAmount:N2} zł";
+            if (BudgetSpentText != null) BudgetSpentText.Text = $"{b.SpentAmount:N2} zł";
+            if (BudgetOverText != null) BudgetOverText.Text = b.IsOverBudget ? $"{b.OverAmount:N2} zł" : "0,00 zł";
 
-            BudgetMetaText.Text = $"{b.TypeDisplay} | {b.Period}";
+            if (BudgetMetaText != null) BudgetMetaText.Text = $"{b.TypeDisplay} | {b.Period}";
 
             LoadBudgetHistoryChart(b);
-            BudgetInsightsList.ItemsSource = BuildInsights(b);
+            if (BudgetInsightsList != null) BudgetInsightsList.ItemsSource = BuildInsights(b);
         }
 
         private IList<string> BuildInsights(BudgetRow b)
@@ -324,9 +365,7 @@ ORDER BY b.StartDate;";
             else
                 list.Add($"Bufor (na dziś): {b.RemainingAmount:N2} zł.");
 
-            // PROGNOZA: ma być zawsze "jako sekcja", ale gdy nie ma danych -> "Brak danych"
-            // sensowne minimum: musimy mieć choć 1 dzień i jakiekolwiek wydatki, żeby prognozować
-            if (daysPassed <= 0 || totalDays <= 0 || b.SpentAmount <= 0)
+            if (daysPassed <= 0 || b.SpentAmount <= 0)
             {
                 list.Add("Prognoza na koniec: Brak danych.");
                 return list;
@@ -572,7 +611,7 @@ ORDER BY Date;";
             ApplyFilters();
             UpdateTopKpis();
 
-            var list = BudgetsList.ItemsSource as IEnumerable<BudgetRow>;
+            var list = BudgetsList?.ItemsSource as IEnumerable<BudgetRow>;
             if (list == null)
             {
                 UpdateDetailsPanel(null);
@@ -586,7 +625,9 @@ ORDER BY Date;";
 
             select ??= list.FirstOrDefault();
 
-            BudgetsList.SelectedItem = select;
+            if (BudgetsList != null)
+                BudgetsList.SelectedItem = select;
+
             UpdateDetailsPanel(select);
         }
     }
@@ -612,10 +653,10 @@ ORDER BY Date;";
         public int Id { get; set; }
         public string Name { get; set; } = string.Empty;
 
-        // DB: Weekly/Monthly/Yearly
+        // DB: Weekly/Monthly/Yearly/Custom
         public string Type { get; set; } = "Monthly";
 
-        // UI: Tygodniowy/Miesięczny/Roczny
+        // UI: Tygodniowy/Miesięczny/Roczny/Inny
         public string TypeDisplay { get; set; } = "Miesięczny";
 
         public DateTime StartDate { get; set; }
@@ -642,9 +683,6 @@ ORDER BY Date;";
         {
             var total = PlannedAmount + IncomeAmount;
             RemainingAmount = total - SpentAmount;
-
-            // jeśli kiedykolwiek będziesz odświeżać pojedynczy wiersz, przyda się:
-            // OnPropertyChanged(nameof(OverDisplayAmount));
         }
 
         public override string ToString() => Name;

@@ -26,7 +26,13 @@ namespace Finly.Views.Dialogs
             set
             {
                 var v = (value ?? "Monthly").Trim();
+                if (string.IsNullOrWhiteSpace(v)) v = "Monthly";
                 if (_type == v) return;
+
+                // normalizacja
+                if (v.Equals("Inny", StringComparison.OrdinalIgnoreCase))
+                    v = "Custom";
+
                 _type = v;
                 OnPropertyChanged();
                 RecomputeEndDate();
@@ -71,10 +77,10 @@ namespace Finly.Views.Dialogs
             }
 
             var s = _startDate.Value.Date;
-            var t = (_type ?? "").Trim();
+            var t = (_type ?? "Monthly").Trim();
 
             // Dla Custom NIE przeliczamy automatycznie EndDate
-            if (string.Equals(t, "Custom", StringComparison.OrdinalIgnoreCase))
+            if (t.Equals("Custom", StringComparison.OrdinalIgnoreCase))
                 return;
 
             EndDate = t switch

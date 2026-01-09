@@ -13,7 +13,6 @@ namespace Finly.Services.SpecificPages
         //  MODELE DTO DLA SERWISU
         // =========================
 
-        // To NIE powinno zależeć od Pages (BudgetsPage).
         public class BudgetOverAlert
         {
             public int BudgetId { get; set; }
@@ -35,6 +34,9 @@ namespace Finly.Services.SpecificPages
         {
             public int Id { get; set; }
             public string Name { get; set; } = "";
+            /// <summary>
+            /// Weekly / Monthly / Yearly / Custom
+            /// </summary>
             public string Type { get; set; } = "";
             public DateTime StartDate { get; set; }
             public DateTime EndDate { get; set; }
@@ -87,10 +89,10 @@ WHERE UserId = @uid
                     Id = reader.GetInt32(0),
                     UserId = reader.GetInt32(1),
                     Name = reader.GetString(2),
-                    Type = reader.GetString(3),
+                    Type = reader.IsDBNull(3) ? "Monthly" : reader.GetString(3),
                     StartDate = DateTime.Parse(reader.GetString(4)),
                     EndDate = DateTime.Parse(reader.GetString(5)),
-                    PlannedAmount = Convert.ToDecimal(reader.GetDouble(6))
+                    PlannedAmount = reader.IsDBNull(6) ? 0m : Convert.ToDecimal(reader.GetDouble(6))
                 });
             }
 
@@ -102,6 +104,15 @@ WHERE UserId = @uid
             using var con = DatabaseService.GetConnection();
             con.Open();
 
+            var type = (vm.Type ?? "Monthly").Trim();
+            if (string.IsNullOrWhiteSpace(type)) type = "Monthly";
+
+            // Normalizacja: Custom zapisujemy jako "Custom"
+            if (type.Equals("Inny", StringComparison.OrdinalIgnoreCase)) type = "Custom";
+
+            var start = (vm.StartDate ?? DateTime.Today).Date;
+            var end = (vm.EndDate ?? start).Date;
+
             using var cmd = con.CreateCommand();
             cmd.CommandText = @"
 INSERT INTO Budgets (UserId, Name, Type, StartDate, EndDate, PlannedAmount)
@@ -110,11 +121,11 @@ SELECT last_insert_rowid();
 ";
 
             cmd.Parameters.AddWithValue("@uid", userId);
-            cmd.Parameters.AddWithValue("@name", vm.Name);
-            cmd.Parameters.AddWithValue("@type", vm.Type?.ToString() ?? "Monthly"); // bezpiecznie
-            cmd.Parameters.AddWithValue("@start", vm.StartDate ?? DateTime.Today);
-            cmd.Parameters.AddWithValue("@end", vm.EndDate ?? vm.StartDate ?? DateTime.Today);
-            cmd.Parameters.AddWithValue("@planned", vm.PlannedAmount);
+            cmd.Parameters.AddWithValue("@name", vm.Name ?? "");
+            cmd.Parameters.AddWithValue("@type", type);
+            cmd.Parameters.AddWithValue("@start", start.ToString("yyyy-MM-dd"));
+            cmd.Parameters.AddWithValue("@end", end.ToString("yyyy-MM-dd"));
+            cmd.Parameters.AddWithValue("@planned", (double)vm.PlannedAmount);
 
             var id = (long)cmd.ExecuteScalar();
             return (int)id;
@@ -124,6 +135,10 @@ SELECT last_insert_rowid();
         {
             using var conn = DatabaseService.GetConnection();
             conn.Open();
+
+            var type = (b.Type ?? "Monthly").Trim();
+            if (string.IsNullOrWhiteSpace(type)) type = "Monthly";
+            if (type.Equals("Inny", StringComparison.OrdinalIgnoreCase)) type = "Custom";
 
             using var cmd = conn.CreateCommand();
             cmd.CommandText = @"
@@ -138,8 +153,8 @@ WHERE Id = @id AND UserId = @uid;
 
             cmd.Parameters.AddWithValue("@id", b.Id);
             cmd.Parameters.AddWithValue("@uid", b.UserId);
-            cmd.Parameters.AddWithValue("@name", b.Name);
-            cmd.Parameters.AddWithValue("@type", b.Type);
+            cmd.Parameters.AddWithValue("@name", b.Name ?? "");
+            cmd.Parameters.AddWithValue("@type", type);
             cmd.Parameters.AddWithValue("@start", b.StartDate.ToString("yyyy-MM-dd"));
             cmd.Parameters.AddWithValue("@end", b.EndDate.ToString("yyyy-MM-dd"));
             cmd.Parameters.AddWithValue("@planned", (double)b.PlannedAmount);
@@ -171,6 +186,7 @@ WHERE Id = @id AND UserId = @uid;
             conn.Open();
 
             using var cmd = conn.CreateCommand();
+            // UWAGA: usuń DISTINCT, bo zaniża sumę przy powtarzających się kwotach
             cmd.CommandText = @"
 SELECT 
     b.Id,
@@ -179,8 +195,8 @@ SELECT
     b.StartDate,
     b.EndDate,
     b.PlannedAmount,
-    IFNULL(SUM(DISTINCT e.Amount), 0) AS Spent,
-    IFNULL(SUM(DISTINCT i.Amount), 0) AS IncomesForBudget
+    IFNULL(SUM(e.Amount), 0) AS Spent,
+    IFNULL(SUM(i.Amount), 0) AS IncomesForBudget
 FROM Budgets b
 LEFT JOIN Expenses e 
     ON e.BudgetId = b.Id 
@@ -203,13 +219,17 @@ ORDER BY b.StartDate;
                 {
                     Id = reader.GetInt32(0),
                     Name = reader.GetString(1),
-                    Type = reader.GetString(2),
+                    Type = reader.IsDBNull(2) ? "Monthly" : reader.GetString(2),
                     StartDate = DateTime.Parse(reader.GetString(3)),
                     EndDate = DateTime.Parse(reader.GetString(4)),
-                    PlannedAmount = Convert.ToDecimal(reader.GetDouble(5)),
-                    Spent = Convert.ToDecimal(reader.GetDouble(6)),
-                    IncomesForBudget = Convert.ToDecimal(reader.GetDouble(7))
+                    PlannedAmount = reader.IsDBNull(5) ? 0m : Convert.ToDecimal(reader.GetDouble(5)),
+                    Spent = reader.IsDBNull(6) ? 0m : Convert.ToDecimal(reader.GetDouble(6)),
+                    IncomesForBudget = reader.IsDBNull(7) ? 0m : Convert.ToDecimal(reader.GetDouble(7))
                 };
+
+                // Normalizacja: jeśli w bazie ktoś zapisał "Inny" -> traktuj jak Custom
+                if (item.Type.Equals("Inny", StringComparison.OrdinalIgnoreCase))
+                    item.Type = "Custom";
 
                 result.Add(item);
             }
@@ -313,15 +333,15 @@ WHERE UserId = @uid
             var result = new List<Budget>();
 
             using var conn = DatabaseService.GetConnection();
-            conn.Open(); // <<< TO BYŁO BRAKUJĄCE
+            conn.Open();
 
             using var cmd = conn.CreateCommand();
             cmd.CommandText = @"
 SELECT Id, Name, Type, StartDate, EndDate, PlannedAmount
 FROM Budgets
 WHERE UserId = @uid
-  AND StartDate <= @date
-  AND EndDate   >= @date
+  AND date(StartDate) <= date(@date)
+  AND date(EndDate)   >= date(@date)
 ORDER BY StartDate;
 ";
 
@@ -335,11 +355,14 @@ ORDER BY StartDate;
                 {
                     Id = reader.GetInt32(0),
                     Name = reader.GetString(1),
-                    Type = reader.GetString(2),
+                    Type = reader.IsDBNull(2) ? "Monthly" : reader.GetString(2),
                     StartDate = DateTime.Parse(reader.GetString(3)),
                     EndDate = DateTime.Parse(reader.GetString(4)),
-                    PlannedAmount = Convert.ToDecimal(reader.GetDouble(5))
+                    PlannedAmount = reader.IsDBNull(5) ? 0m : Convert.ToDecimal(reader.GetDouble(5))
                 };
+
+                if (b.Type.Equals("Inny", StringComparison.OrdinalIgnoreCase))
+                    b.Type = "Custom";
 
                 result.Add(b);
             }

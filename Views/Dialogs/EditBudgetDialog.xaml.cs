@@ -49,6 +49,7 @@ namespace Finly.Views.Dialogs
 
             var start = row.StartDate.Date;
             var end = row.EndDate.Date;
+
             var days = (end - start).Days;
 
             bool looksWeekly = days == 6;
@@ -58,8 +59,8 @@ namespace Finly.Views.Dialogs
             var rawType = (row.Type ?? "").Trim();
 
             bool isExplicitCustom =
-                rawType.Equals("Inny", StringComparison.OrdinalIgnoreCase) ||
-                rawType.Equals("Custom", StringComparison.OrdinalIgnoreCase);
+                rawType.Equals("Custom", StringComparison.OrdinalIgnoreCase) ||
+                rawType.Equals("Inny", StringComparison.OrdinalIgnoreCase);
 
             bool isImplicitCustom = !looksWeekly && !looksMonthly && !looksYearly;
 
@@ -147,7 +148,7 @@ namespace Finly.Views.Dialogs
                 _isCustomRange = true;
                 CustomRangePanel.Visibility = Visibility.Visible;
 
-                // wymuś typ Custom (Inny)
+                // klucz: ustaw typ budżetu na Custom (Inny)
                 Budget.Type = "Custom";
 
                 if (Budget.EndDate == null && Budget.StartDate != null)
@@ -190,6 +191,10 @@ namespace Finly.Views.Dialogs
 
             var start = Budget.StartDate.Value.Date;
             var t = (Budget.Type ?? "Monthly").Trim();
+
+            // zabezpieczenie: gdyby ktoś ręcznie wbił "Custom", nie licz automatycznie
+            if (t.Equals("Custom", StringComparison.OrdinalIgnoreCase))
+                return;
 
             Budget.EndDate = t switch
             {
@@ -309,7 +314,7 @@ namespace Finly.Views.Dialogs
                     return;
                 }
 
-                // upewnij się, że typ jest Custom
+                // gwarancja: custom zapisuje się jako Custom
                 vm.Type = "Custom";
             }
             else
