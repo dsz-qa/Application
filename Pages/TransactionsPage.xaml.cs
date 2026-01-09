@@ -54,6 +54,7 @@ namespace Finly.Pages
 
             _vm.Initialize(uid);
 
+            // XAML teraz ZAWIERA x:Name="PeriodBar" -> FindName zadziała
             _periodBar = FindName("PeriodBar") as PeriodBarControl;
             if (_periodBar != null)
             {
@@ -113,8 +114,6 @@ namespace Finly.Pages
 
         private void LoadEditResources(int uid)
         {
-            // kompatybilność: Twoje ComboBoxy jadą z VM.Available*,
-            // ale zostawiam zasoby gdyby gdzieś jeszcze były używane.
             try
             {
                 var cats = DatabaseService.GetCategoriesByUser(uid)
@@ -231,15 +230,12 @@ namespace Finly.Pages
         }
 
         // ================== EDYCJA INLINE ==================
-        // Wymaganie: edytujemy tylko Data + Kategoria + Opis.
-        // Transferów nie edytujemy inline.
 
         private void StartEdit_Click(object sender, RoutedEventArgs e)
         {
             if (sender is not FrameworkElement fe) return;
             if (fe.DataContext is not TransactionCardVm vm) return;
 
-            // Transferów nie edytujemy inline
             if (vm.Kind == TransactionKind.Transfer || vm.IsTransfer)
                 return;
 
@@ -256,7 +252,6 @@ namespace Finly.Pages
             if (sender is not FrameworkElement fe) return;
             if (fe.DataContext is not TransactionCardVm vm) return;
 
-            // Bezpiecznik – transferu nie zapisujemy
             if (vm.Kind == TransactionKind.Transfer || vm.IsTransfer)
             {
                 vm.IsEditing = false;
