@@ -6,465 +6,464 @@
              x:Name="Root"
              Background="{DynamicResource App.Background}">
 
-	<UserControl.Resources>
+    <UserControl.Resources>
 
-		<BooleanToVisibilityConverter x:Key="BoolToVisibilityConverter"/>
+        <BooleanToVisibilityConverter x:Key="BoolToVisibilityConverter"/>
 
-		<Style x:Key="Card" TargetType="Border">
-			<Setter Property="Background" Value="{DynamicResource Surface.Background}"/>
-			<Setter Property="BorderBrush" Value="{DynamicResource Surface.Border}"/>
-			<Setter Property="BorderThickness" Value="1"/>
-			<Setter Property="CornerRadius" Value="10"/>
-			<Setter Property="Padding" Value="12"/>
-		</Style>
+        <Style x:Key="Card" TargetType="Border">
+            <Setter Property="Background" Value="{DynamicResource Surface.Background}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource Surface.Border}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="CornerRadius" Value="10"/>
+            <Setter Property="Padding" Value="12"/>
+        </Style>
 
-		<Style x:Key="OrangeCard" TargetType="Border" BasedOn="{StaticResource Card}">
-			<Setter Property="BorderBrush" Value="{DynamicResource Brand.Orange}"/>
-			<Setter Property="BorderThickness" Value="2"/>
-		</Style>
+        <Style x:Key="OrangeCard" TargetType="Border" BasedOn="{StaticResource Card}">
+            <Setter Property="BorderBrush" Value="{DynamicResource Brand.Orange}"/>
+            <Setter Property="BorderThickness" Value="2"/>
+        </Style>
 
-		<Style x:Key="KpiCard" TargetType="Border" BasedOn="{StaticResource Card}">
-			<Setter Property="BorderBrush" Value="{DynamicResource Brand.Blue}"/>
-			<Setter Property="BorderThickness" Value="2"/>
-			<Setter Property="Margin" Value="0,0,16,0"/>
-		</Style>
+        <Style x:Key="KpiCard" TargetType="Border" BasedOn="{StaticResource Card}">
+            <Setter Property="BorderBrush" Value="{DynamicResource Brand.Blue}"/>
+            <Setter Property="BorderThickness" Value="2"/>
+            <Setter Property="Margin" Value="0,0,16,0"/>
+        </Style>
 
-		<Style x:Key="CardHeader" TargetType="TextBlock">
-			<Setter Property="FontSize" Value="16"/>
-			<Setter Property="FontWeight" Value="Bold"/>
-			<Setter Property="Foreground" Value="{DynamicResource App.Foreground}"/>
-		</Style>
+        <Style x:Key="CardHeader" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="16"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="Foreground" Value="{DynamicResource App.Foreground}"/>
+        </Style>
 
-		<Style x:Key="KpiValueStyle" TargetType="TextBlock">
-			<Setter Property="FontSize" Value="20"/>
-			<Setter Property="FontWeight" Value="Bold"/>
-			<Setter Property="Margin" Value="0,2,0,0"/>
-			<Setter Property="Foreground" Value="{DynamicResource App.Foreground}"/>
-		</Style>
+        <Style x:Key="KpiValueStyle" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="20"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="Margin" Value="0,2,0,0"/>
+            <Setter Property="Foreground" Value="{DynamicResource App.Foreground}"/>
+        </Style>
 
-		<Style x:Key="MiniLabel" TargetType="TextBlock">
-			<Setter Property="Foreground" Value="{DynamicResource App.Foreground}"/>
-			<Setter Property="Opacity" Value="0.85"/>
-			<Setter Property="FontWeight" Value="SemiBold"/>
-			<Setter Property="FontSize" Value="11"/>
-		</Style>
+        <Style x:Key="MiniLabel" TargetType="TextBlock">
+            <Setter Property="Foreground" Value="{DynamicResource App.Foreground}"/>
+            <Setter Property="Opacity" Value="0.85"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="FontSize" Value="11"/>
+        </Style>
 
-		<Style x:Key="MiniValue" TargetType="TextBlock">
-			<Setter Property="Foreground" Value="{DynamicResource App.Foreground}"/>
-			<Setter Property="FontWeight" Value="Bold"/>
-			<Setter Property="FontSize" Value="14"/>
-		</Style>
+        <Style x:Key="MiniValue" TargetType="TextBlock">
+            <Setter Property="Foreground" Value="{DynamicResource App.Foreground}"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="FontSize" Value="14"/>
+        </Style>
 
-		<Style x:Key="MiniTableHeaderBorder" TargetType="Border">
-			<Setter Property="Background" Value="{DynamicResource Surface.Background}"/>
-			<Setter Property="Padding" Value="6,4"/>
-			<Setter Property="Margin" Value="0,0,0,6"/>
-			<Setter Property="CornerRadius" Value="6"/>
-		</Style>
+        <Style x:Key="MiniTableHeaderBorder" TargetType="Border">
+            <Setter Property="Background" Value="{DynamicResource Surface.Background}"/>
+            <Setter Property="Padding" Value="6,4"/>
+            <Setter Property="Margin" Value="0,0,0,6"/>
+            <Setter Property="CornerRadius" Value="6"/>
+        </Style>
 
-		<Style x:Key="MiniTableHeaderText" TargetType="TextBlock">
-			<Setter Property="FontSize" Value="11"/>
-			<Setter Property="FontWeight" Value="SemiBold"/>
-			<Setter Property="Foreground" Value="{DynamicResource App.Foreground}"/>
-			<Setter Property="Opacity" Value="0.8"/>
-			<Setter Property="Margin" Value="6,0,6,0"/>
-		</Style>
+        <Style x:Key="MiniTableHeaderText" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="11"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Foreground" Value="{DynamicResource App.Foreground}"/>
+            <Setter Property="Opacity" Value="0.8"/>
+            <Setter Property="Margin" Value="6,0,6,0"/>
+        </Style>
 
-		<Style x:Key="MiniTableCellText" TargetType="TextBlock">
-			<Setter Property="Foreground" Value="{DynamicResource App.Foreground}"/>
-			<Setter Property="VerticalAlignment" Value="Center"/>
-			<Setter Property="Margin" Value="6,2,6,2"/>
-			<Setter Property="TextTrimming" Value="CharacterEllipsis"/>
-			<Setter Property="TextWrapping" Value="NoWrap"/>
-		</Style>
+        <Style x:Key="MiniTableCellText" TargetType="TextBlock">
+            <Setter Property="Foreground" Value="{DynamicResource App.Foreground}"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+            <Setter Property="Margin" Value="6,2,6,2"/>
+            <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
+            <Setter Property="TextWrapping" Value="NoWrap"/>
+        </Style>
 
-		<Style x:Key="MiniTableCellRight" TargetType="TextBlock" BasedOn="{StaticResource MiniTableCellText}">
-			<Setter Property="HorizontalAlignment" Value="Right"/>
-			<Setter Property="TextAlignment" Value="Right"/>
-		</Style>
+        <Style x:Key="MiniTableCellRight" TargetType="TextBlock" BasedOn="{StaticResource MiniTableCellText}">
+            <Setter Property="HorizontalAlignment" Value="Right"/>
+            <Setter Property="TextAlignment" Value="Right"/>
+        </Style>
 
-		<!-- Wydano na liście (pomarańczowe) -->
-		<Style x:Key="AmountSpentOrange" TargetType="TextBlock" BasedOn="{StaticResource MiniTableCellRight}">
-			<Setter Property="Foreground" Value="{DynamicResource Brand.Orange}"/>
-			<Setter Property="FontWeight" Value="SemiBold"/>
-		</Style>
+        <!-- Wydano na liście (pomarańczowe) -->
+        <Style x:Key="AmountSpentOrange" TargetType="TextBlock" BasedOn="{StaticResource MiniTableCellRight}">
+            <Setter Property="Foreground" Value="{DynamicResource Brand.Orange}"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+        </Style>
 
-		<!-- Przekroczono na liście (czerwone) -->
-		<Style x:Key="AmountOverRed" TargetType="TextBlock" BasedOn="{StaticResource MiniTableCellRight}">
-			<Setter Property="Foreground" Value="Tomato"/>
-			<Setter Property="FontWeight" Value="SemiBold"/>
-		</Style>
+        <!-- Przekroczono na liście (czerwone) -->
+        <Style x:Key="AmountOverRed" TargetType="TextBlock" BasedOn="{StaticResource MiniTableCellRight}">
+            <Setter Property="Foreground" Value="Tomato"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+        </Style>
 
-		<Style x:Key="BudgetNameCell" TargetType="TextBlock" BasedOn="{StaticResource MiniTableCellText}">
-			<Setter Property="FontWeight" Value="SemiBold"/>
-		</Style>
+        <Style x:Key="BudgetNameCell" TargetType="TextBlock" BasedOn="{StaticResource MiniTableCellText}">
+            <Setter Property="FontWeight" Value="SemiBold"/>
+        </Style>
 
-		<Style x:Key="BudgetTypeSub" TargetType="TextBlock">
-			<Setter Property="Foreground" Value="{DynamicResource App.Foreground}"/>
-			<Setter Property="Opacity" Value="0.80"/>
-			<Setter Property="FontSize" Value="11"/>
-			<Setter Property="Margin" Value="6,0,6,2"/>
-			<Setter Property="TextTrimming" Value="CharacterEllipsis"/>
-		</Style>
+        <Style x:Key="BudgetTypeSub" TargetType="TextBlock">
+            <Setter Property="Foreground" Value="{DynamicResource App.Foreground}"/>
+            <Setter Property="Opacity" Value="0.80"/>
+            <Setter Property="FontSize" Value="11"/>
+            <Setter Property="Margin" Value="6,0,6,2"/>
+            <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
+        </Style>
 
-		<Style x:Key="BudgetListItemStyle" TargetType="ListBoxItem">
-			<Setter Property="Padding" Value="0"/>
-			<Setter Property="Margin" Value="0,2,0,2"/>
-			<Setter Property="Background" Value="Transparent"/>
-			<Setter Property="BorderThickness" Value="1"/>
-			<Setter Property="BorderBrush" Value="Transparent"/>
-			<Setter Property="HorizontalContentAlignment" Value="Stretch"/>
-			<Setter Property="Template">
-				<Setter.Value>
-					<ControlTemplate TargetType="ListBoxItem">
-						<Border Background="{TemplateBinding Background}"
+        <!-- KLUCZOWE: brak zmiany ramki na hover; pomarańczowa tylko po kliknięciu (IsSelected) -->
+        <Style x:Key="BudgetListItemStyle" TargetType="ListBoxItem">
+            <Setter Property="Padding" Value="0"/>
+            <Setter Property="Margin" Value="0,2,0,2"/>
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="BorderBrush" Value="Transparent"/>
+            <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ListBoxItem">
+                        <Border Background="{TemplateBinding Background}"
                                 BorderBrush="{TemplateBinding BorderBrush}"
                                 BorderThickness="{TemplateBinding BorderThickness}"
                                 CornerRadius="8">
-							<ContentPresenter/>
-						</Border>
-						<ControlTemplate.Triggers>
-							<Trigger Property="IsSelected" Value="True">
-								<Setter Property="BorderBrush" Value="{DynamicResource Brand.Orange}"/>
-								<Setter Property="BorderThickness" Value="2"/>
-							</Trigger>
-							<Trigger Property="IsMouseOver" Value="True">
-								<Setter Property="BorderBrush" Value="{DynamicResource Surface.Border}"/>
-							</Trigger>
-						</ControlTemplate.Triggers>
-					</ControlTemplate>
-				</Setter.Value>
-			</Setter>
-		</Style>
+                            <ContentPresenter/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsSelected" Value="True">
+                                <Setter Property="BorderBrush" Value="{DynamicResource Brand.Orange}"/>
+                                <Setter Property="BorderThickness" Value="2"/>
+                            </Trigger>
+                            <!-- Nie zmieniamy obramowania na hover -->
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
 
-		<!-- Analizy: większa czcionka + wyróżnienie -->
-		<Style x:Key="InsightItemText" TargetType="TextBlock">
-			<Setter Property="Foreground" Value="{DynamicResource App.Foreground}"/>
-			<Setter Property="FontSize" Value="13"/>
-			<Setter Property="FontWeight" Value="SemiBold"/>
-			<Setter Property="Margin" Value="0"/>
-			<Setter Property="TextWrapping" Value="Wrap"/>
-		</Style>
+        <!-- Analizy: większa czcionka + wyróżnienie -->
+        <Style x:Key="InsightItemText" TargetType="TextBlock">
+            <Setter Property="Foreground" Value="{DynamicResource App.Foreground}"/>
+            <Setter Property="FontSize" Value="13"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Margin" Value="0"/>
+            <Setter Property="TextWrapping" Value="Wrap"/>
+        </Style>
 
-	</UserControl.Resources>
+    </UserControl.Resources>
 
-	<ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
-		<Grid Margin="16">
-			<Grid.RowDefinitions>
-				<RowDefinition Height="Auto"/>
-				<RowDefinition Height="Auto"/>
-				<RowDefinition Height="*"/>
-			</Grid.RowDefinitions>
+    <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+        <Grid Margin="16">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="*"/>
+            </Grid.RowDefinitions>
 
-			<!-- KPI -->
-			<Grid Grid.Row="0" Margin="0,0,0,12">
-				<Grid.ColumnDefinitions>
-					<ColumnDefinition Width="*"/>
-					<ColumnDefinition Width="*"/>
-					<ColumnDefinition Width="*"/>
-				</Grid.ColumnDefinitions>
+            <!-- KPI -->
+            <Grid Grid.Row="0" Margin="0,0,0,12">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
 
-				<Border Grid.Column="0" Style="{StaticResource KpiCard}">
-					<StackPanel>
-						<TextBlock Text="Aktywne budżety (dzisiaj)" Style="{StaticResource CardHeader}"/>
-						<TextBlock x:Name="KpiActiveBudgetsText" Style="{StaticResource KpiValueStyle}" Text="0"/>
-					</StackPanel>
-				</Border>
+                <Border Grid.Column="0" Style="{StaticResource KpiCard}">
+                    <StackPanel>
+                        <TextBlock Text="Aktywne budżety (dzisiaj)" Style="{StaticResource CardHeader}"/>
+                        <TextBlock x:Name="KpiActiveBudgetsText" Style="{StaticResource KpiValueStyle}" Text="0"/>
+                    </StackPanel>
+                </Border>
 
-				<Border Grid.Column="1" Style="{StaticResource KpiCard}">
-					<StackPanel>
-						<TextBlock Text="Planowane (aktywne)" Style="{StaticResource CardHeader}"/>
-						<TextBlock x:Name="KpiPlannedActiveText" Style="{StaticResource KpiValueStyle}" Text="0,00 zł"/>
-					</StackPanel>
-				</Border>
+                <Border Grid.Column="1" Style="{StaticResource KpiCard}">
+                    <StackPanel>
+                        <TextBlock Text="Planowane (aktywne)" Style="{StaticResource CardHeader}"/>
+                        <TextBlock x:Name="KpiPlannedActiveText" Style="{StaticResource KpiValueStyle}" Text="0,00 zł"/>
+                    </StackPanel>
+                </Border>
 
-				<Border Grid.Column="2" Style="{StaticResource KpiCard}" Margin="0">
-					<StackPanel>
-						<TextBlock Text="Przekroczone (aktywne)" Style="{StaticResource CardHeader}"/>
-						<TextBlock x:Name="KpiOverActiveText" Style="{StaticResource KpiValueStyle}" Text="0 | 0,00 zł"/>
-					</StackPanel>
-				</Border>
-			</Grid>
+                <Border Grid.Column="2" Style="{StaticResource KpiCard}" Margin="0">
+                    <StackPanel>
+                        <TextBlock Text="Przekroczone (aktywne)" Style="{StaticResource CardHeader}"/>
+                        <TextBlock x:Name="KpiOverActiveText" Style="{StaticResource KpiValueStyle}" Text="0 | 0,00 zł"/>
+                    </StackPanel>
+                </Border>
+            </Grid>
 
-			<!-- separator NAD tytułem -->
-			<Separator Grid.Row="1"
+            <Separator Grid.Row="1"
                        Height="1"
                        Background="{DynamicResource Surface.Border}"
                        Opacity="0.8"
                        Margin="0,0,0,10"/>
 
-			<!-- tytuł POD separatorem -->
-			<TextBlock Grid.Row="1"
+            <TextBlock Grid.Row="1"
                        Text="Budżety"
                        FontSize="24"
                        FontWeight="Bold"
                        Foreground="{DynamicResource App.Foreground}"
                        Margin="0,12,0,12"/>
 
-			<!-- GŁÓWNA TREŚĆ -->
-			<Grid Grid.Row="2">
-				<Grid.RowDefinitions>
-					<RowDefinition Height="Auto"/>
-					<RowDefinition Height="*"/>
-				</Grid.RowDefinitions>
+            <Grid Grid.Row="2">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="*"/>
+                </Grid.RowDefinitions>
 
-				<!-- RZĄD 1: 3 kafelki obok siebie (NIŻSZE) -->
-				<Grid Grid.Row="0" Margin="0,0,0,12">
-					<Grid.ColumnDefinitions>
-						<ColumnDefinition Width="1.05*"/>
-						<ColumnDefinition Width="1.10*"/>
-						<ColumnDefinition Width="1.25*"/>
-					</Grid.ColumnDefinitions>
+                <!-- RZĄD 1 -->
+                <Grid Grid.Row="0" Margin="0,0,0,12">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="1.05*"/>
+                        <ColumnDefinition Width="1.10*"/>
+                        <ColumnDefinition Width="1.25*"/>
+                    </Grid.ColumnDefinitions>
 
-					<!-- Kafelek: Szczegóły budżetu (NIŻSZY) -->
-					<Border Grid.Column="0"
+                    <!-- Szczegóły budżetu -->
+                    <Border Grid.Column="0"
                             Style="{StaticResource OrangeCard}"
                             Margin="0,0,10,0"
                             Height="240"
                             Padding="10">
-						<Grid>
-							<Grid.ColumnDefinitions>
-								<ColumnDefinition Width="*"/>
-								<ColumnDefinition Width="*"/>
-							</Grid.ColumnDefinitions>
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
 
-							<!-- LEWA -->
-							<StackPanel Grid.Column="0" Margin="0,0,12,0">
-								<TextBlock Text="Nazwa budżetu" Style="{StaticResource MiniLabel}"/>
-								<TextBlock x:Name="BudgetNameText"
+                            <StackPanel Grid.Column="0" Margin="0,0,12,0">
+                                <TextBlock Text="Nazwa budżetu" Style="{StaticResource MiniLabel}"/>
+                                <TextBlock x:Name="BudgetNameText"
                                            Text="(wybierz budżet)"
                                            FontSize="16"
                                            FontWeight="Bold"
                                            Foreground="{DynamicResource App.Foreground}"
                                            TextTrimming="CharacterEllipsis"/>
 
-								<TextBlock Text="Typ" Style="{StaticResource MiniLabel}" Margin="0,8,0,0"/>
-								<TextBlock x:Name="BudgetTypeText"
+                                <TextBlock Text="Typ" Style="{StaticResource MiniLabel}" Margin="0,8,0,0"/>
+                                <TextBlock x:Name="BudgetTypeText"
                                            Style="{StaticResource MiniValue}"
                                            Text="—"/>
 
-								<TextBlock Text="Okres" Style="{StaticResource MiniLabel}" Margin="0,8,0,0"/>
-								<TextBlock x:Name="BudgetPeriodText"
+                                <TextBlock Text="Okres" Style="{StaticResource MiniLabel}" Margin="0,8,0,0"/>
+                                <TextBlock x:Name="BudgetPeriodText"
                                            Style="{StaticResource MiniValue}"
                                            Text="—"
                                            TextWrapping="Wrap"/>
-							</StackPanel>
+                            </StackPanel>
 
-							<!-- PRAWA -->
-							<StackPanel Grid.Column="1">
-								<TextBlock Text="Limit" Style="{StaticResource MiniLabel}"/>
-								<TextBlock x:Name="BudgetPlannedText"
+                            <StackPanel Grid.Column="1">
+                                <!-- ZMIANA: Limit -> Zaplanowano wydać -->
+                                <TextBlock Text="Zaplanowano wydać" Style="{StaticResource MiniLabel}"/>
+                                <TextBlock x:Name="BudgetPlannedText"
                                            Style="{StaticResource MiniValue}"
-                                           Foreground="Tomato"
+                                           Foreground="LimeGreen"
                                            FontSize="15"/>
 
-								<TextBlock Text="Wydano" Style="{StaticResource MiniLabel}" Margin="0,6,0,0"/>
-								<TextBlock x:Name="BudgetSpentText"
+                                <TextBlock Text="Wydano" Style="{StaticResource MiniLabel}" Margin="0,6,0,0"/>
+                                <TextBlock x:Name="BudgetSpentText"
                                            Style="{StaticResource MiniValue}"
                                            FontSize="13"
                                            Foreground="{DynamicResource Brand.Orange}"/>
 
-								<TextBlock Text="Przekroczono" Style="{StaticResource MiniLabel}" Margin="0,6,0,0"/>
-								<TextBlock x:Name="BudgetOverText"
+                                <TextBlock Text="Przekroczono" Style="{StaticResource MiniLabel}" Margin="0,6,0,0"/>
+                                <TextBlock x:Name="BudgetOverText"
                                            Style="{StaticResource MiniValue}"
                                            Foreground="Tomato"
                                            FontSize="13"/>
-							</StackPanel>
+                            </StackPanel>
 
-							<TextBlock x:Name="BudgetMetaText" Visibility="Collapsed"/>
-						</Grid>
-					</Border>
+                            <TextBlock x:Name="BudgetMetaText" Visibility="Collapsed"/>
+                        </Grid>
+                    </Border>
 
-					<!-- Kafelek: Historia (NIŻSZY) -->
-					<Border Grid.Column="1"
+                    <!-- Historia -->
+                    <Border Grid.Column="1"
                             Style="{StaticResource OrangeCard}"
                             Margin="0,0,10,0"
                             Height="240"
                             Padding="10">
-						<Grid>
-							<Grid.RowDefinitions>
-								<RowDefinition Height="Auto"/>
-								<RowDefinition Height="*"/>
-							</Grid.RowDefinitions>
+                        <Grid>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="*"/>
+                            </Grid.RowDefinitions>
 
-							<TextBlock Grid.Row="0" Text="Historia budżetu" Style="{StaticResource CardHeader}" Margin="0,0,0,6"/>
+                            <TextBlock Grid.Row="0"
+                                       Text="Historia budżetu"
+                                       Style="{StaticResource CardHeader}"
+                                       Margin="0,0,0,6"/>
 
-							<lvc:CartesianChart Grid.Row="1"
-											x:Name="BudgetHistoryChartControl"
-											Height="160"
-											Background="{DynamicResource Surface.Background}"/>
-						</Grid>
-					</Border>
+                            <lvc:CartesianChart Grid.Row="1"
+												x:Name="BudgetHistoryChartControl"
+												Height="160"
+												Background="{DynamicResource Surface.Background}"/>
+                        </Grid>
+                    </Border>
 
-					<!-- Kafelek: Analiza (NIŻSZY + SCROLL wewnątrz) -->
-					<Border Grid.Column="2"
+                    <!-- Analiza -->
+                    <Border Grid.Column="2"
                             Style="{StaticResource OrangeCard}"
                             Height="240"
                             Padding="10">
-						<Grid>
-							<Grid.RowDefinitions>
-								<RowDefinition Height="Auto"/>
-								<RowDefinition Height="*"/>
-							</Grid.RowDefinitions>
+                        <Grid>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="*"/>
+                            </Grid.RowDefinitions>
 
-							<TextBlock Grid.Row="0" Text="Analiza budżetu" Style="{StaticResource CardHeader}" Margin="0,0,0,6"/>
+                            <TextBlock Grid.Row="0"
+                                       Text="Analiza budżetu"
+                                       Style="{StaticResource CardHeader}"
+                                       Margin="0,0,0,6"/>
 
-							<ScrollViewer Grid.Row="1"
+                            <ScrollViewer Grid.Row="1"
                                           VerticalScrollBarVisibility="Auto"
                                           HorizontalScrollBarVisibility="Disabled">
-								<ItemsControl x:Name="BudgetInsightsList">
-									<ItemsControl.ItemTemplate>
-										<DataTemplate>
-											<Border Padding="8"
+                                <ItemsControl x:Name="BudgetInsightsList">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <Border Padding="8"
                                                     Margin="0,6,0,0"
                                                     CornerRadius="8"
                                                     Background="{DynamicResource Surface.Background}"
                                                     BorderBrush="{DynamicResource Surface.Border}"
                                                     BorderThickness="1">
-												<TextBlock Text="{Binding}"
+                                                <TextBlock Text="{Binding}"
                                                            Style="{StaticResource InsightItemText}"/>
-											</Border>
-										</DataTemplate>
-									</ItemsControl.ItemTemplate>
-								</ItemsControl>
-							</ScrollViewer>
+                                            </Border>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </ScrollViewer>
 
-						</Grid>
-					</Border>
-				</Grid>
+                        </Grid>
+                    </Border>
+                </Grid>
 
-				<!-- RZĄD 2: lista budżetów + filtry + dodaj -->
-				<Border Grid.Row="1" Style="{StaticResource Card}">
-					<StackPanel>
+                <!-- RZĄD 2 -->
+                <Border Grid.Row="1" Style="{StaticResource Card}">
+                    <StackPanel>
 
-						<TextBlock Text="Wybierz budżet, aby zobaczyć szczegóły"
+                        <TextBlock Text="Wybierz budżet, aby zobaczyć szczegóły"
                                    Foreground="{DynamicResource App.Foreground}"
                                    Opacity="0.9"
                                    Margin="0,0,0,10"/>
 
-						<Grid Margin="0,0,0,10">
-							<Grid.ColumnDefinitions>
-								<ColumnDefinition Width="240"/>
-								<ColumnDefinition Width="10"/>
-								<ColumnDefinition Width="*"/>
-							</Grid.ColumnDefinitions>
+                        <Grid Margin="0,0,0,10">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="240"/>
+                                <ColumnDefinition Width="10"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
 
-							<ComboBox x:Name="TypeFilterCombo"
+                            <ComboBox x:Name="TypeFilterCombo"
                                       Grid.Column="0"
                                       SelectionChanged="TypeFilterCombo_SelectionChanged"/>
 
-							<TextBox x:Name="SearchBox"
+                            <TextBox x:Name="SearchBox"
                                      Grid.Column="2"
                                      Style="{StaticResource SearchBoxStyle}"
                                      TextChanged="SearchBox_TextChanged"
                                      ToolTip="Wyszukiwanie po nazwie budżetu lub typie (np. Miesięczny)"/>
-						</Grid>
+                        </Grid>
 
-						<!-- Header -->
-						<Border Style="{StaticResource MiniTableHeaderBorder}">
-							<Grid>
-								<Grid.ColumnDefinitions>
-									<ColumnDefinition Width="*"/>
-									<ColumnDefinition Width="160"/>
-									<ColumnDefinition Width="160"/>
-									<ColumnDefinition Width="260"/>
-									<ColumnDefinition Width="70"/>
-								</Grid.ColumnDefinitions>
+                        <Border Style="{StaticResource MiniTableHeaderBorder}">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="160"/>
+                                    <ColumnDefinition Width="160"/>
+                                    <ColumnDefinition Width="260"/>
+                                    <ColumnDefinition Width="70"/>
+                                </Grid.ColumnDefinitions>
 
-								<TextBlock Grid.Column="0" Text="Budżet" Style="{StaticResource MiniTableHeaderText}"/>
-								<TextBlock Grid.Column="1" Text="Wydano" Style="{StaticResource MiniTableHeaderText}" HorizontalAlignment="Right"/>
-								<TextBlock Grid.Column="2" Text="Przekroczono" Style="{StaticResource MiniTableHeaderText}" HorizontalAlignment="Right"/>
-								<TextBlock Grid.Column="3" Text="Okres" Style="{StaticResource MiniTableHeaderText}"/>
-								<TextBlock Grid.Column="4" Text="" Style="{StaticResource MiniTableHeaderText}"/>
-							</Grid>
-						</Border>
+                                <TextBlock Grid.Column="0" Text="Budżet" Style="{StaticResource MiniTableHeaderText}"/>
+                                <TextBlock Grid.Column="1" Text="Wydano" Style="{StaticResource MiniTableHeaderText}" HorizontalAlignment="Right"/>
+                                <TextBlock Grid.Column="2" Text="Przekroczono" Style="{StaticResource MiniTableHeaderText}" HorizontalAlignment="Right"/>
+                                <TextBlock Grid.Column="3" Text="Okres" Style="{StaticResource MiniTableHeaderText}"/>
+                                <TextBlock Grid.Column="4" Text="" Style="{StaticResource MiniTableHeaderText}"/>
+                            </Grid>
+                        </Border>
 
-						<!-- Lista -->
-						<ListBox x:Name="BudgetsList"
+                        <ListBox x:Name="BudgetsList"
                                  ItemContainerStyle="{StaticResource BudgetListItemStyle}"
                                  SelectionChanged="BudgetsList_SelectionChanged"
                                  BorderThickness="0"
                                  Background="Transparent"
                                  ScrollViewer.VerticalScrollBarVisibility="Auto">
 
-							<ListBox.ItemTemplate>
-								<DataTemplate>
-									<StackPanel Margin="2,2">
+                            <ListBox.ItemTemplate>
+                                <DataTemplate>
+                                    <StackPanel Margin="2,2">
 
-										<Grid MinHeight="44">
-											<Grid.ColumnDefinitions>
-												<ColumnDefinition Width="*"/>
-												<ColumnDefinition Width="160"/>
-												<ColumnDefinition Width="160"/>
-												<ColumnDefinition Width="260"/>
-												<ColumnDefinition Width="70"/>
-											</Grid.ColumnDefinitions>
+                                        <Grid MinHeight="44">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="160"/>
+                                                <ColumnDefinition Width="160"/>
+                                                <ColumnDefinition Width="260"/>
+                                                <ColumnDefinition Width="70"/>
+                                            </Grid.ColumnDefinitions>
 
-											<StackPanel Grid.Column="0" Orientation="Vertical">
-												<TextBlock Text="{Binding Name}" Style="{StaticResource BudgetNameCell}"/>
-												<TextBlock Text="{Binding TypeDisplay}" Style="{StaticResource BudgetTypeSub}"/>
-											</StackPanel>
+                                            <StackPanel Grid.Column="0" Orientation="Vertical">
+                                                <TextBlock Text="{Binding Name}" Style="{StaticResource BudgetNameCell}"/>
+                                                <TextBlock Text="{Binding TypeDisplay}" Style="{StaticResource BudgetTypeSub}"/>
+                                            </StackPanel>
 
-											<TextBlock Grid.Column="1"
+                                            <TextBlock Grid.Column="1"
                                                        Text="{Binding SpentAmount, StringFormat={}{0:N2} zł}"
                                                        Style="{StaticResource AmountSpentOrange}"/>
 
-											<TextBlock Grid.Column="2"
+                                            <TextBlock Grid.Column="2"
                                                        Text="{Binding OverDisplayAmount, StringFormat={}{0:N2} zł}"
                                                        Style="{StaticResource AmountOverRed}"/>
 
-											<TextBlock Grid.Column="3"
+                                            <TextBlock Grid.Column="3"
                                                        Text="{Binding Period}"
                                                        Style="{StaticResource MiniTableCellText}"/>
 
-											<StackPanel Grid.Column="4"
+                                            <StackPanel Grid.Column="4"
                                                         Orientation="Horizontal"
                                                         HorizontalAlignment="Right"
                                                         VerticalAlignment="Center"
                                                         Margin="0,0,6,0">
-												<Button Style="{StaticResource EditIconButton}"
+                                                <Button Style="{StaticResource EditIconButton}"
                                                         Width="26"
                                                         Height="26"
                                                         Margin="0,0,6,0"
                                                         Click="EditBudget_Click"/>
-												<Button Style="{StaticResource DeleteIconButton}"
+                                                <Button Style="{StaticResource DeleteIconButton}"
                                                         Width="26"
                                                         Height="26"
                                                         Click="DeleteBudget_Click"/>
-											</StackPanel>
-										</Grid>
+                                            </StackPanel>
+                                        </Grid>
 
-										<Border Margin="0,6,0,0"
+                                        <Border Margin="0,6,0,0"
                                                 Padding="8"
                                                 CornerRadius="8"
                                                 BorderThickness="1"
                                                 BorderBrush="{DynamicResource Surface.Border}"
                                                 Background="{DynamicResource Surface.Background}"
                                                 Visibility="{Binding IsDeleteConfirmVisible, Converter={StaticResource BoolToVisibilityConverter}}">
-											<StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-												<TextBlock Text="Czy na pewno chcesz usunąć budżet?"
+                                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                                <TextBlock Text="Czy na pewno chcesz usunąć budżet?"
                                                            Foreground="{DynamicResource App.Foreground}"
                                                            Margin="0,0,10,0"/>
 
-												<Button Content="Tak"
+                                                <Button Content="Tak"
                                                         Width="60"
                                                         Margin="0,0,6,0"
                                                         Click="DeleteBudgetConfirmYes_Click"
                                                         Style="{StaticResource PrimaryButton}"/>
 
-												<Button Content="Nie"
+                                                <Button Content="Nie"
                                                         Width="60"
                                                         Click="DeleteBudgetConfirmNo_Click"
                                                         Style="{StaticResource SecondaryButton}"/>
-											</StackPanel>
-										</Border>
+                                            </StackPanel>
+                                        </Border>
 
-									</StackPanel>
-								</DataTemplate>
-							</ListBox.ItemTemplate>
-						</ListBox>
+                                    </StackPanel>
+                                </DataTemplate>
+                            </ListBox.ItemTemplate>
+                        </ListBox>
 
-						<Border Background="Transparent"
+                        <Border Background="Transparent"
                                 BorderBrush="{DynamicResource Surface.Border}"
                                 BorderThickness="1"
                                 CornerRadius="8"
@@ -472,21 +471,21 @@
                                 Cursor="Hand"
                                 MouseLeftButtonUp="AddBudget_Click"
                                 Margin="0,10,0,0">
-							<StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
-								<TextBlock Text="+" FontSize="18" FontWeight="Bold"
+                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                                <TextBlock Text="+" FontSize="18" FontWeight="Bold"
                                            Foreground="{DynamicResource App.Foreground}"
                                            Margin="0,0,8,0"/>
-								<TextBlock Text="Dodaj budżet"
+                                <TextBlock Text="Dodaj budżet"
                                            FontSize="13"
                                            FontWeight="SemiBold"
                                            Foreground="{DynamicResource App.Foreground}"/>
-							</StackPanel>
-						</Border>
+                            </StackPanel>
+                        </Border>
 
-					</StackPanel>
-				</Border>
+                    </StackPanel>
+                </Border>
 
-			</Grid>
-		</Grid>
-	</ScrollViewer>
+            </Grid>
+        </Grid>
+    </ScrollViewer>
 </UserControl>

@@ -1,13 +1,10 @@
 ﻿using System;
 using System.Globalization;
-using System.Linq;
-using System.Text;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using Finly.Pages; // BudgetRow
 using Finly.Helpers.Converters;
-
 
 namespace Finly.Views.Dialogs
 {
@@ -37,9 +34,6 @@ namespace Finly.Views.Dialogs
                 HideInlineError();
 
                 RecalcEndDateIfNeeded();
-
-                // ponieważ PlannedAmountTextBox NIE ma bindingu w XAML,
-                // musimy go wypełnić ręcznie na starcie
                 EnsurePlannedTextFromVm();
             };
         }
@@ -53,33 +47,54 @@ namespace Finly.Views.Dialogs
 
             Budget.Name = row.Name;
 
-            var t = (row.Type ?? "").Trim();
-            Budget.Type = t switch
-            {
-                "Tygodniowy" => "Weekly",
-                "Miesięczny" => "Monthly",
-                "Roczny" => "Yearly",
-                "Weekly" => "Weekly",
-                "Monthly" => "Monthly",
-                "Yearly" => "Yearly",
-                _ => "Monthly"
-            };
+            var start = row.StartDate.Date;
+            var end = row.EndDate.Date;
+            var days = (end - start).Days;
 
-            Budget.StartDate = row.StartDate;
+            bool looksWeekly = days == 6;
+            bool looksMonthly = end == new DateTime(start.Year, start.Month, 1).AddMonths(1).AddDays(-1);
+            bool looksYearly = end == new DateTime(start.Year, 12, 31);
+
+            var rawType = (row.Type ?? "").Trim();
+
+            bool isExplicitCustom =
+                rawType.Equals("Inny", StringComparison.OrdinalIgnoreCase) ||
+                rawType.Equals("Custom", StringComparison.OrdinalIgnoreCase);
+
+            bool isImplicitCustom = !looksWeekly && !looksMonthly && !looksYearly;
+
+            if (isExplicitCustom || isImplicitCustom)
+            {
+                Budget.Type = "Custom";
+                Budget.StartDate = start;
+                Budget.EndDate = end;
+
+                _isCustomRange = true;
+                CustomRangePanel.Visibility = Visibility.Visible;
+
+                Budget.PlannedAmount = row.PlannedAmount;
+
+                HideInlineError();
+                EnsurePlannedTextFromVm();
+                return;
+            }
+
+            Budget.Type = looksWeekly ? "Weekly"
+                        : looksYearly ? "Yearly"
+                        : "Monthly";
+
+            Budget.StartDate = start;
             Budget.PlannedAmount = row.PlannedAmount;
 
             _isCustomRange = false;
             CustomRangePanel.Visibility = Visibility.Collapsed;
 
             HideInlineError();
-
             RecalcEndDateIfNeeded();
-
-            // ustaw textbox kwoty wg VM (bez dziwnych formatów)
             EnsurePlannedTextFromVm();
         }
 
-        // ======= TitleBar (drag + close) =======
+        // ======= TitleBar =======
 
         private void TitleBar_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
         {
@@ -121,7 +136,7 @@ namespace Finly.Views.Dialogs
             }
         }
 
-        // ===================== OKRES: custom vs predef =====================
+        // ===================== OKRES =====================
 
         private void PeriodCombo_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
@@ -132,8 +147,11 @@ namespace Finly.Views.Dialogs
                 _isCustomRange = true;
                 CustomRangePanel.Visibility = Visibility.Visible;
 
+                // wymuś typ Custom (Inny)
+                Budget.Type = "Custom";
+
                 if (Budget.EndDate == null && Budget.StartDate != null)
-                    Budget.EndDate = Budget.StartDate.Value;
+                    Budget.EndDate = Budget.StartDate.Value.Date;
 
                 return;
             }
@@ -150,8 +168,14 @@ namespace Finly.Views.Dialogs
 
             if (_isCustomRange)
             {
-                if (Budget.EndDate == null && Budget.StartDate != null)
-                    Budget.EndDate = Budget.StartDate.Value;
+                if (Budget.StartDate != null && Budget.EndDate == null)
+                    Budget.EndDate = Budget.StartDate.Value.Date;
+
+                if (Budget.StartDate != null && Budget.EndDate != null &&
+                    Budget.EndDate.Value.Date < Budget.StartDate.Value.Date)
+                {
+                    Budget.EndDate = Budget.StartDate.Value.Date;
+                }
 
                 return;
             }
@@ -205,10 +229,8 @@ namespace Finly.Views.Dialogs
             var tb = (TextBox)sender;
             var t = (tb.Text ?? string.Empty).Trim();
 
-            // usuń spacje (formaty tysięcy)
             t = t.Replace(" ", "").Replace("\u00A0", "").Replace("\u202F", "").Replace("'", "");
 
-            // Jeśli to format "X,00" lub "X.00" -> pokaż "X"
             if (t.EndsWith(",00", StringComparison.Ordinal) || t.EndsWith(".00", StringComparison.Ordinal))
                 t = t.Substring(0, t.Length - 3);
 
@@ -240,7 +262,6 @@ namespace Finly.Views.Dialogs
 
             if (FlexibleDecimalConverter.TryParseFlexibleDecimal(raw, out var val))
             {
-                // w budżecie i tak chcesz 2 miejsca po przecinku
                 val = Math.Round(val, 2, MidpointRounding.AwayFromZero);
 
                 Budget.PlannedAmount = val;
@@ -248,12 +269,11 @@ namespace Finly.Views.Dialogs
                 return;
             }
 
-            // fallback
             Budget.PlannedAmount = 0m;
             PlannedAmountTextBox.Text = 0m.ToString("0.00", CultureInfo.CurrentCulture);
         }
 
-        // ===================== ZAPIS / ANULUJ =====================
+        // ===================== ZAPIS =====================
 
         private void Ok_Click(object sender, RoutedEventArgs e)
         {
@@ -261,8 +281,6 @@ namespace Finly.Views.Dialogs
                 return;
 
             HideInlineError();
-
-            // upewnij się, że textbox -> VM jest zsynchronizowany
             EnsurePlannedNotEmptyAndNormalize();
 
             if (string.IsNullOrWhiteSpace(vm.Name))
@@ -290,6 +308,9 @@ namespace Finly.Views.Dialogs
                     ShowInlineError("Data końca nie może być wcześniejsza niż data startu.", EndDatePicker);
                     return;
                 }
+
+                // upewnij się, że typ jest Custom
+                vm.Type = "Custom";
             }
             else
             {
@@ -312,6 +333,4 @@ namespace Finly.Views.Dialogs
             Close();
         }
     }
-
-
 }

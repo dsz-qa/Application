@@ -11,38 +11,36 @@
         Foreground="{DynamicResource App.Foreground}"
         Icon="/Assets/Icons/logoFinly.ico">
 
-	<!-- WindowChrome jak w ShellWindow (dialog: bez resize) -->
-	<shell:WindowChrome.WindowChrome>
-		<shell:WindowChrome CaptionHeight="40"
+    <shell:WindowChrome.WindowChrome>
+        <shell:WindowChrome CaptionHeight="40"
                             ResizeBorderThickness="0"
                             CornerRadius="0"
                             UseAeroCaptionButtons="False"/>
-	</shell:WindowChrome.WindowChrome>
+    </shell:WindowChrome.WindowChrome>
 
-	<Grid>
-		<Grid.RowDefinitions>
-			<RowDefinition Height="40"/>
-			<RowDefinition Height="Auto"/>
-		</Grid.RowDefinitions>
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="40"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
 
-		<!-- ===== Pasek tytułu ===== -->
-		<Grid Grid.Row="0"
+        <Grid Grid.Row="0"
               Background="{DynamicResource TitleBar.Background}"
               MouseLeftButtonDown="TitleBar_MouseLeftButtonDown">
-			<Grid.ColumnDefinitions>
-				<ColumnDefinition/>
-				<ColumnDefinition Width="Auto"/>
-			</Grid.ColumnDefinitions>
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition/>
+                <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
 
-			<TextBlock Text="Budżet"
+            <TextBlock Text="Budżet"
                        VerticalAlignment="Center"
                        Margin="12,0,0,0"
                        Foreground="{DynamicResource App.Foreground}"
                        FontSize="13"
                        shell:WindowChrome.IsHitTestVisibleInChrome="True"/>
 
-			<StackPanel Grid.Column="1" Orientation="Horizontal">
-				<Button Width="46" Height="32" Padding="0"
+            <StackPanel Grid.Column="1" Orientation="Horizontal">
+                <Button Width="46" Height="32" Padding="0"
                         Background="Transparent"
                         BorderBrush="{x:Null}"
                         Foreground="{DynamicResource App.Foreground}"
@@ -50,15 +48,14 @@
                         FocusVisualStyle="{x:Null}"
                         shell:WindowChrome.IsHitTestVisibleInChrome="True"
                         Click="Close_Click">
-					<TextBlock Text="✕" FontSize="12"
+                    <TextBlock Text="✕" FontSize="12"
                                HorizontalAlignment="Center"
                                VerticalAlignment="Center"/>
-				</Button>
-			</StackPanel>
-		</Grid>
+                </Button>
+            </StackPanel>
+        </Grid>
 
-		<!-- ===== Content ===== -->
-		<Border Grid.Row="1"
+        <Border Grid.Row="1"
                 Margin="14"
                 Padding="16"
                 Background="{DynamicResource App.Background}"
@@ -67,132 +64,118 @@
                 CornerRadius="12"
                 MinWidth="560">
 
-			<Border Padding="16"
+            <Border Padding="16"
                     Background="{DynamicResource Surface.Background}"
                     BorderBrush="{DynamicResource Surface.Border}"
                     BorderThickness="1"
                     CornerRadius="10">
 
-				<Grid>
-					<Grid.RowDefinitions>
-						<RowDefinition Height="Auto"/>
-						<!-- header -->
-						<RowDefinition Height="12"/>
-						<RowDefinition Height="Auto"/>
-						<!-- name -->
-						<RowDefinition Height="Auto"/>
-						<!-- period -->
-						<RowDefinition Height="Auto"/>
-						<!-- start -->
-						<RowDefinition Height="Auto"/>
-						<!-- custom end -->
-						<RowDefinition Height="Auto"/>
-						<!-- planned -->
-						<RowDefinition Height="18"/>
-						<RowDefinition Height="Auto"/>
-						<!-- buttons -->
-					</Grid.RowDefinitions>
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="12"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="18"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
 
-					<Grid.ColumnDefinitions>
-						<ColumnDefinition Width="180"/>
-						<ColumnDefinition Width="*"/>
-					</Grid.ColumnDefinitions>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="180"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
 
-					<!-- HEADER -->
-					<Grid Grid.Row="0" Grid.ColumnSpan="2" Margin="0,0,0,6">
-						<StackPanel>
-							<TextBlock x:Name="HeaderTitleText"
+                    <Grid Grid.Row="0" Grid.ColumnSpan="2" Margin="0,0,0,6">
+                        <StackPanel>
+                            <TextBlock x:Name="HeaderTitleText"
                                        Text="Dodawanie budżetu"
                                        FontSize="18"
                                        FontWeight="Bold"
                                        Foreground="{DynamicResource App.Foreground}"/>
-							<TextBlock Text="Ustaw okres i kwotę, a następnie zapisz budżet."
+                            <TextBlock Text="Ustaw okres i kwotę, a następnie zapisz budżet."
                                        Opacity="0.75"
                                        Foreground="{DynamicResource App.Foreground}"/>
-						</StackPanel>
-					</Grid>
+                        </StackPanel>
+                    </Grid>
 
-					<!-- Nazwa -->
-					<TextBlock Grid.Row="2" Grid.Column="0"
+                    <TextBlock Grid.Row="2" Grid.Column="0"
                                Text="Nazwa budżetu:"
                                VerticalAlignment="Center"
                                Margin="0,0,10,0"/>
 
-					<StackPanel Grid.Row="2" Grid.Column="1">
-						<TextBox x:Name="NameTextBox"
+                    <StackPanel Grid.Row="2" Grid.Column="1">
+                        <TextBox x:Name="NameTextBox"
                                  MinWidth="300"
                                  Text="{Binding Name, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                                  TextChanged="NameTextBox_TextChanged"/>
 
-						<TextBlock x:Name="NameErrorText"
+                        <TextBlock x:Name="NameErrorText"
                                    Text=""
                                    Foreground="Tomato"
                                    FontSize="12"
                                    Margin="2,4,0,0"
                                    Visibility="Collapsed"/>
-					</StackPanel>
+                    </StackPanel>
 
-					<!-- Okres -->
-					<TextBlock Grid.Row="3" Grid.Column="0"
+                    <TextBlock Grid.Row="3" Grid.Column="0"
                                Text="Okres:"
                                VerticalAlignment="Center"
                                Margin="0,8,10,0"/>
 
-					<ComboBox x:Name="PeriodCombo"
+                    <ComboBox x:Name="PeriodCombo"
                               Grid.Row="3" Grid.Column="1"
                               Margin="0,8,0,0"
                               SelectedValuePath="Tag"
                               SelectedValue="{Binding Type, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                               SelectionChanged="PeriodCombo_SelectionChanged">
-						<ComboBoxItem Content="Tygodniowy" Tag="Weekly" />
-						<ComboBoxItem Content="Miesięczny" Tag="Monthly" />
-						<ComboBoxItem Content="Roczny" Tag="Yearly" />
-						<ComboBoxItem Content="Inny okres (ręcznie)" Tag="Custom" />
-					</ComboBox>
+                        <ComboBoxItem Content="Tygodniowy" Tag="Weekly" />
+                        <ComboBoxItem Content="Miesięczny" Tag="Monthly" />
+                        <ComboBoxItem Content="Roczny" Tag="Yearly" />
+                        <ComboBoxItem Content="Inny okres (ręcznie)" Tag="Custom" />
+                    </ComboBox>
 
-					<!-- Data startu -->
-					<TextBlock Grid.Row="4" Grid.Column="0"
+                    <TextBlock Grid.Row="4" Grid.Column="0"
                                Text="Data startu:"
                                VerticalAlignment="Center"
                                Margin="0,10,10,0"/>
 
-					<DatePicker x:Name="StartDatePicker"
+                    <DatePicker x:Name="StartDatePicker"
                                 Grid.Row="4" Grid.Column="1"
                                 Margin="0,10,0,0"
                                 SelectedDate="{Binding StartDate, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                                 SelectedDateChanged="StartDatePicker_SelectedDateChanged"/>
 
-					<!-- Custom end date -->
-					<StackPanel x:Name="CustomRangePanel"
+                    <StackPanel x:Name="CustomRangePanel"
                                 Grid.Row="5" Grid.Column="0"
                                 Grid.ColumnSpan="2"
                                 Visibility="Collapsed"
                                 Margin="0,10,0,0">
-						<Grid>
-							<Grid.ColumnDefinitions>
-								<ColumnDefinition Width="180"/>
-								<ColumnDefinition Width="*"/>
-							</Grid.ColumnDefinitions>
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="180"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
 
-							<TextBlock Grid.Column="0"
+                            <TextBlock Grid.Column="0"
                                        Text="Data końca:"
                                        VerticalAlignment="Center"
                                        Margin="0,0,10,0"/>
 
-							<DatePicker x:Name="EndDatePicker"
+                            <DatePicker x:Name="EndDatePicker"
                                         Grid.Column="1"
                                         SelectedDate="{Binding EndDate, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
-						</Grid>
-					</StackPanel>
+                        </Grid>
+                    </StackPanel>
 
-					<!-- Kwota planowana -->
-					<TextBlock Grid.Row="6" Grid.Column="0"
+                    <TextBlock Grid.Row="6" Grid.Column="0"
                                Text="Kwota planowana:"
                                VerticalAlignment="Center"
                                Margin="0,10,10,0"/>
 
-					<!-- UWAGA: brak StringFormat, parsowanie/formatowanie robimy ręcznie w code-behind -->
-					<TextBox x:Name="PlannedAmountTextBox"
+                    <TextBox x:Name="PlannedAmountTextBox"
                              Grid.Row="6" Grid.Column="1"
                              Margin="0,10,0,0"
                              PreviewMouseLeftButtonDown="PlannedAmount_PreviewMouseLeftButtonDown"
@@ -200,25 +183,24 @@
                              LostFocus="PlannedAmount_LostFocus"
                              VerticalContentAlignment="Center"/>
 
-					<!-- Buttons -->
-					<StackPanel Grid.Row="8"
+                    <StackPanel Grid.Row="8"
                                 Grid.ColumnSpan="2"
                                 Orientation="Horizontal"
                                 HorizontalAlignment="Right">
 
-						<Button Content="Anuluj"
+                        <Button Content="Anuluj"
                                 Style="{StaticResource SecondaryButton}"
                                 IsCancel="True"
                                 Click="Cancel_Click"/>
 
-						<Button Content="Zapisz"
+                        <Button Content="Zapisz"
                                 Style="{StaticResource PrimaryButton}"
                                 Margin="8,0,0,0"
                                 IsDefault="True"
                                 Click="Ok_Click"/>
-					</StackPanel>
-				</Grid>
-			</Border>
-		</Border>
-	</Grid>
+                    </StackPanel>
+                </Grid>
+            </Border>
+        </Border>
+    </Grid>
 </Window>

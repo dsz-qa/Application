@@ -7,7 +7,7 @@ namespace Finly.Views.Dialogs
     public sealed class BudgetDialogViewModel : INotifyPropertyChanged
     {
         private string _name = string.Empty;
-        private string _type = "Monthly"; // trzymamy stringi: Weekly/Monthly/Yearly/OneTime/Rollover
+        private string _type = "Monthly"; // Weekly/Monthly/Yearly/Custom/OneTime/Rollover
         private DateTime? _startDate = DateTime.Today;
         private DateTime? _endDate;
         private decimal _plannedAmount;
@@ -25,8 +25,9 @@ namespace Finly.Views.Dialogs
             get => _type;
             set
             {
-                if (_type == value) return;
-                _type = value ?? "Monthly";
+                var v = (value ?? "Monthly").Trim();
+                if (_type == v) return;
+                _type = v;
                 OnPropertyChanged();
                 RecomputeEndDate();
             }
@@ -55,7 +56,6 @@ namespace Finly.Views.Dialogs
             }
         }
 
-
         public decimal PlannedAmount
         {
             get => _plannedAmount;
@@ -73,6 +73,10 @@ namespace Finly.Views.Dialogs
             var s = _startDate.Value.Date;
             var t = (_type ?? "").Trim();
 
+            // Dla Custom NIE przeliczamy automatycznie EndDate
+            if (string.Equals(t, "Custom", StringComparison.OrdinalIgnoreCase))
+                return;
+
             EndDate = t switch
             {
                 "Weekly" => s.AddDays(6),
@@ -80,7 +84,7 @@ namespace Finly.Views.Dialogs
                 "Yearly" => new DateTime(s.Year, 12, 31),
                 "OneTime" => s,
                 "Rollover" => new DateTime(s.Year, s.Month, 1).AddMonths(1).AddDays(-1),
-                _ => new DateTime(s.Year, s.Month, 1).AddMonths(1).AddDays(-1) // domyślnie Monthly
+                _ => new DateTime(s.Year, s.Month, 1).AddMonths(1).AddDays(-1)
             };
         }
 
