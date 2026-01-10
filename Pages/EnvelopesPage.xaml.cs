@@ -94,12 +94,21 @@ namespace Finly.Pages
                         r["Remaining"] = target - alloc;
 
                         SplitNote(r["Note"]?.ToString(), out var goal, out var description, out var deadline);
-                        r["GoalText"] = goal;
-                        r["Description"] = description;
+
+                        // Cel
+                        r["GoalText"] = string.IsNullOrWhiteSpace(goal)
+                            ? "Brak"
+                            : goal;
+
+                        // Opis
+                        r["Description"] = string.IsNullOrWhiteSpace(description)
+                            ? "Brak"
+                            : description;
+
 
                         if (deadline.HasValue)
                         {
-                            r["Deadline"] = deadline.Value.ToString("d", CultureInfo.CurrentCulture);
+                            r["Deadline"] = deadline.Value.ToString("dd.MM.yyyy", CultureInfo.CurrentCulture);
 
                             var remaining = target - alloc;
                             if (remaining <= 0m)
@@ -109,17 +118,16 @@ namespace Finly.Pages
                             else
                             {
                                 int monthsLeft = MonthsBetween(DateTime.Today, deadline.Value);
-                                if (monthsLeft <= 0)
-                                    monthsLeft = 1;
-
+                                if (monthsLeft <= 0) monthsLeft = 1;
                                 r["MonthlyRequired"] = remaining / monthsLeft;
                             }
                         }
                         else
                         {
-                            r["Deadline"] = "";
+                            r["Deadline"] = "Brak";
                             r["MonthlyRequired"] = 0m;
                         }
+
                     }
                 }
 

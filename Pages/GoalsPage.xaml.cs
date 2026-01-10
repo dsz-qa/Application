@@ -14,17 +14,25 @@ namespace Finly.Pages
 {
     public class GoalVm
     {
-        // powiązanie 1:1 z kopertą
         public int EnvelopeId { get; set; }
 
-        // Tekst nagłówka "Cel: ..."
+        // nazwa koperty (nie zmieniamy jej przy edycji celu)
+        public string EnvelopeName { get; set; } = "";
+
+        // tytuł celu (to edytujesz w GoalsPage)
         public string GoalTitle { get; set; } = "";
 
-        public string Name { get; set; } = "";
         public decimal TargetAmount { get; set; }
         public decimal CurrentAmount { get; set; }
         public DateTime? DueDate { get; set; }
         public string Description { get; set; } = "";
+
+        // BACKWARD COMPAT: stare miejsca w projekcie oczekują GoalVm.Name
+        public string Name
+        {
+            get => EnvelopeName;
+            set => EnvelopeName = value ?? "";
+        }
 
         public decimal Remaining => Math.Max(0, TargetAmount - CurrentAmount);
 
@@ -112,13 +120,15 @@ namespace Finly.Pages
                 _goals.Add(new GoalVm
                 {
                     EnvelopeId = g.EnvelopeId,
-                    Name = g.Name,
+                    EnvelopeName = g.Name,
                     GoalTitle = goalTitle,
                     TargetAmount = g.Target,
                     CurrentAmount = g.Allocated,
                     DueDate = g.Deadline,
-                    Description = description
+                    Description = string.IsNullOrWhiteSpace(description) ? "Brak" : description
                 });
+
+
             }
 
             RebuildItems();
@@ -206,8 +216,12 @@ namespace Finly.Pages
             if (string.IsNullOrWhiteSpace(goalTitle))
                 goalTitle = fallbackName;
 
-            var description = string.Join(Environment.NewLine, descLines);
+            var description = string.Join(Environment.NewLine, descLines).Trim();
+            if (string.IsNullOrWhiteSpace(description))
+                description = "Brak";
+
             return (goalTitle, description);
+
         }
 
         /// <summary>
@@ -286,7 +300,7 @@ namespace Finly.Pages
             GoalFormMessage.Text = string.Empty;
             FormBorder.Visibility = Visibility.Visible;
 
-            GoalNameBox.Text = vm.Name;
+            GoalNameBox.Text = vm.GoalTitle; // edytujesz nazwę celu, nie koperty
             GoalTargetBox.Text = vm.TargetAmount.ToString("N2");
             GoalCurrentBox.Text = vm.CurrentAmount.ToString("N2");
             GoalDueDatePicker.SelectedDate = vm.DueDate;
@@ -355,13 +369,13 @@ namespace Finly.Pages
 
         private void AddGoal_Click(object sender, RoutedEventArgs e)
         {
-            var name = (GoalNameBox.Text ?? "").Trim();
+            var goalTitle = (GoalNameBox.Text ?? "").Trim();
             var target = ParseDecimal(GoalTargetBox.Text);
             var current = ParseDecimal(GoalCurrentBox.Text);
             var dueDate = GoalDueDatePicker.SelectedDate;
             var desc = (GoalDescriptionBox.Text ?? "").Trim();
 
-            if (string.IsNullOrWhiteSpace(name))
+            if (string.IsNullOrWhiteSpace(goalTitle))
             {
                 GoalFormMessage.Text = "Podaj nazwę celu.";
                 return;
@@ -399,7 +413,7 @@ namespace Finly.Pages
             }
 
             // NOTE – jedyne źródło prawdy dla celu/terminu/opisu
-            var note = BuildNote(name, desc, dueDate.Value);
+            var note = BuildNote(goalTitle, desc, dueDate.Value);
 
             try
             {
@@ -407,20 +421,23 @@ namespace Finly.Pages
 
                 if (_editingEnvelopeId.HasValue)
                 {
+                    // EDYCJA: pracujemy na tej samej kopercie po ID
                     envelopeId = _editingEnvelopeId.Value;
                 }
                 else
                 {
-                    var existingId = DatabaseService.GetEnvelopeIdByName(_uid, name);
+                    // DODAWANIE: tu tworzysz (lub odnajdujesz) kopertę po nazwie CELU
+                    var existingId = DatabaseService.GetEnvelopeIdByName(_uid, goalTitle);
                     if (existingId.HasValue)
                     {
                         envelopeId = existingId.Value;
                     }
                     else
                     {
-                        envelopeId = DatabaseService.InsertEnvelope(_uid, name, target, current, note);
+                        envelopeId = DatabaseService.InsertEnvelope(_uid, goalTitle, target, current, note);
                     }
                 }
+
 
                 // UWAGA: przekazujemy NOTE (a nie sam opis)
                 DatabaseService.UpdateEnvelopeGoal(_uid, envelopeId, target, current, dueDate.Value, note);

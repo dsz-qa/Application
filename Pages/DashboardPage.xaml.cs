@@ -698,10 +698,26 @@ namespace Finly.Pages
             var item = GetSelectedIncome();
             if (item == null) { ToastService.Info("Zaznacz pozycję do usunięcia."); return; }
 
-            try { DatabaseService.DeleteIncome(item.Id); ToastService.Success("Usunięto przychód."); }
+            try
+            {
+                var isPlanned = GetIsPlannedFlag("Incomes", item.Id) == 1;
+
+                if (isPlanned)
+                {
+                    HardDeleteById("Incomes", item.Id);
+                    DatabaseService.NotifyDataChanged();
+                    ToastService.Success("Usunięto zaplanowany przychód.");
+                }
+                else
+                {
+                    DatabaseService.DeleteIncome(item.Id);
+                    ToastService.Success("Usunięto przychód.");
+                }
+            }
             catch (Exception ex) { ToastService.Error("Błąd usuwania przychodu.\n" + ex.Message); }
             finally { IncomeDeleteConfirmNo_Click(sender, e); ReloadAfterEdit(); }
         }
+
 
         private void ShowExpenseDeleteConfirm_Click(object sender, RoutedEventArgs e)
         {
@@ -716,9 +732,49 @@ namespace Finly.Pages
             var item = GetSelectedExpense();
             if (item == null) { ToastService.Info("Zaznacz pozycję do usunięcia."); return; }
 
-            try { DatabaseService.DeleteExpense(item.Id); ToastService.Success("Usunięto wydatek."); }
+            try
+            {
+                var isPlanned = GetIsPlannedFlag("Expenses", item.Id) == 1;
+
+                if (isPlanned)
+                {
+                    HardDeleteById("Expenses", item.Id);
+                    DatabaseService.NotifyDataChanged();
+                    ToastService.Success("Usunięto zaplanowany wydatek.");
+                }
+                else
+                {
+                    DatabaseService.DeleteExpense(item.Id);
+                    ToastService.Success("Usunięto wydatek.");
+                }
+            }
             catch (Exception ex) { ToastService.Error("Błąd usuwania wydatku.\n" + ex.Message); }
             finally { ExpenseDeleteConfirmNo_Click(sender, e); ReloadAfterEdit(); }
+        }
+
+
+
+        private static int GetIsPlannedFlag(string table, int id)
+        {
+            try
+            {
+                using var con = DatabaseService.GetConnection();
+                using var cmd = con.CreateCommand();
+                cmd.CommandText = $"SELECT IFNULL(IsPlanned,0) FROM {table} WHERE Id=@id;";
+                cmd.Parameters.AddWithValue("@id", id);
+                var obj = cmd.ExecuteScalar();
+                return Convert.ToInt32(obj ?? 0);
+            }
+            catch { return 0; }
+        }
+
+        private static void HardDeleteById(string table, int id)
+        {
+            using var con = DatabaseService.GetConnection();
+            using var cmd = con.CreateCommand();
+            cmd.CommandText = $"DELETE FROM {table} WHERE Id=@id;";
+            cmd.Parameters.AddWithValue("@id", id);
+            cmd.ExecuteNonQuery();
         }
 
         private void ShowPlannedDeleteConfirm_Click(object sender, RoutedEventArgs e)
@@ -736,19 +792,44 @@ namespace Finly.Pages
 
             try
             {
-                if (string.Equals(item.Kind, "Przychód", StringComparison.OrdinalIgnoreCase))
-                    DatabaseService.DeleteIncome(item.Id);
-                else if (string.Equals(item.Kind, "Wydatek", StringComparison.OrdinalIgnoreCase))
-                    DatabaseService.DeleteExpense(item.Id);
-                else
-                    ToastService.Info("Transfer usuń poprzez powiązane wpisy.");
+                // Transferów nie kasujemy tu, bo u Ciebie są wykrywane heurystycznie (a nie jako 1 rekord).
+                if (string.Equals(item.Kind, "Transfer", StringComparison.OrdinalIgnoreCase))
+                {
+                    ToastService.Info("Transfer usuń poprzez powiązane wpisy (przychód/wydatek).");
+                    return;
+                }
 
-                ToastService.Success("Usunięto.");
+                if (string.Equals(item.Kind, "Przychód", StringComparison.OrdinalIgnoreCase))
+                {
+                    HardDeleteById("Incomes", item.Id);
+                    DatabaseService.NotifyDataChanged();
+                    ToastService.Success("Usunięto zaplanowany przychód.");
+                }
+                else if (string.Equals(item.Kind, "Wydatek", StringComparison.OrdinalIgnoreCase))
+                {
+                    HardDeleteById("Expenses", item.Id);
+                    DatabaseService.NotifyDataChanged();
+                    ToastService.Success("Usunięto zaplanowany wydatek.");
+                }
+                else
+                {
+                    ToastService.Info("Nieznany typ transakcji.");
+                }
             }
-            catch (Exception ex) { ToastService.Error("Błąd usuwania.\n" + ex.Message); }
-            finally { PlannedDeleteConfirmNo_Click(sender, e); ReloadAfterEdit(); }
+            catch (Exception ex)
+            {
+                ToastService.Error("Błąd usuwania.\n" + ex.Message);
+            }
+            finally
+            {
+                PlannedDeleteConfirmNo_Click(sender, e);
+                ReloadAfterEdit();
+            }
         }
+
     }
+
+
 
     // =====================================================================
     // Klasy pomocnicze
