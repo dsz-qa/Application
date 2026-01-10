@@ -873,13 +873,60 @@ WHERE Id=@id AND UserId=@u;";
 
         private void SaveEditExpense(TransactionCardVm vm, DateTime newDate, string newDesc, string? selectedCat, bool newPlanned)
         {
-            var exp = DatabaseService.GetExpenseById(vm.Id);
-            if (exp == null) return;
+            using var c = DatabaseService.GetConnection();
+            DatabaseService.EnsureTables();
+            using var tx = c.BeginTransaction();
 
-            exp.UserId = UserId;
+            // 1) Odczytaj STAN ŹRÓDŁOWY z DB (z właściwym PaymentKind/PaymentRefId)
+            int dbUserId;
+            decimal amount;
+            DateTime oldDate;
+            bool dbIsPlanned;
+            int paymentKind;
+            int? paymentRefId;
 
-            bool oldPlanned = exp.IsPlanned || exp.Date.Date > DateTime.Today;
+            using (var read = c.CreateCommand())
+            {
+                read.Transaction = tx;
+                read.CommandText = @"
+SELECT UserId,
+       Amount,
+       Date,
+       COALESCE(IsPlanned,0) AS IsPlanned,
+       COALESCE(PaymentKind,0) AS PaymentKind,
+       PaymentRefId
+FROM Expenses
+WHERE Id=@id AND UserId=@u
+LIMIT 1;";
+                read.Parameters.AddWithValue("@id", vm.Id);
+                read.Parameters.AddWithValue("@u", UserId);
 
+                using var r = read.ExecuteReader();
+                if (!r.Read())
+                {
+                    tx.Rollback();
+                    return;
+                }
+
+                dbUserId = r.IsDBNull(0) ? 0 : Convert.ToInt32(r.GetValue(0));
+                amount = r.IsDBNull(1) ? 0m : Convert.ToDecimal(r.GetValue(1));
+                var dateTxt = r.IsDBNull(2) ? "" : (r.GetValue(2)?.ToString() ?? "");
+                dbIsPlanned = !r.IsDBNull(3) && Convert.ToInt32(r.GetValue(3)) == 1;
+                paymentKind = r.IsDBNull(4) ? 0 : Convert.ToInt32(r.GetValue(4));
+                paymentRefId = r.IsDBNull(5) ? (int?)null : Convert.ToInt32(r.GetValue(5));
+
+                oldDate =
+                    DateTime.TryParseExact(dateTxt, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var d1) ? d1 :
+                    (DateTime.TryParse(dateTxt, out var d2) ? d2 : DateTime.MinValue);
+            }
+
+            if (dbUserId != UserId)
+            {
+                tx.Rollback();
+                return;
+            }
+
+            // 2) Kategoria -> CategoryId
             int catId = 0;
             if (!string.IsNullOrWhiteSpace(selectedCat) &&
                 !string.Equals(selectedCat, "(brak)", StringComparison.CurrentCultureIgnoreCase))
@@ -892,41 +939,49 @@ WHERE Id=@id AND UserId=@u;";
                 catch { catId = 0; }
             }
 
-            exp.Date = newDate;
-            exp.Description = newDesc;
-            exp.CategoryId = catId;
-            exp.IsPlanned = newPlanned;
+            // 3) Planned/realized – licz na podstawie DB (stare) i nowej daty (nowe)
+            bool oldPlanned = dbIsPlanned || (oldDate != DateTime.MinValue && oldDate.Date > DateTime.Today);
 
-            using var c = DatabaseService.GetConnection();
-            DatabaseService.EnsureTables();
-            using var tx = c.BeginTransaction();
-
+            // 4) Księgowanie: PRZY ZMIANIE planned<->realized używaj PaymentKind/PaymentRefId z DB
             if (oldPlanned != newPlanned)
             {
-                var amount = Convert.ToDecimal(exp.Amount);
-
                 if (oldPlanned && !newPlanned)
                 {
-                    // planned -> realized
-                    LedgerService.ApplyExpenseEffect(
-                        c, tx, UserId, amount,
-                        (int)exp.PaymentKind,
-                        exp.PaymentRefId);
+                    // planned -> realized (dopiero teraz ma zejść z konta)
+                    LedgerService.ApplyExpenseEffect(c, tx, UserId, amount, paymentKind, paymentRefId);
                 }
                 else if (!oldPlanned && newPlanned)
                 {
-                    // realized -> planned
-                    LedgerService.RevertExpenseEffect(
-                        c, tx, UserId, amount,
-                        (int)exp.PaymentKind,
-                        exp.PaymentRefId);
+                    // realized -> planned (oddaj na to samo konto, z którego zeszło)
+                    LedgerService.RevertExpenseEffect(c, tx, UserId, amount, paymentKind, paymentRefId);
                 }
             }
 
-            UpdateExpenseRowSql(c, tx, exp);
+            // 5) Update rekordu (nie ruszamy PaymentKind/PaymentRefId, bo nie edytujesz konta inline)
+            using (var upd = c.CreateCommand())
+            {
+                upd.Transaction = tx;
+                upd.CommandText = @"
+UPDATE Expenses
+SET Date=@d,
+    Description=@desc,
+    CategoryId=@cat,
+    IsPlanned=@p
+WHERE Id=@id AND UserId=@u;";
+                upd.Parameters.AddWithValue("@d", ToIso(newDate));
+                upd.Parameters.AddWithValue("@desc", (object?)newDesc ?? DBNull.Value);
+                if (catId > 0) upd.Parameters.AddWithValue("@cat", catId);
+                else upd.Parameters.AddWithValue("@cat", DBNull.Value);
+                upd.Parameters.AddWithValue("@p", newPlanned ? 1 : 0);
+                upd.Parameters.AddWithValue("@id", vm.Id);
+                upd.Parameters.AddWithValue("@u", UserId);
+
+                upd.ExecuteNonQuery();
+            }
 
             tx.Commit();
 
+            // 6) Update VM
             vm.DateDisplay = ToUiDate(newDate);
             vm.Description = newDesc;
             vm.CategoryName = string.IsNullOrWhiteSpace(selectedCat) ? "(brak)" : selectedCat!;
@@ -934,6 +989,7 @@ WHERE Id=@id AND UserId=@u;";
             vm.IsPlanned = newPlanned;
             vm.IsFuture = newPlanned;
         }
+
 
         private void SaveEditIncome(TransactionCardVm vm, DateTime newDate, string newDesc, string? selectedCat, bool newPlanned)
         {
