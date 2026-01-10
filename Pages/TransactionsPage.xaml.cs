@@ -279,6 +279,13 @@ namespace Finly.Pages
             }
         }
 
+        private void RootScroll_RequestBringIntoView(object sender, RequestBringIntoViewEventArgs e)
+        {
+            // blokuje automatyczne "skakanie" ScrollViewera po focusie na DatePicker/TextBox itp.
+            e.Handled = true;
+        }
+
+
         private void EditDescription_GotFocus(object sender, RoutedEventArgs e)
         {
             if (sender is TextBox tb)
@@ -337,6 +344,8 @@ namespace Finly.Pages
             }
         }
     }
+
+
 
     /// <summary>
     /// Konwerter używany w XAML – string daty yyyy-MM-dd → dd.MM.yyyy.

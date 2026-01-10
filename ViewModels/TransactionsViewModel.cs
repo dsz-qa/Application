@@ -415,15 +415,23 @@ namespace Finly.ViewModels
             PlannedTransactions.Clear();
 
             var today = DateTime.Today;
+
             foreach (var t in AllTransactions)
             {
-                bool isPlannedOrFuture = t.IsPlanned ||
-                                         (DateTime.TryParse(t.DateDisplay, out var d) && d.Date > today);
+                DateTime parsed;
+                bool hasDate = DateTime.TryParse(t.DateDisplay, out parsed);
+
+                bool isFuture = hasDate && parsed.Date > today;
+                bool isPlannedOrFuture = t.IsPlanned || isFuture;
+
+                // utrzymuj spójność flag w VM (pomaga w UI)
+                t.IsFuture = isFuture;
 
                 if (isPlannedOrFuture) PlannedTransactions.Add(t);
                 else Transactions.Add(t);
             }
         }
+
 
         // ------------------ WYŚWIETLANIE KONT (PaymentKind/Ref) ------------------
 
@@ -708,9 +716,8 @@ namespace Finly.ViewModels
                 var desc = vm.EditDescription ?? string.Empty;
                 var selectedCat = vm.SelectedCategory?.Trim();
 
-                // Opcjonalnie: blokada „future” dla zrealizowanych
-                if (!vm.IsPlanned && date.Date > DateTime.Today)
-                    return;
+                // UWAGA: usuwamy blokadę "future"
+                // if (!vm.IsPlanned && date.Date > DateTime.Today) return;
 
                 switch (vm.Kind)
                 {
@@ -722,6 +729,9 @@ namespace Finly.ViewModels
                             exp.UserId = UserId;
                             exp.Date = date;
                             exp.Description = desc;
+
+                            // jeśli data w przyszłości -> ma być zaplanowana (i nie księgować teraz)
+                            exp.IsPlanned = date.Date > DateTime.Today;
 
                             int catId = 0;
                             if (!string.IsNullOrWhiteSpace(selectedCat) &&
@@ -736,13 +746,20 @@ namespace Finly.ViewModels
                             }
 
                             exp.CategoryId = catId;
+
                             // NIE ruszamy: Amount / PaymentKind / PaymentRefId
                             DatabaseService.UpdateExpense(exp);
 
+                            // aktualizacja VM (żeby UI był spójny od razu)
                             vm.DateDisplay = date.ToString("yyyy-MM-dd");
                             vm.Description = desc;
+
                             vm.CategoryName = string.IsNullOrWhiteSpace(selectedCat) ? "(brak)" : selectedCat!;
                             vm.SelectedCategory = vm.CategoryName;
+
+                            vm.IsPlanned = exp.IsPlanned;
+                            vm.IsFuture = date.Date > DateTime.Today;
+
                             break;
                         }
 
@@ -774,6 +791,11 @@ namespace Finly.ViewModels
                             vm.Description = desc;
                             vm.CategoryName = string.IsNullOrWhiteSpace(selectedCat) ? "Przychód" : selectedCat!;
                             vm.SelectedCategory = vm.CategoryName;
+
+                            // Income: w tym VM i tak traktujesz przyszłość jako "prawą kolumnę" przez IsFuture,
+                            // a planned bierzesz z DB (jeśli kolumna istnieje). Tu zostawiamy planned bez wymuszeń:
+                            vm.IsFuture = date.Date > DateTime.Today;
+
                             break;
                         }
                 }
@@ -790,6 +812,7 @@ namespace Finly.ViewModels
                 LoadFromDatabase();
             }
         }
+
 
         private void ClearPeriods()
         {
