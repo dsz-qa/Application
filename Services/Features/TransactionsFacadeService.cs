@@ -135,6 +135,27 @@ SET Amount   = excluded.Amount,
         //  Kombinacje „czytelne” (atomowo: 1 transfer Any)
         // =========================
 
+        public static void UpdatePlannedTransactionDate(LedgerService.TransactionSource src, int userId, int id, DateTime newDate)
+        {
+            switch (src)
+            {
+                case LedgerService.TransactionSource.Expense:
+                    DatabaseService.UpdatePlannedExpenseDate(userId, id, newDate);
+                    break;
+
+                case LedgerService.TransactionSource.Income:
+                    DatabaseService.UpdatePlannedIncomeDate(userId, id, newDate);
+                    break;
+
+                case LedgerService.TransactionSource.Transfer:
+                    DatabaseService.UpdatePlannedTransferDate(userId, id, newDate);
+                    break;
+
+                default:
+                    throw new InvalidOperationException("Nieobsługiwany typ transakcji.");
+            }
+        }
+
         public static int TransferBankToFreeCash(int userId, int accountId, decimal amount, DateTime? date = null, string? desc = null)
             => LedgerService.TransferAny(
                 userId, amount, date ?? DateTime.Today, desc,

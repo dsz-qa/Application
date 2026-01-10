@@ -20,7 +20,6 @@ namespace Finly.Pages
         private readonly TransactionsViewModel _vm;
         private PeriodBarControl? _periodBar;
         private int _uid;
-
         private bool _isAlive;
 
         public TransactionsPage()
@@ -54,7 +53,6 @@ namespace Finly.Pages
 
             _vm.Initialize(uid);
 
-            // XAML teraz ZAWIERA x:Name="PeriodBar" -> FindName zadziała
             _periodBar = FindName("PeriodBar") as PeriodBarControl;
             if (_periodBar != null)
             {
@@ -65,7 +63,6 @@ namespace Finly.Pages
             }
 
             LoadEditResources(uid);
-
             RefreshMoneySummary();
 
             DatabaseService.DataChanged -= DatabaseService_DataChanged;
@@ -190,36 +187,6 @@ namespace Finly.Pages
 
         // ================== DRZEWO WIZUALNE – HELPERY ==================
 
-        private static T? FindDescendantByName<T>(DependencyObject? start, string name)
-            where T : FrameworkElement
-        {
-            if (start == null) return null;
-
-            int cnt = VisualTreeHelper.GetChildrenCount(start);
-            for (int i = 0; i < cnt; i++)
-            {
-                var child = VisualTreeHelper.GetChild(start, i);
-
-                if (child is FrameworkElement fe)
-                {
-                    if (fe is T t && t.Name == name)
-                        return t;
-
-                    var deeper = FindDescendantByName<T>(fe, name);
-                    if (deeper != null)
-                        return deeper;
-                }
-                else
-                {
-                    var deeper = FindDescendantByName<T>(child, name);
-                    if (deeper != null)
-                        return deeper;
-                }
-            }
-
-            return null;
-        }
-
         private static T? FindAncestor<T>(DependencyObject? start) where T : DependencyObject
         {
             var cur = start;
@@ -236,9 +203,6 @@ namespace Finly.Pages
             if (sender is not FrameworkElement fe) return;
             if (fe.DataContext is not TransactionCardVm vm) return;
 
-            if (vm.Kind == TransactionKind.Transfer || vm.IsTransfer)
-                return;
-
             try
             {
                 vm.IsDeleteConfirmationVisible = false;
@@ -251,12 +215,6 @@ namespace Finly.Pages
         {
             if (sender is not FrameworkElement fe) return;
             if (fe.DataContext is not TransactionCardVm vm) return;
-
-            if (vm.Kind == TransactionKind.Transfer || vm.IsTransfer)
-            {
-                vm.IsEditing = false;
-                return;
-            }
 
             try
             {
@@ -279,17 +237,25 @@ namespace Finly.Pages
             }
         }
 
-        private void RootScroll_RequestBringIntoView(object sender, RequestBringIntoViewEventArgs e)
-        {
-            // blokuje automatyczne "skakanie" ScrollViewera po focusie na DatePicker/TextBox itp.
-            e.Handled = true;
-        }
-
-
         private void EditDescription_GotFocus(object sender, RoutedEventArgs e)
         {
             if (sender is TextBox tb)
                 tb.SelectAll();
+        }
+
+        // ================== BLOKADA AUTO-SCROLL (SKAKANIE) ==================
+
+        private void Root_RequestBringIntoView(object sender, RequestBringIntoViewEventArgs e)
+        {
+            // Blokuj auto-scroll, ale tylko gdy pochodzi z elementów wewnątrz kart transakcji
+            if (e.OriginalSource is not DependencyObject src) return;
+
+            // jeśli fokus/próba bring-into-view pochodzi z list transakcji (lewa lub prawa) -> blokuj
+            var items = FindAncestor<ItemsControl>(src);
+            if (items == RealizedItems || items == PlannedItemsList)
+            {
+                e.Handled = true;
+            }
         }
 
         // ================== PRZYCISKI "POKAŻ WSZYSTKO" ==================
@@ -345,17 +311,12 @@ namespace Finly.Pages
         }
     }
 
-
-
     /// <summary>
     /// Konwerter używany w XAML – string daty yyyy-MM-dd → dd.MM.yyyy.
     /// </summary>
     public sealed class DateStringToPLConverter : IValueConverter
     {
-        public object? Convert(object value,
-                               Type targetType,
-                               object parameter,
-                               CultureInfo culture)
+        public object? Convert(object value, Type targetType, object parameter, CultureInfo culture)
         {
             var s = value as string;
             if (string.IsNullOrWhiteSpace(s))
@@ -370,10 +331,7 @@ namespace Finly.Pages
             return s;
         }
 
-        public object ConvertBack(object value,
-                                  Type targetType,
-                                  object parameter,
-                                  CultureInfo culture)
+        public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
             => Binding.DoNothing;
     }
 }

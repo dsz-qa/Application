@@ -2345,6 +2345,80 @@ VALUES(@u, @n);";
             RaiseDataChanged();
         }
 
+        public static void UpdatePlannedExpenseDate(int userId, int expenseId, DateTime newDate)
+        {
+            if (userId <= 0 || expenseId <= 0) return;
+
+            using var c = OpenAndEnsureSchema();
+            using var cmd = c.CreateCommand();
+
+            bool hasIsPlanned = ColumnExists(c, "Expenses", "IsPlanned");
+
+            cmd.CommandText = hasIsPlanned
+                ? @"UPDATE Expenses
+              SET Date=@d
+            WHERE Id=@id AND UserId=@u AND IsPlanned=1;"
+                : @"UPDATE Expenses
+              SET Date=@d
+            WHERE Id=@id AND UserId=@u;";
+
+            cmd.Parameters.AddWithValue("@d", ToIsoDate(newDate));
+            cmd.Parameters.AddWithValue("@id", expenseId);
+            cmd.Parameters.AddWithValue("@u", userId);
+
+            cmd.ExecuteNonQuery();
+            RaiseDataChanged();
+        }
+
+        public static void UpdatePlannedIncomeDate(int userId, int incomeId, DateTime newDate)
+        {
+            if (userId <= 0 || incomeId <= 0) return;
+
+            using var c = OpenAndEnsureSchema();
+            using var cmd = c.CreateCommand();
+
+            bool hasIsPlanned = ColumnExists(c, "Incomes", "IsPlanned");
+
+            cmd.CommandText = hasIsPlanned
+                ? @"UPDATE Incomes
+              SET Date=@d
+            WHERE Id=@id AND UserId=@u AND IsPlanned=1;"
+                : @"UPDATE Incomes
+              SET Date=@d
+            WHERE Id=@id AND UserId=@u;";
+
+            cmd.Parameters.AddWithValue("@d", ToIsoDate(newDate));
+            cmd.Parameters.AddWithValue("@id", incomeId);
+            cmd.Parameters.AddWithValue("@u", userId);
+
+            cmd.ExecuteNonQuery();
+            RaiseDataChanged();
+        }
+
+        public static void UpdatePlannedTransferDate(int userId, int transferId, DateTime newDate)
+        {
+            if (userId <= 0 || transferId <= 0) return;
+
+            using var c = OpenAndEnsureSchema();
+            using var cmd = c.CreateCommand();
+
+            bool hasIsPlanned = ColumnExists(c, "Transfers", "IsPlanned");
+
+            cmd.CommandText = hasIsPlanned
+                ? @"UPDATE Transfers
+              SET Date=@d
+            WHERE Id=@id AND UserId=@u AND IsPlanned=1;"
+                : @"UPDATE Transfers
+              SET Date=@d
+            WHERE Id=@id AND UserId=@u;";
+
+            cmd.Parameters.AddWithValue("@d", ToIsoDate(newDate));
+            cmd.Parameters.AddWithValue("@id", transferId);
+            cmd.Parameters.AddWithValue("@u", userId);
+
+            cmd.ExecuteNonQuery();
+            RaiseDataChanged();
+        }
 
 
         private static int? TryResolveAccountIdFromExpenseAccountText(SqliteConnection c, SqliteTransaction tx, int userId, string? accountText)

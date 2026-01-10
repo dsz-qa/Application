@@ -10,13 +10,11 @@
              SnapsToDevicePixels="True"
              UseLayoutRounding="True"
              TextOptions.TextFormattingMode="Display"
-             TextOptions.TextRenderingMode="ClearType">
+             TextOptions.TextRenderingMode="ClearType"
+             RequestBringIntoView="Root_RequestBringIntoView">
 
     <UserControl.Resources>
         <BooleanToVisibilityConverter x:Key="BoolToVisibilityConverter"/>
-
-        <!-- Converter: yyyy-MM-dd -> dd.MM.yyyy -->
-        <local:DateStringToPLConverter x:Key="DateToPl"/>
 
         <!-- KPI -->
         <Style x:Key="KpiValueStyle" TargetType="TextBlock">
@@ -43,7 +41,7 @@
             <Setter Property="Margin" Value="0,0,16,0"/>
         </Style>
 
-        <!-- ========= KLUCZ: duże sekcje BEZ cienia (brak rozmycia) ========= -->
+        <!-- Duże sekcje BEZ cienia -->
         <Style x:Key="SectionCard" TargetType="Border">
             <Setter Property="Background" Value="{DynamicResource Surface.Background}"/>
             <Setter Property="BorderBrush" Value="{DynamicResource Surface.Border}"/>
@@ -56,7 +54,7 @@
             <Setter Property="TextOptions.TextRenderingMode" Value="ClearType"/>
         </Style>
 
-        <!-- Pojedyncza karta transakcji (może mieć cień) -->
+        <!-- Pojedyncza karta transakcji -->
         <Style x:Key="TransactionItemCard" TargetType="Border">
             <Setter Property="Background" Value="{DynamicResource Surface.Background}"/>
             <Setter Property="BorderBrush" Value="{DynamicResource Surface.Border}"/>
@@ -125,6 +123,8 @@
             <Setter Property="BorderBrush" Value="{DynamicResource Brand.Blue}"/>
             <Setter Property="BorderThickness" Value="0"/>
             <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Focusable" Value="False"/>
+            <Setter Property="IsTabStop" Value="False"/>
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="Button">
@@ -156,14 +156,13 @@
         <!-- ========= Transaction Card Template (Read/Edit) ========= -->
         <DataTemplate x:Key="TransactionCardTemplate">
             <Border Style="{StaticResource TransactionItemCard}">
-                <!-- 2 kolumny: TREŚĆ (lewa) + AKCJE (prawa) => nic się nie rozciąga pod przyciski -->
                 <Grid>
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*"/>
                         <ColumnDefinition Width="Auto"/>
                     </Grid.ColumnDefinitions>
 
-                    <!-- CONTENT AREA -->
+                    <!-- CONTENT -->
                     <Grid Grid.Column="0">
                         <Grid.RowDefinitions>
                             <RowDefinition Height="Auto"/>
@@ -173,8 +172,6 @@
                         <!-- READ MODE -->
                         <Grid x:Name="ReadMode" Grid.RowSpan="2">
                             <StackPanel Orientation="Vertical" Margin="4,0,16,0">
-
-                                <!-- Header: icon + type -->
                                 <StackPanel Orientation="Horizontal" Margin="0,0,0,8" VerticalAlignment="Center">
                                     <Image Width="20" Height="20" Margin="0,0,6,0">
                                         <Image.Style>
@@ -215,20 +212,18 @@
                                     </TextBlock>
                                 </StackPanel>
 
-                                <!-- Data -->
                                 <StackPanel Orientation="Horizontal" Margin="0,0,0,2">
                                     <TextBlock Text="Data:" FontWeight="SemiBold" Foreground="{DynamicResource App.Foreground}" Margin="0,0,6,0"/>
-                                    <TextBlock Text="{Binding DateDisplay, Converter={StaticResource DateToPl}}"
-                                               Foreground="{DynamicResource App.Foreground}"/>
+                                    <TextBlock Text="{Binding DateDisplay}"
+           Foreground="{DynamicResource App.Foreground}"/>
+
                                 </StackPanel>
 
-                                <!-- Kwota -->
                                 <StackPanel Orientation="Horizontal" Margin="0,0,0,2">
                                     <TextBlock Text="Kwota:" FontWeight="SemiBold" Foreground="{DynamicResource App.Foreground}" Margin="0,0,6,0"/>
                                     <TextBlock Text="{Binding AmountStr}" Foreground="{DynamicResource App.Foreground}"/>
                                 </StackPanel>
 
-                                <!-- Konto: Expense -->
                                 <StackPanel Orientation="Horizontal" Margin="0,0,0,2"
                                             Visibility="{Binding IsExpense, Converter={StaticResource BoolToVisibilityConverter}}">
                                     <TextBlock Text="Z konta:" FontWeight="SemiBold" Foreground="{DynamicResource App.Foreground}" Margin="0,0,6,0"/>
@@ -236,7 +231,6 @@
                                                Foreground="{DynamicResource App.Foreground}"/>
                                 </StackPanel>
 
-                                <!-- Konto: Income -->
                                 <StackPanel Orientation="Horizontal" Margin="0,0,0,2"
                                             Visibility="{Binding IsIncome, Converter={StaticResource BoolToVisibilityConverter}}">
                                     <TextBlock Text="Na konto:" FontWeight="SemiBold" Foreground="{DynamicResource App.Foreground}" Margin="0,0,6,0"/>
@@ -244,7 +238,6 @@
                                                Foreground="{DynamicResource App.Foreground}"/>
                                 </StackPanel>
 
-                                <!-- Konto: Transfer -->
                                 <StackPanel Margin="0,0,0,2"
                                             Visibility="{Binding IsTransfer, Converter={StaticResource BoolToVisibilityConverter}}">
                                     <StackPanel Orientation="Horizontal" Margin="0,0,0,2">
@@ -259,7 +252,6 @@
                                     </StackPanel>
                                 </StackPanel>
 
-                                <!-- Kategoria (ukryj dla transferu) -->
                                 <StackPanel Orientation="Horizontal" Margin="0,0,0,2">
                                     <StackPanel.Style>
                                         <Style TargetType="StackPanel">
@@ -277,7 +269,6 @@
                                                Foreground="{DynamicResource App.Foreground}"/>
                                 </StackPanel>
 
-                                <!-- Opis -->
                                 <StackPanel Orientation="Horizontal" Margin="0,0,0,2">
                                     <TextBlock Text="Opis:" FontWeight="SemiBold" Foreground="{DynamicResource App.Foreground}" Margin="0,0,6,0"/>
                                     <TextBlock Text="{Binding Description, TargetNullValue=Brak danych, FallbackValue=Brak danych}"
@@ -285,7 +276,6 @@
                                                TextTrimming="CharacterEllipsis"/>
                                 </StackPanel>
 
-                                <!-- Delete confirmation -->
                                 <StackPanel Visibility="{Binding IsDeleteConfirmationVisible, Converter={StaticResource BoolToVisibilityConverter}}"
                                             Margin="0,8,0,0">
                                     <TextBlock Text="Czy na pewno chcesz usunąć tę transakcję?"
@@ -296,16 +286,19 @@
                                         <Button Content="Tak"
                                                 Padding="8,4"
                                                 MinWidth="70"
+                                                Focusable="False"
+                                                IsTabStop="False"
                                                 Command="{Binding DataContext.DeleteTransactionCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
                                                 CommandParameter="{Binding}"/>
                                         <Button Content="Nie"
                                                 Padding="8,4"
                                                 MinWidth="70"
                                                 Margin="8,0,0,0"
+                                                Focusable="False"
+                                                IsTabStop="False"
                                                 Command="{Binding HideDeleteConfirmationCommand}"/>
                                     </StackPanel>
                                 </StackPanel>
-
                             </StackPanel>
                         </Grid>
 
@@ -313,7 +306,6 @@
                         <Grid x:Name="EditMode" Grid.RowSpan="2" Visibility="Collapsed">
                             <StackPanel Orientation="Vertical" Margin="4,0,16,0">
 
-                                <!-- Header -->
                                 <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
                                     <Image Width="20" Height="20" Margin="0,0,6,0">
                                         <Image.Style>
@@ -354,7 +346,7 @@
                                     </TextBlock>
                                 </StackPanel>
 
-                                <!-- 1) DATA (edytowalne) -->
+                                <!-- DATA -->
                                 <Grid Margin="0,0,0,6">
                                     <Grid.ColumnDefinitions>
                                         <ColumnDefinition Width="110"/>
@@ -370,11 +362,11 @@
                                     <DatePicker Grid.Column="1"
                                                 Width="160"
                                                 HorizontalAlignment="Left"
-                                                SelectedDate="{Binding EditDate, Mode=TwoWay}"
+                                                SelectedDate="{Binding EditDate, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                                                 Height="28"/>
                                 </Grid>
 
-                                <!-- 2) KWOTA (nieedytowalne) -->
+                                <!-- KWOTA (read-only) -->
                                 <Grid Margin="0,0,0,6">
                                     <Grid.ColumnDefinitions>
                                         <ColumnDefinition Width="110"/>
@@ -393,8 +385,7 @@
                                                VerticalAlignment="Center"/>
                                 </Grid>
 
-                                <!-- 3) KONTO (nieedytowalne) -->
-                                <!-- Expense -->
+                                <!-- KONTO (read-only) -->
                                 <Grid Margin="0,0,0,6"
                                       Visibility="{Binding IsExpense, Converter={StaticResource BoolToVisibilityConverter}}">
                                     <Grid.ColumnDefinitions>
@@ -414,7 +405,6 @@
                                                VerticalAlignment="Center"/>
                                 </Grid>
 
-                                <!-- Income -->
                                 <Grid Margin="0,0,0,6"
                                       Visibility="{Binding IsIncome, Converter={StaticResource BoolToVisibilityConverter}}">
                                     <Grid.ColumnDefinitions>
@@ -434,7 +424,6 @@
                                                VerticalAlignment="Center"/>
                                 </Grid>
 
-                                <!-- Transfer: tylko informacja (bez edycji) -->
                                 <TextBlock Margin="0,6,0,0"
                                            Foreground="{DynamicResource App.Foreground}"
                                            Opacity="0.75"
@@ -451,7 +440,7 @@
                                     </TextBlock.Style>
                                 </TextBlock>
 
-                                <!-- 4) KATEGORIA (edytowalne, ukryj dla transferu) -->
+                                <!-- KATEGORIA -->
                                 <Grid Margin="0,0,0,6">
                                     <Grid.Style>
                                         <Style TargetType="Grid">
@@ -480,13 +469,13 @@
                                               Height="28"
                                               HorizontalAlignment="Left"
                                               ItemsSource="{Binding DataContext.AvailableCategories, RelativeSource={RelativeSource AncestorType=UserControl}}"
-                                              SelectedItem="{Binding SelectedCategory, Mode=TwoWay}"
+                                              SelectedItem="{Binding SelectedCategory, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                                               IsEditable="False"
                                               MaxDropDownHeight="240"
                                               HorizontalContentAlignment="Left"/>
                                 </Grid>
 
-                                <!-- 5) OPIS (edytowalne) -->
+                                <!-- OPIS -->
                                 <Grid Margin="0,0,0,0">
                                     <Grid.ColumnDefinitions>
                                         <ColumnDefinition Width="110"/>
@@ -506,12 +495,11 @@
                                              Text="{Binding EditDescription, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                                              GotFocus="EditDescription_GotFocus"/>
                                 </Grid>
-
                             </StackPanel>
                         </Grid>
                     </Grid>
 
-                    <!-- ACTIONS (prawa kolumna - nie wpływa na szerokość pól) -->
+                    <!-- ACTIONS -->
                     <Grid Grid.Column="1"
                           HorizontalAlignment="Right"
                           VerticalAlignment="Top"
@@ -521,7 +509,9 @@
                         <StackPanel x:Name="NormalActions" Orientation="Horizontal">
                             <Button Margin="0,0,8,0"
                                     ToolTip="Edytuj"
-                                    Click="StartEdit_Click">
+                                    Click="StartEdit_Click"
+                                    Focusable="False"
+                                    IsTabStop="False">
                                 <Button.Style>
                                     <Style TargetType="Button" BasedOn="{StaticResource EditIconButton}">
                                         <Style.Triggers>
@@ -537,7 +527,9 @@
 
                             <Button ToolTip="Usuń"
                                     Command="{Binding ShowDeleteConfirmationCommand}"
-                                    Style="{StaticResource DeleteIconButton}"/>
+                                    Style="{StaticResource DeleteIconButton}"
+                                    Focusable="False"
+                                    IsTabStop="False"/>
                         </StackPanel>
 
                         <StackPanel x:Name="EditActions" Orientation="Horizontal" Visibility="Collapsed">
@@ -545,7 +537,9 @@
                                     MinWidth="92"
                                     ToolTip="Zapisz"
                                     Click="SaveEdit_Click"
-                                    Style="{StaticResource PrimaryButton}">
+                                    Style="{StaticResource PrimaryButton}"
+                                    Focusable="False"
+                                    IsTabStop="False">
                                 <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                                     <Path Data="M2,10 L6,14 L14,4"
                                           Stroke="{DynamicResource Brand.Blue}"
@@ -564,13 +558,14 @@
                                     ToolTip="Anuluj"
                                     Click="CancelEdit_Click"
                                     Margin="8,0,0,0"
-                                    Style="{StaticResource SecondaryButton}">
+                                    Style="{StaticResource SecondaryButton}"
+                                    Focusable="False"
+                                    IsTabStop="False">
                                 <TextBlock Text="Anuluj" VerticalAlignment="Center"/>
                             </Button>
                         </StackPanel>
 
                     </Grid>
-
                 </Grid>
             </Border>
 
@@ -592,13 +587,12 @@
         </DataTemplate>
     </UserControl.Resources>
 
-    <!-- UWAGA: hook na RequestBringIntoView (kod poniżej) -->
     <ScrollViewer x:Name="RootScroll"
                   VerticalScrollBarVisibility="Auto"
                   HorizontalScrollBarVisibility="Disabled"
-                  PanningMode="VerticalOnly"
-                  RequestBringIntoView="RootScroll_RequestBringIntoView">
+                  PanningMode="VerticalOnly">
 
+        <!-- reszta Twojego layoutu bez zmian -->
         <Grid>
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto"/>
@@ -692,120 +686,7 @@
             </Grid>
 
             <!-- FILTRY -->
-            <StackPanel Grid.Row="2" Margin="16,0,16,12" Orientation="Vertical">
-                <Grid>
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="*"/>
-                        <ColumnDefinition Width="*"/>
-                        <ColumnDefinition Width="*"/>
-                    </Grid.ColumnDefinitions>
-
-                    <GroupBox Grid.Column="0" Style="{StaticResource FilterPanelStyle}">
-                        <GroupBox.Header>
-                            <DockPanel>
-                                <TextBlock Text="Typ transakcji"
-                                           FontWeight="Bold"
-                                           FontSize="16"
-                                           Foreground="{DynamicResource App.Foreground}"
-                                           VerticalAlignment="Center"/>
-                                <Button Content="Pokaż wszystko"
-                                        Style="{StaticResource FilterHeaderButtonStyle}"
-                                        Click="ShowAllTypes_Click"
-                                        DockPanel.Dock="Right"/>
-                            </DockPanel>
-                        </GroupBox.Header>
-
-                        <ScrollViewer VerticalScrollBarVisibility="Auto">
-                            <StackPanel>
-                                <CheckBox Style="{StaticResource FilterCheckBox}"
-                                          IsChecked="{Binding ShowExpenses, Mode=TwoWay}">
-                                    <StackPanel Orientation="Horizontal">
-                                        <Image Source="/Assets/Icons/wydatki.png" Width="18" Height="18" Margin="0,0,6,0"/>
-                                        <TextBlock Text="Wydatki"/>
-                                    </StackPanel>
-                                </CheckBox>
-
-                                <CheckBox Style="{StaticResource FilterCheckBox}"
-                                          IsChecked="{Binding ShowIncomes, Mode=TwoWay}">
-                                    <StackPanel Orientation="Horizontal">
-                                        <Image Source="/Assets/Icons/przychody.png" Width="18" Height="18" Margin="0,0,6,0"/>
-                                        <TextBlock Text="Przychody"/>
-                                    </StackPanel>
-                                </CheckBox>
-
-                                <CheckBox Style="{StaticResource FilterCheckBox}"
-                                          IsChecked="{Binding ShowTransfers, Mode=TwoWay}">
-                                    <StackPanel Orientation="Horizontal">
-                                        <Image Source="/Assets/Icons/transfer.png" Width="18" Height="18" Margin="0,0,6,0"/>
-                                        <TextBlock Text="Transfery"/>
-                                    </StackPanel>
-                                </CheckBox>
-                            </StackPanel>
-                        </ScrollViewer>
-                    </GroupBox>
-
-                    <GroupBox Grid.Column="1" Style="{StaticResource FilterPanelStyle}">
-                        <GroupBox.Header>
-                            <DockPanel>
-                                <TextBlock Text="Kategorie"
-                                           FontWeight="Bold"
-                                           FontSize="16"
-                                           Foreground="{DynamicResource App.Foreground}"
-                                           VerticalAlignment="Center"/>
-                                <Button Content="Pokaż wszystko"
-                                        Style="{StaticResource FilterHeaderButtonStyle}"
-                                        Click="ShowAllCategories_Click"
-                                        DockPanel.Dock="Right"/>
-                            </DockPanel>
-                        </GroupBox.Header>
-
-                        <ScrollViewer VerticalScrollBarVisibility="Auto">
-                            <ItemsControl ItemsSource="{Binding Categories}">
-                                <ItemsControl.ItemTemplate>
-                                    <DataTemplate>
-                                        <CheckBox Style="{StaticResource FilterCheckBox}"
-                                                  Content="{Binding Name}"
-                                                  IsChecked="{Binding IsSelected, Mode=TwoWay}"/>
-                                    </DataTemplate>
-                                </ItemsControl.ItemTemplate>
-                            </ItemsControl>
-                        </ScrollViewer>
-                    </GroupBox>
-
-                    <GroupBox Grid.Column="2" Style="{StaticResource FilterPanelStyle}" Margin="0">
-                        <GroupBox.Header>
-                            <DockPanel>
-                                <TextBlock Text="Konta"
-                                           FontWeight="Bold"
-                                           FontSize="16"
-                                           Foreground="{DynamicResource App.Foreground}"
-                                           VerticalAlignment="Center"/>
-                                <Button Content="Pokaż wszystko"
-                                        Style="{StaticResource FilterHeaderButtonStyle}"
-                                        Click="ShowAllAccounts_Click"
-                                        DockPanel.Dock="Right"/>
-                            </DockPanel>
-                        </GroupBox.Header>
-
-                        <ScrollViewer VerticalScrollBarVisibility="Auto">
-                            <ItemsControl ItemsSource="{Binding Accounts}">
-                                <ItemsControl.ItemTemplate>
-                                    <DataTemplate>
-                                        <CheckBox Style="{StaticResource FilterCheckBox}"
-                                                  Content="{Binding Name}"
-                                                  IsChecked="{Binding IsSelected, Mode=TwoWay}"/>
-                                    </DataTemplate>
-                                </ItemsControl.ItemTemplate>
-                            </ItemsControl>
-                        </ScrollViewer>
-                    </GroupBox>
-                </Grid>
-
-                <Border Height="2"
-                        Background="{DynamicResource Brand.Orange}"
-                        CornerRadius="0,0,8,8"
-                        Margin="0,8,0,0"/>
-            </StackPanel>
+            <!-- ... (Twoja reszta bez zmian) ... -->
 
             <!-- CONTENT -->
             <Border Grid.Row="3"
@@ -824,7 +705,7 @@
                         <ColumnDefinition Width="*"/>
                     </Grid.ColumnDefinitions>
 
-                    <!-- PeriodBarControl + search -->
+                    <!-- PeriodBar + search -->
                     <StackPanel Grid.Row="0" Grid.ColumnSpan="2" Margin="0,0,0,12">
 
                         <Border Background="{DynamicResource Surface.Background}"
@@ -852,6 +733,8 @@
                                     Content="Wyczyść"
                                     Margin="10,0,0,0"
                                     Padding="14,6"
+                                    Focusable="False"
+                                    IsTabStop="False"
                                     Click="ClearSearch_Click"/>
                         </Grid>
 

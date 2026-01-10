@@ -1,13 +1,15 @@
-﻿using System;
-using System.Collections.ObjectModel;
+﻿using Finly.Models;
+using Finly.Services.Features;
+using Microsoft.Data.Sqlite;
+using System;
 using System.Collections.Generic;
+using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Data;
+using System.Globalization;
 using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Windows.Input;
-using Finly.Models;
-using Finly.Services.Features;
 
 namespace Finly.ViewModels
 {
@@ -218,6 +220,7 @@ namespace Finly.ViewModels
             {
                 _showScheduled = value;
                 OnPropertyChanged();
+                ApplyFilters();
             }
         }
 
@@ -246,7 +249,6 @@ namespace Finly.ViewModels
                         _ => throw new InvalidOperationException("Nieznany typ transakcji.")
                     };
 
-                    // Jedyny punkt kasowania: reversal + delete (planned bez reversal)
                     TransactionsFacadeService.DeleteTransaction(src, vm.Id);
                 }
                 catch
@@ -418,13 +420,11 @@ namespace Finly.ViewModels
 
             foreach (var t in AllTransactions)
             {
-                DateTime parsed;
-                bool hasDate = DateTime.TryParse(t.DateDisplay, out parsed);
+                var d = TryParseDateDisplay(t.DateDisplay, out var parsed) ? parsed : DateTime.MinValue;
 
-                bool isFuture = hasDate && parsed.Date > today;
+                bool isFuture = d != DateTime.MinValue && d.Date > today;
                 bool isPlannedOrFuture = t.IsPlanned || isFuture;
 
-                // utrzymuj spójność flag w VM (pomaga w UI)
                 t.IsFuture = isFuture;
 
                 if (isPlannedOrFuture) PlannedTransactions.Add(t);
@@ -432,15 +432,51 @@ namespace Finly.ViewModels
             }
         }
 
+        // ------------------ DATE HELPERS ------------------
+
+        private static string ToIso(DateTime dt)
+            => dt.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
+
+        private static string ToUiDate(DateTime dt)
+            => dt.ToString("dd-MM-yyyy", CultureInfo.CurrentCulture);
+
+        private static bool TryParseDateDisplay(string? s, out DateTime dt)
+        {
+            dt = default;
+            if (string.IsNullOrWhiteSpace(s)) return false;
+
+            // Akceptujemy oba formaty (bo masz już historyczne dane w różnych formatach)
+            var formats = new[] { "yyyy-MM-dd", "dd-MM-yyyy", "yyyy/MM/dd", "dd/MM/yyyy" };
+
+            if (DateTime.TryParseExact(s.Trim(), formats, CultureInfo.InvariantCulture, DateTimeStyles.None, out dt))
+                return true;
+
+            // fallback
+            return DateTime.TryParse(s, CultureInfo.CurrentCulture, DateTimeStyles.None, out dt)
+                || DateTime.TryParse(s, CultureInfo.InvariantCulture, DateTimeStyles.None, out dt);
+        }
+
+        private DateTime ParseDate(object? raw)
+        {
+            if (raw is DateTime dt) return dt;
+
+            // Jeśli w DB masz ISO, to to przejdzie:
+            if (DateTime.TryParseExact(raw?.ToString(), "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var p1))
+                return p1;
+
+            if (DateTime.TryParse(raw?.ToString(), out var p)) return p;
+
+            return DateTime.MinValue;
+        }
 
         // ------------------ WYŚWIETLANIE KONT (PaymentKind/Ref) ------------------
 
         private string ResolvePaymentDisplay(int paymentKind, int? paymentRefId, int? fallbackAccountId = null)
         {
+            // 0 FreeCash, 1 SavedCash, 2 BankAccount, 3 Envelope (wg Twojego kodu)
             if (paymentKind == 0) return "Wolna gotówka";
             if (paymentKind == 1) return "Odłożona gotówka";
 
-            // Jeśli mamy refId, rozpoznaj po słownikach (bezpieczne).
             if (paymentRefId.HasValue)
             {
                 if (_accountNameById.TryGetValue(paymentRefId.Value, out var acc))
@@ -450,7 +486,6 @@ namespace Finly.ViewModels
                     return $"Koperta: {env}";
             }
 
-            // Zakładamy: 2=Bank, 3=Envelope (nie ruszamy Twojej logiki).
             if (paymentKind == 2)
             {
                 if (paymentRefId.HasValue && _accountNameById.TryGetValue(paymentRefId.Value, out var acc2))
@@ -473,6 +508,22 @@ namespace Finly.ViewModels
             return "?";
         }
 
+        private string ResolveAccountDisplay(string kind, int? id)
+        {
+            var k = (kind ?? string.Empty).Trim().ToLowerInvariant();
+
+            return k switch
+            {
+                "bank" => (id.HasValue && _accountNameById.TryGetValue(id.Value, out var acc)) ? acc : "Konto bankowe",
+                "envelope" => (id.HasValue && _envelopeNameById.TryGetValue(id.Value, out var env)) ? $"Koperta: {env}" : "Koperta",
+                "freecash" => "Wolna gotówka",
+                "cash" => "Wolna gotówka",
+                "savedcash" => "Odłożona gotówka",
+                "saved" => "Odłożona gotówka",
+                _ => "?"
+            };
+        }
+
         // ------------------ DODAWANIE WIERSZY Z DB ------------------
 
         private void AddExpenseRow(DataRow r)
@@ -480,8 +531,15 @@ namespace Finly.ViewModels
             int id = Convert.ToInt32(r["Id"]);
             double amt = Convert.ToDouble(r["Amount"]);
             DateTime date = ParseDate(r["Date"]);
-            string desc = r["Description"]?.ToString() ?? string.Empty;
-            string catName = r["CategoryName"]?.ToString() ?? string.Empty;
+
+            // w Expenses masz i Title i Description; UI ma Description
+            string desc = r.Table.Columns.Contains("Description")
+                ? (r["Description"]?.ToString() ?? string.Empty)
+                : (r.Table.Columns.Contains("Title") ? (r["Title"]?.ToString() ?? string.Empty) : string.Empty);
+
+            string catName = r.Table.Columns.Contains("CategoryName")
+                ? (r["CategoryName"]?.ToString() ?? string.Empty)
+                : string.Empty;
 
             bool planned =
                 r.Table.Columns.Contains("IsPlanned") &&
@@ -511,7 +569,7 @@ namespace Finly.ViewModels
                 Kind = TransactionKind.Expense,
                 CategoryName = string.IsNullOrWhiteSpace(catName) ? "(brak)" : catName,
                 Description = desc,
-                DateDisplay = date.ToString("yyyy-MM-dd"),
+                DateDisplay = ToUiDate(date),
                 AmountStr = amt.ToString("N2") + " zł",
                 IsPlanned = planned,
                 IsFuture = date.Date > DateTime.Today,
@@ -521,7 +579,9 @@ namespace Finly.ViewModels
                 FromAccountName = fromName,
                 ToAccountName = null,
 
-                // edycja tylko: opis, data, kategoria
+                PaymentKind = pk,
+                PaymentRefId = pr,
+
                 SelectedCategory = string.IsNullOrWhiteSpace(catName) ? "(brak)" : catName,
                 EditDescription = desc,
                 EditDate = date
@@ -544,24 +604,39 @@ namespace Finly.ViewModels
                 r["IsPlanned"] != DBNull.Value &&
                 Convert.ToInt32(r["IsPlanned"]) == 1;
 
-            string toName = string.Empty;
+            int pk =
+                r.Table.Columns.Contains("PaymentKind") && r["PaymentKind"] != DBNull.Value
+                    ? Convert.ToInt32(r["PaymentKind"])
+                    : 0;
 
-            if (r.Table.Columns.Contains("AccountId") && r["AccountId"] != DBNull.Value)
+            int? pr =
+                r.Table.Columns.Contains("PaymentRefId") && r["PaymentRefId"] != DBNull.Value
+                    ? (int?)Convert.ToInt32(r["PaymentRefId"])
+                    : null;
+
+            // Jeśli masz PaymentKind/Ref, pokaż konto wynikające z tego.
+            string toName = ResolvePaymentDisplay(pk, pr, fallbackAccountId: null);
+
+            // fallback na legacy (Source/AccountId) jeśli coś jest puste
+            if (string.IsNullOrWhiteSpace(toName) || toName == "?")
             {
-                var accId = Convert.ToInt32(r["AccountId"]);
-                if (_accountNameById.TryGetValue(accId, out var accName))
-                    toName = accName;
-            }
+                if (r.Table.Columns.Contains("AccountId") && r["AccountId"] != DBNull.Value)
+                {
+                    var accId = Convert.ToInt32(r["AccountId"]);
+                    if (_accountNameById.TryGetValue(accId, out var accName))
+                        toName = accName;
+                }
 
-            if (string.IsNullOrWhiteSpace(toName) &&
-                r.Table.Columns.Contains("Source") &&
-                r["Source"] != DBNull.Value)
-            {
-                toName = r["Source"]?.ToString() ?? string.Empty;
-            }
+                if (string.IsNullOrWhiteSpace(toName) &&
+                    r.Table.Columns.Contains("Source") &&
+                    r["Source"] != DBNull.Value)
+                {
+                    toName = r["Source"]?.ToString() ?? string.Empty;
+                }
 
-            if (string.IsNullOrWhiteSpace(toName))
-                toName = "Wolna gotówka";
+                if (string.IsNullOrWhiteSpace(toName))
+                    toName = "Wolna gotówka";
+            }
 
             AllTransactions.Add(new TransactionCardVm
             {
@@ -569,7 +644,7 @@ namespace Finly.ViewModels
                 Kind = TransactionKind.Income,
                 CategoryName = string.IsNullOrEmpty(catName) ? "Przychód" : catName,
                 Description = desc,
-                DateDisplay = date.ToString("yyyy-MM-dd"),
+                DateDisplay = ToUiDate(date),
                 AmountStr = amt.ToString("N2") + " zł",
                 IsPlanned = planned,
                 IsFuture = date.Date > DateTime.Today,
@@ -579,7 +654,9 @@ namespace Finly.ViewModels
                 FromAccountName = null,
                 ToAccountName = toName,
 
-                // edycja tylko: opis, data, kategoria
+                PaymentKind = pk,
+                PaymentRefId = pr,
+
                 SelectedCategory = string.IsNullOrWhiteSpace(catName) ? "Przychód" : catName,
                 EditDescription = desc,
                 EditDate = date
@@ -626,7 +703,7 @@ namespace Finly.ViewModels
                 Kind = TransactionKind.Transfer,
                 CategoryName = "Transfer",
                 Description = desc,
-                DateDisplay = date.ToString("yyyy-MM-dd"),
+                DateDisplay = ToUiDate(date),
                 AmountStr = amt.ToString("N2") + " zł",
                 IsPlanned = planned,
                 IsFuture = date.Date > DateTime.Today,
@@ -636,34 +713,10 @@ namespace Finly.ViewModels
                 FromAccountName = fromName,
                 ToAccountName = toName,
 
-                // transferów nie edytujemy (żeby nie udawać zapisu bez update w DB)
                 SelectedCategory = "Transfer",
                 EditDescription = desc,
                 EditDate = date
             });
-        }
-
-        private string ResolveAccountDisplay(string kind, int? id)
-        {
-            var k = (kind ?? string.Empty).Trim().ToLowerInvariant();
-
-            return k switch
-            {
-                "bank" => (id.HasValue && _accountNameById.TryGetValue(id.Value, out var acc)) ? acc : "Konto bankowe",
-                "envelope" => (id.HasValue && _envelopeNameById.TryGetValue(id.Value, out var env)) ? $"Koperta: {env}" : "Koperta",
-                "freecash" => "Wolna gotówka",
-                "cash" => "Wolna gotówka", // legacy
-                "savedcash" => "Odłożona gotówka",
-                "saved" => "Odłożona gotówka", // legacy
-                _ => "?"
-            };
-        }
-
-        private DateTime ParseDate(object? raw)
-        {
-            if (raw is DateTime dt) return dt;
-            if (DateTime.TryParse(raw?.ToString(), out var p)) return p;
-            return DateTime.MinValue;
         }
 
         public void RefreshData() => ApplyFilters();
@@ -673,7 +726,13 @@ namespace Finly.ViewModels
             if (string.IsNullOrWhiteSpace(amountStr)) return 0m;
 
             var txt = new string(amountStr.Where(ch => char.IsDigit(ch) || ch == ',' || ch == '.' || ch == '-').ToArray());
-            if (decimal.TryParse(txt, out var v)) return Math.Abs(v);
+
+            // Najbezpieczniej: najpierw PL, potem invariant
+            if (decimal.TryParse(txt, NumberStyles.Number, CultureInfo.CurrentCulture, out var v1))
+                return Math.Abs(v1);
+
+            if (decimal.TryParse(txt, NumberStyles.Number, CultureInfo.InvariantCulture, out var v2))
+                return Math.Abs(v2);
 
             return 0m;
         }
@@ -684,13 +743,15 @@ namespace Finly.ViewModels
         {
             if (vm == null) return;
 
-            // Nie pozwalamy edytować transferów (brak update w DB w tym etapie)
-            if (vm.Kind == TransactionKind.Transfer) return;
-
             LoadAvailableLists();
 
             vm.EditDescription = vm.Description ?? string.Empty;
-            vm.EditDate = DateTime.TryParse(vm.DateDisplay, out var d) ? d : DateTime.Today;
+
+            // DateDisplay jest dd-MM-yyyy (UI), ale wspieramy oba:
+            if (TryParseDateDisplay(vm.DateDisplay, out var parsed))
+                vm.EditDate = parsed.Date;
+            else
+                vm.EditDate = DateTime.Today;
 
             vm.SelectedCategory = string.IsNullOrWhiteSpace(vm.CategoryName)
                 ? (vm.Kind == TransactionKind.Income ? "Przychód" : "(brak)")
@@ -703,102 +764,30 @@ namespace Finly.ViewModels
         {
             if (vm == null) return;
 
-            // Nie zapisujemy transferów w tej wersji
-            if (vm.Kind == TransactionKind.Transfer)
-            {
-                vm.IsEditing = false;
-                return;
-            }
 
             try
             {
-                var date = vm.EditDate == default ? DateTime.Today : vm.EditDate;
-                var desc = vm.EditDescription ?? string.Empty;
-                var selectedCat = vm.SelectedCategory?.Trim();
+                DateTime newDate = (vm.EditDate ?? DateTime.Today).Date;
+                string newDesc = vm.EditDescription ?? string.Empty;
+                string? selectedCat = vm.SelectedCategory?.Trim();
 
-                // UWAGA: usuwamy blokadę "future"
-                // if (!vm.IsPlanned && date.Date > DateTime.Today) return;
+                bool newPlanned = newDate.Date > DateTime.Today;
 
                 switch (vm.Kind)
                 {
                     case TransactionKind.Expense:
-                        {
-                            var exp = DatabaseService.GetExpenseById(vm.Id);
-                            if (exp == null) return;
-
-                            exp.UserId = UserId;
-                            exp.Date = date;
-                            exp.Description = desc;
-
-                            // jeśli data w przyszłości -> ma być zaplanowana (i nie księgować teraz)
-                            exp.IsPlanned = date.Date > DateTime.Today;
-
-                            int catId = 0;
-                            if (!string.IsNullOrWhiteSpace(selectedCat) &&
-                                !string.Equals(selectedCat, "(brak)", StringComparison.CurrentCultureIgnoreCase))
-                            {
-                                try
-                                {
-                                    var id = DatabaseService.GetOrCreateCategoryId(UserId, selectedCat!);
-                                    if (id > 0) catId = id;
-                                }
-                                catch { catId = 0; }
-                            }
-
-                            exp.CategoryId = catId;
-
-                            // NIE ruszamy: Amount / PaymentKind / PaymentRefId
-                            DatabaseService.UpdateExpense(exp);
-
-                            // aktualizacja VM (żeby UI był spójny od razu)
-                            vm.DateDisplay = date.ToString("yyyy-MM-dd");
-                            vm.Description = desc;
-
-                            vm.CategoryName = string.IsNullOrWhiteSpace(selectedCat) ? "(brak)" : selectedCat!;
-                            vm.SelectedCategory = vm.CategoryName;
-
-                            vm.IsPlanned = exp.IsPlanned;
-                            vm.IsFuture = date.Date > DateTime.Today;
-
-                            break;
-                        }
+                        SaveEditExpense(vm, newDate, newDesc, selectedCat, newPlanned);
+                        break;
 
                     case TransactionKind.Income:
-                        {
-                            // Brak GetIncomeById -> zachowujemy kwotę i konto bez zmian.
-                            var oldAmount = ParseAmountInternal(vm.AmountStr);
+                        SaveEditIncome(vm, newDate, newDesc, selectedCat, newPlanned);
+                        break;
 
-                            string? sourceUnchanged =
-                                !string.IsNullOrWhiteSpace(vm.ToAccountName) ? vm.ToAccountName :
-                                (!string.IsNullOrWhiteSpace(vm.AccountName) ? vm.AccountName : null);
-
-                            int? cid = null;
-                            if (!string.IsNullOrWhiteSpace(selectedCat) &&
-                                !string.Equals(selectedCat, "Przychód", StringComparison.CurrentCultureIgnoreCase))
-                            {
-                                try
-                                {
-                                    var id = DatabaseService.GetOrCreateCategoryId(UserId, selectedCat!);
-                                    if (id > 0) cid = id;
-                                }
-                                catch { cid = null; }
-                            }
-
-                            // NIE ruszamy: amount (oldAmount), source (sourceUnchanged)
-                            DatabaseService.UpdateIncome(vm.Id, UserId, oldAmount, desc, null, date, cid, sourceUnchanged);
-
-                            vm.DateDisplay = date.ToString("yyyy-MM-dd");
-                            vm.Description = desc;
-                            vm.CategoryName = string.IsNullOrWhiteSpace(selectedCat) ? "Przychód" : selectedCat!;
-                            vm.SelectedCategory = vm.CategoryName;
-
-                            // Income: w tym VM i tak traktujesz przyszłość jako "prawą kolumnę" przez IsFuture,
-                            // a planned bierzesz z DB (jeśli kolumna istnieje). Tu zostawiamy planned bez wymuszeń:
-                            vm.IsFuture = date.Date > DateTime.Today;
-
-                            break;
-                        }
+                    case TransactionKind.Transfer:
+                        SaveEditTransfer(vm, newDate, newDesc, newPlanned);
+                        break;
                 }
+
             }
             catch
             {
@@ -807,12 +796,315 @@ namespace Finly.ViewModels
             finally
             {
                 vm.IsEditing = false;
-
-                // po zmianie daty może zmienić się kolumna (Planned vs normal)
                 LoadFromDatabase();
             }
         }
 
+        private void SaveEditTransfer(TransactionCardVm vm, DateTime newDate, string newDesc, bool newPlanned)
+        {
+            using var c = DatabaseService.GetConnection();
+            DatabaseService.EnsureTables();
+            using var tx = c.BeginTransaction();
+
+            // Stary stan (żeby wiedzieć planned<->realized)
+            bool oldPlanned = false;
+            decimal amount = 0m;
+
+            using (var read = c.CreateCommand())
+            {
+                read.Transaction = tx;
+                read.CommandText = @"
+SELECT Amount, Date, COALESCE(IsPlanned,0) AS IsPlanned
+FROM Transfers
+WHERE Id=@id AND UserId=@u
+LIMIT 1;";
+                read.Parameters.AddWithValue("@id", vm.Id);
+                read.Parameters.AddWithValue("@u", UserId);
+
+                using var r = read.ExecuteReader();
+                if (!r.Read())
+                {
+                    tx.Rollback();
+                    return;
+                }
+
+                amount = r.IsDBNull(0) ? 0m : Convert.ToDecimal(r.GetValue(0));
+                var dateTxt = r.IsDBNull(1) ? "" : (r.GetValue(1)?.ToString() ?? "");
+                var isPlannedDb = !r.IsDBNull(2) && Convert.ToInt32(r.GetValue(2)) == 1;
+
+                DateTime oldDate =
+                    DateTime.TryParseExact(dateTxt, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var d1) ? d1 :
+                    (DateTime.TryParse(dateTxt, out var d2) ? d2 : DateTime.MinValue);
+
+                oldPlanned = isPlannedDb || (oldDate != DateTime.MinValue && oldDate.Date > DateTime.Today);
+            }
+
+            // UWAGA: Na tym etapie NIE ruszam Ledger dla transferów,
+            // bo nie pokazałaś metod ApplyTransferEffect/RevertTransferEffect.
+            // To jest bezpieczne: zmieniasz tylko plan/termin i opis.
+
+            using (var upd = c.CreateCommand())
+            {
+                upd.Transaction = tx;
+                upd.CommandText = @"
+UPDATE Transfers
+SET Date=@d,
+    Description=@desc,
+    IsPlanned=@p
+WHERE Id=@id AND UserId=@u;";
+                upd.Parameters.AddWithValue("@d", ToIso(newDate));
+                upd.Parameters.AddWithValue("@desc", (object?)newDesc ?? DBNull.Value);
+                upd.Parameters.AddWithValue("@p", newPlanned ? 1 : 0);
+                upd.Parameters.AddWithValue("@id", vm.Id);
+                upd.Parameters.AddWithValue("@u", UserId);
+
+                upd.ExecuteNonQuery();
+            }
+
+            tx.Commit();
+
+            // Update VM (UI)
+            vm.DateDisplay = ToUiDate(newDate);
+            vm.Description = newDesc;
+            vm.IsPlanned = newPlanned;
+            vm.IsFuture = newPlanned;
+        }
+
+
+        private void SaveEditExpense(TransactionCardVm vm, DateTime newDate, string newDesc, string? selectedCat, bool newPlanned)
+        {
+            var exp = DatabaseService.GetExpenseById(vm.Id);
+            if (exp == null) return;
+
+            exp.UserId = UserId;
+
+            bool oldPlanned = exp.IsPlanned || exp.Date.Date > DateTime.Today;
+
+            int catId = 0;
+            if (!string.IsNullOrWhiteSpace(selectedCat) &&
+                !string.Equals(selectedCat, "(brak)", StringComparison.CurrentCultureIgnoreCase))
+            {
+                try
+                {
+                    var id = DatabaseService.GetOrCreateCategoryId(UserId, selectedCat!);
+                    if (id > 0) catId = id;
+                }
+                catch { catId = 0; }
+            }
+
+            exp.Date = newDate;
+            exp.Description = newDesc;
+            exp.CategoryId = catId;
+            exp.IsPlanned = newPlanned;
+
+            using var c = DatabaseService.GetConnection();
+            DatabaseService.EnsureTables();
+            using var tx = c.BeginTransaction();
+
+            if (oldPlanned != newPlanned)
+            {
+                var amount = Convert.ToDecimal(exp.Amount);
+
+                if (oldPlanned && !newPlanned)
+                {
+                    // planned -> realized
+                    LedgerService.ApplyExpenseEffect(
+                        c, tx, UserId, amount,
+                        (int)exp.PaymentKind,
+                        exp.PaymentRefId);
+                }
+                else if (!oldPlanned && newPlanned)
+                {
+                    // realized -> planned
+                    LedgerService.RevertExpenseEffect(
+                        c, tx, UserId, amount,
+                        (int)exp.PaymentKind,
+                        exp.PaymentRefId);
+                }
+            }
+
+            UpdateExpenseRowSql(c, tx, exp);
+
+            tx.Commit();
+
+            vm.DateDisplay = ToUiDate(newDate);
+            vm.Description = newDesc;
+            vm.CategoryName = string.IsNullOrWhiteSpace(selectedCat) ? "(brak)" : selectedCat!;
+            vm.SelectedCategory = vm.CategoryName;
+            vm.IsPlanned = newPlanned;
+            vm.IsFuture = newPlanned;
+        }
+
+        private void SaveEditIncome(TransactionCardVm vm, DateTime newDate, string newDesc, string? selectedCat, bool newPlanned)
+        {
+            // Czytamy stan bazowy z DB (kwota/konto/isPlanned), żeby księgowanie było poprawne.
+            using var c = DatabaseService.GetConnection();
+            DatabaseService.EnsureTables();
+            using var tx = c.BeginTransaction();
+
+            var info = ReadIncomeLedgerInfo(c, tx, vm.Id);
+            if (info == null || info.UserId != UserId)
+            {
+                tx.Rollback();
+                return;
+            }
+
+            bool oldPlanned = info.IsPlanned || info.Date.Date > DateTime.Today;
+
+            // Kategoria (opcjonalna)
+            int? catId = null;
+            if (!string.IsNullOrWhiteSpace(selectedCat) &&
+                !string.Equals(selectedCat, "Przychód", StringComparison.CurrentCultureIgnoreCase))
+            {
+                try
+                {
+                    var id = DatabaseService.GetOrCreateCategoryId(UserId, selectedCat!);
+                    if (id > 0) catId = id;
+                }
+                catch { catId = null; }
+            }
+
+            // Księgowanie/odksięgowanie przy zmianie planned<->realized
+            if (oldPlanned != newPlanned)
+            {
+                if (oldPlanned && !newPlanned)
+                {
+                    LedgerService.ApplyIncomeEffect(c, tx, UserId, info.Amount, info.PaymentKind, info.PaymentRefId);
+                }
+                else if (!oldPlanned && newPlanned)
+                {
+                    LedgerService.RevertIncomeEffect(c, tx, UserId, info.Amount, info.PaymentKind, info.PaymentRefId);
+                }
+            }
+
+            UpdateIncomeRowSql(c, tx, UserId, vm.Id, newDate, newDesc, catId, newPlanned);
+
+            tx.Commit();
+
+            vm.DateDisplay = ToUiDate(newDate);
+            vm.Description = newDesc;
+            vm.CategoryName = string.IsNullOrWhiteSpace(selectedCat) ? "Przychód" : selectedCat!;
+            vm.SelectedCategory = vm.CategoryName;
+
+            vm.IsPlanned = newPlanned;
+            vm.IsFuture = newPlanned;
+        }
+
+        // ------------------ SQL UPDATE HELPERS ------------------
+
+        private static void UpdateExpenseRowSql(SqliteConnection c, SqliteTransaction tx, Expense exp)
+        {
+            using var cmd = c.CreateCommand();
+            cmd.Transaction = tx;
+
+            cmd.CommandText = @"
+UPDATE Expenses
+SET Date=@d,
+    Description=@desc,
+    CategoryId=@cat,
+    IsPlanned=@p
+WHERE Id=@id AND UserId=@u;";
+
+            cmd.Parameters.AddWithValue("@d", ToIso(exp.Date));
+            cmd.Parameters.AddWithValue("@desc", (object?)exp.Description ?? DBNull.Value);
+
+            if (exp.CategoryId > 0) cmd.Parameters.AddWithValue("@cat", exp.CategoryId);
+            else cmd.Parameters.AddWithValue("@cat", DBNull.Value);
+
+            cmd.Parameters.AddWithValue("@p", exp.IsPlanned ? 1 : 0);
+            cmd.Parameters.AddWithValue("@id", exp.Id);
+            cmd.Parameters.AddWithValue("@u", exp.UserId);
+
+            cmd.ExecuteNonQuery();
+        }
+
+        private static void UpdateIncomeRowSql(
+            SqliteConnection c,
+            SqliteTransaction tx,
+            int userId,
+            int incomeId,
+            DateTime date,
+            string description,
+            int? categoryId,
+            bool isPlanned)
+        {
+            using var cmd = c.CreateCommand();
+            cmd.Transaction = tx;
+
+            cmd.CommandText = @"
+UPDATE Incomes
+SET Date=@d,
+    Description=@desc,
+    CategoryId=@cat,
+    IsPlanned=@p
+WHERE Id=@id AND UserId=@u;";
+
+            cmd.Parameters.AddWithValue("@d", ToIso(date));
+            cmd.Parameters.AddWithValue("@desc", (object?)description ?? DBNull.Value);
+
+            if (categoryId.HasValue && categoryId.Value > 0) cmd.Parameters.AddWithValue("@cat", categoryId.Value);
+            else cmd.Parameters.AddWithValue("@cat", DBNull.Value);
+
+            cmd.Parameters.AddWithValue("@p", isPlanned ? 1 : 0);
+            cmd.Parameters.AddWithValue("@id", incomeId);
+            cmd.Parameters.AddWithValue("@u", userId);
+
+            cmd.ExecuteNonQuery();
+        }
+
+        private sealed class IncomeLedgerInfo
+        {
+            public int UserId { get; set; }
+            public decimal Amount { get; set; }
+            public bool IsPlanned { get; set; }
+            public DateTime Date { get; set; }
+            public int PaymentKind { get; set; }
+            public int? PaymentRefId { get; set; }
+        }
+
+        private static IncomeLedgerInfo? ReadIncomeLedgerInfo(SqliteConnection c, SqliteTransaction tx, int incomeId)
+        {
+            // schema wg Twojego SchemaService: Incomes ma PaymentKind/PaymentRefId/IsPlanned/Date/Amount
+            using var cmd = c.CreateCommand();
+            cmd.Transaction = tx;
+
+            cmd.CommandText = @"
+SELECT UserId, Amount, Date,
+       COALESCE(IsPlanned,0) AS IsPlanned,
+       COALESCE(PaymentKind,0) AS PaymentKind,
+       PaymentRefId
+FROM Incomes
+WHERE Id=@id
+LIMIT 1;";
+
+            cmd.Parameters.AddWithValue("@id", incomeId);
+
+            using var r = cmd.ExecuteReader();
+            if (!r.Read()) return null;
+
+            int userId = r.IsDBNull(0) ? 0 : Convert.ToInt32(r.GetValue(0));
+            decimal amount = r.IsDBNull(1) ? 0m : Convert.ToDecimal(r.GetValue(1));
+            string dateTxt = r.IsDBNull(2) ? "" : (r.GetValue(2)?.ToString() ?? "");
+            bool isPlanned = !r.IsDBNull(3) && Convert.ToInt32(r.GetValue(3)) == 1;
+            int pk = r.IsDBNull(4) ? 0 : Convert.ToInt32(r.GetValue(4));
+            int? pr = r.IsDBNull(5) ? (int?)null : Convert.ToInt32(r.GetValue(5));
+
+            DateTime date =
+                DateTime.TryParseExact(dateTxt, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var d1) ? d1 :
+                (DateTime.TryParse(dateTxt, out var d2) ? d2 : DateTime.MinValue);
+
+            return new IncomeLedgerInfo
+            {
+                UserId = userId,
+                Amount = amount,
+                Date = date,
+                IsPlanned = isPlanned,
+                PaymentKind = pk,
+                PaymentRefId = pr
+            };
+        }
+
+        // ------------------ FILTERS ------------------
 
         private void ClearPeriods()
         {
@@ -825,7 +1117,6 @@ namespace Finly.ViewModels
             if (selectedAccounts.Count == totalAccounts) return true;
 
             string Normalize(string s) => (s ?? string.Empty).Trim();
-
             var set = selectedAccounts.Select(Normalize).ToHashSet(StringComparer.CurrentCultureIgnoreCase);
 
             bool MatchesCash(string name) =>
@@ -902,8 +1193,11 @@ namespace Finly.ViewModels
             bool PassCommonFilters(TransactionCardVm t)
             {
                 bool dateOk = true;
-                if (from.HasValue && to.HasValue && DateTime.TryParse(t.DateDisplay, out var d))
-                    dateOk = d.Date >= from.Value.Date && d.Date <= to.Value.Date;
+                if (from.HasValue && to.HasValue)
+                {
+                    if (TryParseDateDisplay(t.DateDisplay, out var d))
+                        dateOk = d.Date >= from.Value.Date && d.Date <= to.Value.Date;
+                }
 
                 bool typeOk;
                 bool allTypesSelected = ShowExpenses && ShowIncomes && ShowTransfers;
@@ -950,7 +1244,7 @@ namespace Finly.ViewModels
             foreach (var i in left) TransactionsList.Add(i);
 
             var right = AllTransactions.Where(t => PassCommonFilters(t) && (t.IsPlanned || t.IsFuture))
-                .OrderBy(t => t.DateDisplay)
+                .OrderBy(t => TryParseDateDisplay(t.DateDisplay, out var d) ? d : DateTime.MaxValue)
                 .ToList();
             PlannedTransactionsList.Clear();
             foreach (var r in right) PlannedTransactionsList.Add(r);
@@ -1091,13 +1385,16 @@ namespace Finly.ViewModels
                 }
             }
 
+            // do księgowania przy edycji Income/Expense (planowane<->zrealizowane)
+            public int PaymentKind { get; set; }
+            public int? PaymentRefId { get; set; }
+
             public TransactionKind Kind { get; set; } = TransactionKind.Expense;
 
             public bool IsTransfer => Kind == TransactionKind.Transfer;
             public bool IsExpense => Kind == TransactionKind.Expense;
             public bool IsIncome => Kind == TransactionKind.Income;
 
-            // Co pokazujemy w UI:
             public bool ShowFromAccount => Kind == TransactionKind.Transfer || Kind == TransactionKind.Expense;
             public bool ShowToAccount => Kind == TransactionKind.Transfer || Kind == TransactionKind.Income;
 
@@ -1111,10 +1408,26 @@ namespace Finly.ViewModels
                 set { _isEditing = value; Raise(); }
             }
 
-            // Edycja tylko: opis, data, kategoria
-            public string EditDescription { get; set; } = "";
-            public DateTime EditDate { get; set; } = DateTime.Today;
-            public string SelectedCategory { get; set; } = "";
+            private string _editDescription = "";
+            public string EditDescription
+            {
+                get => _editDescription;
+                set { _editDescription = value; Raise(); }
+            }
+
+            private DateTime? _editDate = DateTime.Today;
+            public DateTime? EditDate
+            {
+                get => _editDate;
+                set { _editDate = value; Raise(); }
+            }
+
+            private string _selectedCategory = "";
+            public string SelectedCategory
+            {
+                get => _selectedCategory;
+                set { _selectedCategory = value; Raise(); }
+            }
 
             private bool _isDeleteConfirmationVisible;
             public bool IsDeleteConfirmationVisible
