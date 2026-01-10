@@ -149,6 +149,21 @@
             <Setter Property="TextWrapping" Value="Wrap"/>
         </Style>
 
+        <!-- PRAWA LISTA: transakcje budżetu -->
+        <Style x:Key="TxTitle" TargetType="TextBlock">
+            <Setter Property="Foreground" Value="{DynamicResource App.Foreground}"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="FontSize" Value="13"/>
+            <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
+        </Style>
+
+        <Style x:Key="TxSub" TargetType="TextBlock">
+            <Setter Property="Foreground" Value="{DynamicResource App.Foreground}"/>
+            <Setter Property="Opacity" Value="0.75"/>
+            <Setter Property="FontSize" Value="11"/>
+            <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
+        </Style>
+
     </UserControl.Resources>
 
     <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
@@ -361,7 +376,6 @@
                                     <ColumnDefinition Width="*"/>
                                 </Grid.ColumnDefinitions>
 
-                                <!-- Filtr typu: dodane Custom -->
                                 <ComboBox x:Name="TypeFilterCombo"
                                           Grid.Column="0"
                                           SelectedIndex="0"
@@ -381,7 +395,6 @@
                                          ToolTip="Wyszukiwanie po nazwie budżetu lub typie (np. Miesięczny, Inny)"/>
                             </Grid>
 
-                            <!-- Header: dodana kolumna Zaplanowano -->
                             <Border Style="{StaticResource MiniTableHeaderBorder}">
                                 <Grid>
                                     <Grid.ColumnDefinitions>
@@ -428,7 +441,6 @@
                                                     <TextBlock Text="{Binding TypeDisplay}" Style="{StaticResource BudgetTypeSub}"/>
                                                 </StackPanel>
 
-                                                <!-- NOWE: Zaplanowano wydać -->
                                                 <TextBlock Grid.Column="1"
                                                            Text="{Binding PlannedAmount, StringFormat={}{0:N2} zł}"
                                                            Style="{StaticResource AmountPlannedGreen}"/>
@@ -514,7 +526,6 @@
                         </StackPanel>
                     </Border>
 
-                    <!-- separator -->
                     <Border Grid.Column="1" Background="Transparent"/>
 
                     <!-- PRAWA: transakcje budżetu -->
@@ -536,13 +547,64 @@
                                            Margin="0,4,0,0"/>
                             </StackPanel>
 
-                            <!-- Lista transakcji (do podpięcia w code-behind) -->
                             <ListBox Grid.Row="2"
                                      x:Name="BudgetTransactionsList"
                                      BorderThickness="0"
                                      Background="Transparent"
                                      ScrollViewer.VerticalScrollBarVisibility="Auto">
-                                <!-- Na start puste: wypełnisz ItemsSource po wyborze budżetu -->
+
+                                <ListBox.ItemTemplate>
+                                    <DataTemplate>
+                                        <Border Margin="0,6,0,0"
+                                                Padding="10"
+                                                CornerRadius="10"
+                                                Background="{DynamicResource Surface.Background}"
+                                                BorderBrush="{DynamicResource Surface.Border}"
+                                                BorderThickness="1">
+                                            <Grid>
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="110"/>
+                                                    <ColumnDefinition Width="*"/>
+                                                    <ColumnDefinition Width="130"/>
+                                                </Grid.ColumnDefinitions>
+
+                                                <TextBlock Grid.Column="0"
+                                                           Text="{Binding DateText}"
+                                                           Foreground="{DynamicResource App.Foreground}"
+                                                           Opacity="0.85"
+                                                           FontWeight="SemiBold"/>
+
+                                                <StackPanel Grid.Column="1" Margin="10,0,10,0">
+                                                    <TextBlock Text="{Binding Title}" Style="{StaticResource TxTitle}"/>
+                                                    <TextBlock Text="{Binding SubTitle}" Style="{StaticResource TxSub}" Margin="0,2,0,0"/>
+                                                </StackPanel>
+
+                                                <StackPanel Grid.Column="2" HorizontalAlignment="Right">
+                                                    <TextBlock Text="{Binding AmountText}"
+                                                               Foreground="{DynamicResource App.Foreground}"
+                                                               FontWeight="Bold"
+                                                               TextAlignment="Right"/>
+
+                                                    <Border Margin="0,6,0,0"
+                                                            Padding="6,2"
+                                                            CornerRadius="8"
+                                                            HorizontalAlignment="Right"
+                                                            Background="{DynamicResource Surface.Background}"
+                                                            BorderBrush="{DynamicResource Surface.Border}"
+                                                            BorderThickness="1"
+                                                            Visibility="{Binding IsPlanned, Converter={StaticResource BoolToVisibilityConverter}}">
+                                                        <TextBlock Text="Planowana"
+                                                                   FontSize="10"
+                                                                   FontWeight="SemiBold"
+                                                                   Foreground="{DynamicResource App.Foreground}"
+                                                                   Opacity="0.85"/>
+                                                    </Border>
+                                                </StackPanel>
+                                            </Grid>
+                                        </Border>
+                                    </DataTemplate>
+                                </ListBox.ItemTemplate>
+
                             </ListBox>
                         </Grid>
                     </Border>

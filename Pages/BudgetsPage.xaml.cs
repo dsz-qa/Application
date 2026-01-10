@@ -26,7 +26,6 @@ namespace Finly.Pages
             InitializeComponent();
             _currentUserId = userId;
 
-            // WAŻNE: nie dotykamy BudgetsList/TypeFilterCombo/SearchBox przed Loaded
             Loaded += BudgetsPage_Loaded;
         }
 
@@ -46,7 +45,9 @@ namespace Finly.Pages
             if (BudgetsList != null && BudgetsList.SelectedItem == null && BudgetsList.Items.Count > 0)
                 BudgetsList.SelectedIndex = 0;
 
-            UpdateDetailsPanel(GetSelectedBudgetFromList());
+            var selected = GetSelectedBudgetFromList();
+            UpdateDetailsPanel(selected);
+            LoadBudgetTransactions(selected);
         }
 
         // =================== TYPY ===================
@@ -57,14 +58,12 @@ namespace Finly.Pages
 
             TypeFilterCombo.Items.Clear();
 
-            // Tag = "" oznacza brak filtra
             TypeFilterCombo.Items.Add(new ComboBoxItem { Content = "Wszystkie", Tag = "" });
             TypeFilterCombo.Items.Add(new ComboBoxItem { Content = "Tygodniowy", Tag = "Weekly" });
             TypeFilterCombo.Items.Add(new ComboBoxItem { Content = "Miesięczny", Tag = "Monthly" });
             TypeFilterCombo.Items.Add(new ComboBoxItem { Content = "Roczny", Tag = "Yearly" });
             TypeFilterCombo.Items.Add(new ComboBoxItem { Content = "Inny (własny zakres)", Tag = "Custom" });
 
-            // Jeżeli w XAML masz SelectedValuePath="Tag" (masz), to korzystamy z SelectedValue
             TypeFilterCombo.SelectedIndex = 0;
         }
 
@@ -95,13 +94,11 @@ namespace Finly.Pages
         {
             var s = (anyType ?? "").Trim();
 
-            // PL -> DB
             if (s.Equals("Tygodniowy", StringComparison.OrdinalIgnoreCase)) return "Weekly";
             if (s.Equals("Miesięczny", StringComparison.OrdinalIgnoreCase)) return "Monthly";
             if (s.Equals("Roczny", StringComparison.OrdinalIgnoreCase)) return "Yearly";
             if (s.Equals("Inny", StringComparison.OrdinalIgnoreCase)) return "Custom";
 
-            // DB -> DB (normalizacja)
             if (s.Equals("Weekly", StringComparison.OrdinalIgnoreCase)) return "Weekly";
             if (s.Equals("Monthly", StringComparison.OrdinalIgnoreCase)) return "Monthly";
             if (s.Equals("Yearly", StringComparison.OrdinalIgnoreCase)) return "Yearly";
@@ -134,22 +131,21 @@ SELECT
     IFNULL((
         SELECT SUM(e.Amount)
         FROM Expenses e
-        WHERE e.UserId  = b.UserId
+        WHERE e.UserId   = b.UserId
           AND e.BudgetId = b.Id
-          AND e.Date >= b.StartDate
-          AND e.Date <= b.EndDate
+          AND date(e.Date) BETWEEN date(b.StartDate) AND date(b.EndDate)
     ), 0) AS SpentAmount,
     IFNULL((
         SELECT SUM(i.Amount)
         FROM Incomes i
-        WHERE i.UserId  = b.UserId
+        WHERE i.UserId   = b.UserId
           AND i.BudgetId = b.Id
-          AND i.Date >= b.StartDate
-          AND i.Date <= b.EndDate
+          AND date(i.Date) BETWEEN date(b.StartDate) AND date(b.EndDate)
     ), 0) AS IncomeAmount
 FROM Budgets b
 WHERE b.UserId = @uid
-ORDER BY b.StartDate;";
+  AND IFNULL(b.IsDeleted,0) = 0
+ORDER BY date(b.StartDate);";
 
             cmd.Parameters.AddWithValue("@uid", _currentUserId);
 
@@ -167,14 +163,14 @@ ORDER BY b.StartDate;";
                     Type = normalizedType,
                     TypeDisplay = ToPlType(normalizedType),
 
-                    StartDate = Convert.ToDateTime(reader["StartDate"]),
-                    EndDate = Convert.ToDateTime(reader["EndDate"]),
+                    StartDate = Convert.ToDateTime(reader["StartDate"], CultureInfo.InvariantCulture),
+                    EndDate = Convert.ToDateTime(reader["EndDate"], CultureInfo.InvariantCulture),
 
                     PlannedAmount = ReadDecimal(reader, "PlannedAmount"),
                     SpentAmount = ReadDecimal(reader, "SpentAmount"),
                     IncomeAmount = ReadDecimal(reader, "IncomeAmount"),
 
-                    OverState = reader["OverState"] == DBNull.Value ? 0 : Convert.ToInt32(reader["OverState"]),
+                    OverState = reader["OverState"] == DBNull.Value ? 0 : Convert.ToInt32(reader["OverState"], CultureInfo.InvariantCulture),
                     OverNotifiedAt = reader["OverNotifiedAt"] == DBNull.Value ? null : reader["OverNotifiedAt"].ToString(),
 
                     IsDeleteConfirmVisible = false
@@ -215,17 +211,14 @@ ORDER BY b.StartDate;";
 
             var previouslySelectedId = (BudgetsList.SelectedItem as BudgetRow)?.Id;
 
-            // Ponieważ masz SelectedValuePath="Tag" w XAML – korzystamy z SelectedValue
             var typeValue = TypeFilterCombo.SelectedValue as string ?? "";
 
             IEnumerable<BudgetRow> query = _allBudgets;
 
-            // typeValue == "" -> "Wszystkie"
             if (!string.IsNullOrWhiteSpace(typeValue))
             {
                 query = query.Where(b =>
                     string.Equals(b.Type, typeValue, StringComparison.OrdinalIgnoreCase)
-                    // asekuracja na stare dane:
                     || (typeValue.Equals("Custom", StringComparison.OrdinalIgnoreCase)
                         && string.Equals(b.Type, "Inny", StringComparison.OrdinalIgnoreCase)));
             }
@@ -249,6 +242,7 @@ ORDER BY b.StartDate;";
             {
                 BudgetsList.SelectedItem = null;
                 UpdateDetailsPanel(null);
+                LoadBudgetTransactions(null);
                 return;
             }
 
@@ -271,9 +265,37 @@ ORDER BY b.StartDate;";
         private void BudgetsList_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
             HideAllDeleteConfirms();
-            UpdateDetailsPanel(GetSelectedBudgetFromList());
 
-            // TODO: podpiąć transakcje po prawej
+            var selected = GetSelectedBudgetFromList();
+            UpdateDetailsPanel(selected);
+            LoadBudgetTransactions(selected);
+        }
+
+        // =================== PRAWA LISTA: TRANSAKCJE ===================
+
+        private void LoadBudgetTransactions(BudgetRow? budget)
+        {
+            if (BudgetTransactionsList == null || BudgetTransactionsHintText == null)
+                return;
+
+            if (budget == null)
+            {
+                BudgetTransactionsList.ItemsSource = null;
+                BudgetTransactionsHintText.Text = "Wybierz budżet z listy po lewej, aby zobaczyć jego transakcje.";
+                return;
+            }
+
+            var rows = BudgetService.GetBudgetTransactions(
+                userId: _currentUserId,
+                budgetId: budget.Id,
+                startDate: budget.StartDate.Date,
+                endDate: budget.EndDate.Date);
+
+            BudgetTransactionsList.ItemsSource = rows;
+
+            BudgetTransactionsHintText.Text = rows.Count == 0
+                ? "Brak transakcji przypisanych do tego budżetu w jego okresie."
+                : $"Znaleziono: {rows.Count} transakcji w okresie budżetu.";
         }
 
         // =================== KPI OGÓLNE (góra) ===================
@@ -406,12 +428,15 @@ ORDER BY b.StartDate;";
                 cmd.CommandText = @"
 SELECT Date, IFNULL(SUM(Amount), 0) AS Total
 FROM Incomes
-WHERE UserId  = @uid
+WHERE UserId = @uid
   AND BudgetId = @bid
+  AND date(Date) BETWEEN date(@from) AND date(@to)
 GROUP BY Date
 ORDER BY Date;";
                 cmd.Parameters.AddWithValue("@uid", _currentUserId);
                 cmd.Parameters.AddWithValue("@bid", budget.Id);
+                cmd.Parameters.AddWithValue("@from", budget.StartDate.ToString("yyyy-MM-dd"));
+                cmd.Parameters.AddWithValue("@to", budget.EndDate.ToString("yyyy-MM-dd"));
 
                 using var reader = cmd.ExecuteReader();
                 while (reader.Read())
@@ -419,15 +444,7 @@ ORDER BY Date;";
                     var dateStr = reader.GetString(0);
                     var date = DateTime.ParseExact(dateStr, "yyyy-MM-dd", CultureInfo.InvariantCulture);
 
-                    var totalObj = reader.GetValue(1);
-                    var total = totalObj switch
-                    {
-                        double d => Convert.ToDecimal(d, CultureInfo.InvariantCulture),
-                        decimal dec => dec,
-                        long l => l,
-                        int i => i,
-                        _ => Convert.ToDecimal(totalObj, CultureInfo.InvariantCulture)
-                    };
+                    var total = ReadDecimal(reader, "Total");
 
                     if (!daily.TryGetValue(date, out var tuple))
                         tuple = (0m, 0m);
@@ -443,12 +460,15 @@ ORDER BY Date;";
                 cmd.CommandText = @"
 SELECT Date, IFNULL(SUM(Amount), 0) AS Total
 FROM Expenses
-WHERE UserId  = @uid
+WHERE UserId = @uid
   AND BudgetId = @bid
+  AND date(Date) BETWEEN date(@from) AND date(@to)
 GROUP BY Date
 ORDER BY Date;";
                 cmd.Parameters.AddWithValue("@uid", _currentUserId);
                 cmd.Parameters.AddWithValue("@bid", budget.Id);
+                cmd.Parameters.AddWithValue("@from", budget.StartDate.ToString("yyyy-MM-dd"));
+                cmd.Parameters.AddWithValue("@to", budget.EndDate.ToString("yyyy-MM-dd"));
 
                 using var reader = cmd.ExecuteReader();
                 while (reader.Read())
@@ -456,15 +476,7 @@ ORDER BY Date;";
                     var dateStr = reader.GetString(0);
                     var date = DateTime.ParseExact(dateStr, "yyyy-MM-dd", CultureInfo.InvariantCulture);
 
-                    var totalObj = reader.GetValue(1);
-                    var total = totalObj switch
-                    {
-                        double d => Convert.ToDecimal(d, CultureInfo.InvariantCulture),
-                        decimal dec => dec,
-                        long l => l,
-                        int i => i,
-                        _ => Convert.ToDecimal(totalObj, CultureInfo.InvariantCulture)
-                    };
+                    var total = ReadDecimal(reader, "Total");
 
                     if (!daily.TryGetValue(date, out var tuple))
                         tuple = (0m, 0m);
@@ -615,6 +627,7 @@ ORDER BY Date;";
             if (list == null)
             {
                 UpdateDetailsPanel(null);
+                LoadBudgetTransactions(null);
                 return;
             }
 
@@ -629,6 +642,7 @@ ORDER BY Date;";
                 BudgetsList.SelectedItem = select;
 
             UpdateDetailsPanel(select);
+            LoadBudgetTransactions(select);
         }
     }
 
@@ -676,7 +690,6 @@ ORDER BY Date;";
         public bool IsOverBudget => RemainingAmount < 0;
         public decimal OverAmount => IsOverBudget ? Math.Abs(RemainingAmount) : 0m;
 
-        // DO BINDINGU w liście: zawsze liczba (0 jeśli nieprzekroczone)
         public decimal OverDisplayAmount => OverAmount;
 
         public void Recalculate()

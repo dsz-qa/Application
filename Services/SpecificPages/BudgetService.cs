@@ -4,6 +4,7 @@ using Finly.Views.Dialogs;
 using Microsoft.Data.Sqlite;
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 
 namespace Finly.Services.SpecificPages
 {
@@ -54,6 +55,24 @@ namespace Finly.Services.SpecificPages
             public string Period => $"{StartDate:dd.MM.yyyy} – {EndDate:dd.MM.yyyy}";
         }
 
+        // NOWE: transakcje budżetu do prawej listy
+        public sealed class BudgetTransactionRow
+        {
+            public DateTime Date { get; set; }
+            public string Kind { get; set; } = ""; // "Wydatek" / "Przychód"
+            public decimal Amount { get; set; }
+            public string? Description { get; set; }
+            public string? Meta { get; set; }      // kategoria / źródło
+            public bool IsPlanned { get; set; }
+
+            public string DateText => Date.ToString("dd.MM.yyyy", CultureInfo.InvariantCulture);
+            public string Title => string.IsNullOrWhiteSpace(Description) ? "(bez opisu)" : Description!;
+            public string SubTitle
+                => $"{Kind}{(string.IsNullOrWhiteSpace(Meta) ? "" : $" • {Meta}")}{(IsPlanned ? " • Planowana" : "")}";
+            public string AmountText => $"{Amount:N2} zł";
+            public bool IsExpense => Kind.Equals("Wydatek", StringComparison.OrdinalIgnoreCase);
+        }
+
         // =========================
         //  CRUD / QUERY
         // =========================
@@ -70,6 +89,7 @@ namespace Finly.Services.SpecificPages
 SELECT Id, UserId, Name, Type, StartDate, EndDate, PlannedAmount
 FROM Budgets
 WHERE UserId = @uid
+  AND IFNULL(IsDeleted,0) = 0
 ";
 
             if (from.HasValue)
@@ -90,9 +110,9 @@ WHERE UserId = @uid
                     UserId = reader.GetInt32(1),
                     Name = reader.GetString(2),
                     Type = reader.IsDBNull(3) ? "Monthly" : reader.GetString(3),
-                    StartDate = DateTime.Parse(reader.GetString(4)),
-                    EndDate = DateTime.Parse(reader.GetString(5)),
-                    PlannedAmount = reader.IsDBNull(6) ? 0m : Convert.ToDecimal(reader.GetDouble(6))
+                    StartDate = DateTime.Parse(reader.GetString(4), CultureInfo.InvariantCulture),
+                    EndDate = DateTime.Parse(reader.GetString(5), CultureInfo.InvariantCulture),
+                    PlannedAmount = ReadDecimal(reader, 6)
                 });
             }
 
@@ -107,7 +127,6 @@ WHERE UserId = @uid
             var type = (vm.Type ?? "Monthly").Trim();
             if (string.IsNullOrWhiteSpace(type)) type = "Monthly";
 
-            // Normalizacja: Custom zapisujemy jako "Custom"
             if (type.Equals("Inny", StringComparison.OrdinalIgnoreCase)) type = "Custom";
 
             var start = (vm.StartDate ?? DateTime.Today).Date;
@@ -167,11 +186,25 @@ WHERE Id = @id AND UserId = @uid;
             using var conn = DatabaseService.GetConnection();
             conn.Open();
 
+            // Preferuj soft delete jeśli istnieje IsDeleted
             using var cmd = conn.CreateCommand();
-            cmd.CommandText = "DELETE FROM Budgets WHERE Id = @id AND UserId = @uid;";
+            cmd.CommandText = @"
+UPDATE Budgets SET IsDeleted = 1
+WHERE Id = @id AND UserId = @uid;
+";
             cmd.Parameters.AddWithValue("@id", id);
             cmd.Parameters.AddWithValue("@uid", userId);
-            cmd.ExecuteNonQuery();
+
+            var affected = cmd.ExecuteNonQuery();
+            if (affected == 0)
+            {
+                // awaryjnie twarde kasowanie (gdy stara baza bez IsDeleted)
+                using var hard = conn.CreateCommand();
+                hard.CommandText = "DELETE FROM Budgets WHERE Id = @id AND UserId = @uid;";
+                hard.Parameters.AddWithValue("@id", id);
+                hard.Parameters.AddWithValue("@uid", userId);
+                hard.ExecuteNonQuery();
+            }
         }
 
         // =========================
@@ -186,28 +219,35 @@ WHERE Id = @id AND UserId = @uid;
             conn.Open();
 
             using var cmd = conn.CreateCommand();
-            // UWAGA: usuń DISTINCT, bo zaniża sumę przy powtarzających się kwotach
+
+            // WAŻNE: nie robimy JOIN Expenses + JOIN Incomes, bo to mnoży wiersze i psuje SUM()
+            // Zamiast tego: subquery per budżet, dodatkowo ograniczenie do okresu budżetu.
             cmd.CommandText = @"
-SELECT 
+SELECT
     b.Id,
     b.Name,
     b.Type,
     b.StartDate,
     b.EndDate,
     b.PlannedAmount,
-    IFNULL(SUM(e.Amount), 0) AS Spent,
-    IFNULL(SUM(i.Amount), 0) AS IncomesForBudget
+    IFNULL((
+        SELECT SUM(e.Amount)
+        FROM Expenses e
+        WHERE e.UserId = b.UserId
+          AND e.BudgetId = b.Id
+          AND date(e.Date) BETWEEN date(b.StartDate) AND date(b.EndDate)
+    ), 0) AS Spent,
+    IFNULL((
+        SELECT SUM(i.Amount)
+        FROM Incomes i
+        WHERE i.UserId = b.UserId
+          AND i.BudgetId = b.Id
+          AND date(i.Date) BETWEEN date(b.StartDate) AND date(b.EndDate)
+    ), 0) AS IncomesForBudget
 FROM Budgets b
-LEFT JOIN Expenses e 
-    ON e.BudgetId = b.Id 
-   AND e.UserId = @uid
-LEFT JOIN Incomes i
-    ON i.BudgetId = b.Id
-   AND i.UserId = @uid
 WHERE b.UserId = @uid
-GROUP BY 
-    b.Id, b.Name, b.Type, b.StartDate, b.EndDate, b.PlannedAmount
-ORDER BY b.StartDate;
+  AND IFNULL(b.IsDeleted,0) = 0
+ORDER BY date(b.StartDate);
 ";
 
             cmd.Parameters.AddWithValue("@uid", userId);
@@ -220,14 +260,13 @@ ORDER BY b.StartDate;
                     Id = reader.GetInt32(0),
                     Name = reader.GetString(1),
                     Type = reader.IsDBNull(2) ? "Monthly" : reader.GetString(2),
-                    StartDate = DateTime.Parse(reader.GetString(3)),
-                    EndDate = DateTime.Parse(reader.GetString(4)),
-                    PlannedAmount = reader.IsDBNull(5) ? 0m : Convert.ToDecimal(reader.GetDouble(5)),
-                    Spent = reader.IsDBNull(6) ? 0m : Convert.ToDecimal(reader.GetDouble(6)),
-                    IncomesForBudget = reader.IsDBNull(7) ? 0m : Convert.ToDecimal(reader.GetDouble(7))
+                    StartDate = DateTime.Parse(reader.GetString(3), CultureInfo.InvariantCulture),
+                    EndDate = DateTime.Parse(reader.GetString(4), CultureInfo.InvariantCulture),
+                    PlannedAmount = ReadDecimal(reader, 5),
+                    Spent = ReadDecimal(reader, 6),
+                    IncomesForBudget = ReadDecimal(reader, 7)
                 };
 
-                // Normalizacja: jeśli w bazie ktoś zapisał "Inny" -> traktuj jak Custom
                 if (item.Type.Equals("Inny", StringComparison.OrdinalIgnoreCase))
                     item.Type = "Custom";
 
@@ -249,9 +288,10 @@ ORDER BY b.StartDate;
 SELECT Id, Name, Type, StartDate, EndDate, PlannedAmount
 FROM Budgets
 WHERE UserId = @uid
+  AND IFNULL(IsDeleted,0) = 0
   AND date(EndDate) >= date(@from)
   AND date(StartDate) <= date(@to)
-ORDER BY StartDate;
+ORDER BY date(StartDate);
 ";
 
             cmd.Parameters.AddWithValue("@uid", userId);
@@ -263,10 +303,11 @@ ORDER BY StartDate;
             {
                 var id = r.GetInt32(0);
                 var name = r.GetString(1);
-                var start = DateTime.Parse(r.GetString(3));
-                var end = DateTime.Parse(r.GetString(4));
-                var planned = Convert.ToDecimal(r.GetDouble(5));
+                var start = DateTime.Parse(r.GetString(3), CultureInfo.InvariantCulture);
+                var end = DateTime.Parse(r.GetString(4), CultureInfo.InvariantCulture);
+                var planned = ReadDecimal(r, 5);
 
+                // UWAGA: alerty liczymy w danym range, ale transakcje i tak filtrujemy na budżet+range
                 var spent = SumExpensesForBudget(conn, userId, id, rangeFrom, rangeTo);
                 var inc = SumIncomesForBudget(conn, userId, id, rangeFrom, rangeTo);
 
@@ -288,6 +329,137 @@ ORDER BY StartDate;
             return result;
         }
 
+        // =========================
+        //  TRANSAKCJE BUDŻETU (PRAWA LISTA)
+        // =========================
+
+        public static List<BudgetTransactionRow> GetBudgetTransactions(int userId, int budgetId, DateTime startDate, DateTime endDate)
+        {
+            var rows = new List<BudgetTransactionRow>();
+
+            using var con = DatabaseService.GetConnection();
+            con.Open();
+
+            // Expenses
+            using (var cmd = con.CreateCommand())
+            {
+                cmd.CommandText = @"
+SELECT
+    e.Date,
+    e.Amount,
+    COALESCE(e.Title, e.Description, '') AS DescText,
+    COALESCE(c.Name, '') AS CategoryName,
+    COALESCE(e.IsPlanned,0) AS IsPlanned
+FROM Expenses e
+LEFT JOIN Categories c ON c.Id = e.CategoryId
+WHERE e.UserId = @u
+  AND e.BudgetId = @b
+  AND date(e.Date) BETWEEN date(@from) AND date(@to)
+ORDER BY date(e.Date) DESC, e.Id DESC;
+";
+                cmd.Parameters.AddWithValue("@u", userId);
+                cmd.Parameters.AddWithValue("@b", budgetId);
+                cmd.Parameters.AddWithValue("@from", startDate.ToString("yyyy-MM-dd"));
+                cmd.Parameters.AddWithValue("@to", endDate.ToString("yyyy-MM-dd"));
+
+                using var r = cmd.ExecuteReader();
+                while (r.Read())
+                {
+                    var date = ParseDate(r.GetString(0));
+                    var amount = ReadDecimal(r, 1);
+                    var desc = r.IsDBNull(2) ? null : r.GetString(2);
+                    var cat = r.IsDBNull(3) ? null : r.GetString(3);
+                    var planned = !r.IsDBNull(4) && Convert.ToInt32(r.GetValue(4), CultureInfo.InvariantCulture) == 1;
+
+                    rows.Add(new BudgetTransactionRow
+                    {
+                        Date = date,
+                        Kind = "Wydatek",
+                        Amount = amount,
+                        Description = desc,
+                        Meta = string.IsNullOrWhiteSpace(cat) ? null : cat,
+                        IsPlanned = planned
+                    });
+                }
+            }
+
+            // Incomes
+            using (var cmd = con.CreateCommand())
+            {
+                cmd.CommandText = @"
+SELECT
+    i.Date,
+    i.Amount,
+    COALESCE(i.Description,'') AS DescText,
+    COALESCE(i.Source,'') AS SourceText,
+    COALESCE(i.IsPlanned,0) AS IsPlanned
+FROM Incomes i
+WHERE i.UserId = @u
+  AND i.BudgetId = @b
+  AND date(i.Date) BETWEEN date(@from) AND date(@to)
+ORDER BY date(i.Date) DESC, i.Id DESC;
+";
+                cmd.Parameters.AddWithValue("@u", userId);
+                cmd.Parameters.AddWithValue("@b", budgetId);
+                cmd.Parameters.AddWithValue("@from", startDate.ToString("yyyy-MM-dd"));
+                cmd.Parameters.AddWithValue("@to", endDate.ToString("yyyy-MM-dd"));
+
+                using var r = cmd.ExecuteReader();
+                while (r.Read())
+                {
+                    var date = ParseDate(r.GetString(0));
+                    var amount = ReadDecimal(r, 1);
+                    var desc = r.IsDBNull(2) ? null : r.GetString(2);
+                    var src = r.IsDBNull(3) ? null : r.GetString(3);
+                    var planned = !r.IsDBNull(4) && Convert.ToInt32(r.GetValue(4), CultureInfo.InvariantCulture) == 1;
+
+                    rows.Add(new BudgetTransactionRow
+                    {
+                        Date = date,
+                        Kind = "Przychód",
+                        Amount = amount,
+                        Description = desc,
+                        Meta = string.IsNullOrWhiteSpace(src) ? null : src,
+                        IsPlanned = planned
+                    });
+                }
+            }
+
+            rows.Sort((a, b) => b.Date.CompareTo(a.Date));
+            return rows;
+        }
+
+        // =========================
+        //  Helpers
+        // =========================
+
+        private static DateTime ParseDate(string s)
+        {
+            // Najczęściej zapisujesz yyyy-MM-dd. Ale asekuracja na stare formaty.
+            if (DateTime.TryParseExact(s, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var d))
+                return d;
+            if (DateTime.TryParse(s, CultureInfo.InvariantCulture, DateTimeStyles.None, out d))
+                return d;
+            return DateTime.Today;
+        }
+
+        private static decimal ReadDecimal(System.Data.IDataRecord r, int ordinal)
+        {
+            if (r.IsDBNull(ordinal)) return 0m;
+
+            var obj = r.GetValue(ordinal);
+            return obj switch
+            {
+                decimal d => d,
+                double dbl => Convert.ToDecimal(dbl, CultureInfo.InvariantCulture),
+                float f => Convert.ToDecimal(f, CultureInfo.InvariantCulture),
+                long l => l,
+                int i => i,
+                string s when decimal.TryParse(s, NumberStyles.Number, CultureInfo.InvariantCulture, out var v) => v,
+                _ => Convert.ToDecimal(obj, CultureInfo.InvariantCulture)
+            };
+        }
+
         private static decimal SumExpensesForBudget(SqliteConnection conn, int userId, int budgetId, DateTime from, DateTime to)
         {
             using var cmd = conn.CreateCommand();
@@ -296,8 +468,7 @@ SELECT IFNULL(SUM(Amount), 0)
 FROM Expenses
 WHERE UserId = @uid
   AND BudgetId = @bid
-  AND date(Date) >= date(@from)
-  AND date(Date) <= date(@to);
+  AND date(Date) BETWEEN date(@from) AND date(@to);
 ";
             cmd.Parameters.AddWithValue("@uid", userId);
             cmd.Parameters.AddWithValue("@bid", budgetId);
@@ -305,7 +476,7 @@ WHERE UserId = @uid
             cmd.Parameters.AddWithValue("@to", to.ToString("yyyy-MM-dd"));
 
             var val = cmd.ExecuteScalar();
-            return val == null || val == DBNull.Value ? 0m : Convert.ToDecimal(val);
+            return val == null || val == DBNull.Value ? 0m : Convert.ToDecimal(val, CultureInfo.InvariantCulture);
         }
 
         private static decimal SumIncomesForBudget(SqliteConnection conn, int userId, int budgetId, DateTime from, DateTime to)
@@ -316,8 +487,7 @@ SELECT IFNULL(SUM(Amount), 0)
 FROM Incomes
 WHERE UserId = @uid
   AND BudgetId = @bid
-  AND date(Date) >= date(@from)
-  AND date(Date) <= date(@to);
+  AND date(Date) BETWEEN date(@from) AND date(@to);
 ";
             cmd.Parameters.AddWithValue("@uid", userId);
             cmd.Parameters.AddWithValue("@bid", budgetId);
@@ -325,7 +495,7 @@ WHERE UserId = @uid
             cmd.Parameters.AddWithValue("@to", to.ToString("yyyy-MM-dd"));
 
             var val = cmd.ExecuteScalar();
-            return val == null || val == DBNull.Value ? 0m : Convert.ToDecimal(val);
+            return val == null || val == DBNull.Value ? 0m : Convert.ToDecimal(val, CultureInfo.InvariantCulture);
         }
 
         public static List<Budget> GetBudgetsForDate(int userId, DateTime date)
@@ -340,9 +510,10 @@ WHERE UserId = @uid
 SELECT Id, Name, Type, StartDate, EndDate, PlannedAmount
 FROM Budgets
 WHERE UserId = @uid
+  AND IFNULL(IsDeleted,0) = 0
   AND date(StartDate) <= date(@date)
   AND date(EndDate)   >= date(@date)
-ORDER BY StartDate;
+ORDER BY date(StartDate);
 ";
 
             cmd.Parameters.AddWithValue("@uid", userId);
@@ -356,9 +527,9 @@ ORDER BY StartDate;
                     Id = reader.GetInt32(0),
                     Name = reader.GetString(1),
                     Type = reader.IsDBNull(2) ? "Monthly" : reader.GetString(2),
-                    StartDate = DateTime.Parse(reader.GetString(3)),
-                    EndDate = DateTime.Parse(reader.GetString(4)),
-                    PlannedAmount = reader.IsDBNull(5) ? 0m : Convert.ToDecimal(reader.GetDouble(5))
+                    StartDate = DateTime.Parse(reader.GetString(3), CultureInfo.InvariantCulture),
+                    EndDate = DateTime.Parse(reader.GetString(4), CultureInfo.InvariantCulture),
+                    PlannedAmount = ReadDecimal(reader, 5)
                 };
 
                 if (b.Type.Equals("Inny", StringComparison.OrdinalIgnoreCase))
