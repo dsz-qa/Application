@@ -546,7 +546,7 @@ SET Amount = SavedCash.Amount + excluded.Amount,
         }
 
         // =========================
-        //  INCOME EFFECT (NOWE – symetria do Expenses)
+        //  INCOME EFFECT (symetria do Expenses)
         // =========================
         public static void ApplyIncomeEffect(
             SqliteConnection c,
@@ -886,15 +886,19 @@ LIMIT 1;";
             bool hasPlanned = DatabaseService.ColumnExists(c, "Incomes", "IsPlanned");
             bool hasPk = DatabaseService.ColumnExists(c, "Incomes", "PaymentKind");
             bool hasPr = DatabaseService.ColumnExists(c, "Incomes", "PaymentRefId");
+            bool hasSource = DatabaseService.ColumnExists(c, "Incomes", "Source");
 
             using var get = c.CreateCommand();
             get.Transaction = tx;
+
+            // UWAGA: dodajemy Source do odczytu, bo to pozwala ustalić gdzie był przychód
             get.CommandText = $@"
 SELECT UserId,
        Amount,
        {(hasPlanned ? "IsPlanned" : "0")} as IsPlanned,
        {(hasPk ? "PaymentKind" : "0")} as PaymentKind,
-       {(hasPr ? "PaymentRefId" : "NULL")} as PaymentRefId
+       {(hasPr ? "PaymentRefId" : "NULL")} as PaymentRefId,
+       {(hasSource ? "Source" : "NULL")} as Source
 FROM Incomes
 WHERE Id=@id
 LIMIT 1;";
@@ -904,13 +908,25 @@ LIMIT 1;";
             if (!r.Read()) return false;
 
             var userId = Convert.ToInt32(r.GetValue(0));
-            var amount = Convert.ToDecimal(r.GetValue(1));
+            var amount = Math.Abs(Convert.ToDecimal(r.GetValue(1)));
             var isPlanned = Convert.ToInt32(r.GetValue(2)) == 1;
-            var pk = Convert.ToInt32(r.GetValue(3));
-            var pr = r.IsDBNull(4) ? (int?)null : Convert.ToInt32(r.GetValue(4));
 
+            int pk = Convert.ToInt32(r.GetValue(3));
+            int? pr = r.IsDBNull(4) ? (int?)null : Convert.ToInt32(r.GetValue(4));
+            string source = r.IsDBNull(5) ? "" : (r.GetString(5) ?? "");
+
+            // planned -> nie odwracamy sald
             if (!isPlanned)
+            {
+                // Jeżeli PaymentKind jest niepewny (brak kolumny albo 0), spróbujmy go ustalić z Source.
+                // To jest krytyczne, bo inaczej kasowanie przychodu z banku próbuje zdjąć gotówkę z portfela.
+                if (!hasPk || pk == 0)
+                {
+                    InferIncomeDestinationFromSource(c, tx, userId, source, out pk, out pr);
+                }
+
                 RevertIncomeEffect(c, tx, userId, amount, pk, pr);
+            }
 
             using var del = c.CreateCommand();
             del.Transaction = tx;
@@ -919,6 +935,151 @@ LIMIT 1;";
             del.ExecuteNonQuery();
 
             return true;
+        }
+
+        private static void InferIncomeDestinationFromSource(
+            SqliteConnection c,
+            SqliteTransaction tx,
+            int userId,
+            string source,
+            out int paymentKind,
+            out int? paymentRefId)
+        {
+            paymentRefId = null;
+
+            var s = (source ?? "").Trim();
+
+            // Dopasuj do tego, jak TY realnie zapisujesz Source w DB.
+            // Z Twoich VM wynika, że Source bywa np: "Wolna gotówka", "Odłożona gotówka", "Konto: mBank", "Koperta: Jedzenie"
+            if (s.Equals("Wolna gotówka", StringComparison.OrdinalIgnoreCase))
+            {
+                paymentKind = (int)PaymentKind.FreeCash;
+                return;
+            }
+
+            if (s.Equals("Odłożona gotówka", StringComparison.OrdinalIgnoreCase))
+            {
+                paymentKind = (int)PaymentKind.SavedCash;
+                return;
+            }
+
+            if (s.StartsWith("Konto", StringComparison.OrdinalIgnoreCase))
+            {
+                paymentKind = (int)PaymentKind.BankAccount;
+
+                // spróbuj wyciągnąć nazwę po ":" (np. "Konto: mBank")
+                var name = s;
+                var idx = s.IndexOf(':');
+                if (idx >= 0 && idx + 1 < s.Length) name = s[(idx + 1)..].Trim();
+
+                paymentRefId = ResolveBankAccountIdByName(c, tx, userId, name);
+                if (!paymentRefId.HasValue)
+                    throw new InvalidOperationException($"Nie można ustalić konta bankowego dla przychodu (Source='{source}').");
+
+                return;
+            }
+
+            if (s.StartsWith("Koperta", StringComparison.OrdinalIgnoreCase))
+            {
+                paymentKind = (int)PaymentKind.Envelope;
+
+                var name = s;
+                var idx = s.IndexOf(':');
+                if (idx >= 0 && idx + 1 < s.Length) name = s[(idx + 1)..].Trim();
+
+                paymentRefId = ResolveEnvelopeIdByName(c, tx, userId, name);
+                if (!paymentRefId.HasValue)
+                    throw new InvalidOperationException($"Nie można ustalić koperty dla przychodu (Source='{source}').");
+
+                return;
+            }
+
+            // fallback – jeśli nie rozpoznaliśmy formatu Source
+            paymentKind = (int)PaymentKind.FreeCash;
+            paymentRefId = null;
+        }
+
+        private static int? ResolveBankAccountIdByName(SqliteConnection c, SqliteTransaction tx, int userId, string accountName)
+        {
+            if (!DatabaseService.TableExists(c, "BankAccounts")) return null;
+
+            // wybierz istniejącą kolumnę z nazwą konta
+            string? col =
+                DatabaseService.ColumnExists(c, "BankAccounts", "Name") ? "Name" :
+                DatabaseService.ColumnExists(c, "BankAccounts", "AccountName") ? "AccountName" :
+                DatabaseService.ColumnExists(c, "BankAccounts", "Title") ? "Title" :
+                DatabaseService.ColumnExists(c, "BankAccounts", "BankName") ? "BankName" :
+                null;
+
+            if (col == null)
+                throw new InvalidOperationException("Tabela BankAccounts nie ma kolumny z nazwą (Name/AccountName/Title/BankName).");
+
+            using var cmd = c.CreateCommand();
+            cmd.Transaction = tx;
+            cmd.CommandText = $@"
+SELECT Id
+FROM BankAccounts
+WHERE UserId=@u AND (TRIM({col})=TRIM(@n))
+LIMIT 1;";
+            cmd.Parameters.AddWithValue("@u", userId);
+            cmd.Parameters.AddWithValue("@n", accountName);
+
+            var obj = cmd.ExecuteScalar();
+            return obj == null || obj == DBNull.Value ? (int?)null : Convert.ToInt32(obj);
+        }
+
+        private static int? ResolveEnvelopeIdByName(SqliteConnection c, SqliteTransaction tx, int userId, string envelopeName)
+        {
+            if (!DatabaseService.TableExists(c, "Envelopes")) return null;
+
+            // wybierz istniejącą kolumnę z nazwą koperty
+            string? col =
+                DatabaseService.ColumnExists(c, "Envelopes", "Name") ? "Name" :
+                DatabaseService.ColumnExists(c, "Envelopes", "Title") ? "Title" :
+                DatabaseService.ColumnExists(c, "Envelopes", "EnvelopeName") ? "EnvelopeName" :
+                null;
+
+            if (col == null)
+                throw new InvalidOperationException("Tabela Envelopes nie ma kolumny z nazwą (Name/Title/EnvelopeName).");
+
+            using var cmd = c.CreateCommand();
+            cmd.Transaction = tx;
+            cmd.CommandText = $@"
+SELECT Id
+FROM Envelopes
+WHERE UserId=@u AND (TRIM({col})=TRIM(@n))
+LIMIT 1;";
+            cmd.Parameters.AddWithValue("@u", userId);
+            cmd.Parameters.AddWithValue("@n", envelopeName);
+
+            var obj = cmd.ExecuteScalar();
+            return obj == null || obj == DBNull.Value ? (int?)null : Convert.ToInt32(obj);
+        }
+
+
+        /// <summary>
+        /// Publiczne API usuwania przychodu.
+        /// Spójne z resztą LedgerService: transakcja + odwrócenie efektu tylko jeśli nie-planned.
+        /// </summary>
+        public static void DeleteIncome(int incomeId)
+        {
+            if (incomeId <= 0) return;
+
+            using var c = DatabaseService.GetConnection();
+            DatabaseService.EnsureTables();
+            using var tx = c.BeginTransaction();
+
+            // To robi:
+            // - jeśli planned: tylko DELETE rekordu (bez ruszania sald)
+            // - jeśli zrealizowany: RevertIncomeEffect + DELETE
+            if (TryDeleteIncomeInternal(c, tx, incomeId))
+            {
+                tx.Commit();
+                DatabaseService.NotifyDataChanged();
+                return;
+            }
+
+            tx.Commit(); // nic do usunięcia
         }
 
         private static void DeleteIncomeInternal(SqliteConnection c, SqliteTransaction tx, int id)

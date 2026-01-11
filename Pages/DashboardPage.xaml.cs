@@ -139,7 +139,6 @@ namespace Finly.Pages
             SetKpiText("SavedToAllocateText", snap.SavedUnallocated);
             SetKpiText("EnvelopesDashboardText", snap.Envelopes);
             SetKpiText("InvestmentsText", snap.Investments);
-
         }
 
         // =====================================================================
@@ -627,31 +626,15 @@ namespace Finly.Pages
             }
         }
 
-
         // =====================================================================
-        // SELEKCJA: MiniTableControl -> ListBox (w środku)
+        // SELEKCJA: MiniTableControl.SelectedItem — NOWA WERSJA
         // =====================================================================
-        private static T? FindDescendant<T>(DependencyObject root) where T : DependencyObject
-        {
-            if (root == null) return null;
-
-            int count = VisualTreeHelper.GetChildrenCount(root);
-            for (int i = 0; i < count; i++)
-            {
-                var child = VisualTreeHelper.GetChild(root, i);
-                if (child is T t) return t;
-
-                var found = FindDescendant<T>(child);
-                if (found != null) return found;
-            }
-            return null;
-        }
-
         private TransactionItem? GetSelectedFromMiniTable(string elementName)
         {
-            if (FindName(elementName) is not DependencyObject host) return null;
-            var lb = FindDescendant<ListBox>(host);
-            return lb?.SelectedItem as TransactionItem;
+            if (FindName(elementName) is Finly.Views.Controls.MiniTableControl mt)
+                return mt.SelectedItem as TransactionItem;
+
+            return null;
         }
 
         private TransactionItem? GetSelectedIncome() => GetSelectedFromMiniTable("IncomeTable");
@@ -689,10 +672,12 @@ namespace Finly.Pages
         {
             if (FindName("IncomeDeleteConfirmPanel") is FrameworkElement p) p.Visibility = Visibility.Visible;
         }
+
         private void IncomeDeleteConfirmNo_Click(object sender, RoutedEventArgs e)
         {
             if (FindName("IncomeDeleteConfirmPanel") is FrameworkElement p) p.Visibility = Visibility.Collapsed;
         }
+
         private void IncomeDeleteConfirmYes_Click(object sender, RoutedEventArgs e)
         {
             var item = GetSelectedIncome();
@@ -710,23 +695,26 @@ namespace Finly.Pages
                 }
                 else
                 {
-                    DatabaseService.DeleteIncome(item.Id);
+                    TransactionsFacadeService.DeleteIncome(item.Id);
                     ToastService.Success("Usunięto przychód.");
                 }
+
+
             }
             catch (Exception ex) { ToastService.Error("Błąd usuwania przychodu.\n" + ex.Message); }
             finally { IncomeDeleteConfirmNo_Click(sender, e); ReloadAfterEdit(); }
         }
 
-
         private void ShowExpenseDeleteConfirm_Click(object sender, RoutedEventArgs e)
         {
             if (FindName("ExpenseDeleteConfirmPanel") is FrameworkElement p) p.Visibility = Visibility.Visible;
         }
+
         private void ExpenseDeleteConfirmNo_Click(object sender, RoutedEventArgs e)
         {
             if (FindName("ExpenseDeleteConfirmPanel") is FrameworkElement p) p.Visibility = Visibility.Collapsed;
         }
+
         private void ExpenseDeleteConfirmYes_Click(object sender, RoutedEventArgs e)
         {
             var item = GetSelectedExpense();
@@ -751,8 +739,6 @@ namespace Finly.Pages
             catch (Exception ex) { ToastService.Error("Błąd usuwania wydatku.\n" + ex.Message); }
             finally { ExpenseDeleteConfirmNo_Click(sender, e); ReloadAfterEdit(); }
         }
-
-
 
         private static int GetIsPlannedFlag(string table, int id)
         {
@@ -781,10 +767,12 @@ namespace Finly.Pages
         {
             if (FindName("PlannedDeleteConfirmPanel") is FrameworkElement p) p.Visibility = Visibility.Visible;
         }
+
         private void PlannedDeleteConfirmNo_Click(object sender, RoutedEventArgs e)
         {
             if (FindName("PlannedDeleteConfirmPanel") is FrameworkElement p) p.Visibility = Visibility.Collapsed;
         }
+
         private void PlannedDeleteConfirmYes_Click(object sender, RoutedEventArgs e)
         {
             var item = GetSelectedPlanned();
@@ -826,10 +814,7 @@ namespace Finly.Pages
                 ReloadAfterEdit();
             }
         }
-
     }
-
-
 
     // =====================================================================
     // Klasy pomocnicze

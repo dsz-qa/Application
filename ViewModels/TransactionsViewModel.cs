@@ -9,6 +9,7 @@ using System.Data;
 using System.Globalization;
 using System.Linq;
 using System.Runtime.CompilerServices;
+using System.Windows.Data;
 using System.Windows.Input;
 
 namespace Finly.ViewModels
@@ -38,6 +39,40 @@ namespace Finly.ViewModels
 
         // Lista kategorii do edycji (ComboBox)
         public ObservableCollection<string> AvailableCategories { get; } = new();
+
+        // ------------------ SORTOWANIE (NA POZIOMIE VM, NIE CardVm) ------------------
+
+        public enum TransactionSortMode
+        {
+            DateDesc, // najnowsze -> najstarsze
+            DateAsc   // najstarsze -> najnowsze
+        }
+
+        private TransactionSortMode _sortMode = TransactionSortMode.DateDesc;
+        public TransactionSortMode SortMode
+        {
+            get => _sortMode;
+            set
+            {
+                if (_sortMode == value) return;
+                _sortMode = value;
+                OnPropertyChanged();
+                ApplyFilters();
+            }
+        }
+
+        public Array SortModes => Enum.GetValues(typeof(TransactionSortMode));
+
+        private static DateTime SortKeyDate(TransactionCardVm t, bool plannedList)
+        {
+            if (TryParseDateDisplay(t.DateDisplay, out var d))
+                return d.Date;
+
+            // Brak daty -> na koniec listy
+            return plannedList ? DateTime.MaxValue : DateTime.MinValue;
+        }
+
+        // ------------------ KPI ------------------
 
         private decimal _totalExpenses;
         public decimal TotalExpenses
@@ -445,13 +480,11 @@ namespace Finly.ViewModels
             dt = default;
             if (string.IsNullOrWhiteSpace(s)) return false;
 
-            // Akceptujemy oba formaty (bo masz już historyczne dane w różnych formatach)
             var formats = new[] { "yyyy-MM-dd", "dd-MM-yyyy", "yyyy/MM/dd", "dd/MM/yyyy" };
 
             if (DateTime.TryParseExact(s.Trim(), formats, CultureInfo.InvariantCulture, DateTimeStyles.None, out dt))
                 return true;
 
-            // fallback
             return DateTime.TryParse(s, CultureInfo.CurrentCulture, DateTimeStyles.None, out dt)
                 || DateTime.TryParse(s, CultureInfo.InvariantCulture, DateTimeStyles.None, out dt);
         }
@@ -460,7 +493,6 @@ namespace Finly.ViewModels
         {
             if (raw is DateTime dt) return dt;
 
-            // Jeśli w DB masz ISO, to to przejdzie:
             if (DateTime.TryParseExact(raw?.ToString(), "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var p1))
                 return p1;
 
@@ -532,7 +564,6 @@ namespace Finly.ViewModels
             double amt = Convert.ToDouble(r["Amount"]);
             DateTime date = ParseDate(r["Date"]);
 
-            // w Expenses masz i Title i Description; UI ma Description
             string desc = r.Table.Columns.Contains("Description")
                 ? (r["Description"]?.ToString() ?? string.Empty)
                 : (r.Table.Columns.Contains("Title") ? (r["Title"]?.ToString() ?? string.Empty) : string.Empty);
@@ -614,10 +645,8 @@ namespace Finly.ViewModels
                     ? (int?)Convert.ToInt32(r["PaymentRefId"])
                     : null;
 
-            // Jeśli masz PaymentKind/Ref, pokaż konto wynikające z tego.
             string toName = ResolvePaymentDisplay(pk, pr, fallbackAccountId: null);
 
-            // fallback na legacy (Source/AccountId) jeśli coś jest puste
             if (string.IsNullOrWhiteSpace(toName) || toName == "?")
             {
                 if (r.Table.Columns.Contains("AccountId") && r["AccountId"] != DBNull.Value)
@@ -727,7 +756,6 @@ namespace Finly.ViewModels
 
             var txt = new string(amountStr.Where(ch => char.IsDigit(ch) || ch == ',' || ch == '.' || ch == '-').ToArray());
 
-            // Najbezpieczniej: najpierw PL, potem invariant
             if (decimal.TryParse(txt, NumberStyles.Number, CultureInfo.CurrentCulture, out var v1))
                 return Math.Abs(v1);
 
@@ -747,7 +775,6 @@ namespace Finly.ViewModels
 
             vm.EditDescription = vm.Description ?? string.Empty;
 
-            // DateDisplay jest dd-MM-yyyy (UI), ale wspieramy oba:
             if (TryParseDateDisplay(vm.DateDisplay, out var parsed))
                 vm.EditDate = parsed.Date;
             else
@@ -763,7 +790,6 @@ namespace Finly.ViewModels
         public void SaveEdit(TransactionCardVm vm)
         {
             if (vm == null) return;
-
 
             try
             {
@@ -787,7 +813,6 @@ namespace Finly.ViewModels
                         SaveEditTransfer(vm, newDate, newDesc, newPlanned);
                         break;
                 }
-
             }
             catch
             {
@@ -806,10 +831,6 @@ namespace Finly.ViewModels
             DatabaseService.EnsureTables();
             using var tx = c.BeginTransaction();
 
-            // Stary stan (żeby wiedzieć planned<->realized)
-            bool oldPlanned = false;
-            decimal amount = 0m;
-
             using (var read = c.CreateCommand())
             {
                 read.Transaction = tx;
@@ -827,21 +848,7 @@ LIMIT 1;";
                     tx.Rollback();
                     return;
                 }
-
-                amount = r.IsDBNull(0) ? 0m : Convert.ToDecimal(r.GetValue(0));
-                var dateTxt = r.IsDBNull(1) ? "" : (r.GetValue(1)?.ToString() ?? "");
-                var isPlannedDb = !r.IsDBNull(2) && Convert.ToInt32(r.GetValue(2)) == 1;
-
-                DateTime oldDate =
-                    DateTime.TryParseExact(dateTxt, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var d1) ? d1 :
-                    (DateTime.TryParse(dateTxt, out var d2) ? d2 : DateTime.MinValue);
-
-                oldPlanned = isPlannedDb || (oldDate != DateTime.MinValue && oldDate.Date > DateTime.Today);
             }
-
-            // UWAGA: Na tym etapie NIE ruszam Ledger dla transferów,
-            // bo nie pokazałaś metod ApplyTransferEffect/RevertTransferEffect.
-            // To jest bezpieczne: zmieniasz tylko plan/termin i opis.
 
             using (var upd = c.CreateCommand())
             {
@@ -863,13 +870,11 @@ WHERE Id=@id AND UserId=@u;";
 
             tx.Commit();
 
-            // Update VM (UI)
             vm.DateDisplay = ToUiDate(newDate);
             vm.Description = newDesc;
             vm.IsPlanned = newPlanned;
             vm.IsFuture = newPlanned;
         }
-
 
         private void SaveEditExpense(TransactionCardVm vm, DateTime newDate, string newDesc, string? selectedCat, bool newPlanned)
         {
@@ -877,7 +882,6 @@ WHERE Id=@id AND UserId=@u;";
             DatabaseService.EnsureTables();
             using var tx = c.BeginTransaction();
 
-            // 1) Odczytaj STAN ŹRÓDŁOWY z DB (z właściwym PaymentKind/PaymentRefId)
             int dbUserId;
             decimal amount;
             DateTime oldDate;
@@ -926,7 +930,6 @@ LIMIT 1;";
                 return;
             }
 
-            // 2) Kategoria -> CategoryId
             int catId = 0;
             if (!string.IsNullOrWhiteSpace(selectedCat) &&
                 !string.Equals(selectedCat, "(brak)", StringComparison.CurrentCultureIgnoreCase))
@@ -939,25 +942,20 @@ LIMIT 1;";
                 catch { catId = 0; }
             }
 
-            // 3) Planned/realized – licz na podstawie DB (stare) i nowej daty (nowe)
             bool oldPlanned = dbIsPlanned || (oldDate != DateTime.MinValue && oldDate.Date > DateTime.Today);
 
-            // 4) Księgowanie: PRZY ZMIANIE planned<->realized używaj PaymentKind/PaymentRefId z DB
             if (oldPlanned != newPlanned)
             {
                 if (oldPlanned && !newPlanned)
                 {
-                    // planned -> realized (dopiero teraz ma zejść z konta)
                     LedgerService.ApplyExpenseEffect(c, tx, UserId, amount, paymentKind, paymentRefId);
                 }
                 else if (!oldPlanned && newPlanned)
                 {
-                    // realized -> planned (oddaj na to samo konto, z którego zeszło)
                     LedgerService.RevertExpenseEffect(c, tx, UserId, amount, paymentKind, paymentRefId);
                 }
             }
 
-            // 5) Update rekordu (nie ruszamy PaymentKind/PaymentRefId, bo nie edytujesz konta inline)
             using (var upd = c.CreateCommand())
             {
                 upd.Transaction = tx;
@@ -981,7 +979,6 @@ WHERE Id=@id AND UserId=@u;";
 
             tx.Commit();
 
-            // 6) Update VM
             vm.DateDisplay = ToUiDate(newDate);
             vm.Description = newDesc;
             vm.CategoryName = string.IsNullOrWhiteSpace(selectedCat) ? "(brak)" : selectedCat!;
@@ -990,10 +987,8 @@ WHERE Id=@id AND UserId=@u;";
             vm.IsFuture = newPlanned;
         }
 
-
         private void SaveEditIncome(TransactionCardVm vm, DateTime newDate, string newDesc, string? selectedCat, bool newPlanned)
         {
-            // Czytamy stan bazowy z DB (kwota/konto/isPlanned), żeby księgowanie było poprawne.
             using var c = DatabaseService.GetConnection();
             DatabaseService.EnsureTables();
             using var tx = c.BeginTransaction();
@@ -1007,7 +1002,6 @@ WHERE Id=@id AND UserId=@u;";
 
             bool oldPlanned = info.IsPlanned || info.Date.Date > DateTime.Today;
 
-            // Kategoria (opcjonalna)
             int? catId = null;
             if (!string.IsNullOrWhiteSpace(selectedCat) &&
                 !string.Equals(selectedCat, "Przychód", StringComparison.CurrentCultureIgnoreCase))
@@ -1020,7 +1014,6 @@ WHERE Id=@id AND UserId=@u;";
                 catch { catId = null; }
             }
 
-            // Księgowanie/odksięgowanie przy zmianie planned<->realized
             if (oldPlanned != newPlanned)
             {
                 if (oldPlanned && !newPlanned)
@@ -1112,51 +1105,52 @@ WHERE Id=@id AND UserId=@u;";
         {
             public int UserId { get; set; }
             public decimal Amount { get; set; }
-            public bool IsPlanned { get; set; }
             public DateTime Date { get; set; }
+            public bool IsPlanned { get; set; }
             public int PaymentKind { get; set; }
             public int? PaymentRefId { get; set; }
         }
 
         private static IncomeLedgerInfo? ReadIncomeLedgerInfo(SqliteConnection c, SqliteTransaction tx, int incomeId)
         {
-            // schema wg Twojego SchemaService: Incomes ma PaymentKind/PaymentRefId/IsPlanned/Date/Amount
+            if (!DatabaseService.TableExists(c, "Incomes")) return null;
+
+            bool hasPlanned = DatabaseService.ColumnExists(c, "Incomes", "IsPlanned");
+            bool hasPk = DatabaseService.ColumnExists(c, "Incomes", "PaymentKind");
+            bool hasPr = DatabaseService.ColumnExists(c, "Incomes", "PaymentRefId");
+
             using var cmd = c.CreateCommand();
             cmd.Transaction = tx;
 
             cmd.CommandText = @"
-SELECT UserId, Amount, Date,
-       COALESCE(IsPlanned,0) AS IsPlanned,
-       COALESCE(PaymentKind,0) AS PaymentKind,
-       PaymentRefId
+SELECT UserId,
+       Amount,
+       Date,
+       " + (hasPlanned ? "IsPlanned" : "0") + @" AS IsPlanned,
+       " + (hasPk ? "PaymentKind" : "0") + @" AS PaymentKind,
+       " + (hasPr ? "PaymentRefId" : "NULL") + @" AS PaymentRefId
 FROM Incomes
 WHERE Id=@id
 LIMIT 1;";
-
             cmd.Parameters.AddWithValue("@id", incomeId);
 
             using var r = cmd.ExecuteReader();
             if (!r.Read()) return null;
 
-            int userId = r.IsDBNull(0) ? 0 : Convert.ToInt32(r.GetValue(0));
-            decimal amount = r.IsDBNull(1) ? 0m : Convert.ToDecimal(r.GetValue(1));
-            string dateTxt = r.IsDBNull(2) ? "" : (r.GetValue(2)?.ToString() ?? "");
-            bool isPlanned = !r.IsDBNull(3) && Convert.ToInt32(r.GetValue(3)) == 1;
-            int pk = r.IsDBNull(4) ? 0 : Convert.ToInt32(r.GetValue(4));
-            int? pr = r.IsDBNull(5) ? (int?)null : Convert.ToInt32(r.GetValue(5));
-
-            DateTime date =
+            var dateTxt = r.IsDBNull(2) ? "" : (r.GetValue(2)?.ToString() ?? "");
+            DateTime dt =
                 DateTime.TryParseExact(dateTxt, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var d1) ? d1 :
-                (DateTime.TryParse(dateTxt, out var d2) ? d2 : DateTime.MinValue);
+                (DateTime.TryParse(dateTxt, CultureInfo.InvariantCulture, DateTimeStyles.None, out var d2) ? d2 :
+                 (DateTime.TryParse(dateTxt, CultureInfo.CurrentCulture, DateTimeStyles.None, out var d3) ? d3 : DateTime.MinValue));
 
             return new IncomeLedgerInfo
             {
-                UserId = userId,
-                Amount = amount,
-                Date = date,
-                IsPlanned = isPlanned,
-                PaymentKind = pk,
-                PaymentRefId = pr
+                UserId = r.IsDBNull(0) ? 0 : r.GetInt32(0),
+                Amount = r.IsDBNull(1) ? 0m : Convert.ToDecimal(r.GetValue(1)),
+                Date = dt,
+                IsPlanned = !r.IsDBNull(3) && Convert.ToInt32(r.GetValue(3)) == 1,
+                PaymentKind = r.IsDBNull(4) ? 0 : Convert.ToInt32(r.GetValue(4)),
+                PaymentRefId = r.IsDBNull(5) ? (int?)null : Convert.ToInt32(r.GetValue(5))
             };
         }
 
@@ -1191,6 +1185,8 @@ LIMIT 1;";
                 return set.Contains(n) || MatchesCash(n);
             }
         }
+
+
 
         private void ApplyFilters()
         {
@@ -1285,30 +1281,72 @@ LIMIT 1;";
                 else
                     catOk = selectedCategories.Any(x => string.Equals(t.CategoryName, x, StringComparison.CurrentCultureIgnoreCase));
 
-                bool textOk = string.IsNullOrEmpty(q)
-                    || (t.CategoryName?.IndexOf(q, StringComparison.CurrentCultureIgnoreCase) >= 0)
-                    || (t.Description?.IndexOf(q, StringComparison.CurrentCultureIgnoreCase) >= 0)
-                    || (t.AccountName?.IndexOf(q, StringComparison.CurrentCultureIgnoreCase) >= 0)
-                    || (t.FromAccountName?.IndexOf(q, StringComparison.CurrentCultureIgnoreCase) >= 0)
-                    || (t.ToAccountName?.IndexOf(q, StringComparison.CurrentCultureIgnoreCase) >= 0);
+                // WYSZUKIWANIE: także po kwocie (AmountStr)
+                bool textOk = true;
+
+                if (!string.IsNullOrWhiteSpace(q))
+                {
+                    // 1) klasyczne pola tekstowe
+                    bool textHit =
+                        (t.CategoryName?.IndexOf(q, StringComparison.CurrentCultureIgnoreCase) >= 0)
+                        || (t.Description?.IndexOf(q, StringComparison.CurrentCultureIgnoreCase) >= 0)
+                        || (t.AccountName?.IndexOf(q, StringComparison.CurrentCultureIgnoreCase) >= 0)
+                        || (t.FromAccountName?.IndexOf(q, StringComparison.CurrentCultureIgnoreCase) >= 0)
+                        || (t.ToAccountName?.IndexOf(q, StringComparison.CurrentCultureIgnoreCase) >= 0);
+
+                    // 2) kwota: wspieramy wpisy typu: "100", "100,5", "100.50", "1 000", "1000zł"
+                    bool amountHit = false;
+
+                    var qClean = new string(q.Where(ch => char.IsDigit(ch) || ch == ',' || ch == '.' || ch == '-').ToArray());
+                    if (!string.IsNullOrWhiteSpace(qClean))
+                    {
+                        // próbujemy zinterpretować jako liczbę
+                        if (decimal.TryParse(qClean, NumberStyles.Number, CultureInfo.CurrentCulture, out var qNum)
+                            || decimal.TryParse(qClean, NumberStyles.Number, CultureInfo.InvariantCulture, out qNum))
+                        {
+                            var amt = ParseAmountInternal(t.AmountStr); // Twoja metoda zwraca abs()
+                                                                        // tolerancja 1 grosz
+                            amountHit = Math.Abs(amt - Math.Abs(qNum)) < 0.01m;
+                        }
+                        else
+                        {
+                            // fallback: tekstowo po AmountStr (np. ktoś wpisze "8 877")
+                            amountHit = (t.AmountStr?.IndexOf(q, StringComparison.CurrentCultureIgnoreCase) >= 0);
+                        }
+                    }
+
+                    textOk = textHit || amountHit;
+                }
+
 
                 return dateOk && typeOk && accOk && catOk && textOk;
             }
 
-            var left = AllTransactions.Where(t => PassCommonFilters(t) && !(t.IsPlanned || t.IsFuture)).ToList();
+            var leftRaw = AllTransactions
+                .Where(t => PassCommonFilters(t) && !(t.IsPlanned || t.IsFuture));
+
+            var leftList = (SortMode == TransactionSortMode.DateAsc)
+                ? leftRaw.OrderBy(t => SortKeyDate(t, plannedList: false)).ToList()
+                : leftRaw.OrderByDescending(t => SortKeyDate(t, plannedList: false)).ToList();
+
             TransactionsList.Clear();
-            foreach (var i in left) TransactionsList.Add(i);
+            foreach (var i in leftList) TransactionsList.Add(i);
 
-            var right = AllTransactions.Where(t => PassCommonFilters(t) && (t.IsPlanned || t.IsFuture))
-                .OrderBy(t => TryParseDateDisplay(t.DateDisplay, out var d) ? d : DateTime.MaxValue)
-                .ToList();
+            var rightRaw = AllTransactions
+                .Where(t => PassCommonFilters(t) && (t.IsPlanned || t.IsFuture));
+
+            var rightList = (SortMode == TransactionSortMode.DateAsc)
+                ? rightRaw.OrderBy(t => SortKeyDate(t, plannedList: true)).ToList()
+                : rightRaw.OrderByDescending(t => SortKeyDate(t, plannedList: true)).ToList();
+
             PlannedTransactionsList.Clear();
-            foreach (var r in right) PlannedTransactionsList.Add(r);
+            foreach (var r in rightList) PlannedTransactionsList.Add(r);
 
-            TotalExpenses = left.Where(t => t.Kind == TransactionKind.Expense)
+            // KPI licz z lewej (zrealizowane)
+            TotalExpenses = leftList.Where(t => t.Kind == TransactionKind.Expense)
                 .Select(x => ParseAmountInternal(x.AmountStr)).Sum();
 
-            TotalIncomes = left.Where(t => t.Kind == TransactionKind.Income)
+            TotalIncomes = leftList.Where(t => t.Kind == TransactionKind.Income)
                 .Select(x => ParseAmountInternal(x.AmountStr)).Sum();
         }
 
@@ -1499,6 +1537,26 @@ LIMIT 1;";
             {
                 ShowDeleteConfirmationCommand = new DelegateCommand(_ => IsDeleteConfirmationVisible = true);
                 HideDeleteConfirmationCommand = new DelegateCommand(_ => IsDeleteConfirmationVisible = false);
+            }
+
+            public sealed class SortModeToPolishTextConverter : IValueConverter
+            {
+                public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
+                {
+                    if (value is TransactionsViewModel.TransactionSortMode m)
+                    {
+                        return m switch
+                        {
+                            TransactionsViewModel.TransactionSortMode.DateDesc => "Od najnowszych",
+                            TransactionsViewModel.TransactionSortMode.DateAsc => "Od najstarszych",
+                            _ => m.ToString()
+                        };
+                    }
+                    return value?.ToString() ?? "";
+                }
+
+                public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
+                    => Binding.DoNothing;
             }
         }
     }

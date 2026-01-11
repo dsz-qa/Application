@@ -1811,8 +1811,14 @@ VALUES (@u,@d,@a,@desc,@fk,@fr,@tk,@tr,@p);";
             using var con = OpenAndEnsureSchema();
             using var cmd = con.CreateCommand();
 
+            bool hasPk = ColumnExists(con, "Incomes", "PaymentKind");
+            bool hasPr = ColumnExists(con, "Incomes", "PaymentRefId");
+
             var sb = new StringBuilder(@"
-SELECT i.Id, i.UserId, i.Date, i.Amount, i.Description, i.Source, i.CategoryId, c.Name AS CategoryName, i.IsPlanned
+SELECT i.Id, i.UserId, i.Date, i.Amount, i.Description, i.Source, i.CategoryId,
+       c.Name AS CategoryName, i.IsPlanned,
+       " + (hasPk ? "i.PaymentKind" : "0") + @" AS PaymentKind,
+       " + (hasPr ? "i.PaymentRefId" : "NULL") + @" AS PaymentRefId
 FROM Incomes i
 LEFT JOIN Categories c ON c.Id = i.CategoryId
 WHERE i.UserId=@u");
@@ -1842,6 +1848,7 @@ WHERE i.UserId=@u");
             return dt;
         }
 
+
         public static int InsertIncome(
             int userId,
             decimal amount,
@@ -1850,37 +1857,60 @@ WHERE i.UserId=@u");
             string? source,
             int? categoryId,
             bool isPlanned = false,
-            int? budgetId = null)
+            int? budgetId = null,
+            Finly.Models.PaymentKind paymentKind = Finly.Models.PaymentKind.FreeCash,
+            int? paymentRefId = null)
         {
             using var con = OpenAndEnsureSchema();
+
             bool hasBudgetId = ColumnExists(con, "Incomes", "BudgetId");
+            bool hasPk = ColumnExists(con, "Incomes", "PaymentKind");
+            bool hasPr = ColumnExists(con, "Incomes", "PaymentRefId");
+
+            using var tx = con.BeginTransaction();
+
+            var cols = new List<string> { "UserId", "Amount", "Date", "Description", "Source", "CategoryId", "IsPlanned" };
+            var vals = new List<string> { "@u", "@a", "@d", "@desc", "@s", "@c", "@p" };
+
+            if (hasBudgetId) { cols.Add("BudgetId"); vals.Add("@b"); }
+            if (hasPk) { cols.Add("PaymentKind"); vals.Add("@pk"); }
+            if (hasPr) { cols.Add("PaymentRefId"); vals.Add("@pr"); }
 
             using var cmd = con.CreateCommand();
-
-            cmd.CommandText = hasBudgetId
-                ? @"INSERT INTO Incomes(UserId, Amount, Date, Description, Source, CategoryId, IsPlanned, BudgetId)
-                    VALUES (@u,@a,@d,@desc,@s,@c,@p,@b);
-                    SELECT last_insert_rowid();"
-                : @"INSERT INTO Incomes(UserId, Amount, Date, Description, Source, CategoryId, IsPlanned)
-                    VALUES (@u,@a,@d,@desc,@s,@c,@p);
-                    SELECT last_insert_rowid();";
+            cmd.Transaction = tx;
+            cmd.CommandText = $@"
+INSERT INTO Incomes({string.Join(",", cols)})
+VALUES ({string.Join(",", vals)});
+SELECT last_insert_rowid();";
 
             cmd.Parameters.AddWithValue("@u", userId);
             cmd.Parameters.AddWithValue("@a", amount);
             cmd.Parameters.AddWithValue("@d", date.ToString("yyyy-MM-dd"));
             cmd.Parameters.AddWithValue("@desc", (object?)description ?? DBNull.Value);
             cmd.Parameters.AddWithValue("@s", (object?)source ?? DBNull.Value);
+
             if (categoryId.HasValue && categoryId.Value > 0) cmd.Parameters.AddWithValue("@c", categoryId.Value);
             else cmd.Parameters.AddWithValue("@c", DBNull.Value);
+
             cmd.Parameters.AddWithValue("@p", isPlanned ? 1 : 0);
 
-            if (hasBudgetId)
-                cmd.Parameters.AddWithValue("@b", (object?)budgetId ?? DBNull.Value);
+            if (hasBudgetId) cmd.Parameters.AddWithValue("@b", (object?)budgetId ?? DBNull.Value);
+            if (hasPk) cmd.Parameters.AddWithValue("@pk", (int)paymentKind);
+            if (hasPr) cmd.Parameters.AddWithValue("@pr", (object?)paymentRefId ?? DBNull.Value);
 
             var id = Convert.ToInt32(cmd.ExecuteScalar() ?? 0);
+
+            // Ksiêgowanie tylko jeœli nieplanowane
+            if (!isPlanned)
+            {
+                LedgerService.ApplyIncomeEffect(con, tx, userId, Math.Abs(amount), (int)paymentKind, paymentRefId);
+            }
+
+            tx.Commit();
             RaiseDataChanged();
             return id;
         }
+
 
         public static void UpdateIncome(
             int id,
@@ -1891,43 +1921,84 @@ WHERE i.UserId=@u");
             DateTime? date = null,
             int? categoryId = null,
             string? source = null,
-            int? budgetId = null)
+            int? budgetId = null,
+            Finly.Models.PaymentKind? paymentKind = null,
+            int? paymentRefId = null)
         {
             using var con = OpenAndEnsureSchema();
-            bool hasBudgetId = ColumnExists(con, "Incomes", "BudgetId");
 
-            var setParts = new List<string>
+            bool hasBudgetId = ColumnExists(con, "Incomes", "BudgetId");
+            bool hasPk = ColumnExists(con, "Incomes", "PaymentKind");
+            bool hasPr = ColumnExists(con, "Incomes", "PaymentRefId");
+
+            using var tx = con.BeginTransaction();
+
+            var old = ReadIncomeLedgerInfo(con, tx, id);
+            if (old == null) throw new InvalidOperationException("Nie znaleziono przychodu do aktualizacji.");
+
+            // 1) revert starego wp³ywu (jeœli by³ zrealizowany)
+            if (!old.IsPlanned)
             {
-                "Amount = COALESCE(@a, Amount)",
-                "Description = COALESCE(@desc, Description)",
-                "IsPlanned = COALESCE(@p, IsPlanned)",
-                "Date = COALESCE(@d, Date)",
-                "CategoryId = @c",
-                "Source = COALESCE(@s, Source)"
-            };
+                LedgerService.RevertIncomeEffect(con, tx, old.UserId, Math.Abs(old.Amount), old.PaymentKind, old.PaymentRefId);
+            }
+
+            // 2) policz nowe wartoœci (fallback: jeœli null -> zostaw stare)
+            var newAmount = amount ?? old.Amount;
+            var newPlanned = isPlanned ?? old.IsPlanned;
+
+            int newPk = hasPk ? (int)(paymentKind ?? (Finly.Models.PaymentKind)old.PaymentKind) : old.PaymentKind;
+            int? newPr = hasPr ? (paymentKind.HasValue ? paymentRefId : old.PaymentRefId) : old.PaymentRefId;
+
+            // 3) update rekord
+            var setParts = new List<string>
+    {
+        "Amount = COALESCE(@a, Amount)",
+        "Description = COALESCE(@desc, Description)",
+        "IsPlanned = COALESCE(@p, IsPlanned)",
+        "Date = COALESCE(@d, Date)",
+        "CategoryId = @c",
+        "Source = COALESCE(@s, Source)"
+    };
 
             if (hasBudgetId) setParts.Add("BudgetId = @b");
+            if (hasPk) setParts.Add("PaymentKind = COALESCE(@pk, PaymentKind)");
+            if (hasPr) setParts.Add("PaymentRefId = @pr");
 
-            using var cmd = con.CreateCommand();
-            cmd.CommandText = $@"UPDATE Incomes SET {string.Join(", ", setParts)} WHERE Id=@id AND UserId=@u;";
+            using (var cmd = con.CreateCommand())
+            {
+                cmd.Transaction = tx;
+                cmd.CommandText = $@"UPDATE Incomes SET {string.Join(", ", setParts)} WHERE Id=@id AND UserId=@u;";
 
-            cmd.Parameters.AddWithValue("@id", id);
-            cmd.Parameters.AddWithValue("@u", userId);
-            cmd.Parameters.AddWithValue("@a", (object?)amount ?? DBNull.Value);
-            cmd.Parameters.AddWithValue("@desc", (object?)description ?? DBNull.Value);
-            cmd.Parameters.AddWithValue("@p", isPlanned.HasValue ? isPlanned.Value ? 1 : 0 : DBNull.Value);
-            cmd.Parameters.AddWithValue("@d", date.HasValue ? date.Value.ToString("yyyy-MM-dd") : DBNull.Value);
+                cmd.Parameters.AddWithValue("@id", id);
+                cmd.Parameters.AddWithValue("@u", userId);
+                cmd.Parameters.AddWithValue("@a", (object?)amount ?? DBNull.Value);
+                cmd.Parameters.AddWithValue("@desc", (object?)description ?? DBNull.Value);
+                cmd.Parameters.AddWithValue("@p", isPlanned.HasValue ? (isPlanned.Value ? 1 : 0) : DBNull.Value);
+                cmd.Parameters.AddWithValue("@d", date.HasValue ? date.Value.ToString("yyyy-MM-dd") : DBNull.Value);
 
-            if (categoryId.HasValue && categoryId.Value > 0) cmd.Parameters.AddWithValue("@c", categoryId.Value);
-            else cmd.Parameters.AddWithValue("@c", DBNull.Value);
+                if (categoryId.HasValue && categoryId.Value > 0) cmd.Parameters.AddWithValue("@c", categoryId.Value);
+                else cmd.Parameters.AddWithValue("@c", DBNull.Value);
 
-            cmd.Parameters.AddWithValue("@s", (object?)source ?? DBNull.Value);
+                cmd.Parameters.AddWithValue("@s", (object?)source ?? DBNull.Value);
 
-            if (hasBudgetId) cmd.Parameters.AddWithValue("@b", (object?)budgetId ?? DBNull.Value);
+                if (hasBudgetId) cmd.Parameters.AddWithValue("@b", (object?)budgetId ?? DBNull.Value);
 
-            cmd.ExecuteNonQuery();
+                if (hasPk) cmd.Parameters.AddWithValue("@pk", paymentKind.HasValue ? (int)paymentKind.Value : DBNull.Value);
+                if (hasPr) cmd.Parameters.AddWithValue("@pr", hasPr ? (object?)newPr ?? DBNull.Value : DBNull.Value);
+
+                cmd.ExecuteNonQuery();
+            }
+
+            // 4) apply nowego wp³ywu (jeœli nowe jest zrealizowane)
+            if (!newPlanned)
+            {
+                LedgerService.ApplyIncomeEffect(con, tx, userId, Math.Abs(newAmount), newPk, newPr);
+            }
+
+            tx.Commit();
             RaiseDataChanged();
         }
+
 
         public static void DeleteIncome(int id)
         {
@@ -2264,6 +2335,61 @@ LIMIT 1;";
                 PaymentRefId = legacyRef
             };
         }
+
+        private sealed class IncomeLedgerInfo
+        {
+            public int UserId { get; set; }
+            public decimal Amount { get; set; }
+            public bool IsPlanned { get; set; }
+            public int PaymentKind { get; set; }
+            public int? PaymentRefId { get; set; }
+        }
+
+        private static IncomeLedgerInfo? ReadIncomeLedgerInfo(SqliteConnection c, SqliteTransaction tx, int incomeId)
+        {
+            if (!TableExists(c, "Incomes")) return null;
+
+            bool hasIsPlanned = ColumnExists(c, "Incomes", "IsPlanned");
+            bool hasPk = ColumnExists(c, "Incomes", "PaymentKind");
+            bool hasPr = ColumnExists(c, "Incomes", "PaymentRefId");
+
+            string sql = @"
+SELECT UserId,
+       Amount,
+       " + (hasIsPlanned ? "IsPlanned" : "0") + @" AS IsPlanned,
+       " + (hasPk ? "PaymentKind" : "NULL") + @" AS PaymentKind,
+       " + (hasPr ? "PaymentRefId" : "NULL") + @" AS PaymentRefId
+FROM Incomes
+WHERE Id=@id
+LIMIT 1;";
+
+            using var cmd = c.CreateCommand();
+            cmd.Transaction = tx;
+            cmd.CommandText = sql;
+            cmd.Parameters.AddWithValue("@id", incomeId);
+
+            using var r = cmd.ExecuteReader();
+            if (!r.Read()) return null;
+
+            int userId = r.IsDBNull(0) ? 0 : r.GetInt32(0);
+            decimal amount = r.IsDBNull(1) ? 0m : Convert.ToDecimal(r.GetValue(1));
+            bool isPlanned = !r.IsDBNull(2) && Convert.ToInt32(r.GetValue(2)) == 1;
+
+            // Jeœli brak kolumn PaymentKind/RefId w starej bazie:
+            // przychody traktujemy jako FreeCash (0 w Twoich SELECT-ach).
+            int pk = r.IsDBNull(3) ? 0 : Convert.ToInt32(r.GetValue(3));
+            int? pr = r.IsDBNull(4) ? (int?)null : Convert.ToInt32(r.GetValue(4));
+
+            return new IncomeLedgerInfo
+            {
+                UserId = userId,
+                Amount = amount,
+                IsPlanned = isPlanned,
+                PaymentKind = pk,
+                PaymentRefId = pr
+            };
+        }
+
 
         public static void EnsureDefaultCategories(int userId)
         {

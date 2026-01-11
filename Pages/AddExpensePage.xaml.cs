@@ -319,28 +319,51 @@ namespace Finly.Pages
             UpdateTransferPlannedInfo();
         }
 
+        private static string BudgetsPage_ToDbTypeCompat(string? anyType)
+        {
+            var s = (anyType ?? "").Trim();
+
+            if (s.Equals("Tygodniowy", StringComparison.OrdinalIgnoreCase)) return "Weekly";
+            if (s.Equals("Miesięczny", StringComparison.OrdinalIgnoreCase)) return "Monthly";
+            if (s.Equals("Roczny", StringComparison.OrdinalIgnoreCase)) return "Yearly";
+            if (s.Equals("Inny", StringComparison.OrdinalIgnoreCase)) return "Custom";
+
+            if (s.Equals("Weekly", StringComparison.OrdinalIgnoreCase)) return "Weekly";
+            if (s.Equals("Monthly", StringComparison.OrdinalIgnoreCase)) return "Monthly";
+            if (s.Equals("Yearly", StringComparison.OrdinalIgnoreCase)) return "Yearly";
+            if (s.Equals("Custom", StringComparison.OrdinalIgnoreCase)) return "Custom";
+
+            return "Monthly";
+        }
+
+
         private void LoadExpenseBudgetsForDate(DateTime date)
         {
             try
             {
                 var budgets = BudgetService.GetBudgetsForUser(_uid, from: date, to: date).ToList();
 
-                if (budgets.Any())
-                {
-                    ExpenseBudgetRow.Visibility = Visibility.Visible;
-                    ExpenseBudgetCombo.ItemsSource = budgets;
-                    ExpenseBudgetCombo.SelectedIndex = -1;
-                }
-                else
-                {
-                    ExpenseBudgetRow.Visibility = Visibility.Collapsed;
-                    ExpenseBudgetCombo.ItemsSource = null;
-                }
+                ExpenseBudgetRow.Visibility = Visibility.Visible;
+
+                ExpenseBudgetCombo.ItemsSource = budgets;
+                ExpenseBudgetCombo.SelectedIndex = -1;
+
+                bool any = budgets.Any();
+                ExpenseBudgetCombo.IsEnabled = any;
+
+                if (ExpenseBudgetEmptyHint != null)
+                    ExpenseBudgetEmptyHint.Visibility = any ? Visibility.Collapsed : Visibility.Visible;
             }
             catch
             {
-                ExpenseBudgetRow.Visibility = Visibility.Collapsed;
+                ExpenseBudgetRow.Visibility = Visibility.Visible;
+
                 ExpenseBudgetCombo.ItemsSource = null;
+                ExpenseBudgetCombo.SelectedIndex = -1;
+                ExpenseBudgetCombo.IsEnabled = false;
+
+                if (ExpenseBudgetEmptyHint != null)
+                    ExpenseBudgetEmptyHint.Visibility = Visibility.Visible;
             }
         }
 

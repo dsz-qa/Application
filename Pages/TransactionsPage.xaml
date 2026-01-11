@@ -16,6 +16,9 @@
     <UserControl.Resources>
         <BooleanToVisibilityConverter x:Key="BoolToVisibilityConverter"/>
 
+        <!-- Sortowanie: DateDesc/DateAsc -> PL -->
+        <local:SortModeToPolishTextConverter x:Key="SortModeTextConv"/>
+
         <!-- KPI -->
         <Style x:Key="KpiValueStyle" TargetType="TextBlock">
             <Setter Property="FontSize" Value="18"/>
@@ -41,7 +44,7 @@
             <Setter Property="Margin" Value="0,0,16,0"/>
         </Style>
 
-        <!-- Duże sekcje BEZ cienia -->
+        <!-- Duże sekcje -->
         <Style x:Key="SectionCard" TargetType="Border">
             <Setter Property="Background" Value="{DynamicResource Surface.Background}"/>
             <Setter Property="BorderBrush" Value="{DynamicResource Surface.Border}"/>
@@ -73,15 +76,16 @@
             </Setter>
         </Style>
 
-        <!-- Panel filtrów -->
+        <!-- Panel filtrów (kompaktowy jak na screenie) -->
         <Style x:Key="FilterPanelStyle" TargetType="GroupBox">
-            <Setter Property="Height" Value="220"/>
-            <Setter Property="MinHeight" Value="220"/>
+            <Setter Property="Height" Value="165"/>
+            <Setter Property="MinHeight" Value="165"/>
             <Setter Property="Margin" Value="0,0,16,0"/>
             <Setter Property="Foreground" Value="{DynamicResource App.Foreground}"/>
             <Setter Property="Background" Value="Transparent"/>
             <Setter Property="BorderBrush" Value="{DynamicResource Surface.Border}"/>
             <Setter Property="BorderThickness" Value="2"/>
+            <Setter Property="Padding" Value="0"/>
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="GroupBox">
@@ -113,9 +117,9 @@
         </Style>
 
         <Style x:Key="FilterHeaderButtonStyle" TargetType="Button">
-            <Setter Property="Margin" Value="6,0,0,0"/>
-            <Setter Property="Padding" Value="6,0"/>
-            <Setter Property="MinWidth" Value="64"/>
+            <Setter Property="Margin" Value="8,0,0,0"/>
+            <Setter Property="Padding" Value="10,0"/>
+            <Setter Property="MinWidth" Value="96"/>
             <Setter Property="Height" Value="24"/>
             <Setter Property="FontSize" Value="12"/>
             <Setter Property="Foreground" Value="White"/>
@@ -214,9 +218,7 @@
 
                                 <StackPanel Orientation="Horizontal" Margin="0,0,0,2">
                                     <TextBlock Text="Data:" FontWeight="SemiBold" Foreground="{DynamicResource App.Foreground}" Margin="0,0,6,0"/>
-                                    <TextBlock Text="{Binding DateDisplay}"
-           Foreground="{DynamicResource App.Foreground}"/>
-
+                                    <TextBlock Text="{Binding DateDisplay}" Foreground="{DynamicResource App.Foreground}"/>
                                 </StackPanel>
 
                                 <StackPanel Orientation="Horizontal" Margin="0,0,0,2">
@@ -592,7 +594,6 @@
                   HorizontalScrollBarVisibility="Disabled"
                   PanningMode="VerticalOnly">
 
-        <!-- reszta Twojego layoutu bez zmian -->
         <Grid>
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto"/>
@@ -685,8 +686,102 @@
                 </Border>
             </Grid>
 
-            <!-- FILTRY -->
-            <!-- ... (Twoja reszta bez zmian) ... -->
+            <!-- FILTRY (Typ / Kategorie / Konta) -->
+            <Grid Grid.Row="2" Margin="16">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+
+                <!-- Typ transakcji -->
+                <GroupBox Grid.Column="0" Style="{StaticResource FilterPanelStyle}">
+                    <GroupBox.Header>
+                        <DockPanel LastChildFill="True">
+                            <TextBlock Text="Typ transakcji"
+                                       VerticalAlignment="Center"
+                                       FontWeight="Bold"
+                                       Foreground="{DynamicResource App.Foreground}"/>
+                            <Button DockPanel.Dock="Right"
+                                    Content="Pokaż wszystko"
+                                    Style="{StaticResource FilterHeaderButtonStyle}"
+                                    Click="ShowAllTypes_Click"/>
+                        </DockPanel>
+                    </GroupBox.Header>
+
+                    <StackPanel VerticalAlignment="Top">
+                        <CheckBox Content="Wydatki"
+                                  IsChecked="{Binding ShowExpenses, Mode=TwoWay}"
+                                  Foreground="{DynamicResource App.Foreground}"
+                                  Margin="0,0,0,6"/>
+                        <CheckBox Content="Przychody"
+                                  IsChecked="{Binding ShowIncomes, Mode=TwoWay}"
+                                  Foreground="{DynamicResource App.Foreground}"
+                                  Margin="0,0,0,6"/>
+                        <CheckBox Content="Transfery"
+                                  IsChecked="{Binding ShowTransfers, Mode=TwoWay}"
+                                  Foreground="{DynamicResource App.Foreground}"/>
+                    </StackPanel>
+                </GroupBox>
+
+                <!-- Kategorie -->
+                <GroupBox Grid.Column="1" Style="{StaticResource FilterPanelStyle}">
+                    <GroupBox.Header>
+                        <DockPanel LastChildFill="True">
+                            <TextBlock Text="Kategorie"
+                                       VerticalAlignment="Center"
+                                       FontWeight="Bold"
+                                       Foreground="{DynamicResource App.Foreground}"/>
+                            <Button DockPanel.Dock="Right"
+                                    Content="Pokaż wszystko"
+                                    Style="{StaticResource FilterHeaderButtonStyle}"
+                                    Click="ShowAllCategories_Click"/>
+                        </DockPanel>
+                    </GroupBox.Header>
+
+                    <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                        <ItemsControl ItemsSource="{Binding Categories}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <CheckBox Content="{Binding Name}"
+                                              IsChecked="{Binding IsSelected, Mode=TwoWay}"
+                                              Foreground="{DynamicResource App.Foreground}"
+                                              Margin="0,0,0,6"/>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </ScrollViewer>
+                </GroupBox>
+
+                <!-- Konta -->
+                <GroupBox Grid.Column="2" Style="{StaticResource FilterPanelStyle}" Margin="0">
+                    <GroupBox.Header>
+                        <DockPanel LastChildFill="True">
+                            <TextBlock Text="Konta"
+                                       VerticalAlignment="Center"
+                                       FontWeight="Bold"
+                                       Foreground="{DynamicResource App.Foreground}"/>
+                            <Button DockPanel.Dock="Right"
+                                    Content="Pokaż wszystko"
+                                    Style="{StaticResource FilterHeaderButtonStyle}"
+                                    Click="ShowAllAccounts_Click"/>
+                        </DockPanel>
+                    </GroupBox.Header>
+
+                    <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                        <ItemsControl ItemsSource="{Binding Accounts}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <CheckBox Content="{Binding Name}"
+                                              IsChecked="{Binding IsSelected, Mode=TwoWay}"
+                                              Foreground="{DynamicResource App.Foreground}"
+                                              Margin="0,0,0,6"/>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </ScrollViewer>
+                </GroupBox>
+            </Grid>
 
             <!-- CONTENT -->
             <Border Grid.Row="3"
@@ -705,7 +800,7 @@
                         <ColumnDefinition Width="*"/>
                     </Grid.ColumnDefinitions>
 
-                    <!-- PeriodBar + search -->
+                    <!-- PeriodBar + search + sort -->
                     <StackPanel Grid.Row="0" Grid.ColumnSpan="2" Margin="0,0,0,12">
 
                         <Border Background="{DynamicResource Surface.Background}"
@@ -716,16 +811,20 @@
                             <controls:PeriodBarControl x:Name="PeriodBar"/>
                         </Border>
 
+                        <!-- Szukaj + Wyczyść + Sortowanie (krótsze i bliżej) -->
                         <Grid Margin="0,10,0,0">
                             <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="*"/>
                                 <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="*"/>
                             </Grid.ColumnDefinitions>
 
                             <TextBox x:Name="SearchBox"
                                      Grid.Column="0"
+                                     Width="420"
                                      Style="{StaticResource SearchBoxStyle}"
-                                     Tag="Szukaj: opis, kategoria, konto…"
+                                     Tag="Szukaj: opis, kategoria, konto, kwota…"
                                      Text="{Binding SearchQuery, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                                      KeyDown="SearchBox_KeyDown"/>
 
@@ -736,6 +835,28 @@
                                     Focusable="False"
                                     IsTabStop="False"
                                     Click="ClearSearch_Click"/>
+
+                            <StackPanel Grid.Column="2"
+                                        Orientation="Horizontal"
+                                        Margin="16,0,0,0"
+                                        VerticalAlignment="Center">
+                                <TextBlock Text="Sortowanie:"
+                                           Foreground="{DynamicResource App.Foreground}"
+                                           VerticalAlignment="Center"
+                                           Margin="0,0,8,0"/>
+                                <ComboBox Width="180"
+                                          Height="30"
+                                          ItemsSource="{Binding SortModes}"
+                                          SelectedItem="{Binding SortMode, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}">
+                                    <ComboBox.ItemTemplate>
+                                        <DataTemplate>
+                                            <TextBlock Text="{Binding Converter={StaticResource SortModeTextConv}}"/>
+                                        </DataTemplate>
+                                    </ComboBox.ItemTemplate>
+                                </ComboBox>
+                            </StackPanel>
+
+                            <Border Grid.Column="3"/>
                         </Grid>
 
                         <Border Height="3"

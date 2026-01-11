@@ -6,773 +6,775 @@
              x:Name="Root"
              Background="{DynamicResource App.Background}">
 
-	<UserControl.Resources>
+    <UserControl.Resources>
 
-		<BooleanToVisibilityConverter x:Key="BoolToVisibilityConverter"/>
+        <BooleanToVisibilityConverter x:Key="BoolToVisibilityConverter"/>
 
-		<!-- ===================== DASHBOARD-ONLY STYLES ===================== -->
+        <!-- ===================== DASHBOARD-ONLY STYLES ===================== -->
 
-		<!-- bazowy cell -->
-		<Style x:Key="MiniTableCellText" TargetType="TextBlock">
-			<Setter Property="Foreground" Value="{DynamicResource App.Foreground}"/>
-			<Setter Property="VerticalAlignment" Value="Center"/>
-			<Setter Property="Margin" Value="6,2,6,2"/>
-			<Setter Property="TextTrimming" Value="CharacterEllipsis"/>
-			<Setter Property="TextWrapping" Value="NoWrap"/>
-		</Style>
+        <!-- bazowy cell -->
+        <Style x:Key="MiniTableCellText" TargetType="TextBlock">
+            <Setter Property="Foreground" Value="{DynamicResource App.Foreground}"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+            <Setter Property="Margin" Value="6,2,6,2"/>
+            <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
+            <Setter Property="TextWrapping" Value="NoWrap"/>
+        </Style>
 
-		<!-- single line (ellipsa) -->
-		<Style x:Key="MiniTableCellSingleLine" TargetType="TextBlock" BasedOn="{StaticResource MiniTableCellText}">
-			<Setter Property="TextWrapping" Value="NoWrap"/>
-			<Setter Property="TextTrimming" Value="CharacterEllipsis"/>
-		</Style>
+        <!-- single line (ellipsa) -->
+        <Style x:Key="MiniTableCellSingleLine" TargetType="TextBlock" BasedOn="{StaticResource MiniTableCellText}">
+            <Setter Property="TextWrapping" Value="NoWrap"/>
+            <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
+        </Style>
 
-		<!-- wrap (bez ellipsy) -->
-		<Style x:Key="MiniTableCellWrap" TargetType="TextBlock" BasedOn="{StaticResource MiniTableCellText}">
-			<Setter Property="TextWrapping" Value="Wrap"/>
-			<Setter Property="TextTrimming" Value="None"/>
-		</Style>
+        <!-- wrap (bez ellipsy) -->
+        <Style x:Key="MiniTableCellWrap" TargetType="TextBlock" BasedOn="{StaticResource MiniTableCellText}">
+            <Setter Property="TextWrapping" Value="Wrap"/>
+            <Setter Property="TextTrimming" Value="None"/>
+        </Style>
 
-		<!-- Karty -->
-		<Style x:Key="Card" TargetType="Border">
-			<Setter Property="Background" Value="Transparent"/>
-			<Setter Property="BorderBrush" Value="{DynamicResource Surface.Border}"/>
-			<Setter Property="BorderThickness" Value="1"/>
-			<Setter Property="CornerRadius" Value="10"/>
-			<Setter Property="Padding" Value="12"/>
-		</Style>
+        <!-- Karty -->
+        <Style x:Key="Card" TargetType="Border">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource Surface.Border}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="CornerRadius" Value="10"/>
+            <Setter Property="Padding" Value="12"/>
+        </Style>
 
-		<Style x:Key="AccentOrangeCard" TargetType="Border" BasedOn="{StaticResource Card}">
-			<Setter Property="BorderBrush" Value="{DynamicResource Brand.Orange}"/>
-			<Setter Property="BorderThickness" Value="2"/>
-		</Style>
+        <Style x:Key="AccentOrangeCard" TargetType="Border" BasedOn="{StaticResource Card}">
+            <Setter Property="BorderBrush" Value="{DynamicResource Brand.Orange}"/>
+            <Setter Property="BorderThickness" Value="2"/>
+        </Style>
 
-		<!-- Nagłówki kart -->
-		<Style x:Key="CardHeader" TargetType="TextBlock">
-			<Setter Property="FontSize" Value="16"/>
-			<Setter Property="FontWeight" Value="Bold"/>
-			<Setter Property="Foreground" Value="{DynamicResource App.Foreground}"/>
-		</Style>
+        <!-- Nagłówki kart -->
+        <Style x:Key="CardHeader" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="16"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="Foreground" Value="{DynamicResource App.Foreground}"/>
+        </Style>
 
-		<!-- KPI -->
-		<Style x:Key="KpiValueStyle" TargetType="TextBlock">
-			<Setter Property="FontSize" Value="18"/>
-			<Setter Property="FontWeight" Value="Bold"/>
-			<Setter Property="Margin" Value="0,2,0,0"/>
-			<Setter Property="Foreground" Value="{DynamicResource App.Foreground}"/>
-		</Style>
+        <!-- KPI -->
+        <Style x:Key="KpiValueStyle" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="18"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="Margin" Value="0,2,0,0"/>
+            <Setter Property="Foreground" Value="{DynamicResource App.Foreground}"/>
+        </Style>
 
-		<Style x:Key="KpiHeader" TargetType="TextBlock">
-			<Setter Property="FontSize" Value="20"/>
-			<Setter Property="FontWeight" Value="Bold"/>
-			<Setter Property="Foreground" Value="{DynamicResource App.Foreground}"/>
-		</Style>
+        <Style x:Key="KpiHeader" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="20"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="Foreground" Value="{DynamicResource App.Foreground}"/>
+        </Style>
 
-		<Style x:Key="KpiCard" TargetType="Border">
-			<Setter Property="Background" Value="Transparent"/>
-			<Setter Property="BorderBrush" Value="{DynamicResource Brand.Blue}"/>
-			<Setter Property="BorderThickness" Value="2"/>
-			<Setter Property="CornerRadius" Value="10"/>
-			<Setter Property="Padding" Value="12"/>
-			<Setter Property="Margin" Value="0,0,16,0"/>
-		</Style>
+        <Style x:Key="KpiCard" TargetType="Border">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource Brand.Blue}"/>
+            <Setter Property="BorderThickness" Value="2"/>
+            <Setter Property="CornerRadius" Value="10"/>
+            <Setter Property="Padding" Value="12"/>
+            <Setter Property="Margin" Value="0,0,16,0"/>
+        </Style>
 
-		<!-- Mini etykiety -->
-		<Style x:Key="MiniLabel" TargetType="TextBlock">
-			<Setter Property="Foreground" Value="{DynamicResource App.Foreground}"/>
-			<Setter Property="Opacity" Value="0.85"/>
-			<Setter Property="FontWeight" Value="SemiBold"/>
-		</Style>
+        <!-- Mini etykiety -->
+        <Style x:Key="MiniLabel" TargetType="TextBlock">
+            <Setter Property="Foreground" Value="{DynamicResource App.Foreground}"/>
+            <Setter Property="Opacity" Value="0.85"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+        </Style>
 
-		<Style x:Key="MiniValue" TargetType="TextBlock">
-			<Setter Property="Foreground" Value="{DynamicResource App.Foreground}"/>
-			<Setter Property="FontWeight" Value="Bold"/>
-		</Style>
+        <Style x:Key="MiniValue" TargetType="TextBlock">
+            <Setter Property="Foreground" Value="{DynamicResource App.Foreground}"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+        </Style>
 
-		<!-- fallbacki -->
-		<Style x:Key="FinancialAnalysisCardBorderStyle" TargetType="Border" BasedOn="{StaticResource Card}">
-			<Setter Property="Padding" Value="16"/>
-		</Style>
+        <!-- fallbacki -->
+        <Style x:Key="FinancialAnalysisCardBorderStyle" TargetType="Border" BasedOn="{StaticResource Card}">
+            <Setter Property="Padding" Value="16"/>
+        </Style>
 
-		<Style x:Key="FinancialAnalysisCardHeaderStyle" TargetType="TextBlock" BasedOn="{StaticResource CardHeader}">
-			<Setter Property="FontSize" Value="16"/>
-		</Style>
+        <Style x:Key="FinancialAnalysisCardHeaderStyle" TargetType="TextBlock" BasedOn="{StaticResource CardHeader}">
+            <Setter Property="FontSize" Value="16"/>
+        </Style>
 
-		<Style x:Key="PrimaryButton" TargetType="Button">
-			<Setter Property="Padding" Value="10,6"/>
-			<Setter Property="FontWeight" Value="SemiBold"/>
-			<Setter Property="Background" Value="{DynamicResource Brand.Blue}"/>
-			<Setter Property="Foreground" Value="White"/>
-			<Setter Property="BorderThickness" Value="0"/>
-			<Setter Property="Cursor" Value="Hand"/>
-		</Style>
+        <Style x:Key="PrimaryButton" TargetType="Button">
+            <Setter Property="Padding" Value="10,6"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Background" Value="{DynamicResource Brand.Blue}"/>
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Cursor" Value="Hand"/>
+        </Style>
 
-		<Style x:Key="SecondaryButton" TargetType="Button" BasedOn="{StaticResource PrimaryButton}">
-			<Setter Property="Background" Value="{DynamicResource Surface.Background}"/>
-			<Setter Property="Foreground" Value="{DynamicResource App.Foreground}"/>
-			<Setter Property="BorderThickness" Value="1"/>
-			<Setter Property="BorderBrush" Value="{DynamicResource Surface.Border}"/>
-		</Style>
+        <Style x:Key="SecondaryButton" TargetType="Button" BasedOn="{StaticResource PrimaryButton}">
+            <Setter Property="Background" Value="{DynamicResource Surface.Background}"/>
+            <Setter Property="Foreground" Value="{DynamicResource App.Foreground}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource Surface.Border}"/>
+        </Style>
 
-		<!-- Wspólny styl na długie teksty -->
-		<Style x:Key="EllipsizeWithTooltip" TargetType="TextBlock">
-			<Setter Property="TextTrimming" Value="CharacterEllipsis"/>
-			<Setter Property="TextWrapping" Value="NoWrap"/>
-			<Setter Property="ToolTip" Value="{Binding RelativeSource={RelativeSource Self}, Path=Text}"/>
-		</Style>
+        <!-- Wspólny styl na długie teksty -->
+        <Style x:Key="EllipsizeWithTooltip" TargetType="TextBlock">
+            <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
+            <Setter Property="TextWrapping" Value="NoWrap"/>
+            <Setter Property="ToolTip" Value="{Binding RelativeSource={RelativeSource Self}, Path=Text}"/>
+        </Style>
 
-		<!-- Donut cards -->
-		<Style x:Key="DonutCard" TargetType="Border" BasedOn="{StaticResource Card}">
-			<Setter Property="Padding" Value="10"/>
-			<Setter Property="MinHeight" Value="360"/>
-		</Style>
+        <!-- Donut cards -->
+        <Style x:Key="DonutCard" TargetType="Border" BasedOn="{StaticResource Card}">
+            <Setter Property="Padding" Value="10"/>
+            <Setter Property="MinHeight" Value="360"/>
+        </Style>
 
-		<!-- ===================== MINI TABLE STYLES (Dashboard) ===================== -->
+        <!-- ===================== MINI TABLE STYLES (Dashboard) ===================== -->
+        <Style x:Key="MiniTableHeaderBorder" TargetType="Border">
+            <Setter Property="Background" Value="{DynamicResource Surface.Background}"/>
+            <Setter Property="Padding" Value="6,4"/>
+            <Setter Property="Margin" Value="0,0,0,6"/>
+            <Setter Property="CornerRadius" Value="6"/>
+        </Style>
 
-		<Style x:Key="MiniTableHeaderBorder" TargetType="Border">
-			<Setter Property="Background" Value="{DynamicResource Surface.Background}"/>
-			<Setter Property="Padding" Value="6,4"/>
-			<Setter Property="Margin" Value="0,0,0,6"/>
-			<Setter Property="CornerRadius" Value="6"/>
-		</Style>
+        <Style x:Key="MiniTableHeaderText" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="11"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Foreground" Value="{DynamicResource App.Foreground}"/>
+            <Setter Property="Opacity" Value="0.8"/>
+            <Setter Property="Margin" Value="6,0,6,0"/>
+        </Style>
 
-		<Style x:Key="MiniTableHeaderText" TargetType="TextBlock">
-			<Setter Property="FontSize" Value="11"/>
-			<Setter Property="FontWeight" Value="SemiBold"/>
-			<Setter Property="Foreground" Value="{DynamicResource App.Foreground}"/>
-			<Setter Property="Opacity" Value="0.8"/>
-			<Setter Property="Margin" Value="6,0,6,0"/>
-		</Style>
+        <!-- ===================== TEMPLATES: INCOME / EXPENSE / PLANNED ===================== -->
 
+        <!-- INCOME HEADER -->
+        <DataTemplate x:Key="IncomeHeaderTemplate">
+            <Border Style="{StaticResource MiniTableHeaderBorder}">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition SharedSizeGroup="cDate" Width="120"/>
+                        <ColumnDefinition SharedSizeGroup="cAmount" Width="90"/>
+                        <ColumnDefinition SharedSizeGroup="cCategory" Width="180"/>
+                        <ColumnDefinition SharedSizeGroup="cAccount" Width="140"/>
+                        <ColumnDefinition SharedSizeGroup="cDesc" Width="*"/>
+                    </Grid.ColumnDefinitions>
 
-		<!-- ===================== TEMPLATES: INCOME / EXPENSE / PLANNED ===================== -->
+                    <TextBlock Grid.Column="0" Text="Data" Style="{StaticResource MiniTableHeaderText}"/>
+                    <TextBlock Grid.Column="1" Text="Kwota" Style="{StaticResource MiniTableHeaderText}" HorizontalAlignment="Right"/>
+                    <TextBlock Grid.Column="2" Text="Kategoria" Style="{StaticResource MiniTableHeaderText}"/>
+                    <TextBlock Grid.Column="3" Text="Na konto" Style="{StaticResource MiniTableHeaderText}"/>
+                    <TextBlock Grid.Column="4" Text="Opis" Style="{StaticResource MiniTableHeaderText}"/>
+                </Grid>
+            </Border>
+        </DataTemplate>
 
-		<!-- INCOME HEADER -->
-		<DataTemplate x:Key="IncomeHeaderTemplate">
-			<Border Style="{StaticResource MiniTableHeaderBorder}">
-				<Grid>
-					<Grid.ColumnDefinitions>
-						<ColumnDefinition SharedSizeGroup="cDate" Width="120"/>
-						<ColumnDefinition SharedSizeGroup="cAmount" Width="90"/>
-						<ColumnDefinition SharedSizeGroup="cCategory" Width="180"/>
-						<ColumnDefinition SharedSizeGroup="cAccount" Width="140"/>
-						<ColumnDefinition SharedSizeGroup="cDesc" Width="*"/>
-					</Grid.ColumnDefinitions>
+        <!-- INCOME ROW -->
+        <DataTemplate x:Key="IncomeRowTemplate">
+            <Grid Margin="0,2" VerticalAlignment="Top" MinHeight="24">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition SharedSizeGroup="cDate" Width="120"/>
+                    <ColumnDefinition SharedSizeGroup="cAmount" Width="90"/>
+                    <ColumnDefinition SharedSizeGroup="cCategory" Width="180"/>
+                    <ColumnDefinition SharedSizeGroup="cAccount" Width="140"/>
+                    <ColumnDefinition SharedSizeGroup="cDesc" Width="*"/>
+                </Grid.ColumnDefinitions>
 
-					<TextBlock Grid.Column="0" Text="Data" Style="{StaticResource MiniTableHeaderText}"/>
-					<TextBlock Grid.Column="1" Text="Kwota" Style="{StaticResource MiniTableHeaderText}" HorizontalAlignment="Right"/>
-					<TextBlock Grid.Column="2" Text="Kategoria" Style="{StaticResource MiniTableHeaderText}"/>
-					<TextBlock Grid.Column="3" Text="Na konto" Style="{StaticResource MiniTableHeaderText}"/>
-					<TextBlock Grid.Column="4" Text="Opis" Style="{StaticResource MiniTableHeaderText}"/>
-				</Grid>
-			</Border>
-		</DataTemplate>
+                <TextBlock Grid.Column="0" Text="{Binding DateDisplay}" Style="{StaticResource MiniTableCellSingleLine}"/>
 
-		<!-- INCOME ROW -->
-		<DataTemplate x:Key="IncomeRowTemplate">
-			<Grid Margin="0,2" VerticalAlignment="Top" MinHeight="24">
-				<Grid.ColumnDefinitions>
-					<ColumnDefinition SharedSizeGroup="cDate" Width="120"/>
-					<ColumnDefinition SharedSizeGroup="cAmount" Width="90"/>
-					<ColumnDefinition SharedSizeGroup="cCategory" Width="180"/>
-					<ColumnDefinition SharedSizeGroup="cAccount" Width="140"/>
-					<ColumnDefinition SharedSizeGroup="cDesc" Width="*"/>
-				</Grid.ColumnDefinitions>
+                <TextBlock Grid.Column="1"
+						   Text="{Binding AmountStr}"
+						   Style="{StaticResource MiniTableCellSingleLine}"
+						   HorizontalAlignment="Right"
+						   TextAlignment="Right"/>
 
-				<TextBlock Grid.Column="0" Text="{Binding DateDisplay}" Style="{StaticResource MiniTableCellSingleLine}"/>
+                <TextBlock Grid.Column="2" Text="{Binding Category}" Style="{StaticResource MiniTableCellSingleLine}" ToolTip="{Binding Category}"/>
+                <TextBlock Grid.Column="3" Text="{Binding Account}"  Style="{StaticResource MiniTableCellSingleLine}" ToolTip="{Binding Account}"/>
 
-				<TextBlock Grid.Column="1"
-                           Text="{Binding AmountStr}"
-                           Style="{StaticResource MiniTableCellSingleLine}"
-                           HorizontalAlignment="Right"
-                           TextAlignment="Right"/>
+                <TextBlock Grid.Column="4"
+						   Text="{Binding Description}"
+						   Style="{StaticResource MiniTableCellWrap}"
+						   ToolTip="{Binding Description}"/>
+            </Grid>
+        </DataTemplate>
 
-				<TextBlock Grid.Column="2" Text="{Binding Category}" Style="{StaticResource MiniTableCellSingleLine}" ToolTip="{Binding Category}"/>
-				<TextBlock Grid.Column="3" Text="{Binding Account}"  Style="{StaticResource MiniTableCellSingleLine}" ToolTip="{Binding Account}"/>
+        <!-- EXPENSE HEADER -->
+        <DataTemplate x:Key="ExpenseHeaderTemplate">
+            <Border Style="{StaticResource MiniTableHeaderBorder}">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition SharedSizeGroup="cDate" Width="120"/>
+                        <ColumnDefinition SharedSizeGroup="cAmount" Width="90"/>
+                        <ColumnDefinition SharedSizeGroup="cCategory" Width="180"/>
+                        <ColumnDefinition SharedSizeGroup="cAccount" Width="140"/>
+                        <ColumnDefinition SharedSizeGroup="cDesc" Width="*"/>
+                    </Grid.ColumnDefinitions>
 
-				<TextBlock Grid.Column="4"
-                           Text="{Binding Description}"
-                           Style="{StaticResource MiniTableCellWrap}"
-                           ToolTip="{Binding Description}"/>
-			</Grid>
-		</DataTemplate>
+                    <TextBlock Grid.Column="0" Text="Data" Style="{StaticResource MiniTableHeaderText}"/>
+                    <TextBlock Grid.Column="1" Text="Kwota" Style="{StaticResource MiniTableHeaderText}" HorizontalAlignment="Right"/>
+                    <TextBlock Grid.Column="2" Text="Kategoria" Style="{StaticResource MiniTableHeaderText}"/>
+                    <TextBlock Grid.Column="3" Text="Z konta" Style="{StaticResource MiniTableHeaderText}"/>
+                    <TextBlock Grid.Column="4" Text="Opis" Style="{StaticResource MiniTableHeaderText}"/>
+                </Grid>
+            </Border>
+        </DataTemplate>
 
-		<!-- EXPENSE HEADER -->
-		<DataTemplate x:Key="ExpenseHeaderTemplate">
-			<Border Style="{StaticResource MiniTableHeaderBorder}">
-				<Grid>
-					<Grid.ColumnDefinitions>
-						<ColumnDefinition SharedSizeGroup="cDate" Width="120"/>
-						<ColumnDefinition SharedSizeGroup="cAmount" Width="90"/>
-						<ColumnDefinition SharedSizeGroup="cCategory" Width="180"/>
-						<ColumnDefinition SharedSizeGroup="cAccount" Width="140"/>
-						<ColumnDefinition SharedSizeGroup="cDesc" Width="*"/>
-					</Grid.ColumnDefinitions>
+        <!-- EXPENSE ROW -->
+        <DataTemplate x:Key="ExpenseRowTemplate">
+            <Grid Margin="0,2" VerticalAlignment="Top" MinHeight="24">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition SharedSizeGroup="cDate" Width="120"/>
+                    <ColumnDefinition SharedSizeGroup="cAmount" Width="90"/>
+                    <ColumnDefinition SharedSizeGroup="cCategory" Width="180"/>
+                    <ColumnDefinition SharedSizeGroup="cAccount" Width="140"/>
+                    <ColumnDefinition SharedSizeGroup="cDesc" Width="*"/>
+                </Grid.ColumnDefinitions>
 
-					<TextBlock Grid.Column="0" Text="Data" Style="{StaticResource MiniTableHeaderText}"/>
-					<TextBlock Grid.Column="1" Text="Kwota" Style="{StaticResource MiniTableHeaderText}" HorizontalAlignment="Right"/>
-					<TextBlock Grid.Column="2" Text="Kategoria" Style="{StaticResource MiniTableHeaderText}"/>
-					<TextBlock Grid.Column="3" Text="Z konta" Style="{StaticResource MiniTableHeaderText}"/>
-					<TextBlock Grid.Column="4" Text="Opis" Style="{StaticResource MiniTableHeaderText}"/>
-				</Grid>
-			</Border>
-		</DataTemplate>
+                <TextBlock Grid.Column="0" Text="{Binding DateDisplay}" Style="{StaticResource MiniTableCellSingleLine}"/>
 
-		<!-- EXPENSE ROW -->
-		<DataTemplate x:Key="ExpenseRowTemplate">
-			<Grid Margin="0,2" VerticalAlignment="Top" MinHeight="24">
-				<Grid.ColumnDefinitions>
-					<ColumnDefinition SharedSizeGroup="cDate" Width="120"/>
-					<ColumnDefinition SharedSizeGroup="cAmount" Width="90"/>
-					<ColumnDefinition SharedSizeGroup="cCategory" Width="180"/>
-					<ColumnDefinition SharedSizeGroup="cAccount" Width="140"/>
-					<ColumnDefinition SharedSizeGroup="cDesc" Width="*"/>
-				</Grid.ColumnDefinitions>
+                <TextBlock Grid.Column="1"
+						   Text="{Binding AmountStr}"
+						   Style="{StaticResource MiniTableCellSingleLine}"
+						   HorizontalAlignment="Right"
+						   TextAlignment="Right"/>
 
-				<TextBlock Grid.Column="0" Text="{Binding DateDisplay}" Style="{StaticResource MiniTableCellSingleLine}"/>
+                <TextBlock Grid.Column="2" Text="{Binding Category}" Style="{StaticResource MiniTableCellSingleLine}" ToolTip="{Binding Category}"/>
+                <TextBlock Grid.Column="3" Text="{Binding Account}"  Style="{StaticResource MiniTableCellSingleLine}" ToolTip="{Binding Account}"/>
 
-				<TextBlock Grid.Column="1"
-                           Text="{Binding AmountStr}"
-                           Style="{StaticResource MiniTableCellSingleLine}"
-                           HorizontalAlignment="Right"
-                           TextAlignment="Right"/>
+                <TextBlock Grid.Column="4"
+						   Text="{Binding Description}"
+						   Style="{StaticResource MiniTableCellWrap}"
+						   ToolTip="{Binding Description}"/>
+            </Grid>
+        </DataTemplate>
 
-				<TextBlock Grid.Column="2" Text="{Binding Category}" Style="{StaticResource MiniTableCellSingleLine}" ToolTip="{Binding Category}"/>
-				<TextBlock Grid.Column="3" Text="{Binding Account}"  Style="{StaticResource MiniTableCellSingleLine}" ToolTip="{Binding Account}"/>
+        <!-- PLANNED HEADER -->
+        <DataTemplate x:Key="PlannedHeaderTemplate">
+            <Border Style="{StaticResource MiniTableHeaderBorder}">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition SharedSizeGroup="cDateP" Width="120"/>
+                        <ColumnDefinition SharedSizeGroup="cAmountP" Width="90"/>
+                        <ColumnDefinition SharedSizeGroup="cCategoryP" Width="160"/>
+                        <ColumnDefinition SharedSizeGroup="cFromP" Width="140"/>
+                        <ColumnDefinition SharedSizeGroup="cToP" Width="140"/>
+                        <ColumnDefinition SharedSizeGroup="cDescP" Width="*"/>
+                        <ColumnDefinition SharedSizeGroup="cKindP" Width="110"/>
+                    </Grid.ColumnDefinitions>
 
-				<TextBlock Grid.Column="4"
-                           Text="{Binding Description}"
-                           Style="{StaticResource MiniTableCellWrap}"
-                           ToolTip="{Binding Description}"/>
-			</Grid>
-		</DataTemplate>
+                    <TextBlock Grid.Column="0" Text="Data" Style="{StaticResource MiniTableHeaderText}"/>
+                    <TextBlock Grid.Column="1" Text="Kwota" Style="{StaticResource MiniTableHeaderText}" HorizontalAlignment="Right"/>
+                    <TextBlock Grid.Column="2" Text="Kategoria" Style="{StaticResource MiniTableHeaderText}"/>
+                    <TextBlock Grid.Column="3" Text="Z konta" Style="{StaticResource MiniTableHeaderText}"/>
+                    <TextBlock Grid.Column="4" Text="Na konto" Style="{StaticResource MiniTableHeaderText}"/>
+                    <TextBlock Grid.Column="5" Text="Opis" Style="{StaticResource MiniTableHeaderText}"/>
+                    <TextBlock Grid.Column="6" Text="Typ" Style="{StaticResource MiniTableHeaderText}"/>
+                </Grid>
+            </Border>
+        </DataTemplate>
 
-		<!-- PLANNED HEADER -->
-		<DataTemplate x:Key="PlannedHeaderTemplate">
-			<Border Style="{StaticResource MiniTableHeaderBorder}">
-				<Grid>
-					<Grid.ColumnDefinitions>
-						<ColumnDefinition SharedSizeGroup="cDateP" Width="120"/>
-						<ColumnDefinition SharedSizeGroup="cAmountP" Width="90"/>
-						<ColumnDefinition SharedSizeGroup="cCategoryP" Width="160"/>
-						<ColumnDefinition SharedSizeGroup="cFromP" Width="140"/>
-						<ColumnDefinition SharedSizeGroup="cToP" Width="140"/>
-						<ColumnDefinition SharedSizeGroup="cDescP" Width="*"/>
-						<ColumnDefinition SharedSizeGroup="cKindP" Width="110"/>
-					</Grid.ColumnDefinitions>
+        <!-- PLANNED ROW -->
+        <DataTemplate x:Key="PlannedRowTemplate">
+            <Grid Margin="0,2" VerticalAlignment="Top" MinHeight="24">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition SharedSizeGroup="cDateP" Width="120"/>
+                    <ColumnDefinition SharedSizeGroup="cAmountP" Width="90"/>
+                    <ColumnDefinition SharedSizeGroup="cCategoryP" Width="160"/>
+                    <ColumnDefinition SharedSizeGroup="cFromP" Width="140"/>
+                    <ColumnDefinition SharedSizeGroup="cToP" Width="140"/>
+                    <ColumnDefinition SharedSizeGroup="cDescP" Width="*"/>
+                    <ColumnDefinition SharedSizeGroup="cKindP" Width="110"/>
+                </Grid.ColumnDefinitions>
 
-					<TextBlock Grid.Column="0" Text="Data" Style="{StaticResource MiniTableHeaderText}"/>
-					<TextBlock Grid.Column="1" Text="Kwota" Style="{StaticResource MiniTableHeaderText}" HorizontalAlignment="Right"/>
-					<TextBlock Grid.Column="2" Text="Kategoria" Style="{StaticResource MiniTableHeaderText}"/>
-					<TextBlock Grid.Column="3" Text="Z konta" Style="{StaticResource MiniTableHeaderText}"/>
-					<TextBlock Grid.Column="4" Text="Na konto" Style="{StaticResource MiniTableHeaderText}"/>
-					<TextBlock Grid.Column="5" Text="Opis" Style="{StaticResource MiniTableHeaderText}"/>
-					<TextBlock Grid.Column="6" Text="Typ" Style="{StaticResource MiniTableHeaderText}"/>
-				</Grid>
-			</Border>
-		</DataTemplate>
+                <TextBlock Grid.Column="0" Text="{Binding DateDisplay}" Style="{StaticResource MiniTableCellSingleLine}"/>
 
-		<!-- PLANNED ROW -->
-		<DataTemplate x:Key="PlannedRowTemplate">
-			<Grid Margin="0,2" VerticalAlignment="Top" MinHeight="24">
-				<Grid.ColumnDefinitions>
-					<ColumnDefinition SharedSizeGroup="cDateP" Width="120"/>
-					<ColumnDefinition SharedSizeGroup="cAmountP" Width="90"/>
-					<ColumnDefinition SharedSizeGroup="cCategoryP" Width="160"/>
-					<ColumnDefinition SharedSizeGroup="cFromP" Width="140"/>
-					<ColumnDefinition SharedSizeGroup="cToP" Width="140"/>
-					<ColumnDefinition SharedSizeGroup="cDescP" Width="*"/>
-					<ColumnDefinition SharedSizeGroup="cKindP" Width="110"/>
-				</Grid.ColumnDefinitions>
+                <TextBlock Grid.Column="1"
+						   Text="{Binding AmountStr}"
+						   Style="{StaticResource MiniTableCellSingleLine}"
+						   HorizontalAlignment="Right"
+						   TextAlignment="Right"/>
 
-				<TextBlock Grid.Column="0" Text="{Binding DateDisplay}" Style="{StaticResource MiniTableCellSingleLine}"/>
+                <TextBlock Grid.Column="2" Text="{Binding Category}" Style="{StaticResource MiniTableCellSingleLine}" ToolTip="{Binding Category}"/>
+                <TextBlock Grid.Column="3" Text="{Binding FromAccount}" Style="{StaticResource MiniTableCellSingleLine}" ToolTip="{Binding FromAccount}"/>
+                <TextBlock Grid.Column="4" Text="{Binding ToAccount}" Style="{StaticResource MiniTableCellSingleLine}" ToolTip="{Binding ToAccount}"/>
 
-				<TextBlock Grid.Column="1"
-                           Text="{Binding AmountStr}"
-                           Style="{StaticResource MiniTableCellSingleLine}"
-                           HorizontalAlignment="Right"
-                           TextAlignment="Right"/>
+                <TextBlock Grid.Column="5" Text="{Binding Description}" Style="{StaticResource MiniTableCellWrap}" ToolTip="{Binding Description}"/>
+                <TextBlock Grid.Column="6" Text="{Binding Kind}" Style="{StaticResource MiniTableCellSingleLine}"/>
+            </Grid>
+        </DataTemplate>
 
-				<TextBlock Grid.Column="2" Text="{Binding Category}" Style="{StaticResource MiniTableCellSingleLine}" ToolTip="{Binding Category}"/>
-				<TextBlock Grid.Column="3" Text="{Binding FromAccount}" Style="{StaticResource MiniTableCellSingleLine}" ToolTip="{Binding FromAccount}"/>
-				<TextBlock Grid.Column="4" Text="{Binding ToAccount}" Style="{StaticResource MiniTableCellSingleLine}" ToolTip="{Binding ToAccount}"/>
+    </UserControl.Resources>
 
-				<TextBlock Grid.Column="5" Text="{Binding Description}" Style="{StaticResource MiniTableCellWrap}" ToolTip="{Binding Description}"/>
-				<TextBlock Grid.Column="6" Text="{Binding Kind}" Style="{StaticResource MiniTableCellSingleLine}"/>
-			</Grid>
-		</DataTemplate>
-
-	</UserControl.Resources>
-
-	<ScrollViewer VerticalScrollBarVisibility="Auto"
+    <ScrollViewer VerticalScrollBarVisibility="Auto"
                   HorizontalScrollBarVisibility="Disabled"
                   PanningMode="VerticalOnly">
 
-		<Grid Margin="16">
-			<Grid.RowDefinitions>
-				<RowDefinition Height="Auto"/>
-				<RowDefinition Height="Auto"/>
-				<RowDefinition Height="*"/>
-			</Grid.RowDefinitions>
+        <Grid Margin="16">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="*"/>
+            </Grid.RowDefinitions>
 
-			<!-- ================= KPI ================= -->
-			<Grid Grid.Row="0" Margin="0,0,0,12">
-				<Grid.ColumnDefinitions>
-					<ColumnDefinition Width="*"/>
-					<ColumnDefinition Width="*"/>
-					<ColumnDefinition Width="*"/>
-					<ColumnDefinition Width="*"/>
-					<ColumnDefinition Width="*"/>
-					<ColumnDefinition Width="*"/>
-				</Grid.ColumnDefinitions>
+            <!-- ================= KPI ================= -->
+            <Grid Grid.Row="0" Margin="0,0,0,12">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
 
-				<Border Grid.Column="0" Style="{StaticResource KpiCard}">
-					<StackPanel>
-						<TextBlock Text="Cały majątek" Style="{StaticResource KpiHeader}"/>
-						<TextBlock x:Name="TotalWealthText" Style="{StaticResource KpiValueStyle}" Text="0,00 zł"/>
-					</StackPanel>
-				</Border>
+                <Border Grid.Column="0" Style="{StaticResource KpiCard}">
+                    <StackPanel>
+                        <TextBlock Text="Cały majątek" Style="{StaticResource KpiHeader}"/>
+                        <TextBlock x:Name="TotalWealthText" Style="{StaticResource KpiValueStyle}" Text="0,00 zł"/>
+                    </StackPanel>
+                </Border>
 
-				<Border Grid.Column="1" Style="{StaticResource KpiCard}">
-					<StackPanel>
-						<TextBlock Text="Konta bankowe" Style="{StaticResource KpiHeader}"/>
-						<TextBlock x:Name="BanksText" Style="{StaticResource KpiValueStyle}" Text="0,00 zł"/>
-					</StackPanel>
-				</Border>
+                <Border Grid.Column="1" Style="{StaticResource KpiCard}">
+                    <StackPanel>
+                        <TextBlock Text="Konta bankowe" Style="{StaticResource KpiHeader}"/>
+                        <TextBlock x:Name="BanksText" Style="{StaticResource KpiValueStyle}" Text="0,00 zł"/>
+                    </StackPanel>
+                </Border>
 
-				<Border Grid.Column="2" Style="{StaticResource KpiCard}">
-					<StackPanel>
-						<TextBlock Text="Wolna gotówka" Style="{StaticResource KpiHeader}"/>
-						<TextBlock x:Name="FreeCashDashboardText" Style="{StaticResource KpiValueStyle}" Text="0,00 zł"/>
-					</StackPanel>
-				</Border>
+                <Border Grid.Column="2" Style="{StaticResource KpiCard}">
+                    <StackPanel>
+                        <TextBlock Text="Wolna gotówka" Style="{StaticResource KpiHeader}"/>
+                        <TextBlock x:Name="FreeCashDashboardText" Style="{StaticResource KpiValueStyle}" Text="0,00 zł"/>
+                    </StackPanel>
+                </Border>
 
-				<Border Grid.Column="3" Style="{StaticResource KpiCard}">
-					<StackPanel>
-						<TextBlock Text="Gotówka odłożona" Style="{StaticResource KpiHeader}" TextWrapping="Wrap"/>
-						<TextBlock x:Name="SavedToAllocateText" Style="{StaticResource KpiValueStyle}" Text="0,00 zł"/>
-					</StackPanel>
-				</Border>
+                <Border Grid.Column="3" Style="{StaticResource KpiCard}">
+                    <StackPanel>
+                        <TextBlock Text="Gotówka odłożona" Style="{StaticResource KpiHeader}" TextWrapping="Wrap"/>
+                        <TextBlock x:Name="SavedToAllocateText" Style="{StaticResource KpiValueStyle}" Text="0,00 zł"/>
+                    </StackPanel>
+                </Border>
 
-				<Border Grid.Column="4" Style="{StaticResource KpiCard}">
-					<StackPanel HorizontalAlignment="Left">
-						<TextBlock Text="Gotówka w kopertach"
+                <Border Grid.Column="4" Style="{StaticResource KpiCard}">
+                    <StackPanel HorizontalAlignment="Left">
+                        <TextBlock Text="Gotówka w kopertach"
                                    Style="{StaticResource KpiHeader}"
                                    TextWrapping="Wrap"
                                    TextAlignment="Left"/>
-						<TextBlock x:Name="EnvelopesDashboardText"
+                        <TextBlock x:Name="EnvelopesDashboardText"
                                    Style="{StaticResource KpiValueStyle}"
                                    Text="0,00 zł"
                                    TextWrapping="Wrap"
                                    TextAlignment="Left"/>
-					</StackPanel>
-				</Border>
+                    </StackPanel>
+                </Border>
 
-				<Border Grid.Column="5" Style="{StaticResource KpiCard}" Margin="0">
-					<StackPanel>
-						<TextBlock Text="Inwestycje" Style="{StaticResource KpiHeader}"/>
-						<TextBlock x:Name="InvestmentsText" Style="{StaticResource KpiValueStyle}" Text="0,00 zł"/>
-					</StackPanel>
-				</Border>
-			</Grid>
+                <Border Grid.Column="5" Style="{StaticResource KpiCard}" Margin="0">
+                    <StackPanel>
+                        <TextBlock Text="Inwestycje" Style="{StaticResource KpiHeader}"/>
+                        <TextBlock x:Name="InvestmentsText" Style="{StaticResource KpiValueStyle}" Text="0,00 zł"/>
+                    </StackPanel>
+                </Border>
+            </Grid>
 
-			<!-- ================= Analizy / Alerty / Do ogarnięcia ================= -->
-			<Grid Grid.Row="1" Margin="0,0,0,12">
-				<Grid.ColumnDefinitions>
-					<ColumnDefinition Width="*"/>
-					<ColumnDefinition Width="*"/>
-					<ColumnDefinition Width="*"/>
-				</Grid.ColumnDefinitions>
+            <!-- ================= Analizy / Alerty / Do ogarnięcia ================= -->
+            <Grid Grid.Row="1" Margin="0,0,0,12">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
 
-				<!-- Analizy -->
-				<Border Grid.Column="0" Style="{StaticResource AccentOrangeCard}" Margin="0,0,12,0">
-					<StackPanel>
-						<TextBlock Text="Analizy finansowe" Style="{StaticResource FinancialAnalysisCardHeaderStyle}" Margin="0,0,0,10"/>
-						<ItemsControl ItemsSource="{Binding Insights}">
-							<ItemsControl.ItemTemplate>
-								<DataTemplate>
-									<TextBlock Text="{Binding}"
+                <!-- Analizy -->
+                <Border Grid.Column="0" Style="{StaticResource AccentOrangeCard}" Margin="0,0,12,0">
+                    <StackPanel>
+                        <TextBlock Text="Analizy finansowe" Style="{StaticResource FinancialAnalysisCardHeaderStyle}" Margin="0,0,0,10"/>
+                        <ItemsControl ItemsSource="{Binding Insights}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <TextBlock Text="{Binding}"
                                                Foreground="{DynamicResource App.Foreground}"
                                                Margin="0,2,0,2"
                                                TextWrapping="Wrap"/>
-								</DataTemplate>
-							</ItemsControl.ItemTemplate>
-						</ItemsControl>
-					</StackPanel>
-				</Border>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </StackPanel>
+                </Border>
 
-				<!-- Alerty -->
-				<Border Grid.Column="1" Style="{StaticResource AccentOrangeCard}" Margin="0,0,12,0">
-					<StackPanel>
-						<TextBlock Text="Alerty budżetowe" Style="{StaticResource FinancialAnalysisCardHeaderStyle}" Margin="0,0,0,10"/>
-						<ItemsControl ItemsSource="{Binding Alerts}">
-							<ItemsControl.ItemTemplate>
-								<DataTemplate>
-									<TextBlock Text="{Binding}"
+                <!-- Alerty -->
+                <Border Grid.Column="1" Style="{StaticResource AccentOrangeCard}" Margin="0,0,12,0">
+                    <StackPanel>
+                        <TextBlock Text="Alerty budżetowe" Style="{StaticResource FinancialAnalysisCardHeaderStyle}" Margin="0,0,0,10"/>
+                        <ItemsControl ItemsSource="{Binding Alerts}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <TextBlock Text="{Binding}"
                                                Foreground="{DynamicResource App.Foreground}"
                                                Margin="0,2,0,2"
                                                TextWrapping="Wrap"/>
-								</DataTemplate>
-							</ItemsControl.ItemTemplate>
-						</ItemsControl>
-					</StackPanel>
-				</Border>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </StackPanel>
+                </Border>
 
-				<!-- Do ogarnięcia -->
-				<Border Grid.Column="2" Style="{StaticResource AccentOrangeCard}">
-					<StackPanel>
-						<TextBlock Text="Do uporządkowania"
+                <!-- Do ogarnięcia -->
+                <Border Grid.Column="2" Style="{StaticResource AccentOrangeCard}">
+                    <StackPanel>
+                        <TextBlock Text="Do uporządkowania"
                                    Style="{StaticResource FinancialAnalysisCardHeaderStyle}"
                                    Margin="0,0,0,10"/>
 
-						<Grid Margin="0,0,0,10">
-							<Grid.ColumnDefinitions>
-								<ColumnDefinition Width="*"/>
-								<ColumnDefinition Width="Auto"/>
-								<ColumnDefinition Width="*"/>
-								<ColumnDefinition Width="Auto"/>
-								<ColumnDefinition Width="*"/>
-							</Grid.ColumnDefinitions>
+                        <Grid Margin="0,0,0,10">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
 
-							<StackPanel Grid.Column="0">
-								<TextBlock Text="Wszystkie" Style="{StaticResource MiniLabel}"/>
-								<TextBlock Text="{Binding RangeStats.Total}" Style="{StaticResource MiniValue}"/>
-							</StackPanel>
+                            <StackPanel Grid.Column="0">
+                                <TextBlock Text="Wszystkie" Style="{StaticResource MiniLabel}"/>
+                                <TextBlock Text="{Binding RangeStats.Total}" Style="{StaticResource MiniValue}"/>
+                            </StackPanel>
 
-							<Border Grid.Column="1" Width="1" Margin="10,0" Background="{DynamicResource Surface.Border}"/>
+                            <Border Grid.Column="1" Width="1" Margin="10,0" Background="{DynamicResource Surface.Border}"/>
 
-							<StackPanel Grid.Column="2">
-								<TextBlock Text="Bez kategorii" Style="{StaticResource MiniLabel}"/>
-								<TextBlock Text="{Binding RangeStats.MissingCategory}" Style="{StaticResource MiniValue}"/>
-							</StackPanel>
+                            <StackPanel Grid.Column="2">
+                                <TextBlock Text="Bez kategorii" Style="{StaticResource MiniLabel}"/>
+                                <TextBlock Text="{Binding RangeStats.MissingCategory}" Style="{StaticResource MiniValue}"/>
+                            </StackPanel>
 
-							<Border Grid.Column="3" Width="1" Margin="10,0" Background="{DynamicResource Surface.Border}"/>
+                            <Border Grid.Column="3" Width="1" Margin="10,0" Background="{DynamicResource Surface.Border}"/>
 
-							<StackPanel Grid.Column="4">
-								<TextBlock Text="Zaplanowane" Style="{StaticResource MiniLabel}"/>
-								<TextBlock Text="{Binding RangeStats.Planned}" Style="{StaticResource MiniValue}"/>
-							</StackPanel>
-						</Grid>
+                            <StackPanel Grid.Column="4">
+                                <TextBlock Text="Zaplanowane" Style="{StaticResource MiniLabel}"/>
+                                <TextBlock Text="{Binding RangeStats.Planned}" Style="{StaticResource MiniValue}"/>
+                            </StackPanel>
+                        </Grid>
 
-						<Border Background="{DynamicResource Surface.Background}"
+                        <Border Background="{DynamicResource Surface.Background}"
                                 CornerRadius="10"
                                 Padding="10">
-							<StackPanel>
-								<TextBlock Text="{Binding RangeStats.Message}"
+                            <StackPanel>
+                                <TextBlock Text="{Binding RangeStats.Message}"
                                            Foreground="{DynamicResource App.Foreground}"
                                            Opacity="0.9"
                                            TextWrapping="Wrap"/>
 
-								<Button Content="{Binding RangeStats.ActionText}"
+                                <Button Content="{Binding RangeStats.ActionText}"
                                         Margin="0,10,0,0"
                                         HorizontalAlignment="Left"
                                         Style="{StaticResource SecondaryButton}"
                                         Visibility="{Binding RangeStats.HasAction, Converter={StaticResource BoolToVisibilityConverter}}"
                                         Click="RangeStatsAction_Click"/>
-							</StackPanel>
-						</Border>
-					</StackPanel>
-				</Border>
-			</Grid>
+                            </StackPanel>
+                        </Border>
+                    </StackPanel>
+                </Border>
+            </Grid>
 
-			<!-- ================= Główna część ================= -->
-			<Border Grid.Row="2" Style="{StaticResource Card}" Padding="16">
-				<Grid>
-					<Grid.RowDefinitions>
-						<RowDefinition Height="Auto"/>
-						<RowDefinition Height="Auto"/>
-						<RowDefinition Height="*"/>
-					</Grid.RowDefinitions>
+            <!-- ================= Główna część ================= -->
+            <Border Grid.Row="2" Style="{StaticResource Card}" Padding="16">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                    </Grid.RowDefinitions>
 
-					<Grid.ColumnDefinitions>
-						<ColumnDefinition Width="*"/>
-						<ColumnDefinition Width="*"/>
-					</Grid.ColumnDefinitions>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
 
-					<!-- Pasek okresu -->
-					<StackPanel Grid.Row="0" Grid.ColumnSpan="2" HorizontalAlignment="Center" Margin="0,0,0,10">
-						<controls:PeriodBarControl x:Name="PeriodBar"
+                    <!-- Pasek okresu -->
+                    <StackPanel Grid.Row="0" Grid.ColumnSpan="2" HorizontalAlignment="Center" Margin="0,0,0,10">
+                        <controls:PeriodBarControl x:Name="PeriodBar"
                                                    RangeChanged="PeriodBar_RangeChanged"
                                                    SearchClicked="PeriodBar_SearchClicked"
                                                    ClearClicked="PeriodBar_ClearClicked"/>
-						<Border Height="3"
+                        <Border Height="3"
                                 Background="{DynamicResource Brand.Blue}"
                                 CornerRadius="0,0,8,8"
                                 Margin="0,8,0,0"/>
-					</StackPanel>
+                    </StackPanel>
 
-					<!-- Donuty -->
-					<Border Grid.Row="1" Grid.Column="0" Style="{StaticResource DonutCard}" Margin="0,0,8,0">
-						<StackPanel>
-							<TextBlock Text="Źródła przychodu — bieżący okres" Style="{StaticResource CardHeader}" Margin="0,0,0,8"/>
-							<controls:DonutChartControl x:Name="IncomeDonut" Height="320" Title="Źródła przychodu"/>
-						</StackPanel>
-					</Border>
+                    <!-- Donuty -->
+                    <Border Grid.Row="1" Grid.Column="0" Style="{StaticResource DonutCard}" Margin="0,0,8,0">
+                        <StackPanel>
+                            <TextBlock Text="Źródła przychodu — bieżący okres" Style="{StaticResource CardHeader}" Margin="0,0,0,8"/>
+                            <controls:DonutChartControl x:Name="IncomeDonut" Height="320" Title="Źródła przychodu"/>
+                        </StackPanel>
+                    </Border>
 
-					<Border Grid.Row="1" Grid.Column="1" Style="{StaticResource DonutCard}" Margin="8,0,0,0">
-						<StackPanel>
-							<TextBlock Text="Wydatki wg kategorii — bieżący okres" Style="{StaticResource CardHeader}" Margin="0,0,0,8"/>
-							<controls:DonutChartControl x:Name="ExpenseDonut" Height="320" Title="Wydatki wg kategorii"/>
-						</StackPanel>
-					</Border>
+                    <Border Grid.Row="1" Grid.Column="1" Style="{StaticResource DonutCard}" Margin="8,0,0,0">
+                        <StackPanel>
+                            <TextBlock Text="Wydatki wg kategorii — bieżący okres" Style="{StaticResource CardHeader}" Margin="0,0,0,8"/>
+                            <controls:DonutChartControl x:Name="ExpenseDonut" Height="320" Title="Wydatki wg kategorii"/>
+                        </StackPanel>
+                    </Border>
 
-					<!-- Sekcja dolna -->
-					<Grid Grid.Row="2" Grid.ColumnSpan="2" Margin="0,12,0,0">
-						<Grid.ColumnDefinitions>
-							<ColumnDefinition Width="*"/>
-							<ColumnDefinition Width="*"/>
-						</Grid.ColumnDefinitions>
+                    <!-- Sekcja dolna -->
+                    <Grid Grid.Row="2" Grid.ColumnSpan="2" Margin="0,12,0,0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
 
-						<Grid.RowDefinitions>
-							<RowDefinition Height="Auto"/>
-							<RowDefinition Height="Auto"/>
-							<RowDefinition Height="Auto"/>
-						</Grid.RowDefinitions>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                        </Grid.RowDefinitions>
 
-						<!-- Trend -->
-						<Border Grid.Row="0" Grid.Column="0" Style="{StaticResource Card}" Margin="0,0,8,8">
-							<StackPanel>
-								<TextBlock Text="Trend wydatków — bieżący okres" Style="{StaticResource FinancialAnalysisCardHeaderStyle}" Margin="0,0,0,8"/>
-								<Canvas x:Name="ExpenseTrendCanvas" Height="180" Margin="0,0,0,4"/>
-								<ItemsControl x:Name="ExpenseTrendLabels" Visibility="Collapsed" Margin="0,4,0,0">
-									<ItemsControl.ItemsPanel>
-										<ItemsPanelTemplate>
-											<UniformGrid Rows="1"/>
-										</ItemsPanelTemplate>
-									</ItemsControl.ItemsPanel>
-									<ItemsControl.ItemTemplate>
-										<DataTemplate>
-											<TextBlock Text="{Binding DateLabel}" Foreground="{DynamicResource App.Foreground}" FontSize="10" HorizontalAlignment="Center"/>
-										</DataTemplate>
-									</ItemsControl.ItemTemplate>
-								</ItemsControl>
-								<TextBlock x:Name="ExpenseTrendEmptyText"
+                        <!-- Trend -->
+                        <Border Grid.Row="0" Grid.Column="0" Style="{StaticResource Card}" Margin="0,0,8,8">
+                            <StackPanel>
+                                <TextBlock Text="Trend wydatków — bieżący okres" Style="{StaticResource FinancialAnalysisCardHeaderStyle}" Margin="0,0,0,8"/>
+                                <Canvas x:Name="ExpenseTrendCanvas" Height="180" Margin="0,0,0,4"/>
+                                <ItemsControl x:Name="ExpenseTrendLabels" Visibility="Collapsed" Margin="0,4,0,0">
+                                    <ItemsControl.ItemsPanel>
+                                        <ItemsPanelTemplate>
+                                            <UniformGrid Rows="1"/>
+                                        </ItemsPanelTemplate>
+                                    </ItemsControl.ItemsPanel>
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <TextBlock Text="{Binding DateLabel}" Foreground="{DynamicResource App.Foreground}" FontSize="10" HorizontalAlignment="Center"/>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                                <TextBlock x:Name="ExpenseTrendEmptyText"
                                            Text="Brak danych w tym okresie"
                                            Foreground="{DynamicResource App.Foreground}"
                                            Visibility="Collapsed"
                                            HorizontalAlignment="Center"
                                            FontStyle="Italic"/>
-							</StackPanel>
-						</Border>
+                            </StackPanel>
+                        </Border>
 
-						<!-- Najwyższe wydatki -->
-						<Border Grid.Row="0" Grid.Column="1" Style="{StaticResource Card}" Margin="8,0,0,8">
-							<StackPanel>
-								<TextBlock Text="Najwyższe wydatki — kategorie" Style="{StaticResource CardHeader}" Margin="0,0,0,8"/>
-								<ItemsControl x:Name="TopCategoryBars">
-									<ItemsControl.ItemTemplate>
-										<DataTemplate>
-											<StackPanel Margin="0,4,0,6">
-												<Grid>
-													<Grid.ColumnDefinitions>
-														<ColumnDefinition Width="*"/>
-														<ColumnDefinition Width="Auto"/>
-													</Grid.ColumnDefinitions>
+                        <!-- Najwyższe wydatki -->
+                        <Border Grid.Row="0" Grid.Column="1" Style="{StaticResource Card}" Margin="8,0,0,8">
+                            <StackPanel>
+                                <TextBlock Text="Najwyższe wydatki — kategorie" Style="{StaticResource CardHeader}" Margin="0,0,0,8"/>
+                                <ItemsControl x:Name="TopCategoryBars">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <StackPanel Margin="0,4,0,6">
+                                                <Grid>
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="*"/>
+                                                        <ColumnDefinition Width="Auto"/>
+                                                    </Grid.ColumnDefinitions>
 
-													<TextBlock Text="{Binding Name}"
+                                                    <TextBlock Text="{Binding Name}"
                                                                Foreground="{DynamicResource App.Foreground}"
                                                                Margin="0,0,8,2"
                                                                Style="{StaticResource EllipsizeWithTooltip}"/>
 
-													<TextBlock Grid.Column="1"
+                                                    <TextBlock Grid.Column="1"
                                                                Text="{Binding PercentStr}"
                                                                Foreground="{DynamicResource App.Foreground}"/>
-												</Grid>
+                                                </Grid>
 
-												<ProgressBar Minimum="0" Maximum="100" Height="10" Value="{Binding Percent}"/>
-											</StackPanel>
-										</DataTemplate>
-									</ItemsControl.ItemTemplate>
-								</ItemsControl>
+                                                <ProgressBar Minimum="0" Maximum="100" Height="10" Value="{Binding Percent}"/>
+                                            </StackPanel>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
 
-								<TextBlock x:Name="TopCategoryEmptyText"
+                                <TextBlock x:Name="TopCategoryEmptyText"
                                            Text="Brak danych w tym okresie"
                                            Foreground="{DynamicResource App.Foreground}"
                                            Visibility="Collapsed"
                                            HorizontalAlignment="Center"
                                            Margin="4,8,4,0"
                                            FontStyle="Italic"/>
-							</StackPanel>
-						</Border>
+                            </StackPanel>
+                        </Border>
 
-						<!-- PRZYCHODY -->
-						<Border Grid.Row="1" Grid.Column="0" Style="{StaticResource Card}" Margin="0,0,8,8">
-							<StackPanel>
-								<Grid Margin="0,0,0,6">
-									<Grid.ColumnDefinitions>
-										<ColumnDefinition Width="*"/>
-										<ColumnDefinition Width="Auto"/>
-									</Grid.ColumnDefinitions>
+                        <!-- PRZYCHODY -->
+                        <Border Grid.Row="1" Grid.Column="0" Style="{StaticResource Card}" Margin="0,0,8,8">
+                            <StackPanel>
+                                <Grid Margin="0,0,0,6">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
 
-									<TextBlock Text="Przychody — bieżący okres" Style="{StaticResource CardHeader}" VerticalAlignment="Center"/>
+                                    <TextBlock Text="Przychody — bieżący okres" Style="{StaticResource CardHeader}" VerticalAlignment="Center"/>
 
-									<Button Grid.Column="1"
+                                    <Button Grid.Column="1"
                                             Style="{StaticResource DeleteIconButton}"
                                             HorizontalAlignment="Right"
                                             VerticalAlignment="Center"
                                             Panel.ZIndex="10"
                                             ToolTip="Usuń zaznaczony"
                                             Click="ShowIncomeDeleteConfirm_Click"/>
-								</Grid>
+                                </Grid>
 
-								<StackPanel x:Name="IncomeDeleteConfirmPanel"
+                                <StackPanel x:Name="IncomeDeleteConfirmPanel"
                                             Orientation="Horizontal"
                                             Visibility="Collapsed"
                                             Margin="0,0,0,8"
                                             HorizontalAlignment="Left">
-									<TextBlock Text="Czy na pewno chcesz usunąć przychód?"
+                                    <TextBlock Text="Czy na pewno chcesz usunąć przychód?"
                                                Foreground="{DynamicResource App.Foreground}"
                                                Margin="0,0,8,0"/>
-									<Button Content="Tak"
+                                    <Button Content="Tak"
                                             Width="60"
                                             Margin="0,0,6,0"
                                             Click="IncomeDeleteConfirmYes_Click"
                                             Style="{StaticResource PrimaryButton}"/>
-									<Button Content="Nie"
+                                    <Button Content="Nie"
                                             Width="60"
                                             Click="IncomeDeleteConfirmNo_Click"
                                             Style="{StaticResource SecondaryButton}"/>
-								</StackPanel>
+                                </StackPanel>
 
-								<controls:MiniTableControl x:Name="IncomeTable"
+                                <!-- ZMIANA: SelectionMode="Single" -->
+                                <controls:MiniTableControl x:Name="IncomeTable"
+                                                           SelectionMode="Single"
                                                            ItemsSource="{Binding Incomes}"
                                                            HeaderTemplate="{StaticResource IncomeHeaderTemplate}"
                                                            RowTemplate="{StaticResource IncomeRowTemplate}"/>
 
-								<TextBlock x:Name="IncomeEmptyText"
+                                <TextBlock x:Name="IncomeEmptyText"
                                            Text="Brak danych w tym okresie"
                                            Foreground="{DynamicResource App.Foreground}"
                                            Visibility="Collapsed"
                                            HorizontalAlignment="Center"
                                            Margin="0,8,0,0"
                                            FontStyle="Italic"/>
-							</StackPanel>
-						</Border>
+                            </StackPanel>
+                        </Border>
 
-						<!-- WYDATKI -->
-						<Border Grid.Row="1" Grid.Column="1" Style="{StaticResource Card}" Margin="8,0,0,8">
-							<StackPanel>
-								<Grid Margin="0,0,0,6">
-									<Grid.ColumnDefinitions>
-										<ColumnDefinition Width="*"/>
-										<ColumnDefinition Width="Auto"/>
-									</Grid.ColumnDefinitions>
+                        <!-- WYDATKI -->
+                        <Border Grid.Row="1" Grid.Column="1" Style="{StaticResource Card}" Margin="8,0,0,8">
+                            <StackPanel>
+                                <Grid Margin="0,0,0,6">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
 
-									<TextBlock Text="Wydatki — bieżący okres" Style="{StaticResource CardHeader}" VerticalAlignment="Center"/>
+                                    <TextBlock Text="Wydatki — bieżący okres" Style="{StaticResource CardHeader}" VerticalAlignment="Center"/>
 
-									<Button Grid.Column="1"
+                                    <Button Grid.Column="1"
                                             Style="{StaticResource DeleteIconButton}"
                                             VerticalAlignment="Center"
                                             Panel.ZIndex="10"
                                             ToolTip="Usuń zaznaczony"
                                             Click="ShowExpenseDeleteConfirm_Click"/>
-								</Grid>
+                                </Grid>
 
-								<StackPanel x:Name="ExpenseDeleteConfirmPanel"
+                                <StackPanel x:Name="ExpenseDeleteConfirmPanel"
                                             Orientation="Horizontal"
                                             Visibility="Collapsed"
                                             Margin="0,0,0,8"
                                             HorizontalAlignment="Left">
-									<TextBlock Text="Czy na pewno chcesz usunąć wydatek?"
+                                    <TextBlock Text="Czy na pewno chcesz usunąć wydatek?"
                                                Foreground="{DynamicResource App.Foreground}"
                                                Margin="0,0,8,0"/>
-									<Button Content="Tak" Width="60" Margin="0,0,6,0"
+                                    <Button Content="Tak" Width="60" Margin="0,0,6,0"
                                             Click="ExpenseDeleteConfirmYes_Click"
                                             Style="{StaticResource PrimaryButton}"/>
-									<Button Content="Nie" Width="60"
+                                    <Button Content="Nie" Width="60"
                                             Click="ExpenseDeleteConfirmNo_Click"
                                             Style="{StaticResource SecondaryButton}"/>
-								</StackPanel>
+                                </StackPanel>
 
-								<controls:MiniTableControl x:Name="ExpenseTable"
+                                <!-- ZMIANA: SelectionMode="Single" -->
+                                <controls:MiniTableControl x:Name="ExpenseTable"
+                                                           SelectionMode="Single"
                                                            ItemsSource="{Binding Expenses}"
                                                            HeaderTemplate="{StaticResource ExpenseHeaderTemplate}"
                                                            RowTemplate="{StaticResource ExpenseRowTemplate}"/>
 
-								<TextBlock x:Name="ExpenseEmptyText"
+                                <TextBlock x:Name="ExpenseEmptyText"
                                            Text="Brak danych w tym okresie"
                                            Foreground="{DynamicResource App.Foreground}"
                                            Visibility="Collapsed"
                                            HorizontalAlignment="Center"
                                            Margin="0,8,0,0"
                                            FontStyle="Italic"/>
-							</StackPanel>
-						</Border>
+                            </StackPanel>
+                        </Border>
 
-						<!-- Podsumowanie -->
-						<Border Grid.Row="2" Grid.Column="0" Style="{StaticResource Card}" Margin="0,0,8,0">
-							<StackPanel>
-								<TextBlock Text="Podsumowanie — bieżący okres" Style="{StaticResource CardHeader}" Margin="0,0,0,8"/>
-								<TextBlock x:Name="PeriodIncomeSummaryText" Foreground="{DynamicResource App.Foreground}" Margin="0,0,0,4"/>
-								<TextBlock x:Name="PeriodExpenseSummaryText" Foreground="{DynamicResource App.Foreground}" Margin="0,0,0,4"/>
-								<TextBlock x:Name="PeriodBalanceSummaryText" Foreground="{DynamicResource App.Foreground}" FontWeight="Bold"/>
-							</StackPanel>
-						</Border>
+                        <!-- Podsumowanie -->
+                        <Border Grid.Row="2" Grid.Column="0" Style="{StaticResource Card}" Margin="0,0,8,0">
+                            <StackPanel>
+                                <TextBlock Text="Podsumowanie — bieżący okres" Style="{StaticResource CardHeader}" Margin="0,0,0,8"/>
+                                <TextBlock x:Name="PeriodIncomeSummaryText" Foreground="{DynamicResource App.Foreground}" Margin="0,0,0,4"/>
+                                <TextBlock x:Name="PeriodExpenseSummaryText" Foreground="{DynamicResource App.Foreground}" Margin="0,0,0,4"/>
+                                <TextBlock x:Name="PeriodBalanceSummaryText" Foreground="{DynamicResource App.Foreground}" FontWeight="Bold"/>
+                            </StackPanel>
+                        </Border>
 
-						<!-- Zaplanowane -->
-						<Border Grid.Row="2" Grid.Column="1" Style="{StaticResource Card}" Margin="8,0,0,0">
-							<StackPanel>
-								<Grid Margin="0,0,0,6">
-									<Grid.ColumnDefinitions>
-										<ColumnDefinition Width="*"/>
-										<ColumnDefinition Width="Auto"/>
-									</Grid.ColumnDefinitions>
+                        <!-- Zaplanowane -->
+                        <Border Grid.Row="2" Grid.Column="1" Style="{StaticResource Card}" Margin="8,0,0,0">
+                            <StackPanel>
+                                <Grid Margin="0,0,0,6">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
 
-									<TextBlock Text="Zaplanowane transakcje" Style="{StaticResource CardHeader}" VerticalAlignment="Center"/>
+                                    <TextBlock Text="Zaplanowane transakcje" Style="{StaticResource CardHeader}" VerticalAlignment="Center"/>
 
-									<Button Grid.Column="1"
+                                    <Button Grid.Column="1"
                                             Style="{StaticResource DeleteIconButton}"
                                             HorizontalAlignment="Right"
                                             VerticalAlignment="Center"
                                             Panel.ZIndex="10"
                                             ToolTip="Usuń zaznaczony"
                                             Click="ShowPlannedDeleteConfirm_Click"/>
-								</Grid>
+                                </Grid>
 
-								<StackPanel x:Name="PlannedDeleteConfirmPanel"
+                                <StackPanel x:Name="PlannedDeleteConfirmPanel"
                                             Orientation="Horizontal"
                                             Visibility="Collapsed"
                                             Margin="0,0,0,8"
                                             HorizontalAlignment="Left">
-									<TextBlock Text="Czy na pewno chcesz usunąć transakcję?"
+                                    <TextBlock Text="Czy na pewno chcesz usunąć transakcję?"
                                                Foreground="{DynamicResource App.Foreground}"
                                                Margin="0,0,8,0"/>
-									<Button Content="Tak" Width="60" Margin="0,0,6,0"
+                                    <Button Content="Tak" Width="60" Margin="0,0,6,0"
                                             Click="PlannedDeleteConfirmYes_Click"
                                             Style="{StaticResource PrimaryButton}"/>
-									<Button Content="Nie" Width="60"
+                                    <Button Content="Nie" Width="60"
                                             Click="PlannedDeleteConfirmNo_Click"
                                             Style="{StaticResource SecondaryButton}"/>
-								</StackPanel>
+                                </StackPanel>
 
-								<!-- Poziomy scroll TYLKO dla tej tabeli -->
-								<ScrollViewer HorizontalScrollBarVisibility="Auto"
+                                <!-- Poziomy scroll TYLKO dla tej tabeli -->
+                                <ScrollViewer HorizontalScrollBarVisibility="Auto"
                                               VerticalScrollBarVisibility="Disabled"
                                               CanContentScroll="False">
+                                    <Border MinWidth="980" Background="Transparent">
 
-									<!-- MinWidth wymusza realny poziomy scroll,
-                                         gdy ekran jest węższy niż tabela -->
-									<Border MinWidth="980" Background="Transparent">
-										<controls:MiniTableControl x:Name="PlannedTransactionsList"
+                                        <!-- ZMIANA: SelectionMode="Single" -->
+                                        <controls:MiniTableControl x:Name="PlannedTransactionsList"
+                                                                   SelectionMode="Single"
                                                                    ItemsSource="{Binding PlannedTransactions}"
                                                                    HeaderTemplate="{StaticResource PlannedHeaderTemplate}"
                                                                    RowTemplate="{StaticResource PlannedRowTemplate}"/>
-									</Border>
-								</ScrollViewer>
+                                    </Border>
+                                </ScrollViewer>
 
-								<TextBlock x:Name="PlannedEmptyText"
+                                <TextBlock x:Name="PlannedEmptyText"
                                            Text="Brak zaplanowanych transakcji"
                                            Foreground="{DynamicResource App.Foreground}"
                                            Visibility="Collapsed"
                                            HorizontalAlignment="Center"
                                            Margin="0,8,0,0"
                                            FontStyle="Italic"/>
-							</StackPanel>
-						</Border>
+                            </StackPanel>
+                        </Border>
 
-					</Grid>
-				</Grid>
-			</Border>
-		</Grid>
-	</ScrollViewer>
+                    </Grid>
+                </Grid>
+            </Border>
+        </Grid>
+    </ScrollViewer>
 </UserControl>

@@ -183,5 +183,11 @@ SET Amount   = excluded.Amount,
                 fromKind: "bank", fromRefId: accountId,
                 toKind: "envelope", toRefId: envelopeId,
                 isPlanned: false);
+
+        public static void DeleteIncome(int incomeId)
+        {
+            LedgerService.DeleteIncome(incomeId);
+        }
+
     }
 }

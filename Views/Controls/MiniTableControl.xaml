@@ -3,28 +3,66 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              x:Name="Root">
 
-	<Grid IsSharedSizeScope="True">
-		<Grid.RowDefinitions>
-			<RowDefinition Height="Auto"/>
-			<RowDefinition Height="*"/>
-		</Grid.RowDefinitions>
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
 
-		<!-- Header -->
-		<ContentPresenter Grid.Row="0"
-                          Content="{Binding RelativeSource={RelativeSource AncestorType=UserControl}}"
-                          ContentTemplate="{Binding HeaderTemplate, ElementName=Root}"/>
+        <!-- Header -->
+        <ContentControl Grid.Row="0"
+                        Content="{Binding}"
+                        ContentTemplate="{Binding HeaderTemplate, ElementName=Root}"/>
 
-		<!-- Rows -->
-		<ListBox x:Name="PART_List"
-                 Grid.Row="1"
+        <!-- Rows (SELEKCJA) -->
+        <ListBox Grid.Row="1"
                  ItemsSource="{Binding ItemsSource, ElementName=Root}"
                  ItemTemplate="{Binding RowTemplate, ElementName=Root}"
-                 Style="{StaticResource MiniTableListBox}"
-                 HorizontalContentAlignment="Stretch"
                  SelectionMode="{Binding SelectionMode, ElementName=Root}"
-                 SelectedItem="{Binding SelectedItem, ElementName=Root, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                 SelectedIndex="{Binding SelectedIndex, ElementName=Root, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                 SelectedItem="{Binding SelectedItem, ElementName=Root, Mode=TwoWay}"
+                 SelectedIndex="{Binding SelectedIndex, ElementName=Root, Mode=TwoWay}"
                  ScrollViewer.HorizontalScrollBarVisibility="{Binding HorizontalScrollBarVisibility, ElementName=Root}"
-                 ScrollViewer.VerticalScrollBarVisibility="{Binding VerticalScrollBarVisibility, ElementName=Root}"/>
-	</Grid>
+                 ScrollViewer.VerticalScrollBarVisibility="{Binding VerticalScrollBarVisibility, ElementName=Root}"
+                 Background="Transparent"
+                 BorderThickness="0"
+                 Padding="0"
+                 HorizontalContentAlignment="Stretch">
+
+            <!-- Estetyka zaznaczenia (żeby było widać, co wybrane) -->
+            <ListBox.ItemContainerStyle>
+                <Style TargetType="ListBoxItem">
+                    <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+                    <Setter Property="Padding" Value="2"/>
+                    <Setter Property="Margin" Value="0"/>
+                    <Setter Property="Background" Value="Transparent"/>
+                    <Setter Property="BorderThickness" Value="1"/>
+                    <Setter Property="BorderBrush" Value="Transparent"/>
+                    <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
+                    <Setter Property="Template">
+                        <Setter.Value>
+                            <ControlTemplate TargetType="ListBoxItem">
+                                <Border x:Name="Bd"
+                                        Background="{TemplateBinding Background}"
+                                        BorderBrush="{TemplateBinding BorderBrush}"
+                                        BorderThickness="{TemplateBinding BorderThickness}"
+                                        CornerRadius="6">
+                                    <ContentPresenter/>
+                                </Border>
+                                <ControlTemplate.Triggers>
+                                    <Trigger Property="IsSelected" Value="True">
+                                        <Setter TargetName="Bd" Property="Background" Value="{DynamicResource Surface.Background}"/>
+                                        <Setter TargetName="Bd" Property="BorderBrush" Value="{DynamicResource Brand.Blue}"/>
+                                    </Trigger>
+                                    <Trigger Property="IsMouseOver" Value="True">
+                                        <Setter TargetName="Bd" Property="BorderBrush" Value="{DynamicResource Surface.Border}"/>
+                                    </Trigger>
+                                </ControlTemplate.Triggers>
+                            </ControlTemplate>
+                        </Setter.Value>
+                    </Setter>
+                </Style>
+            </ListBox.ItemContainerStyle>
+
+        </ListBox>
+    </Grid>
 </UserControl>

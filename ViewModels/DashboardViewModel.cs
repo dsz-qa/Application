@@ -26,7 +26,8 @@ namespace Finly.ViewModels
     {
         public int Id { get; set; }
         public DateTime Date { get; set; }
-        public string DateDisplay => Date == DateTime.MinValue ? "" : Date.ToString("d");
+        public string DateDisplay => Date == DateTime.MinValue ? "" : Date.ToString("dd.MM.yyyy");
+
 
         public string Category { get; set; } = string.Empty;
 
