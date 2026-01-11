@@ -19,32 +19,200 @@
         <!-- Sortowanie: DateDesc/DateAsc -> PL -->
         <local:SortModeToPolishTextConverter x:Key="SortModeTextConv"/>
 
-        <!-- KPI -->
-        <Style x:Key="KpiValueStyle" TargetType="TextBlock">
-            <Setter Property="FontSize" Value="18"/>
-            <Setter Property="FontWeight" Value="Bold"/>
-            <Setter Property="Margin" Value="0,2,0,0"/>
-            <Setter Property="Foreground" Value="{DynamicResource App.Foreground}"/>
-        </Style>
+        <!-- ===================== KPI ===================== -->
 
         <Style x:Key="KpiHeader" TargetType="TextBlock">
-            <Setter Property="FontSize" Value="20"/>
+            <Setter Property="FontSize" Value="22"/>
             <Setter Property="FontWeight" Value="Bold"/>
             <Setter Property="Foreground" Value="{DynamicResource App.Foreground}"/>
             <Setter Property="Opacity" Value="1"/>
         </Style>
 
-        <!-- Karta akcentowa KPI -->
+        <Style x:Key="KpiValueStyle" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="20"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="Margin" Value="0,4,0,0"/>
+            <Setter Property="Foreground" Value="{DynamicResource App.Foreground}"/>
+        </Style>
+
+        <!-- Kafelek KPI (jak na screenie: ciemne tło, nieprzeźroczyste) -->
         <Style x:Key="AccentCard" TargetType="Border">
-            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="Background" Value="{DynamicResource Surface.Background}"/>
             <Setter Property="BorderBrush" Value="{DynamicResource Brand.Blue}"/>
             <Setter Property="BorderThickness" Value="2"/>
             <Setter Property="CornerRadius" Value="10"/>
-            <Setter Property="Padding" Value="12"/>
-            <Setter Property="Margin" Value="0,0,16,0"/>
+            <Setter Property="Padding" Value="14"/>
+            <Setter Property="Margin" Value="0,0,12,0"/>
+            <Setter Property="SnapsToDevicePixels" Value="True"/>
+            <Setter Property="UseLayoutRounding" Value="True"/>
         </Style>
 
-        <!-- Duże sekcje -->
+        <!-- ===================== FILTRY ===================== -->
+
+        <!-- większy tytuł sekcji (Typ transakcji / Kategorie / Konta) -->
+        <Style x:Key="FilterHeaderTextStyle" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="16"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="Foreground" Value="{DynamicResource App.Foreground}"/>
+        </Style>
+
+        <!-- GroupBox: pomarańczowa ramka + surface w środku (jak na screenie) -->
+        <Style x:Key="FilterPanelStyle" TargetType="GroupBox">
+            <Setter Property="Height" Value="185"/>
+            <Setter Property="MinHeight" Value="185"/>
+            <Setter Property="Margin" Value="0,0,12,0"/>
+            <Setter Property="Foreground" Value="{DynamicResource App.Foreground}"/>
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource Brand.Orange}"/>
+            <Setter Property="BorderThickness" Value="2"/>
+            <Setter Property="Padding" Value="0"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="GroupBox">
+                        <Grid Height="{TemplateBinding Height}" ClipToBounds="True">
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="*"/>
+                            </Grid.RowDefinitions>
+
+                            <!-- HEADER -->
+                            <ContentPresenter Grid.Row="0"
+                                              Content="{TemplateBinding Header}"
+                                              Margin="0,0,0,6"
+                                              VerticalAlignment="Center"/>
+
+                            <!-- BODY -->
+                            <Border Grid.Row="1"
+                                    Background="{DynamicResource Surface.Background}"
+                                    BorderBrush="{TemplateBinding BorderBrush}"
+                                    BorderThickness="{TemplateBinding BorderThickness}"
+                                    CornerRadius="10"
+                                    Padding="12"
+                                    SnapsToDevicePixels="True">
+                                <ContentPresenter VerticalAlignment="Stretch"
+                                                  HorizontalAlignment="Stretch"/>
+                            </Border>
+                        </Grid>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- przycisk "Pokaż wszystko" -->
+        <Style x:Key="FilterHeaderButtonStyle" TargetType="Button">
+            <Setter Property="Margin" Value="8,0,0,0"/>
+            <Setter Property="Padding" Value="12,0"/>
+            <Setter Property="MinWidth" Value="102"/>
+            <Setter Property="Height" Value="24"/>
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="Background" Value="{DynamicResource Brand.Blue}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource Brand.Blue}"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Focusable" Value="False"/>
+            <Setter Property="IsTabStop" Value="False"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Bd"
+                                Background="{TemplateBinding Background}"
+                                CornerRadius="12">
+                            <ContentPresenter HorizontalAlignment="Center"
+                                              VerticalAlignment="Center"
+                                              Margin="10,0"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Bd" Property="Opacity" Value="0.92"/>
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="Bd" Property="Opacity" Value="0.85"/>
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter TargetName="Bd" Property="Opacity" Value="0.60"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- checkbox: JAK NA SCREENIE:
+             - mały kwadrat,
+             - checked: pomarańczowe wypełnienie + biały ptaszek,
+             - unchecked: obrys pomarańczowy, środek transparent,
+             - tekst pogrubiony. -->
+        <Style x:Key="OrangeCheckBoxStyle" TargetType="CheckBox">
+            <Setter Property="Foreground" Value="{DynamicResource App.Foreground}"/>
+            <Setter Property="FontSize" Value="13"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="Margin" Value="0,0,0,10"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Focusable" Value="False"/>
+            <Setter Property="IsTabStop" Value="False"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="CheckBox">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="22"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+
+                            <!-- box -->
+                            <Border x:Name="Box"
+                                    Width="14"
+                                    Height="14"
+                                    CornerRadius="2"
+                                    BorderThickness="2"
+                                    BorderBrush="{DynamicResource Brand.Orange}"
+                                    Background="Transparent"
+                                    VerticalAlignment="Center"
+                                    Margin="0,0,8,0"/>
+
+                            <!-- check -->
+                            <Path x:Name="Check"
+                                  Data="M 2 7 L 6 11 L 13 2"
+                                  Stroke="White"
+                                  StrokeThickness="2.4"
+                                  StrokeStartLineCap="Round"
+                                  StrokeEndLineCap="Round"
+                                  StrokeLineJoin="Round"
+                                  Width="14"
+                                  Height="14"
+                                  VerticalAlignment="Center"
+                                  Visibility="Collapsed"/>
+
+                            <!-- content -->
+                            <ContentPresenter Grid.Column="1"
+                                              VerticalAlignment="Center"
+                                              RecognizesAccessKey="True"/>
+                        </Grid>
+
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsChecked" Value="True">
+                                <Setter TargetName="Box" Property="Background" Value="{DynamicResource Brand.Orange}"/>
+                                <Setter TargetName="Box" Property="BorderBrush" Value="{DynamicResource Brand.Orange}"/>
+                                <Setter TargetName="Check" Property="Visibility" Value="Visible"/>
+                            </Trigger>
+
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter Property="Opacity" Value="0.95"/>
+                            </Trigger>
+
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter Property="Opacity" Value="0.60"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- ===================== KARTY / SEKCJE ===================== -->
+
         <Style x:Key="SectionCard" TargetType="Border">
             <Setter Property="Background" Value="{DynamicResource Surface.Background}"/>
             <Setter Property="BorderBrush" Value="{DynamicResource Surface.Border}"/>
@@ -57,7 +225,6 @@
             <Setter Property="TextOptions.TextRenderingMode" Value="ClearType"/>
         </Style>
 
-        <!-- Pojedyncza karta transakcji -->
         <Style x:Key="TransactionItemCard" TargetType="Border">
             <Setter Property="Background" Value="{DynamicResource Surface.Background}"/>
             <Setter Property="BorderBrush" Value="{DynamicResource Surface.Border}"/>
@@ -72,87 +239,6 @@
                     <DropShadowEffect BlurRadius="8"
                                       ShadowDepth="2"
                                       Opacity="0.16"/>
-                </Setter.Value>
-            </Setter>
-        </Style>
-
-        <!-- Panel filtrów (kompaktowy jak na screenie) -->
-        <Style x:Key="FilterPanelStyle" TargetType="GroupBox">
-            <Setter Property="Height" Value="165"/>
-            <Setter Property="MinHeight" Value="165"/>
-            <Setter Property="Margin" Value="0,0,16,0"/>
-            <Setter Property="Foreground" Value="{DynamicResource App.Foreground}"/>
-            <Setter Property="Background" Value="Transparent"/>
-            <Setter Property="BorderBrush" Value="{DynamicResource Surface.Border}"/>
-            <Setter Property="BorderThickness" Value="2"/>
-            <Setter Property="Padding" Value="0"/>
-            <Setter Property="Template">
-                <Setter.Value>
-                    <ControlTemplate TargetType="GroupBox">
-                        <Grid Height="{TemplateBinding Height}" ClipToBounds="True">
-                            <Grid.RowDefinitions>
-                                <RowDefinition Height="Auto"/>
-                                <RowDefinition Height="*"/>
-                            </Grid.RowDefinitions>
-
-                            <ContentPresenter Grid.Row="0"
-                                              Content="{TemplateBinding Header}"
-                                              Margin="0,0,0,6"
-                                              VerticalAlignment="Center"/>
-
-                            <Border Grid.Row="1"
-                                    Background="{DynamicResource Surface.Background}"
-                                    BorderBrush="{TemplateBinding BorderBrush}"
-                                    BorderThickness="{TemplateBinding BorderThickness}"
-                                    CornerRadius="10"
-                                    Padding="10"
-                                    SnapsToDevicePixels="True">
-                                <ContentPresenter VerticalAlignment="Stretch"
-                                                  HorizontalAlignment="Stretch"/>
-                            </Border>
-                        </Grid>
-                    </ControlTemplate>
-                </Setter.Value>
-            </Setter>
-        </Style>
-
-        <Style x:Key="FilterHeaderButtonStyle" TargetType="Button">
-            <Setter Property="Margin" Value="8,0,0,0"/>
-            <Setter Property="Padding" Value="10,0"/>
-            <Setter Property="MinWidth" Value="96"/>
-            <Setter Property="Height" Value="24"/>
-            <Setter Property="FontSize" Value="12"/>
-            <Setter Property="Foreground" Value="White"/>
-            <Setter Property="Background" Value="{DynamicResource Brand.Blue}"/>
-            <Setter Property="BorderBrush" Value="{DynamicResource Brand.Blue}"/>
-            <Setter Property="BorderThickness" Value="0"/>
-            <Setter Property="Cursor" Value="Hand"/>
-            <Setter Property="Focusable" Value="False"/>
-            <Setter Property="IsTabStop" Value="False"/>
-            <Setter Property="Template">
-                <Setter.Value>
-                    <ControlTemplate TargetType="Button">
-                        <Border x:Name="Bd"
-                                Background="{TemplateBinding Background}"
-                                BorderBrush="{TemplateBinding BorderBrush}"
-                                BorderThickness="{TemplateBinding BorderThickness}"
-                                CornerRadius="12">
-                            <ContentPresenter HorizontalAlignment="Center"
-                                              VerticalAlignment="Center"
-                                              Margin="8,0"/>
-                        </Border>
-                        <ControlTemplate.Triggers>
-                            <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="Bd" Property="Opacity" Value="0.9"/>
-                            </Trigger>
-                            <Trigger Property="IsPressed" Value="True">
-                                <Setter TargetName="Bd" Property="Opacity" Value="0.8"/>
-                            </Trigger>
-                            <Trigger Property="IsEnabled" Value="False">
-                                <Setter TargetName="Bd" Property="Opacity" Value="0.6"/>
-                            </Trigger>
-                        </ControlTemplate.Triggers>
-                    </ControlTemplate>
                 </Setter.Value>
             </Setter>
         </Style>
@@ -177,19 +263,18 @@
                         <Grid x:Name="ReadMode" Grid.RowSpan="2">
                             <StackPanel Orientation="Vertical" Margin="4,0,16,0">
                                 <StackPanel Orientation="Horizontal" Margin="0,0,0,8" VerticalAlignment="Center">
+
+                                    <!-- ICON (pewne: po IsExpense/IsIncome/IsTransfer + pack uri) -->
                                     <Image Width="20" Height="20" Margin="0,0,6,0">
                                         <Image.Style>
                                             <Style TargetType="Image">
-                                                <Setter Property="Source" Value="/Assets/Icons/wydatki.png"/>
+                                                <Setter Property="Source" Value="pack://application:,,,/Assets/Icons/wydatki.png"/>
                                                 <Style.Triggers>
-                                                    <DataTrigger Binding="{Binding Kind}" Value="Expense">
-                                                        <Setter Property="Source" Value="/Assets/Icons/wydatki.png"/>
+                                                    <DataTrigger Binding="{Binding IsIncome}" Value="True">
+                                                        <Setter Property="Source" Value="pack://application:,,,/Assets/Icons/przychody.png"/>
                                                     </DataTrigger>
-                                                    <DataTrigger Binding="{Binding Kind}" Value="Income">
-                                                        <Setter Property="Source" Value="/Assets/Icons/przychody.png"/>
-                                                    </DataTrigger>
-                                                    <DataTrigger Binding="{Binding Kind}" Value="Transfer">
-                                                        <Setter Property="Source" Value="/Assets/Icons/transfer.png"/>
+                                                    <DataTrigger Binding="{Binding IsTransfer}" Value="True">
+                                                        <Setter Property="Source" Value="pack://application:,,,/Assets/Icons/transfer.png"/>
                                                     </DataTrigger>
                                                 </Style.Triggers>
                                             </Style>
@@ -201,13 +286,10 @@
                                             <Style TargetType="TextBlock">
                                                 <Setter Property="Text" Value="Wydatek"/>
                                                 <Style.Triggers>
-                                                    <DataTrigger Binding="{Binding Kind}" Value="Expense">
-                                                        <Setter Property="Text" Value="Wydatek"/>
-                                                    </DataTrigger>
-                                                    <DataTrigger Binding="{Binding Kind}" Value="Income">
+                                                    <DataTrigger Binding="{Binding IsIncome}" Value="True">
                                                         <Setter Property="Text" Value="Przychód"/>
                                                     </DataTrigger>
-                                                    <DataTrigger Binding="{Binding Kind}" Value="Transfer">
+                                                    <DataTrigger Binding="{Binding IsTransfer}" Value="True">
                                                         <Setter Property="Text" Value="Transfer"/>
                                                     </DataTrigger>
                                                 </Style.Triggers>
@@ -312,16 +394,13 @@
                                     <Image Width="20" Height="20" Margin="0,0,6,0">
                                         <Image.Style>
                                             <Style TargetType="Image">
-                                                <Setter Property="Source" Value="/Assets/Icons/wydatki.png"/>
+                                                <Setter Property="Source" Value="pack://application:,,,/Assets/Icons/wydatki.png"/>
                                                 <Style.Triggers>
-                                                    <DataTrigger Binding="{Binding Kind}" Value="Expense">
-                                                        <Setter Property="Source" Value="/Assets/Icons/wydatki.png"/>
+                                                    <DataTrigger Binding="{Binding IsIncome}" Value="True">
+                                                        <Setter Property="Source" Value="pack://application:,,,/Assets/Icons/przychody.png"/>
                                                     </DataTrigger>
-                                                    <DataTrigger Binding="{Binding Kind}" Value="Income">
-                                                        <Setter Property="Source" Value="/Assets/Icons/przychody.png"/>
-                                                    </DataTrigger>
-                                                    <DataTrigger Binding="{Binding Kind}" Value="Transfer">
-                                                        <Setter Property="Source" Value="/Assets/Icons/transfer.png"/>
+                                                    <DataTrigger Binding="{Binding IsTransfer}" Value="True">
+                                                        <Setter Property="Source" Value="pack://application:,,,/Assets/Icons/transfer.png"/>
                                                     </DataTrigger>
                                                 </Style.Triggers>
                                             </Style>
@@ -333,13 +412,10 @@
                                             <Style TargetType="TextBlock">
                                                 <Setter Property="Text" Value="Wydatek"/>
                                                 <Style.Triggers>
-                                                    <DataTrigger Binding="{Binding Kind}" Value="Expense">
-                                                        <Setter Property="Text" Value="Wydatek"/>
-                                                    </DataTrigger>
-                                                    <DataTrigger Binding="{Binding Kind}" Value="Income">
+                                                    <DataTrigger Binding="{Binding IsIncome}" Value="True">
                                                         <Setter Property="Text" Value="Przychód"/>
                                                     </DataTrigger>
-                                                    <DataTrigger Binding="{Binding Kind}" Value="Transfer">
+                                                    <DataTrigger Binding="{Binding IsTransfer}" Value="True">
                                                         <Setter Property="Text" Value="Transfer"/>
                                                     </DataTrigger>
                                                 </Style.Triggers>
@@ -603,7 +679,7 @@
             </Grid.RowDefinitions>
 
             <!-- KPI (6) -->
-            <Grid Grid.Row="0" Margin="16">
+            <Grid Grid.Row="0" Margin="16,16,16,10">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*"/>
                     <ColumnDefinition Width="*"/>
@@ -641,7 +717,7 @@
                     </StackPanel>
                 </Border>
 
-                <Border Grid.Column="4" Style="{StaticResource AccentCard}" Margin="0">
+                <Border Grid.Column="4" Style="{StaticResource AccentCard}" Margin="0,0,12,0">
                     <StackPanel HorizontalAlignment="Left">
                         <TextBlock Text="Gotówka w kopertach" Style="{StaticResource KpiHeader}" TextWrapping="Wrap"/>
                         <TextBlock x:Name="EnvelopesDashboardText" Text="0,00 zł" Style="{StaticResource KpiValueStyle}"/>
@@ -657,7 +733,7 @@
             </Grid>
 
             <!-- KPI (3) -->
-            <Grid Grid.Row="1" Margin="16">
+            <Grid Grid.Row="1" Margin="16,0,16,10">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*"/>
                     <ColumnDefinition Width="*"/>
@@ -678,7 +754,7 @@
                     </StackPanel>
                 </Border>
 
-                <Border Grid.Column="2" Style="{StaticResource AccentCard}" BorderBrush="{DynamicResource Brand.Orange}">
+                <Border Grid.Column="2" Style="{StaticResource AccentCard}" BorderBrush="{DynamicResource Brand.Orange}" Margin="0">
                     <StackPanel>
                         <TextBlock Text="Bilans" Style="{StaticResource KpiHeader}"/>
                         <TextBlock Text="{Binding Balance, StringFormat={}{0:N2} zł}" Style="{StaticResource KpiValueStyle}"/>
@@ -687,7 +763,7 @@
             </Grid>
 
             <!-- FILTRY (Typ / Kategorie / Konta) -->
-            <Grid Grid.Row="2" Margin="16">
+            <Grid Grid.Row="2" Margin="16,0,16,12">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*"/>
                     <ColumnDefinition Width="*"/>
@@ -699,9 +775,8 @@
                     <GroupBox.Header>
                         <DockPanel LastChildFill="True">
                             <TextBlock Text="Typ transakcji"
-                                       VerticalAlignment="Center"
-                                       FontWeight="Bold"
-                                       Foreground="{DynamicResource App.Foreground}"/>
+                                       Style="{StaticResource FilterHeaderTextStyle}"
+                                       VerticalAlignment="Center"/>
                             <Button DockPanel.Dock="Right"
                                     Content="Pokaż wszystko"
                                     Style="{StaticResource FilterHeaderButtonStyle}"
@@ -710,17 +785,38 @@
                     </GroupBox.Header>
 
                     <StackPanel VerticalAlignment="Top">
-                        <CheckBox Content="Wydatki"
-                                  IsChecked="{Binding ShowExpenses, Mode=TwoWay}"
-                                  Foreground="{DynamicResource App.Foreground}"
-                                  Margin="0,0,0,6"/>
-                        <CheckBox Content="Przychody"
-                                  IsChecked="{Binding ShowIncomes, Mode=TwoWay}"
-                                  Foreground="{DynamicResource App.Foreground}"
-                                  Margin="0,0,0,6"/>
-                        <CheckBox Content="Transfery"
+
+                        <!-- Wydatki -->
+                        <CheckBox Style="{StaticResource OrangeCheckBoxStyle}"
+                                  IsChecked="{Binding ShowExpenses, Mode=TwoWay}">
+                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                <Image Width="16" Height="16" Margin="0,0,8,0"
+                                       Source="pack://application:,,,/Assets/Icons/wydatki.png"/>
+                                <TextBlock Text="Wydatki" FontWeight="Bold" />
+                            </StackPanel>
+                        </CheckBox>
+
+                        <!-- Przychody -->
+                        <CheckBox Style="{StaticResource OrangeCheckBoxStyle}"
+                                  IsChecked="{Binding ShowIncomes, Mode=TwoWay}">
+                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                <Image Width="16" Height="16" Margin="0,0,8,0"
+                                       Source="pack://application:,,,/Assets/Icons/przychody.png"/>
+                                <TextBlock Text="Przychody" FontWeight="Bold" />
+                            </StackPanel>
+                        </CheckBox>
+
+                        <!-- Transfery -->
+                        <CheckBox Style="{StaticResource OrangeCheckBoxStyle}"
                                   IsChecked="{Binding ShowTransfers, Mode=TwoWay}"
-                                  Foreground="{DynamicResource App.Foreground}"/>
+                                  Margin="0">
+                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                <Image Width="16" Height="16" Margin="0,0,8,0"
+                                       Source="pack://application:,,,/Assets/Icons/transfer.png"/>
+                                <TextBlock Text="Transfery" FontWeight="Bold" />
+                            </StackPanel>
+                        </CheckBox>
+
                     </StackPanel>
                 </GroupBox>
 
@@ -729,9 +825,8 @@
                     <GroupBox.Header>
                         <DockPanel LastChildFill="True">
                             <TextBlock Text="Kategorie"
-                                       VerticalAlignment="Center"
-                                       FontWeight="Bold"
-                                       Foreground="{DynamicResource App.Foreground}"/>
+                                       Style="{StaticResource FilterHeaderTextStyle}"
+                                       VerticalAlignment="Center"/>
                             <Button DockPanel.Dock="Right"
                                     Content="Pokaż wszystko"
                                     Style="{StaticResource FilterHeaderButtonStyle}"
@@ -744,9 +839,8 @@
                             <ItemsControl.ItemTemplate>
                                 <DataTemplate>
                                     <CheckBox Content="{Binding Name}"
-                                              IsChecked="{Binding IsSelected, Mode=TwoWay}"
-                                              Foreground="{DynamicResource App.Foreground}"
-                                              Margin="0,0,0,6"/>
+                                              Style="{StaticResource OrangeCheckBoxStyle}"
+                                              IsChecked="{Binding IsSelected, Mode=TwoWay}"/>
                                 </DataTemplate>
                             </ItemsControl.ItemTemplate>
                         </ItemsControl>
@@ -758,9 +852,8 @@
                     <GroupBox.Header>
                         <DockPanel LastChildFill="True">
                             <TextBlock Text="Konta"
-                                       VerticalAlignment="Center"
-                                       FontWeight="Bold"
-                                       Foreground="{DynamicResource App.Foreground}"/>
+                                       Style="{StaticResource FilterHeaderTextStyle}"
+                                       VerticalAlignment="Center"/>
                             <Button DockPanel.Dock="Right"
                                     Content="Pokaż wszystko"
                                     Style="{StaticResource FilterHeaderButtonStyle}"
@@ -773,9 +866,8 @@
                             <ItemsControl.ItemTemplate>
                                 <DataTemplate>
                                     <CheckBox Content="{Binding Name}"
-                                              IsChecked="{Binding IsSelected, Mode=TwoWay}"
-                                              Foreground="{DynamicResource App.Foreground}"
-                                              Margin="0,0,0,6"/>
+                                              Style="{StaticResource OrangeCheckBoxStyle}"
+                                              IsChecked="{Binding IsSelected, Mode=TwoWay}"/>
                                 </DataTemplate>
                             </ItemsControl.ItemTemplate>
                         </ItemsControl>
@@ -811,7 +903,7 @@
                             <controls:PeriodBarControl x:Name="PeriodBar"/>
                         </Border>
 
-                        <!-- Szukaj + Wyczyść + Sortowanie (krótsze i bliżej) -->
+                        <!-- Szukaj + Wyczyść + Sortowanie -->
                         <Grid Margin="0,10,0,0">
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="Auto"/>
@@ -842,6 +934,7 @@
                                         VerticalAlignment="Center">
                                 <TextBlock Text="Sortowanie:"
                                            Foreground="{DynamicResource App.Foreground}"
+                                           FontWeight="SemiBold"
                                            VerticalAlignment="Center"
                                            Margin="0,0,8,0"/>
                                 <ComboBox Width="180"
