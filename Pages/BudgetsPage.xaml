@@ -17,9 +17,9 @@
         <local:StringNullOrEmptyToVisibilityConverter x:Key="StringToVisibility"/>
 
         <!-- ===================== KARTY / TYPOGRAFIA ===================== -->
-
+        <!-- KLUCZ: wymuszamy ciemne tło na CAŁEJ powierzchni kafelka -->
         <Style x:Key="Card" TargetType="Border">
-            <Setter Property="Background" Value="{DynamicResource Surface.Background}"/>
+            <Setter Property="Background" Value="{DynamicResource App.Background}"/>
             <Setter Property="BorderBrush" Value="{DynamicResource Surface.Border}"/>
             <Setter Property="BorderThickness" Value="1"/>
             <Setter Property="CornerRadius" Value="10"/>
@@ -67,8 +67,9 @@
             <Setter Property="FontSize" Value="14"/>
         </Style>
 
+        <!-- Nagłówek tabeli może mieć delikatnie inny odcień - ALE jeśli też chcesz 100% ciemne, zmień Background na App.Background -->
         <Style x:Key="MiniTableHeaderBorder" TargetType="Border">
-            <Setter Property="Background" Value="{DynamicResource Surface.Background}"/>
+            <Setter Property="Background" Value="{DynamicResource App.Background}"/>
             <Setter Property="Padding" Value="6,4"/>
             <Setter Property="Margin" Value="0,0,0,6"/>
             <Setter Property="CornerRadius" Value="6"/>
@@ -150,9 +151,6 @@
         </Style>
 
         <!-- ===================== INSIGHT (Analiza budżetu) ===================== -->
-        <!-- USUNIĘCIE PODWÓJNEGO TŁA: wewnętrzne elementy mają Transparent -->
-        <!-- + większy i pogrubiony tekst -->
-
         <Style x:Key="InsightItemBorder" TargetType="Border">
             <Setter Property="Background" Value="Transparent"/>
             <Setter Property="BorderBrush" Value="{DynamicResource Surface.Border}"/>
@@ -170,8 +168,6 @@
         </Style>
 
         <!-- ===================== KARTY TRANSAKCJI (prawa lista) ===================== -->
-        <!-- USUNIĘCIE PODWÓJNEGO TŁA: TxCard ma Transparent i bez "mgły" z cienia -->
-
         <Style x:Key="TxCard" TargetType="Border">
             <Setter Property="Background" Value="Transparent"/>
             <Setter Property="BorderBrush" Value="{DynamicResource Surface.Border}"/>
@@ -181,7 +177,6 @@
             <Setter Property="Margin" Value="0,0,0,12"/>
             <Setter Property="SnapsToDevicePixels" Value="True"/>
             <Setter Property="UseLayoutRounding" Value="True"/>
-            <!-- WYŁĄCZONE: dawało wrażenie "rozjaśnienia/poświaty" -->
             <Setter Property="Effect" Value="{x:Null}"/>
         </Style>
 
@@ -201,7 +196,6 @@
             <Border Style="{StaticResource TxCard}">
                 <StackPanel Orientation="Vertical" Margin="4,0,0,0">
 
-                    <!-- Header: ikonka + typ -->
                     <StackPanel Orientation="Horizontal" Margin="0,0,0,10" VerticalAlignment="Center">
                         <Image Width="20" Height="20" Margin="0,0,6,0">
                             <Image.Style>
@@ -341,7 +335,8 @@
                             Margin="0,0,10,0"
                             Height="260"
                             Padding="10">
-                        <Grid VerticalAlignment="Center">
+                        <!-- dopilnowujemy, że nic w środku nie ma własnego tła -->
+                        <Grid VerticalAlignment="Center" Background="Transparent">
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="*"/>
                                 <ColumnDefinition Width="*"/>
@@ -349,7 +344,8 @@
 
                             <StackPanel Grid.Column="0"
                                         Margin="0,0,12,0"
-                                        VerticalAlignment="Center">
+                                        VerticalAlignment="Center"
+                                        Background="Transparent">
                                 <TextBlock Text="Nazwa budżetu" Style="{StaticResource MiniLabel}"/>
                                 <TextBlock x:Name="BudgetNameText"
                                            Text="(wybierz budżet)"
@@ -372,7 +368,8 @@
                             </StackPanel>
 
                             <StackPanel Grid.Column="1"
-                                        VerticalAlignment="Center">
+                                        VerticalAlignment="Center"
+                                        Background="Transparent">
                                 <TextBlock Text="Zaplanowano wydać" Style="{StaticResource MiniLabel}"/>
                                 <TextBlock x:Name="BudgetPlannedText"
                                            Style="{StaticResource MiniValue}"
@@ -405,7 +402,7 @@
                             Margin="0,0,10,0"
                             Height="260"
                             Padding="10">
-                        <Grid>
+                        <Grid Background="Transparent">
                             <Grid.RowDefinitions>
                                 <RowDefinition Height="Auto"/>
                                 <RowDefinition Height="*"/>
@@ -416,6 +413,7 @@
                                        Style="{StaticResource CardHeader}"
                                        Margin="0,0,0,8"/>
 
+                            <!-- TooltipFindingStrategy: pokazuj wartości dla wszystkich serii przy tym samym X -->
                             <lvc:CartesianChart Grid.Row="1"
                                                 x:Name="BudgetHistoryChartControl"
                                                 Height="182"
@@ -423,7 +421,9 @@
                                                 Foreground="White"
                                                 LegendPosition="Bottom"
                                                 ZoomMode="None"
-                                                AnimationsSpeed="0:0:0.25"/>
+                                                AnimationsSpeed="0:0:0.25"
+                                                TooltipFindingStrategy="CompareOnlyX"
+                                                TooltipPosition="Top"/>
                         </Grid>
                     </Border>
 
@@ -432,7 +432,7 @@
                             Style="{StaticResource OrangeCard}"
                             Height="260"
                             Padding="10">
-                        <Grid>
+                        <Grid Background="Transparent">
                             <Grid.RowDefinitions>
                                 <RowDefinition Height="Auto"/>
                                 <RowDefinition Height="*"/>
@@ -443,9 +443,9 @@
                                        Style="{StaticResource CardHeader}"
                                        Margin="0,0,0,8"/>
 
-                            <!-- USUNIĘCIE PODWÓJNEGO TŁA: itemy mają Transparent -->
                             <ItemsControl Grid.Row="1"
-                                          x:Name="BudgetInsightsList">
+                                          x:Name="BudgetInsightsList"
+                                          Background="Transparent">
                                 <ItemsControl.ItemsPanel>
                                     <ItemsPanelTemplate>
                                         <UniformGrid Columns="2"/>
@@ -455,13 +455,11 @@
                                 <ItemsControl.ItemTemplate>
                                     <DataTemplate>
                                         <Border Style="{StaticResource InsightItemBorder}">
-                                            <TextBlock Text="{Binding}"
-                                                       Style="{StaticResource InsightItemText}"/>
+                                            <TextBlock Text="{Binding}" Style="{StaticResource InsightItemText}"/>
                                         </Border>
                                     </DataTemplate>
                                 </ItemsControl.ItemTemplate>
                             </ItemsControl>
-
                         </Grid>
                     </Border>
                 </Grid>
@@ -476,14 +474,14 @@
 
                     <!-- LEWA: lista budżetów -->
                     <Border Grid.Column="0" Style="{StaticResource Card}">
-                        <StackPanel>
+                        <StackPanel Background="Transparent">
 
                             <TextBlock Text="Wybierz budżet, aby zobaczyć szczegóły"
                                        Foreground="{DynamicResource App.Foreground}"
                                        Opacity="0.9"
                                        Margin="0,0,0,10"/>
 
-                            <Grid Margin="0,0,0,10">
+                            <Grid Margin="0,0,0,10" Background="Transparent">
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="240"/>
                                     <ColumnDefinition Width="10"/>
@@ -504,7 +502,7 @@
                             </Grid>
 
                             <Border Style="{StaticResource MiniTableHeaderBorder}">
-                                <Grid>
+                                <Grid Background="Transparent">
                                     <Grid.ColumnDefinitions>
                                         <ColumnDefinition Width="*"/>
                                         <ColumnDefinition Width="170"/>
@@ -532,9 +530,9 @@
 
                                 <ListBox.ItemTemplate>
                                     <DataTemplate>
-                                        <StackPanel Margin="2,2">
+                                        <StackPanel Margin="2,2" Background="Transparent">
 
-                                            <Grid MinHeight="44">
+                                            <Grid MinHeight="44" Background="Transparent">
                                                 <Grid.ColumnDefinitions>
                                                     <ColumnDefinition Width="*"/>
                                                     <ColumnDefinition Width="170"/>
@@ -544,7 +542,7 @@
                                                     <ColumnDefinition Width="70"/>
                                                 </Grid.ColumnDefinitions>
 
-                                                <StackPanel Grid.Column="0" Orientation="Vertical">
+                                                <StackPanel Grid.Column="0" Orientation="Vertical" Background="Transparent">
                                                     <TextBlock Text="{Binding Name}" Style="{StaticResource BudgetNameCell}"/>
                                                     <TextBlock Text="{Binding TypeDisplay}" Style="{StaticResource BudgetTypeSub}"/>
                                                 </StackPanel>
@@ -569,7 +567,8 @@
                                                             Orientation="Horizontal"
                                                             HorizontalAlignment="Right"
                                                             VerticalAlignment="Center"
-                                                            Margin="0,0,6,0">
+                                                            Margin="0,0,6,0"
+                                                            Background="Transparent">
                                                     <Button Style="{StaticResource EditIconButton}"
                                                             Width="26"
                                                             Height="26"
@@ -582,12 +581,13 @@
                                                 </StackPanel>
                                             </Grid>
 
+                                            <!-- confirm: jeśli też ma być zawsze ciemne, zmień Background na Transparent -->
                                             <Border Margin="0,6,0,0"
                                                     Padding="8"
                                                     CornerRadius="8"
                                                     BorderThickness="1"
                                                     BorderBrush="{DynamicResource Surface.Border}"
-                                                    Background="{DynamicResource Surface.Background}"
+                                                    Background="Transparent"
                                                     Visibility="{Binding IsDeleteConfirmVisible, Converter={StaticResource BoolToVisibilityConverter}}">
                                                 <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                                                     <TextBlock Text="Czy na pewno chcesz usunąć budżet?"
@@ -638,14 +638,14 @@
 
                     <!-- PRAWA: transakcje budżetu -->
                     <Border Grid.Column="2" Style="{StaticResource Card}">
-                        <Grid>
+                        <Grid Background="Transparent">
                             <Grid.RowDefinitions>
                                 <RowDefinition Height="Auto"/>
                                 <RowDefinition Height="10"/>
                                 <RowDefinition Height="*"/>
                             </Grid.RowDefinitions>
 
-                            <StackPanel Grid.Row="0">
+                            <StackPanel Grid.Row="0" Background="Transparent">
                                 <TextBlock Text="Transakcje powiązane z budżetem"
                                            Style="{StaticResource CardHeader}"/>
                                 <TextBlock x:Name="BudgetTransactionsHintText"
