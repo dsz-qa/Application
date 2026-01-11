@@ -2,7 +2,10 @@
 using Finly.Services.Features;
 using Finly.Services.SpecificPages;
 using LiveChartsCore;
+using LiveChartsCore.Defaults;
 using LiveChartsCore.SkiaSharpView;
+using LiveChartsCore.SkiaSharpView.Painting;
+using SkiaSharp;
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
@@ -12,6 +15,7 @@ using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Data;
 
 namespace Finly.Pages
 {
@@ -70,11 +74,13 @@ namespace Finly.Pages
         private static string NormalizeDbType(string? dbType)
         {
             var t = (dbType ?? "Monthly").Trim();
+
             if (t.Equals("Inny", StringComparison.OrdinalIgnoreCase)) return "Custom";
             if (t.Equals("Custom", StringComparison.OrdinalIgnoreCase)) return "Custom";
             if (t.Equals("Weekly", StringComparison.OrdinalIgnoreCase)) return "Weekly";
             if (t.Equals("Monthly", StringComparison.OrdinalIgnoreCase)) return "Monthly";
             if (t.Equals("Yearly", StringComparison.OrdinalIgnoreCase)) return "Yearly";
+
             return "Monthly";
         }
 
@@ -157,7 +163,7 @@ ORDER BY date(b.StartDate);";
 
                 var row = new BudgetRow
                 {
-                    Id = Convert.ToInt32(reader["Id"]),
+                    Id = Convert.ToInt32(reader["Id"], CultureInfo.InvariantCulture),
                     Name = reader["Name"]?.ToString() ?? string.Empty,
 
                     Type = normalizedType,
@@ -414,113 +420,221 @@ ORDER BY date(b.StartDate);";
             if (budget == null)
             {
                 BudgetHistoryChartControl.Series = Array.Empty<ISeries>();
+                BudgetHistoryChartControl.XAxes = Array.Empty<Axis>();
+                BudgetHistoryChartControl.YAxes = Array.Empty<Axis>();
                 return;
             }
 
+            var from = budget.StartDate.Date;
+            var to = budget.EndDate.Date;
+            if (to < from)
+            {
+                BudgetHistoryChartControl.Series = Array.Empty<ISeries>();
+                BudgetHistoryChartControl.XAxes = Array.Empty<Axis>();
+                BudgetHistoryChartControl.YAxes = Array.Empty<Axis>();
+                return;
+            }
+
+            // 1) Zbieramy dzienne sumy (income/expense) w całym okresie
             var daily = new SortedDictionary<DateTime, (decimal income, decimal expense)>();
 
             using var con = DatabaseService.GetConnection();
             con.Open();
 
-            // PRZYCHODY
+            // PRZYCHODY dziennie
             using (var cmd = con.CreateCommand())
             {
                 cmd.CommandText = @"
-SELECT Date, IFNULL(SUM(Amount), 0) AS Total
+SELECT date(Date) as Day, IFNULL(SUM(Amount), 0) AS Total
 FROM Incomes
 WHERE UserId = @uid
   AND BudgetId = @bid
   AND date(Date) BETWEEN date(@from) AND date(@to)
-GROUP BY Date
-ORDER BY Date;";
+GROUP BY date(Date)
+ORDER BY date(Date);";
                 cmd.Parameters.AddWithValue("@uid", _currentUserId);
                 cmd.Parameters.AddWithValue("@bid", budget.Id);
-                cmd.Parameters.AddWithValue("@from", budget.StartDate.ToString("yyyy-MM-dd"));
-                cmd.Parameters.AddWithValue("@to", budget.EndDate.ToString("yyyy-MM-dd"));
+                cmd.Parameters.AddWithValue("@from", from.ToString("yyyy-MM-dd"));
+                cmd.Parameters.AddWithValue("@to", to.ToString("yyyy-MM-dd"));
 
                 using var reader = cmd.ExecuteReader();
                 while (reader.Read())
                 {
-                    var dateStr = reader.GetString(0);
-                    var date = DateTime.ParseExact(dateStr, "yyyy-MM-dd", CultureInfo.InvariantCulture);
+                    var dayStr = reader.GetString(0); // yyyy-MM-dd
+                    var d = DateTime.ParseExact(dayStr, "yyyy-MM-dd", CultureInfo.InvariantCulture);
 
                     var total = ReadDecimal(reader, "Total");
-
-                    if (!daily.TryGetValue(date, out var tuple))
-                        tuple = (0m, 0m);
-
+                    if (!daily.TryGetValue(d, out var tuple)) tuple = (0m, 0m);
                     tuple.income += total;
-                    daily[date] = tuple;
+                    daily[d] = tuple;
                 }
             }
 
-            // WYDATKI
+            // WYDATKI dziennie
             using (var cmd = con.CreateCommand())
             {
                 cmd.CommandText = @"
-SELECT Date, IFNULL(SUM(Amount), 0) AS Total
+SELECT date(Date) as Day, IFNULL(SUM(Amount), 0) AS Total
 FROM Expenses
 WHERE UserId = @uid
   AND BudgetId = @bid
   AND date(Date) BETWEEN date(@from) AND date(@to)
-GROUP BY Date
-ORDER BY Date;";
+GROUP BY date(Date)
+ORDER BY date(Date);";
                 cmd.Parameters.AddWithValue("@uid", _currentUserId);
                 cmd.Parameters.AddWithValue("@bid", budget.Id);
-                cmd.Parameters.AddWithValue("@from", budget.StartDate.ToString("yyyy-MM-dd"));
-                cmd.Parameters.AddWithValue("@to", budget.EndDate.ToString("yyyy-MM-dd"));
+                cmd.Parameters.AddWithValue("@from", from.ToString("yyyy-MM-dd"));
+                cmd.Parameters.AddWithValue("@to", to.ToString("yyyy-MM-dd"));
 
                 using var reader = cmd.ExecuteReader();
                 while (reader.Read())
                 {
-                    var dateStr = reader.GetString(0);
-                    var date = DateTime.ParseExact(dateStr, "yyyy-MM-dd", CultureInfo.InvariantCulture);
+                    var dayStr = reader.GetString(0); // yyyy-MM-dd
+                    var d = DateTime.ParseExact(dayStr, "yyyy-MM-dd", CultureInfo.InvariantCulture);
 
                     var total = ReadDecimal(reader, "Total");
-
-                    if (!daily.TryGetValue(date, out var tuple))
-                        tuple = (0m, 0m);
-
+                    if (!daily.TryGetValue(d, out var tuple)) tuple = (0m, 0m);
                     tuple.expense += total;
-                    daily[date] = tuple;
+                    daily[d] = tuple;
                 }
             }
 
-            if (daily.Count == 0)
-            {
-                BudgetHistoryChartControl.Series = Array.Empty<ISeries>();
-                return;
-            }
+            // 2) Wypełniamy brakujące dni zerami (żeby oś X była ciągła)
+            for (var d = from; d <= to; d = d.AddDays(1))
+                if (!daily.ContainsKey(d))
+                    daily[d] = (0m, 0m);
 
-            var incomeValues = new List<double>();
-            var expenseValues = new List<double>();
+            // 3) Budujemy serie: wydatki narastająco + limit + pozostało
+            var labels = new List<string>();
+            var cumSpentValues = new List<double>();
+            var limitValues = new List<double>();
+            var remainingValues = new List<double>();
 
-            decimal cumIncome = 0m;
-            decimal cumExpense = 0m;
+            var limit = budget.PlannedAmount + budget.IncomeAmount; // realny “limit” budżetu
+            decimal cumSpent = 0m;
 
             foreach (var kvp in daily)
             {
-                cumIncome += kvp.Value.income;
-                cumExpense += kvp.Value.expense;
+                var day = kvp.Key;
+                var (_, exp) = kvp.Value;
 
-                incomeValues.Add((double)cumIncome);
-                expenseValues.Add((double)cumExpense);
+                cumSpent += exp;
+
+                labels.Add(day.ToString("dd.MM", CultureInfo.InvariantCulture));
+                cumSpentValues.Add((double)cumSpent);
+                limitValues.Add((double)limit);
+                remainingValues.Add((double)(limit - cumSpent));
             }
 
+            if (remainingValues.Count == 0)
+            {
+                BudgetHistoryChartControl.Series = Array.Empty<ISeries>();
+                BudgetHistoryChartControl.XAxes = Array.Empty<Axis>();
+                BudgetHistoryChartControl.YAxes = Array.Empty<Axis>();
+                return;
+            }
+
+            // 4) Oś X
+            BudgetHistoryChartControl.XAxes = new Axis[]
+            {
+        new Axis
+        {
+            Labels = labels,
+            LabelsRotation = 0,
+            SeparatorsPaint = null,
+            TextSize = 12
+        }
+            };
+
+            // 5) Dynamiczne limity osi Y (pokazuje minusy, jeśli budżet przekroczony)
+            var minY = remainingValues.Min();
+            var maxY = new[] { cumSpentValues.Max(), limitValues.Max(), remainingValues.Max() }.Max();
+
+            var range = Math.Max(1.0, maxY - Math.Min(0.0, minY));
+            var padding = range * 0.12;
+
+            double minLimit = 0.0;
+            if (minY < 0)
+                minLimit = minY - padding;
+
+            var maxLimit = maxY + padding;
+
+            BudgetHistoryChartControl.YAxes = new Axis[]
+            {
+        new Axis
+        {
+            MinLimit = minLimit,
+            MaxLimit = maxLimit,
+            Labeler = v => $"{v:N0} zł",
+            TextSize = 12
+        }
+            };
+
+            // 6) Białe osie + legenda
+            var white = new SolidColorPaint(SKColors.White);
+
+            BudgetHistoryChartControl.LegendTextPaint = white;
+
+            foreach (var ax in BudgetHistoryChartControl.XAxes)
+            {
+                ax.LabelsPaint = white;
+                ax.NamePaint = white;
+                ax.TicksPaint = white;
+            }
+
+            foreach (var ax in BudgetHistoryChartControl.YAxes)
+            {
+                ax.LabelsPaint = white;
+                ax.NamePaint = white;
+                ax.TicksPaint = white;
+            }
+
+            // 7) Seria "Pozostało" (linia BEZ etykiet)
+            var lastIndex = remainingValues.Count - 1;
+            var lastY = remainingValues[lastIndex];
+
+            var remainingLineSeries = new LineSeries<double>
+            {
+                Name = "Pozostało",
+                Values = remainingValues,
+                GeometrySize = 0
+            };
+
+            // 8) Osobna seria tylko z OSTATNIM punktem + etykieta
+            var remainingLastPointSeries = new ScatterSeries<ObservablePoint>
+            {
+                Name = "", // nie pokazujemy nazwy
+                IsVisibleAtLegend = false, // nie zaśmiecamy legendy
+                GeometrySize = 10,
+                Values = new[] { new ObservablePoint(lastIndex, lastY) },
+
+                DataLabelsPaint = white,
+                DataLabelsSize = 12,
+                DataLabelsPosition = LiveChartsCore.Measure.DataLabelsPosition.Top,
+                DataLabelsFormatter = p =>
+                {
+                    var val = p.Coordinate.PrimaryValue; // Y
+                    return $"{val:N0} zł";
+                }
+            };
+
+            // 9) Serie na wykres
             BudgetHistoryChartControl.Series = new ISeries[]
             {
-                new LineSeries<double>
-                {
-                    Name = "Przychody (narastająco)",
-                    Values = incomeValues,
-                    GeometrySize = 5
-                },
-                new LineSeries<double>
-                {
-                    Name = "Wydatki (narastająco)",
-                    Values = expenseValues,
-                    GeometrySize = 5
-                }
+    new LineSeries<double>
+    {
+        Name = "Wydatki narastająco",
+        Values = cumSpentValues,
+        GeometrySize = 4
+    },
+    new LineSeries<double>
+    {
+        Name = "Limit budżetu",
+        Values = limitValues,
+        GeometrySize = 0
+    },
+    remainingLineSeries,
+    remainingLastPointSeries
             };
         }
 
@@ -702,5 +816,24 @@ ORDER BY Date;";
 
         private void OnPropertyChanged([CallerMemberName] string? name = null)
             => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
+    }
+
+    // =================== KONWERTER: string -> Visibility ===================
+
+    public sealed class StringNullOrEmptyToVisibilityConverter : IValueConverter
+    {
+        public bool Invert { get; set; } = false; // opcjonalnie
+
+        public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
+        {
+            var s = value as string;
+            var hasText = !string.IsNullOrWhiteSpace(s);
+
+            if (Invert) hasText = !hasText;
+            return hasText ? Visibility.Visible : Visibility.Collapsed;
+        }
+
+        public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
+            => Binding.DoNothing;
     }
 }
