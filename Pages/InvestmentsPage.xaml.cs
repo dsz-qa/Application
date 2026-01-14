@@ -17,7 +17,6 @@ using System.Windows.Threading;
 
 namespace Finly.Pages
 {
-    // Stabilna baza pod stan UI (confirm delete) + binding
     public abstract class BindableBase : INotifyPropertyChanged
     {
         public event PropertyChangedEventHandler? PropertyChanged;
@@ -59,9 +58,9 @@ namespace Finly.Pages
 
         public InvestmentType Type { get; set; } = InvestmentType.Other;
 
-        public string Description { get; set; } = "";
+        private string _description = "";
+        public string Description { get => _description; set => Set(ref _description, value); }
 
-        // ====== wycena (ostatnia + poprzednia) ======
         public DateTime? LastDate { get; set; }
         public decimal? LastValue { get; set; }
         public DateTime? PrevDate { get; set; }
@@ -87,7 +86,7 @@ namespace Finly.Pages
             get
             {
                 if (LastDate == null) return "Brak wycen";
-                return "Ostatnia: " + LastDate.Value.ToString("dd.MM.yyyy");
+                return "Ostatnia: " + LastDate.Value.ToString("dd.MM.yyyy", CultureInfo.CurrentCulture);
             }
         }
 
@@ -96,7 +95,7 @@ namespace Finly.Pages
             get
             {
                 if (LastValue == null) return "—";
-                return LastValue.Value.ToString("N2") + " zł";
+                return LastValue.Value.ToString("N2", CultureInfo.CurrentCulture) + " zł";
             }
         }
 
@@ -173,7 +172,6 @@ namespace Finly.Pages
         }
     }
 
-    // VM słupka wykresu (WPF)
     internal sealed class DeltaBarVm
     {
         public string Label { get; init; } = "";
@@ -187,14 +185,12 @@ namespace Finly.Pages
     {
         private readonly ObservableCollection<InvestmentVm> _investments = new();
         private readonly ObservableCollection<object> _items = new();
-
-        // wykres WPF
         private readonly ObservableCollection<DeltaBarVm> _deltaBars = new();
 
         private bool _initializedOk;
-        private bool _isActive;           // Loaded->true, Unloaded->false
-        private bool _dataChangedHooked;  // żeby nie podpiąć 2x
-        private long _reloadToken;        // chroni przed “zaległym” BeginInvoke
+        private bool _isActive;
+        private bool _dataChangedHooked;
+        private long _reloadToken;
 
         private InvestmentVm? _selected;
         public InvestmentVm? SelectedInvestment
@@ -220,8 +216,8 @@ namespace Finly.Pages
                 DataContext = this;
                 InvestmentsRepeater.ItemsSource = _items;
 
-                // wykres
-                DeltaBars.ItemsSource = _deltaBars;
+                if (DeltaBars != null)
+                    DeltaBars.ItemsSource = _deltaBars;
 
                 Loaded += InvestmentsPage_Loaded;
                 Unloaded += InvestmentsPage_Unloaded;
@@ -289,15 +285,15 @@ namespace Finly.Pages
 
             UnhookDataChanged();
 
-            // czyścimy prawą stronę w 100% bezpiecznie
+            // Czyścimy UI w 100% bezpiecznie (żadnych eventów/animacji/wykresów z zewnątrz)
             try
             {
                 _deltaBars.Clear();
-                DeltaChartHint.Visibility = Visibility.Visible;
+                if (DeltaChartHint != null) DeltaChartHint.Visibility = Visibility.Visible;
 
-                GridValuations.ItemsSource = Array.Empty<HistoryRowVm>();
-                NoSelectionCard.Visibility = Visibility.Visible;
-                DetailsCard.Visibility = Visibility.Collapsed;
+                if (GridValuations != null) GridValuations.ItemsSource = Array.Empty<HistoryRowVm>();
+                if (NoSelectionCard != null) NoSelectionCard.Visibility = Visibility.Visible;
+                if (DetailsCard != null) DetailsCard.Visibility = Visibility.Collapsed;
             }
             catch { }
         }
@@ -331,6 +327,7 @@ namespace Finly.Pages
         {
             try
             {
+                if (InvestmentsErrorText == null) return;
                 InvestmentsErrorText.Text = message;
                 InvestmentsErrorText.Visibility = Visibility.Visible;
             }
@@ -341,6 +338,7 @@ namespace Finly.Pages
         {
             try
             {
+                if (InvestmentsErrorText == null) return;
                 InvestmentsErrorText.Text = "";
                 InvestmentsErrorText.Visibility = Visibility.Collapsed;
             }
@@ -462,39 +460,67 @@ ON InvestmentValuations(UserId, InvestmentId, Date);
                     return i.LastValue.Value - i.PrevValue.Value;
                 });
 
-                TotalValueText.Text = totalValue.ToString("N2") + " zł";
+                if (TotalValueText != null)
+                    TotalValueText.Text = totalValue.ToString("N2", CultureInfo.CurrentCulture) + " zł";
 
                 var dSign = totalDelta > 0 ? "+" : (totalDelta < 0 ? "−" : "");
-                TotalDeltaText.Text = dSign + Math.Abs(totalDelta).ToString("N2") + " zł";
-                TotalDeltaText.Foreground = totalDelta > 0 ? Brushes.LimeGreen :
-                                            totalDelta < 0 ? Brushes.IndianRed :
-                                            SafeGetBrush("App.Foreground", Brushes.White);
-
-                if (totalPrev <= 0m)
+                if (TotalDeltaText != null)
                 {
-                    TotalDeltaPctText.Text = "—";
-                    TotalDeltaPctText.Foreground = SafeGetBrush("App.Foreground", Brushes.White);
+                    TotalDeltaText.Text = dSign + Math.Abs(totalDelta).ToString("N2", CultureInfo.CurrentCulture) + " zł";
+                    TotalDeltaText.Foreground = totalDelta > 0 ? Brushes.LimeGreen :
+                                                totalDelta < 0 ? Brushes.IndianRed :
+                                                SafeGetBrush("App.Foreground", Brushes.White);
                 }
-                else
+
+                if (TotalDeltaPctText != null)
                 {
-                    var pct = Math.Round((totalValue - totalPrev) / totalPrev * 100m, 2);
-                    var pSign = pct > 0 ? "+" : (pct < 0 ? "−" : "");
-                    TotalDeltaPctText.Text = pSign + Math.Abs(pct).ToString("N2") + "%";
-                    TotalDeltaPctText.Foreground = pct > 0 ? Brushes.LimeGreen :
-                                                   pct < 0 ? Brushes.IndianRed :
-                                                   SafeGetBrush("App.Foreground", Brushes.White);
+                    if (totalPrev <= 0m)
+                    {
+                        TotalDeltaPctText.Text = "—";
+                        TotalDeltaPctText.Foreground = SafeGetBrush("App.Foreground", Brushes.White);
+                    }
+                    else
+                    {
+                        var pct = Math.Round((totalValue - totalPrev) / totalPrev * 100m, 2);
+                        var pSign = pct > 0 ? "+" : (pct < 0 ? "−" : "");
+                        TotalDeltaPctText.Text = pSign + Math.Abs(pct).ToString("N2", CultureInfo.CurrentCulture) + "%";
+                        TotalDeltaPctText.Foreground = pct > 0 ? Brushes.LimeGreen :
+                                                       pct < 0 ? Brushes.IndianRed :
+                                                       SafeGetBrush("App.Foreground", Brushes.White);
+                    }
                 }
             }
             catch
             {
                 try
                 {
-                    TotalValueText.Text = "—";
-                    TotalDeltaText.Text = "—";
-                    TotalDeltaPctText.Text = "—";
+                    if (TotalValueText != null) TotalValueText.Text = "—";
+                    if (TotalDeltaText != null) TotalDeltaText.Text = "—";
+                    if (TotalDeltaPctText != null) TotalDeltaPctText.Text = "—";
                 }
                 catch { }
             }
+        }
+
+        private static readonly string[] _dateFormats = new[] { "yyyy-MM-dd", "yyyy-M-d" };
+
+        private static bool TryParseDbDate(string? s, out DateTime dt)
+        {
+            if (!string.IsNullOrWhiteSpace(s))
+            {
+                if (DateTime.TryParseExact(s.Trim(),
+                                          _dateFormats,
+                                          CultureInfo.InvariantCulture,
+                                          DateTimeStyles.None,
+                                          out dt))
+                {
+                    dt = dt.Date;
+                    return true;
+                }
+            }
+
+            dt = DateTime.Today;
+            return false;
         }
 
         private static List<ValuationRow> GetLastTwoValuations(int userId, int investmentId)
@@ -517,12 +543,14 @@ LIMIT 2;";
             {
                 var dateText = r.IsDBNull(0) ? "" : r.GetString(0);
                 var dbl = r.IsDBNull(1) ? 0.0 : r.GetDouble(1);
-                var val = Convert.ToDecimal(dbl);
 
-                if (!DateTime.TryParse(dateText, CultureInfo.InvariantCulture, DateTimeStyles.None, out var dt))
+                if (!TryParseDbDate(dateText, out var dt))
                     dt = DateTime.Today;
 
-                list.Add(new ValuationRow { Date = dt.Date, Value = val });
+                // REAL -> double -> decimal (bezpiecznie)
+                var val = Convert.ToDecimal(dbl);
+
+                list.Add(new ValuationRow { Date = dt, Value = val });
             }
 
             return list;
@@ -547,12 +575,13 @@ ORDER BY Date ASC, Id ASC;";
             {
                 var dateText = r.IsDBNull(0) ? "" : r.GetString(0);
                 var dbl = r.IsDBNull(1) ? 0.0 : r.GetDouble(1);
-                var val = Convert.ToDecimal(dbl);
 
-                if (!DateTime.TryParse(dateText, CultureInfo.InvariantCulture, DateTimeStyles.None, out var dt))
+                if (!TryParseDbDate(dateText, out var dt))
                     dt = DateTime.Today;
 
-                list.Add(new ValuationRow { Date = dt.Date, Value = val });
+                var val = Convert.ToDecimal(dbl);
+
+                list.Add(new ValuationRow { Date = dt, Value = val });
             }
 
             return list;
@@ -730,30 +759,33 @@ ORDER BY Date ASC, Id ASC;";
             {
                 if (SelectedInvestment == null)
                 {
-                    NoSelectionCard.Visibility = Visibility.Visible;
-                    DetailsCard.Visibility = Visibility.Collapsed;
+                    if (NoSelectionCard != null) NoSelectionCard.Visibility = Visibility.Visible;
+                    if (DetailsCard != null) DetailsCard.Visibility = Visibility.Collapsed;
 
-                    GridValuations.ItemsSource = Array.Empty<HistoryRowVm>();
+                    if (GridValuations != null) GridValuations.ItemsSource = Array.Empty<HistoryRowVm>();
                     BuildDeltaBars(Array.Empty<ValuationRow>());
                     return;
                 }
 
-                NoSelectionCard.Visibility = Visibility.Collapsed;
-                DetailsCard.Visibility = Visibility.Visible;
+                if (NoSelectionCard != null) NoSelectionCard.Visibility = Visibility.Collapsed;
+                if (DetailsCard != null) DetailsCard.Visibility = Visibility.Visible;
 
-                SelectedTitleText.Text = SelectedInvestment.Name;
-                SelectedSubtitleText.Text = SelectedInvestment.TypeDisplay;
+                if (SelectedTitleText != null) SelectedTitleText.Text = SelectedInvestment.Name;
+                if (SelectedSubtitleText != null) SelectedSubtitleText.Text = SelectedInvestment.TypeDisplay;
 
                 var rows = GetAllValuations(_uid, SelectedInvestment.Id);
 
                 if (rows.Count == 0)
                 {
-                    FirstText.Text = "—";
-                    LastText.Text = "—";
-                    ChangeText.Text = "—";
-                    ChangeText.Foreground = SafeGetBrush("App.Foreground", Brushes.White);
+                    if (FirstText != null) FirstText.Text = "—";
+                    if (LastText != null) LastText.Text = "—";
+                    if (ChangeText != null)
+                    {
+                        ChangeText.Text = "—";
+                        ChangeText.Foreground = SafeGetBrush("App.Foreground", Brushes.White);
+                    }
 
-                    GridValuations.ItemsSource = Array.Empty<HistoryRowVm>();
+                    if (GridValuations != null) GridValuations.ItemsSource = Array.Empty<HistoryRowVm>();
                     BuildDeltaBars(rows);
                     return;
                 }
@@ -761,8 +793,8 @@ ORDER BY Date ASC, Id ASC;";
                 var first = rows.First();
                 var last = rows.Last();
 
-                FirstText.Text = $"{first.Date:dd.MM.yyyy} • {first.Value:N2} zł";
-                LastText.Text = $"{last.Date:dd.MM.yyyy} • {last.Value:N2} zł";
+                if (FirstText != null) FirstText.Text = $"{first.Date:dd.MM.yyyy} • {first.Value.ToString("N2", CultureInfo.CurrentCulture)} zł";
+                if (LastText != null) LastText.Text = $"{last.Date:dd.MM.yyyy} • {last.Value.ToString("N2", CultureInfo.CurrentCulture)} zł";
 
                 var change = last.Value - first.Value;
                 var sign = change > 0 ? "+" : (change < 0 ? "−" : "");
@@ -773,15 +805,18 @@ ORDER BY Date ASC, Id ASC;";
                 {
                     var pct = Math.Round(change / first.Value * 100m, 2);
                     var ps = pct > 0 ? "+" : (pct < 0 ? "−" : "");
-                    pctText = $" ({ps}{Math.Abs(pct):N2}%)";
+                    pctText = $" ({ps}{Math.Abs(pct).ToString("N2", CultureInfo.CurrentCulture)}%)";
                 }
 
-                ChangeText.Text = $"{sign}{abs:N2} zł{pctText}";
-                ChangeText.Foreground = change > 0 ? Brushes.LimeGreen :
-                                        change < 0 ? Brushes.IndianRed :
-                                        SafeGetBrush("App.Foreground", Brushes.White);
+                if (ChangeText != null)
+                {
+                    ChangeText.Text = $"{sign}{abs.ToString("N2", CultureInfo.CurrentCulture)} zł{pctText}";
+                    ChangeText.Foreground = change > 0 ? Brushes.LimeGreen :
+                                            change < 0 ? Brushes.IndianRed :
+                                            SafeGetBrush("App.Foreground", Brushes.White);
+                }
 
-                // tabela
+                // TABELA
                 var vms = new List<HistoryRowVm>();
                 ValuationRow? prev = null;
 
@@ -794,20 +829,20 @@ ORDER BY Date ASC, Id ASC;";
                     {
                         var d = r.Value - prev.Value;
                         var ds = d > 0 ? "+" : (d < 0 ? "−" : "");
-                        delta = $"{ds}{Math.Abs(d):N2} zł";
+                        delta = $"{ds}{Math.Abs(d).ToString("N2", CultureInfo.CurrentCulture)} zł";
 
                         if (prev.Value != 0m)
                         {
                             var pct = Math.Round(d / prev.Value * 100m, 2);
                             var ps = pct > 0 ? "+" : (pct < 0 ? "−" : "");
-                            dpct = $"{ps}{Math.Abs(pct):N2}%";
+                            dpct = $"{ps}{Math.Abs(pct).ToString("N2", CultureInfo.CurrentCulture)}%";
                         }
                     }
 
                     vms.Add(new HistoryRowVm
                     {
-                        Date = r.Date.ToString("dd.MM.yyyy"),
-                        Value = r.Value.ToString("N2") + " zł",
+                        Date = r.Date.ToString("dd.MM.yyyy", CultureInfo.CurrentCulture),
+                        Value = r.Value.ToString("N2", CultureInfo.CurrentCulture) + " zł",
                         Delta = delta,
                         DeltaPct = dpct
                     });
@@ -815,9 +850,9 @@ ORDER BY Date ASC, Id ASC;";
                     prev = r;
                 }
 
-                GridValuations.ItemsSource = vms;
+                if (GridValuations != null) GridValuations.ItemsSource = vms;
 
-                // wykres WPF
+                // WYKRES WPF
                 BuildDeltaBars(rows);
             }
             catch (Exception ex)
@@ -825,9 +860,9 @@ ORDER BY Date ASC, Id ASC;";
                 System.Diagnostics.Debug.WriteLine("UpdateRightPanel error: " + ex);
                 try
                 {
-                    NoSelectionCard.Visibility = Visibility.Visible;
-                    DetailsCard.Visibility = Visibility.Collapsed;
-                    GridValuations.ItemsSource = Array.Empty<HistoryRowVm>();
+                    if (NoSelectionCard != null) NoSelectionCard.Visibility = Visibility.Visible;
+                    if (DetailsCard != null) DetailsCard.Visibility = Visibility.Collapsed;
+                    if (GridValuations != null) GridValuations.ItemsSource = Array.Empty<HistoryRowVm>();
                     BuildDeltaBars(Array.Empty<ValuationRow>());
                 }
                 catch { }
@@ -845,7 +880,7 @@ ORDER BY Date ASC, Id ASC;";
 
                 if (rows == null || rows.Count < 2)
                 {
-                    try { DeltaChartHint.Visibility = Visibility.Visible; } catch { }
+                    if (DeltaChartHint != null) DeltaChartHint.Visibility = Visibility.Visible;
                     return;
                 }
 
@@ -856,20 +891,21 @@ ORDER BY Date ASC, Id ASC;";
                 var maxAbs = deltas.Select(x => Math.Abs(x.delta)).DefaultIfEmpty(0m).Max();
                 if (maxAbs <= 0m)
                 {
-                    try { DeltaChartHint.Visibility = Visibility.Visible; } catch { }
+                    if (DeltaChartHint != null) DeltaChartHint.Visibility = Visibility.Visible;
                     return;
                 }
 
-                try { DeltaChartHint.Visibility = Visibility.Collapsed; } catch { }
+                if (DeltaChartHint != null) DeltaChartHint.Visibility = Visibility.Collapsed;
 
                 const double maxHeight = 180.0;
 
                 foreach (var (date, d) in deltas)
                 {
                     var abs = Math.Abs(d);
-                    var h = (double)(abs / maxAbs) * maxHeight;
 
-                    if (h < 6) h = 6; // żeby było widać słupki
+                    // wysokość proporcjonalna, z minimalnym progiem widoczności (dla bardzo małych zmian)
+                    var h = (double)(abs / maxAbs) * maxHeight;
+                    if (h > 0 && h < 6) h = 6;
 
                     var isPos = d > 0m;
                     var isNeg = d < 0m;
@@ -879,7 +915,11 @@ ORDER BY Date ASC, Id ASC;";
                                Brushes.Gray;
 
                     var sign = isPos ? "+" : (isNeg ? "−" : "");
-                    var valText = $"{sign}{abs:N0}";
+
+                    // ValueText ma być krótszy (na słupku), tooltip pełny
+                    var valText = abs >= 1000m
+                        ? $"{sign}{Math.Round(abs, 0).ToString("N0", CultureInfo.CurrentCulture)}"
+                        : $"{sign}{Math.Round(abs, 0).ToString("N0", CultureInfo.CurrentCulture)}";
 
                     _deltaBars.Add(new DeltaBarVm
                     {
@@ -887,18 +927,17 @@ ORDER BY Date ASC, Id ASC;";
                         BarHeight = h,
                         Fill = fill,
                         ValueText = valText,
-                        Tooltip = $"{date:dd.MM.yyyy}\nDelta: {sign}{abs:N2} zł"
+                        Tooltip = $"{date:dd.MM.yyyy}\nDelta: {sign}{abs.ToString("N2", CultureInfo.CurrentCulture)} zł"
                     });
                 }
             }
             catch (Exception ex)
             {
-                // wykres NIGDY nie może ubić strony
                 System.Diagnostics.Debug.WriteLine("BuildDeltaBars error: " + ex);
                 try
                 {
                     _deltaBars.Clear();
-                    DeltaChartHint.Visibility = Visibility.Visible;
+                    if (DeltaChartHint != null) DeltaChartHint.Visibility = Visibility.Visible;
                 }
                 catch { }
             }
