@@ -16,6 +16,7 @@ using System.Runtime.CompilerServices;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Data;
+using System.Windows.Media;
 
 namespace Finly.Pages
 {
@@ -339,6 +340,14 @@ ORDER BY date(b.StartDate);";
                 if (BudgetOverText != null) BudgetOverText.Text = "0,00 zł";
                 if (BudgetMetaText != null) BudgetMetaText.Text = string.Empty;
 
+                // NOWE: reset paska postępu
+                if (BudgetProgressBar != null) BudgetProgressBar.Value = 0;
+                if (BudgetProgressText != null)
+                {
+                    BudgetProgressText.Text = "0%";
+                    BudgetProgressText.Foreground = Brushes.White;
+                }
+
                 LoadBudgetHistoryChart(null);
                 if (BudgetInsightsList != null) BudgetInsightsList.ItemsSource = new[] { "Brak danych." };
                 return;
@@ -353,6 +362,27 @@ ORDER BY date(b.StartDate);";
             if (BudgetOverText != null) BudgetOverText.Text = b.IsOverBudget ? $"{b.OverAmount:N2} zł" : "0,00 zł";
 
             if (BudgetMetaText != null) BudgetMetaText.Text = $"{b.TypeDisplay} | {b.Period}";
+
+            // NOWE: pasek postępu (Spent / (Planned + Income))
+            var totalBudget = b.PlannedAmount + b.IncomeAmount;
+            double usedPct = 0.0;
+
+            if (totalBudget > 0m)
+            {
+                usedPct = (double)(b.SpentAmount / totalBudget * 100m);
+                if (usedPct < 0) usedPct = 0;
+            }
+
+            var barValue = Math.Min(usedPct, 100.0);
+
+            if (BudgetProgressBar != null)
+                BudgetProgressBar.Value = barValue;
+
+            if (BudgetProgressText != null)
+            {
+                BudgetProgressText.Text = $"{usedPct:0}%";
+                BudgetProgressText.Foreground = usedPct > 100.0 ? Brushes.Tomato : Brushes.White;
+            }
 
             LoadBudgetHistoryChart(b);
             if (BudgetInsightsList != null) BudgetInsightsList.ItemsSource = BuildInsights(b);
@@ -435,13 +465,11 @@ ORDER BY date(b.StartDate);";
                 return;
             }
 
-            // 1) Zbieramy dzienne sumy (income/expense) w całym okresie
             var daily = new SortedDictionary<DateTime, (decimal income, decimal expense)>();
 
             using var con = DatabaseService.GetConnection();
             con.Open();
 
-            // PRZYCHODY dziennie
             using (var cmd = con.CreateCommand())
             {
                 cmd.CommandText = @"
@@ -460,7 +488,7 @@ ORDER BY date(Date);";
                 using var reader = cmd.ExecuteReader();
                 while (reader.Read())
                 {
-                    var dayStr = reader.GetString(0); // yyyy-MM-dd
+                    var dayStr = reader.GetString(0);
                     var d = DateTime.ParseExact(dayStr, "yyyy-MM-dd", CultureInfo.InvariantCulture);
 
                     var total = ReadDecimal(reader, "Total");
@@ -470,7 +498,6 @@ ORDER BY date(Date);";
                 }
             }
 
-            // WYDATKI dziennie
             using (var cmd = con.CreateCommand())
             {
                 cmd.CommandText = @"
@@ -489,7 +516,7 @@ ORDER BY date(Date);";
                 using var reader = cmd.ExecuteReader();
                 while (reader.Read())
                 {
-                    var dayStr = reader.GetString(0); // yyyy-MM-dd
+                    var dayStr = reader.GetString(0);
                     var d = DateTime.ParseExact(dayStr, "yyyy-MM-dd", CultureInfo.InvariantCulture);
 
                     var total = ReadDecimal(reader, "Total");
@@ -499,18 +526,16 @@ ORDER BY date(Date);";
                 }
             }
 
-            // 2) Wypełniamy brakujące dni zerami (żeby oś X była ciągła)
             for (var d = from; d <= to; d = d.AddDays(1))
                 if (!daily.ContainsKey(d))
                     daily[d] = (0m, 0m);
 
-            // 3) Budujemy serie: wydatki narastająco + limit + pozostało
             var labels = new List<string>();
             var cumSpentValues = new List<double>();
             var limitValues = new List<double>();
             var remainingValues = new List<double>();
 
-            var limit = budget.PlannedAmount + budget.IncomeAmount; // realny “limit” budżetu
+            var limit = budget.PlannedAmount + budget.IncomeAmount;
             decimal cumSpent = 0m;
 
             foreach (var kvp in daily)
@@ -534,19 +559,17 @@ ORDER BY date(Date);";
                 return;
             }
 
-            // 4) Oś X
             BudgetHistoryChartControl.XAxes = new Axis[]
             {
-        new Axis
-        {
-            Labels = labels,
-            LabelsRotation = 0,
-            SeparatorsPaint = null,
-            TextSize = 12
-        }
+                new Axis
+                {
+                    Labels = labels,
+                    LabelsRotation = 0,
+                    SeparatorsPaint = null,
+                    TextSize = 12
+                }
             };
 
-            // 5) Dynamiczne limity osi Y (pokazuje minusy, jeśli budżet przekroczony)
             var minY = remainingValues.Min();
             var maxY = new[] { cumSpentValues.Max(), limitValues.Max(), remainingValues.Max() }.Max();
 
@@ -561,16 +584,15 @@ ORDER BY date(Date);";
 
             BudgetHistoryChartControl.YAxes = new Axis[]
             {
-        new Axis
-        {
-            MinLimit = minLimit,
-            MaxLimit = maxLimit,
-            Labeler = v => $"{v:N0} zł",
-            TextSize = 12
-        }
+                new Axis
+                {
+                    MinLimit = minLimit,
+                    MaxLimit = maxLimit,
+                    Labeler = v => $"{v:N0} zł",
+                    TextSize = 12
+                }
             };
 
-            // 6) Białe osie + legenda
             var white = new SolidColorPaint(SKColors.White);
 
             BudgetHistoryChartControl.LegendTextPaint = white;
@@ -589,7 +611,6 @@ ORDER BY date(Date);";
                 ax.TicksPaint = white;
             }
 
-            // 7) Seria "Pozostało" (linia BEZ etykiet)
             var lastIndex = remainingValues.Count - 1;
             var lastY = remainingValues[lastIndex];
 
@@ -600,11 +621,10 @@ ORDER BY date(Date);";
                 GeometrySize = 0
             };
 
-            // 8) Osobna seria tylko z OSTATNIM punktem + etykieta
             var remainingLastPointSeries = new ScatterSeries<ObservablePoint>
             {
-                Name = "", // nie pokazujemy nazwy
-                IsVisibleAtLegend = false, // nie zaśmiecamy legendy
+                Name = "",
+                IsVisibleAtLegend = false,
                 GeometrySize = 10,
                 Values = new[] { new ObservablePoint(lastIndex, lastY) },
 
@@ -613,28 +633,27 @@ ORDER BY date(Date);";
                 DataLabelsPosition = LiveChartsCore.Measure.DataLabelsPosition.Top,
                 DataLabelsFormatter = p =>
                 {
-                    var val = p.Coordinate.PrimaryValue; // Y
+                    var val = p.Coordinate.PrimaryValue;
                     return $"{val:N0} zł";
                 }
             };
 
-            // 9) Serie na wykres
             BudgetHistoryChartControl.Series = new ISeries[]
             {
-    new LineSeries<double>
-    {
-        Name = "Wydatki narastająco",
-        Values = cumSpentValues,
-        GeometrySize = 4
-    },
-    new LineSeries<double>
-    {
-        Name = "Limit budżetu",
-        Values = limitValues,
-        GeometrySize = 0
-    },
-    remainingLineSeries,
-    remainingLastPointSeries
+                new LineSeries<double>
+                {
+                    Name = "Wydatki narastająco",
+                    Values = cumSpentValues,
+                    GeometrySize = 4
+                },
+                new LineSeries<double>
+                {
+                    Name = "Limit budżetu",
+                    Values = limitValues,
+                    GeometrySize = 0
+                },
+                remainingLineSeries,
+                remainingLastPointSeries
             };
         }
 
@@ -822,7 +841,7 @@ ORDER BY date(Date);";
 
     public sealed class StringNullOrEmptyToVisibilityConverter : IValueConverter
     {
-        public bool Invert { get; set; } = false; // opcjonalnie
+        public bool Invert { get; set; } = false;
 
         public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
         {
