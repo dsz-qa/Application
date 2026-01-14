@@ -8,7 +8,8 @@
         Etf = 3,
         Fund = 4,
         Crypto = 5,
-        Deposit = 6
+        Deposit = 6,
+        Gold = 7
     }
 
     public class InvestmentModel
