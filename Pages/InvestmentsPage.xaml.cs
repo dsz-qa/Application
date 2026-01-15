@@ -17,6 +17,9 @@ using System.Windows.Threading;
 
 namespace Finly.Pages
 {
+    // ============================================================
+    // Common base (jak u Ciebie) – zostaje
+    // ============================================================
     public abstract class BindableBase : INotifyPropertyChanged
     {
         public event PropertyChangedEventHandler? PropertyChanged;
@@ -113,7 +116,7 @@ namespace Finly.Pages
             get
             {
                 if (LastValue == null || PrevValue == null) return null;
-                if (PrevValue.Value == 0m) return null;
+                if (PrevValue.Value <= 0.0001m) return null;
                 return Math.Round((LastValue.Value - PrevValue.Value) / PrevValue.Value * 100m, 2);
             }
         }
@@ -181,30 +184,77 @@ namespace Finly.Pages
         public string ValueText { get; init; } = "";
     }
 
-    public partial class InvestmentsPage : UserControl, INotifyPropertyChanged
+    // ============================================================
+    // NEW: ViewModel (spójnie jak DashboardPage)
+    // ============================================================
+    internal sealed class InvestmentsViewModel : BindableBase
     {
-        private readonly ObservableCollection<InvestmentVm> _investments = new();
-        private readonly ObservableCollection<object> _items = new();
-        private readonly ObservableCollection<DeltaBarVm> _deltaBars = new();
-
-        private bool _initializedOk;
-        private bool _isActive;
-        private bool _dataChangedHooked;
-        private long _reloadToken;
+        public ObservableCollection<InvestmentVm> Investments { get; } = new();
+        public ObservableCollection<object> Items { get; } = new();
+        public ObservableCollection<HistoryRowVm> Valuations { get; } = new();
+        public ObservableCollection<DeltaBarVm> DeltaBars { get; } = new();
 
         private InvestmentVm? _selected;
         public InvestmentVm? SelectedInvestment
         {
             get => _selected;
-            set
-            {
-                if (_selected == value) return;
-                _selected = value;
-                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(SelectedInvestment)));
-            }
+            set => Set(ref _selected, value);
         }
 
-        public event PropertyChangedEventHandler? PropertyChanged;
+        // KPI (trzymamy jako stringi dla prostoty)
+        private string _totalValueText = "—";
+        public string TotalValueText { get => _totalValueText; set => Set(ref _totalValueText, value); }
+
+        private string _totalDeltaText = "—";
+        public string TotalDeltaText { get => _totalDeltaText; set => Set(ref _totalDeltaText, value); }
+
+        private Brush _totalDeltaBrush = Brushes.White;
+        public Brush TotalDeltaBrush { get => _totalDeltaBrush; set => Set(ref _totalDeltaBrush, value); }
+
+        private string _totalDeltaPctText = "—";
+        public string TotalDeltaPctText { get => _totalDeltaPctText; set => Set(ref _totalDeltaPctText, value); }
+
+        private Brush _totalDeltaPctBrush = Brushes.White;
+        public Brush TotalDeltaPctBrush { get => _totalDeltaPctBrush; set => Set(ref _totalDeltaPctBrush, value); }
+
+        // Error
+        private string _errorText = "";
+        public string ErrorText { get => _errorText; set => Set(ref _errorText, value); }
+
+        private bool _hasError;
+        public bool HasError { get => _hasError; set => Set(ref _hasError, value); }
+
+        public void ClearError()
+        {
+            ErrorText = "";
+            HasError = false;
+        }
+
+        public void ShowError(string msg)
+        {
+            ErrorText = msg;
+            HasError = true;
+        }
+
+        public void RebuildItems()
+        {
+            Items.Clear();
+            foreach (var i in Investments) Items.Add(i);
+            Items.Add(new AddInvestmentTile());
+        }
+    }
+
+    // ============================================================
+    // InvestmentsPage – DataContext = VM (jak DashboardPage)
+    // ============================================================
+    public partial class InvestmentsPage : UserControl
+    {
+        private readonly InvestmentsViewModel _vm = new();
+
+        private bool _initializedOk;
+        private bool _isActive;
+        private bool _dataChangedHooked;
+        private long _reloadToken;
 
         public InvestmentsPage()
         {
@@ -213,11 +263,12 @@ namespace Finly.Pages
                 InitializeComponent();
                 _initializedOk = true;
 
-                DataContext = this;
-                InvestmentsRepeater.ItemsSource = _items;
+                // KLUCZ: NIE this. Tylko VM.
+                DataContext = _vm;
 
-                if (DeltaBars != null)
-                    DeltaBars.ItemsSource = _deltaBars;
+                // Bind ItemsControl i delta bars przez VM (bez ręcznych kolekcji w Page)
+                InvestmentsRepeater.ItemsSource = _vm.Items;
+                DeltaBars.ItemsSource = _vm.DeltaBars;
 
                 Loaded += InvestmentsPage_Loaded;
                 Unloaded += InvestmentsPage_Unloaded;
@@ -270,7 +321,7 @@ namespace Finly.Pages
             try
             {
                 LoadInvestments();
-                ApplySelection(SelectedInvestment ?? _investments.FirstOrDefault());
+                ApplySelection(_vm.SelectedInvestment ?? _vm.Investments.FirstOrDefault());
             }
             catch (Exception ex)
             {
@@ -285,13 +336,14 @@ namespace Finly.Pages
 
             UnhookDataChanged();
 
-            // Czyścimy UI w 100% bezpiecznie (żadnych eventów/animacji/wykresów z zewnątrz)
+            // Czyścimy UI/VM w 100% bezpiecznie
             try
             {
-                _deltaBars.Clear();
+                _vm.DeltaBars.Clear();
+                _vm.Valuations.Clear();
+
                 if (DeltaChartHint != null) DeltaChartHint.Visibility = Visibility.Visible;
 
-                if (GridValuations != null) GridValuations.ItemsSource = Array.Empty<HistoryRowVm>();
                 if (NoSelectionCard != null) NoSelectionCard.Visibility = Visibility.Visible;
                 if (DetailsCard != null) DetailsCard.Visibility = Visibility.Collapsed;
             }
@@ -327,6 +379,8 @@ namespace Finly.Pages
         {
             try
             {
+                _vm.ShowError(message);
+
                 if (InvestmentsErrorText == null) return;
                 InvestmentsErrorText.Text = message;
                 InvestmentsErrorText.Visibility = Visibility.Visible;
@@ -338,6 +392,8 @@ namespace Finly.Pages
         {
             try
             {
+                _vm.ClearError();
+
                 if (InvestmentsErrorText == null) return;
                 InvestmentsErrorText.Text = "";
                 InvestmentsErrorText.Visibility = Visibility.Collapsed;
@@ -375,6 +431,9 @@ ON InvestmentValuations(UserId, InvestmentId, Date);
             cmd.ExecuteNonQuery();
         }
 
+        // ============================================================
+        // LOAD
+        // ============================================================
         private void LoadInvestments()
         {
             try
@@ -382,9 +441,9 @@ ON InvestmentValuations(UserId, InvestmentId, Date);
                 ClearError();
 
                 var uid = _uid;
-                var rememberSelectedId = SelectedInvestment?.Id ?? 0;
+                var rememberSelectedId = _vm.SelectedInvestment?.Id ?? 0;
 
-                _investments.Clear();
+                _vm.Investments.Clear();
 
                 if (uid > 0)
                 {
@@ -414,14 +473,14 @@ ON InvestmentValuations(UserId, InvestmentId, Date);
 
                         vm.IsSelected = (rememberSelectedId != 0 && vm.Id == rememberSelectedId);
                         vm.RaiseAllComputed();
-                        _investments.Add(vm);
+                        _vm.Investments.Add(vm);
                     }
                 }
 
-                RebuildItems();
+                _vm.RebuildItems();
                 RefreshKpis();
 
-                var sel = _investments.FirstOrDefault(x => x.Id == rememberSelectedId) ?? _investments.FirstOrDefault();
+                var sel = _vm.Investments.FirstOrDefault(x => x.Id == rememberSelectedId) ?? _vm.Investments.FirstOrDefault();
                 ApplySelection(sel);
             }
             catch (Exception ex)
@@ -431,8 +490,8 @@ ON InvestmentValuations(UserId, InvestmentId, Date);
 
                 try
                 {
-                    _investments.Clear();
-                    RebuildItems();
+                    _vm.Investments.Clear();
+                    _vm.RebuildItems();
                     RefreshKpis();
                     ApplySelection(null);
                 }
@@ -440,60 +499,63 @@ ON InvestmentValuations(UserId, InvestmentId, Date);
             }
         }
 
-        private void RebuildItems()
-        {
-            _items.Clear();
-            foreach (var i in _investments) _items.Add(i);
-            _items.Add(new AddInvestmentTile());
-        }
-
         private void RefreshKpis()
         {
             try
             {
-                var totalValue = _investments.Sum(i => i.LastValue ?? 0m);
-                var totalPrev = _investments.Sum(i => i.PrevValue ?? 0m);
+                var totalValue = _vm.Investments.Sum(i => i.LastValue ?? 0m);
 
-                var totalDelta = _investments.Sum(i =>
+                var eligible = _vm.Investments
+                    .Where(i => i.LastValue.HasValue && i.PrevValue.HasValue)
+                    .ToList();
+
+                var totalPrevEligible = eligible.Sum(i => i.PrevValue!.Value);
+                var totalDeltaEligible = eligible.Sum(i => i.LastValue!.Value - i.PrevValue!.Value);
+
+                _vm.TotalValueText = totalValue.ToString("N2", CultureInfo.CurrentCulture) + " zł";
+
+                var dSign = totalDeltaEligible > 0 ? "+" : (totalDeltaEligible < 0 ? "−" : "");
+                _vm.TotalDeltaText = dSign + Math.Abs(totalDeltaEligible).ToString("N2", CultureInfo.CurrentCulture) + " zł";
+                _vm.TotalDeltaBrush = totalDeltaEligible > 0 ? Brushes.LimeGreen :
+                                      totalDeltaEligible < 0 ? Brushes.IndianRed :
+                                      SafeGetBrush("App.Foreground", Brushes.White);
+
+                if (eligible.Count == 0 || totalPrevEligible <= 0.0001m)
                 {
-                    if (i.LastValue == null || i.PrevValue == null) return 0m;
-                    return i.LastValue.Value - i.PrevValue.Value;
-                });
-
-                if (TotalValueText != null)
-                    TotalValueText.Text = totalValue.ToString("N2", CultureInfo.CurrentCulture) + " zł";
-
-                var dSign = totalDelta > 0 ? "+" : (totalDelta < 0 ? "−" : "");
-                if (TotalDeltaText != null)
+                    _vm.TotalDeltaPctText = "—";
+                    _vm.TotalDeltaPctBrush = SafeGetBrush("App.Foreground", Brushes.White);
+                }
+                else
                 {
-                    TotalDeltaText.Text = dSign + Math.Abs(totalDelta).ToString("N2", CultureInfo.CurrentCulture) + " zł";
-                    TotalDeltaText.Foreground = totalDelta > 0 ? Brushes.LimeGreen :
-                                                totalDelta < 0 ? Brushes.IndianRed :
-                                                SafeGetBrush("App.Foreground", Brushes.White);
+                    var pct = Math.Round(totalDeltaEligible / totalPrevEligible * 100m, 2);
+                    var pSign = pct > 0 ? "+" : (pct < 0 ? "−" : "");
+                    _vm.TotalDeltaPctText = pSign + Math.Abs(pct).ToString("N2", CultureInfo.CurrentCulture) + "%";
+                    _vm.TotalDeltaPctBrush = pct > 0 ? Brushes.LimeGreen :
+                                             pct < 0 ? Brushes.IndianRed :
+                                             SafeGetBrush("App.Foreground", Brushes.White);
                 }
 
+                // Ustawiamy też UI (bo masz TextBlock x:Name, a nie bindingi)
+                if (TotalValueText != null) TotalValueText.Text = _vm.TotalValueText;
+                if (TotalDeltaText != null)
+                {
+                    TotalDeltaText.Text = _vm.TotalDeltaText;
+                    TotalDeltaText.Foreground = _vm.TotalDeltaBrush;
+                }
                 if (TotalDeltaPctText != null)
                 {
-                    if (totalPrev <= 0m)
-                    {
-                        TotalDeltaPctText.Text = "—";
-                        TotalDeltaPctText.Foreground = SafeGetBrush("App.Foreground", Brushes.White);
-                    }
-                    else
-                    {
-                        var pct = Math.Round((totalValue - totalPrev) / totalPrev * 100m, 2);
-                        var pSign = pct > 0 ? "+" : (pct < 0 ? "−" : "");
-                        TotalDeltaPctText.Text = pSign + Math.Abs(pct).ToString("N2", CultureInfo.CurrentCulture) + "%";
-                        TotalDeltaPctText.Foreground = pct > 0 ? Brushes.LimeGreen :
-                                                       pct < 0 ? Brushes.IndianRed :
-                                                       SafeGetBrush("App.Foreground", Brushes.White);
-                    }
+                    TotalDeltaPctText.Text = _vm.TotalDeltaPctText;
+                    TotalDeltaPctText.Foreground = _vm.TotalDeltaPctBrush;
                 }
             }
             catch
             {
                 try
                 {
+                    _vm.TotalValueText = "—";
+                    _vm.TotalDeltaText = "—";
+                    _vm.TotalDeltaPctText = "—";
+
                     if (TotalValueText != null) TotalValueText.Text = "—";
                     if (TotalDeltaText != null) TotalDeltaText.Text = "—";
                     if (TotalDeltaPctText != null) TotalDeltaPctText.Text = "—";
@@ -547,7 +609,6 @@ LIMIT 2;";
                 if (!TryParseDbDate(dateText, out var dt))
                     dt = DateTime.Today;
 
-                // REAL -> double -> decimal (bezpiecznie)
                 var val = Convert.ToDecimal(dbl);
 
                 list.Add(new ValuationRow { Date = dt, Value = val });
@@ -587,10 +648,9 @@ ORDER BY Date ASC, Id ASC;";
             return list;
         }
 
-        // =======================
-        // Eventy z XAML
-        // =======================
-
+        // ============================================================
+        // EVENTS (XAML) – zostają
+        // ============================================================
         private void InvestmentCard_Click(object sender, MouseButtonEventArgs e)
         {
             try
@@ -611,7 +671,7 @@ ORDER BY Date ASC, Id ASC;";
 
             try
             {
-                foreach (var inv in _investments) inv.HideDeleteConfirm();
+                foreach (var inv in _vm.Investments) inv.HideDeleteConfirm();
 
                 var dlg = new AddEditInvestmentDialog { Owner = OwnerWindow };
                 var ok = dlg.ShowDialog() == true;
@@ -636,7 +696,7 @@ ORDER BY Date ASC, Id ASC;";
             {
                 if ((sender as FrameworkElement)?.DataContext is not InvestmentVm vm) return;
 
-                foreach (var inv in _investments) inv.HideDeleteConfirm();
+                foreach (var inv in _vm.Investments) inv.HideDeleteConfirm();
 
                 var dlg = new AddEditInvestmentDialog { Owner = OwnerWindow };
 
@@ -684,8 +744,8 @@ ORDER BY Date ASC, Id ASC;";
         {
             try
             {
-                if (SelectedInvestment == null) return;
-                AddValuationFor(SelectedInvestment);
+                if (_vm.SelectedInvestment == null) return;
+                AddValuationFor(_vm.SelectedInvestment);
             }
             catch { }
         }
@@ -696,7 +756,7 @@ ORDER BY Date ASC, Id ASC;";
             {
                 if ((sender as FrameworkElement)?.DataContext is not InvestmentVm vm) return;
 
-                foreach (var inv in _investments)
+                foreach (var inv in _vm.Investments)
                     inv.IsDeleteConfirmVisible = false;
 
                 vm.IsDeleteConfirmVisible = true;
@@ -722,12 +782,12 @@ ORDER BY Date ASC, Id ASC;";
 
                 DeleteInvestmentFromDb(_uid, vm.Id);
 
-                _investments.Remove(vm);
-                RebuildItems();
+                _vm.Investments.Remove(vm);
+                _vm.RebuildItems();
                 RefreshKpis();
 
-                if (SelectedInvestment?.Id == vm.Id)
-                    ApplySelection(_investments.FirstOrDefault());
+                if (_vm.SelectedInvestment?.Id == vm.Id)
+                    ApplySelection(_vm.Investments.FirstOrDefault());
 
                 try { ToastService.Success("Usunięto inwestycję."); } catch { }
             }
@@ -737,15 +797,14 @@ ORDER BY Date ASC, Id ASC;";
             }
         }
 
-        // =======================
-        // Logika wyboru i prawa strona
-        // =======================
-
+        // ============================================================
+        // Selection + Right panel
+        // ============================================================
         private void ApplySelection(InvestmentVm? vm)
         {
-            SelectedInvestment = vm;
+            _vm.SelectedInvestment = vm;
 
-            foreach (var i in _investments)
+            foreach (var i in _vm.Investments)
                 i.IsSelected = (vm != null && i.Id == vm.Id);
 
             UpdateRightPanel();
@@ -757,23 +816,26 @@ ORDER BY Date ASC, Id ASC;";
 
             try
             {
-                if (SelectedInvestment == null)
+                if (_vm.SelectedInvestment == null)
                 {
                     if (NoSelectionCard != null) NoSelectionCard.Visibility = Visibility.Visible;
                     if (DetailsCard != null) DetailsCard.Visibility = Visibility.Collapsed;
 
-                    if (GridValuations != null) GridValuations.ItemsSource = Array.Empty<HistoryRowVm>();
+                    _vm.Valuations.Clear();
                     BuildDeltaBars(Array.Empty<ValuationRow>());
+
+                    // MiniTable source
+                    if (ValuationsMiniTable != null) ValuationsMiniTable.ItemsSource = _vm.Valuations;
                     return;
                 }
 
                 if (NoSelectionCard != null) NoSelectionCard.Visibility = Visibility.Collapsed;
                 if (DetailsCard != null) DetailsCard.Visibility = Visibility.Visible;
 
-                if (SelectedTitleText != null) SelectedTitleText.Text = SelectedInvestment.Name;
-                if (SelectedSubtitleText != null) SelectedSubtitleText.Text = SelectedInvestment.TypeDisplay;
+                if (SelectedTitleText != null) SelectedTitleText.Text = _vm.SelectedInvestment.Name;
+                if (SelectedSubtitleText != null) SelectedSubtitleText.Text = _vm.SelectedInvestment.TypeDisplay;
 
-                var rows = GetAllValuations(_uid, SelectedInvestment.Id);
+                var rows = GetAllValuations(_uid, _vm.SelectedInvestment.Id);
 
                 if (rows.Count == 0)
                 {
@@ -785,7 +847,9 @@ ORDER BY Date ASC, Id ASC;";
                         ChangeText.Foreground = SafeGetBrush("App.Foreground", Brushes.White);
                     }
 
-                    if (GridValuations != null) GridValuations.ItemsSource = Array.Empty<HistoryRowVm>();
+                    _vm.Valuations.Clear();
+                    if (ValuationsMiniTable != null) ValuationsMiniTable.ItemsSource = _vm.Valuations;
+
                     BuildDeltaBars(rows);
                     return;
                 }
@@ -816,10 +880,10 @@ ORDER BY Date ASC, Id ASC;";
                                             SafeGetBrush("App.Foreground", Brushes.White);
                 }
 
-                // TABELA
-                var vms = new List<HistoryRowVm>();
-                ValuationRow? prev = null;
+                // TABLE -> MiniTable
+                _vm.Valuations.Clear();
 
+                ValuationRow? prev = null;
                 foreach (var r in rows)
                 {
                     string delta = "—";
@@ -839,7 +903,7 @@ ORDER BY Date ASC, Id ASC;";
                         }
                     }
 
-                    vms.Add(new HistoryRowVm
+                    _vm.Valuations.Add(new HistoryRowVm
                     {
                         Date = r.Date.ToString("dd.MM.yyyy", CultureInfo.CurrentCulture),
                         Value = r.Value.ToString("N2", CultureInfo.CurrentCulture) + " zł",
@@ -850,9 +914,9 @@ ORDER BY Date ASC, Id ASC;";
                     prev = r;
                 }
 
-                if (GridValuations != null) GridValuations.ItemsSource = vms;
+                if (ValuationsMiniTable != null) ValuationsMiniTable.ItemsSource = _vm.Valuations;
 
-                // WYKRES WPF
+                // CHART
                 BuildDeltaBars(rows);
             }
             catch (Exception ex)
@@ -862,21 +926,22 @@ ORDER BY Date ASC, Id ASC;";
                 {
                     if (NoSelectionCard != null) NoSelectionCard.Visibility = Visibility.Visible;
                     if (DetailsCard != null) DetailsCard.Visibility = Visibility.Collapsed;
-                    if (GridValuations != null) GridValuations.ItemsSource = Array.Empty<HistoryRowVm>();
+
+                    _vm.Valuations.Clear();
+                    if (ValuationsMiniTable != null) ValuationsMiniTable.ItemsSource = _vm.Valuations;
+
                     BuildDeltaBars(Array.Empty<ValuationRow>());
                 }
                 catch { }
             }
         }
 
-        /// <summary>
-        /// Wykres delta w 100% WPF: zero wyjątków z LiveCharts.
-        /// </summary>
+        /// <summary>Wykres delta w 100% WPF</summary>
         private void BuildDeltaBars(IReadOnlyList<ValuationRow> rows)
         {
             try
             {
-                _deltaBars.Clear();
+                _vm.DeltaBars.Clear();
 
                 if (rows == null || rows.Count < 2)
                 {
@@ -903,7 +968,6 @@ ORDER BY Date ASC, Id ASC;";
                 {
                     var abs = Math.Abs(d);
 
-                    // wysokość proporcjonalna, z minimalnym progiem widoczności (dla bardzo małych zmian)
                     var h = (double)(abs / maxAbs) * maxHeight;
                     if (h > 0 && h < 6) h = 6;
 
@@ -916,12 +980,9 @@ ORDER BY Date ASC, Id ASC;";
 
                     var sign = isPos ? "+" : (isNeg ? "−" : "");
 
-                    // ValueText ma być krótszy (na słupku), tooltip pełny
-                    var valText = abs >= 1000m
-                        ? $"{sign}{Math.Round(abs, 0).ToString("N0", CultureInfo.CurrentCulture)}"
-                        : $"{sign}{Math.Round(abs, 0).ToString("N0", CultureInfo.CurrentCulture)}";
+                    var valText = $"{sign}{Math.Round(abs, 0).ToString("N0", CultureInfo.CurrentCulture)}";
 
-                    _deltaBars.Add(new DeltaBarVm
+                    _vm.DeltaBars.Add(new DeltaBarVm
                     {
                         Label = date.ToString("dd.MM", CultureInfo.CurrentCulture),
                         BarHeight = h,
@@ -936,22 +997,21 @@ ORDER BY Date ASC, Id ASC;";
                 System.Diagnostics.Debug.WriteLine("BuildDeltaBars error: " + ex);
                 try
                 {
-                    _deltaBars.Clear();
+                    _vm.DeltaBars.Clear();
                     if (DeltaChartHint != null) DeltaChartHint.Visibility = Visibility.Visible;
                 }
                 catch { }
             }
         }
 
-        // =======================
-        // Dodawanie wyceny / DB
-        // =======================
-
+        // ============================================================
+        // Add valuation / DB
+        // ============================================================
         private void AddValuationFor(InvestmentVm vm)
         {
             try
             {
-                foreach (var inv in _investments) inv.HideDeleteConfirm();
+                foreach (var inv in _vm.Investments) inv.HideDeleteConfirm();
 
                 var dlg = new AddValuationDialog(vm.Name) { Owner = OwnerWindow };
                 var ok = dlg.ShowDialog() == true;
@@ -1013,10 +1073,9 @@ VALUES($uid, $iid, $date, $val);";
             try { DatabaseService.NotifyDataChanged(); } catch { }
         }
 
-        // =======================
-        // DataChanged -> reload
-        // =======================
-
+        // ============================================================
+        // DataChanged -> reload (bezpiecznie)
+        // ============================================================
         private void DatabaseService_DataChanged(object? sender, EventArgs e)
         {
             if (!_isActive) return;

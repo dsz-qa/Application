@@ -3,6 +3,7 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:controls="clr-namespace:Finly.Views.Controls"
              xmlns:local="clr-namespace:Finly.Pages"
              mc:Ignorable="d"
              x:Name="Root"
@@ -65,7 +66,65 @@
             <Setter Property="BorderBrush" Value="{DynamicResource Surface.Border}"/>
         </Style>
 
-        <!-- KARTA INWESTYCJI -->
+        <!-- ===================== MINI TABLE (VALUATIONS) ===================== -->
+
+        <DataTemplate x:Key="ValuationsHeaderTemplate">
+            <Border Style="{StaticResource MiniTableHeaderBorder}">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="140"/>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+
+                    <TextBlock Grid.Column="0"
+                               Text="Data"
+                               Style="{StaticResource MiniTableHeaderText}"/>
+
+                    <TextBlock Grid.Column="1"
+                               Text="Wartość"
+                               Style="{StaticResource MiniTableHeaderText}"/>
+
+                    <TextBlock Grid.Column="2"
+                               Text="Zmiana vs poprzednia"
+                               Style="{StaticResource MiniTableHeaderText}"/>
+
+                    <TextBlock Grid.Column="3"
+                               Text="Zmiana %"
+                               Style="{StaticResource MiniTableHeaderText}"/>
+                </Grid>
+            </Border>
+        </DataTemplate>
+
+        <DataTemplate x:Key="ValuationsRowTemplate" DataType="{x:Type local:HistoryRowVm}">
+            <Grid Margin="0,2">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="140"/>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+
+                <TextBlock Grid.Column="0"
+                           Text="{Binding Date}"
+                           Style="{StaticResource MiniTableCellText}"/>
+
+                <TextBlock Grid.Column="1"
+                           Text="{Binding Value}"
+                           Style="{StaticResource MiniTableCellText}"/>
+
+                <TextBlock Grid.Column="2"
+                           Text="{Binding Delta}"
+                           Style="{StaticResource MiniTableCellText}"/>
+
+                <TextBlock Grid.Column="3"
+                           Text="{Binding DeltaPct}"
+                           Style="{StaticResource MiniTableCellText}"/>
+            </Grid>
+        </DataTemplate>
+
+        <!-- ===================== KARTA INWESTYCJI ===================== -->
         <DataTemplate DataType="{x:Type local:InvestmentVm}">
             <Border Style="{StaticResource SelectedCard}"
                     MinWidth="320"
@@ -517,21 +576,16 @@
                                     </StackPanel>
                                 </Border>
 
-                                <!-- TABELA -->
-                                <DataGrid Margin="0,12,0,0"
-                                          x:Name="GridValuations"
-                                          AutoGenerateColumns="False"
-                                          HeadersVisibility="Column"
-                                          CanUserAddRows="False"
-                                          IsReadOnly="True"
-                                          MinHeight="260">
-                                    <DataGrid.Columns>
-                                        <DataGridTextColumn Header="Data" Binding="{Binding Date}" Width="140"/>
-                                        <DataGridTextColumn Header="Wartość" Binding="{Binding Value}" Width="*"/>
-                                        <DataGridTextColumn Header="Zmiana vs poprzednia" Binding="{Binding Delta}" Width="*"/>
-                                        <DataGridTextColumn Header="Zmiana %" Binding="{Binding DeltaPct}" Width="*"/>
-                                    </DataGrid.Columns>
-                                </DataGrid>
+                                <!-- TABELA (MiniTable) -->
+                                <Border Margin="0,12,0,0"
+                                        Style="{StaticResource MiniTableCard}">
+                                    <controls:MiniTableControl x:Name="ValuationsMiniTable"
+                                                               HeaderTemplate="{StaticResource ValuationsHeaderTemplate}"
+                                                               RowTemplate="{StaticResource ValuationsRowTemplate}"
+                                                               SelectionMode="Single"
+                                                               HorizontalScrollBarVisibility="Disabled"
+                                                               VerticalScrollBarVisibility="Auto"/>
+                                </Border>
 
                             </StackPanel>
                         </Border>
