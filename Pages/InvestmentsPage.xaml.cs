@@ -11,6 +11,7 @@ using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Controls.Primitives;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Threading;
@@ -18,7 +19,7 @@ using System.Windows.Threading;
 namespace Finly.Pages
 {
     // ============================================================
-    // Common base (jak u Ciebie) – zostaje
+    // Common base
     // ============================================================
     public abstract class BindableBase : INotifyPropertyChanged
     {
@@ -89,7 +90,7 @@ namespace Finly.Pages
             get
             {
                 if (LastDate == null) return "Brak wycen";
-                return "Ostatnia: " + LastDate.Value.ToString("dd.MM.yyyy", CultureInfo.CurrentCulture);
+                return "Ostatnia: " + LastDate.Value.ToString("dd.MM.yyyy HH:mm", CultureInfo.CurrentCulture);
             }
         }
 
@@ -175,24 +176,38 @@ namespace Finly.Pages
         }
     }
 
-    internal sealed class DeltaBarVm
+    // ============================================================
+    // Chart VMs
+    // ============================================================
+    public sealed class RangeBarVm
     {
-        public string Label { get; init; } = "";
-        public double BarHeight { get; init; }   // 0..180
-        public Brush Fill { get; init; } = Brushes.Gray;
-        public string Tooltip { get; init; } = "";
-        public string ValueText { get; init; } = "";
+        public string Label { get; set; } = "";          // dd.MM HH:mm
+        public string CurrentText { get; set; } = "";    // current price text
+        public double BarTop { get; set; }               // Canvas.Top for bar
+        public double BarHeight { get; set; }            // bar height
+        public double CurrentDotTop { get; set; }        // dot Y
+        public Brush Fill { get; set; } = Brushes.Gray;
+        public string Tooltip { get; set; } = "";
+    }
+
+    public sealed class AxisTickVm
+    {
+        public double Top { get; set; }   // Canvas.Top
+        public string Text { get; set; } = "";
     }
 
     // ============================================================
-    // NEW: ViewModel (spójnie jak DashboardPage)
+    // VM
     // ============================================================
     internal sealed class InvestmentsViewModel : BindableBase
     {
         public ObservableCollection<InvestmentVm> Investments { get; } = new();
         public ObservableCollection<object> Items { get; } = new();
+
         public ObservableCollection<HistoryRowVm> Valuations { get; } = new();
-        public ObservableCollection<DeltaBarVm> DeltaBars { get; } = new();
+
+        public ObservableCollection<RangeBarVm> RangeBars { get; } = new();
+        public ObservableCollection<AxisTickVm> AxisTicks { get; } = new();
 
         private InvestmentVm? _selected;
         public InvestmentVm? SelectedInvestment
@@ -201,7 +216,7 @@ namespace Finly.Pages
             set => Set(ref _selected, value);
         }
 
-        // KPI (trzymamy jako stringi dla prostoty)
+        // KPI
         private string _totalValueText = "—";
         public string TotalValueText { get => _totalValueText; set => Set(ref _totalValueText, value); }
 
@@ -245,7 +260,7 @@ namespace Finly.Pages
     }
 
     // ============================================================
-    // InvestmentsPage – DataContext = VM (jak DashboardPage)
+    // Page
     // ============================================================
     public partial class InvestmentsPage : UserControl
     {
@@ -256,6 +271,10 @@ namespace Finly.Pages
         private bool _dataChangedHooked;
         private long _reloadToken;
 
+        // wykres – stałe wysokości dopasowane do XAML (Row=220)
+        private const double PlotHeight = 220.0;
+        private const double MinBarPx = 6.0;
+
         public InvestmentsPage()
         {
             try
@@ -263,12 +282,12 @@ namespace Finly.Pages
                 InitializeComponent();
                 _initializedOk = true;
 
-                // KLUCZ: NIE this. Tylko VM.
                 DataContext = _vm;
 
-                // Bind ItemsControl i delta bars przez VM (bez ręcznych kolekcji w Page)
                 InvestmentsRepeater.ItemsSource = _vm.Items;
-                DeltaBars.ItemsSource = _vm.DeltaBars;
+
+                // KLUCZ: podpinamy ItemsSource wykresu i tabeli raz
+                RangeBars.ItemsSource = _vm.RangeBars;
 
                 Loaded += InvestmentsPage_Loaded;
                 Unloaded += InvestmentsPage_Unloaded;
@@ -320,6 +339,9 @@ namespace Finly.Pages
 
             try
             {
+                // mini table – ustaw ItemsSource w Loaded (żeby nigdy nie było puste)
+                if (ValuationsMiniTable != null) ValuationsMiniTable.ItemsSource = _vm.Valuations;
+
                 LoadInvestments();
                 ApplySelection(_vm.SelectedInvestment ?? _vm.Investments.FirstOrDefault());
             }
@@ -336,13 +358,13 @@ namespace Finly.Pages
 
             UnhookDataChanged();
 
-            // Czyścimy UI/VM w 100% bezpiecznie
             try
             {
-                _vm.DeltaBars.Clear();
+                _vm.RangeBars.Clear();
+                _vm.AxisTicks.Clear();
                 _vm.Valuations.Clear();
 
-                if (DeltaChartHint != null) DeltaChartHint.Visibility = Visibility.Visible;
+                if (ValuationChartHint != null) ValuationChartHint.Visibility = Visibility.Visible;
 
                 if (NoSelectionCard != null) NoSelectionCard.Visibility = Visibility.Visible;
                 if (DetailsCard != null) DetailsCard.Visibility = Visibility.Collapsed;
@@ -415,13 +437,15 @@ namespace Finly.Pages
         private static void EnsureValuationsSchema()
         {
             using var con = DatabaseService.GetConnection();
+            con.Open();
+
             using var cmd = con.CreateCommand();
             cmd.CommandText = @"
 CREATE TABLE IF NOT EXISTS InvestmentValuations (
     Id            INTEGER PRIMARY KEY AUTOINCREMENT,
     UserId        INTEGER NOT NULL,
     InvestmentId  INTEGER NOT NULL,
-    Date          TEXT    NOT NULL, -- yyyy-MM-dd
+    Date          TEXT    NOT NULL, -- yyyy-MM-dd HH:mm:ss
     Value         REAL    NOT NULL
 );
 
@@ -535,7 +559,7 @@ ON InvestmentValuations(UserId, InvestmentId, Date);
                                              SafeGetBrush("App.Foreground", Brushes.White);
                 }
 
-                // Ustawiamy też UI (bo masz TextBlock x:Name, a nie bindingi)
+                // TextBlock x:Name
                 if (TotalValueText != null) TotalValueText.Text = _vm.TotalValueText;
                 if (TotalDeltaText != null)
                 {
@@ -552,10 +576,6 @@ ON InvestmentValuations(UserId, InvestmentId, Date);
             {
                 try
                 {
-                    _vm.TotalValueText = "—";
-                    _vm.TotalDeltaText = "—";
-                    _vm.TotalDeltaPctText = "—";
-
                     if (TotalValueText != null) TotalValueText.Text = "—";
                     if (TotalDeltaText != null) TotalDeltaText.Text = "—";
                     if (TotalDeltaPctText != null) TotalDeltaPctText.Text = "—";
@@ -564,7 +584,15 @@ ON InvestmentValuations(UserId, InvestmentId, Date);
             }
         }
 
-        private static readonly string[] _dateFormats = new[] { "yyyy-MM-dd", "yyyy-M-d" };
+        private static readonly string[] _dateFormats = new[]
+        {
+            "yyyy-MM-dd",
+            "yyyy-M-d",
+            "yyyy-MM-dd HH:mm",
+            "yyyy-MM-dd H:mm",
+            "yyyy-MM-dd HH:mm:ss",
+            "yyyy-MM-dd H:mm:ss"
+        };
 
         private static bool TryParseDbDate(string? s, out DateTime dt)
         {
@@ -576,12 +604,11 @@ ON InvestmentValuations(UserId, InvestmentId, Date);
                                           DateTimeStyles.None,
                                           out dt))
                 {
-                    dt = dt.Date;
                     return true;
                 }
             }
 
-            dt = DateTime.Today;
+            dt = DateTime.Now;
             return false;
         }
 
@@ -590,6 +617,8 @@ ON InvestmentValuations(UserId, InvestmentId, Date);
             var list = new List<ValuationRow>();
 
             using var con = DatabaseService.GetConnection();
+            con.Open();
+
             using var cmd = con.CreateCommand();
             cmd.CommandText = @"
 SELECT Date, Value
@@ -607,11 +636,9 @@ LIMIT 2;";
                 var dbl = r.IsDBNull(1) ? 0.0 : r.GetDouble(1);
 
                 if (!TryParseDbDate(dateText, out var dt))
-                    dt = DateTime.Today;
+                    dt = DateTime.Now;
 
-                var val = Convert.ToDecimal(dbl);
-
-                list.Add(new ValuationRow { Date = dt, Value = val });
+                list.Add(new ValuationRow { Date = dt, Value = Convert.ToDecimal(dbl) });
             }
 
             return list;
@@ -622,6 +649,8 @@ LIMIT 2;";
             var list = new List<ValuationRow>();
 
             using var con = DatabaseService.GetConnection();
+            con.Open();
+
             using var cmd = con.CreateCommand();
             cmd.CommandText = @"
 SELECT Date, Value
@@ -638,18 +667,16 @@ ORDER BY Date ASC, Id ASC;";
                 var dbl = r.IsDBNull(1) ? 0.0 : r.GetDouble(1);
 
                 if (!TryParseDbDate(dateText, out var dt))
-                    dt = DateTime.Today;
+                    dt = DateTime.Now;
 
-                var val = Convert.ToDecimal(dbl);
-
-                list.Add(new ValuationRow { Date = dt, Value = val });
+                list.Add(new ValuationRow { Date = dt, Value = Convert.ToDecimal(dbl) });
             }
 
             return list;
         }
 
         // ============================================================
-        // EVENTS (XAML) – zostają
+        // EVENTS
         // ============================================================
         private void InvestmentCard_Click(object sender, MouseButtonEventArgs e)
         {
@@ -816,16 +843,16 @@ ORDER BY Date ASC, Id ASC;";
 
             try
             {
+                // zawsze trzymaj ItemsSource tabeli
+                if (ValuationsMiniTable != null) ValuationsMiniTable.ItemsSource = _vm.Valuations;
+
                 if (_vm.SelectedInvestment == null)
                 {
                     if (NoSelectionCard != null) NoSelectionCard.Visibility = Visibility.Visible;
                     if (DetailsCard != null) DetailsCard.Visibility = Visibility.Collapsed;
 
                     _vm.Valuations.Clear();
-                    BuildDeltaBars(Array.Empty<ValuationRow>());
-
-                    // MiniTable source
-                    if (ValuationsMiniTable != null) ValuationsMiniTable.ItemsSource = _vm.Valuations;
+                    BuildRangeBars(Array.Empty<ValuationRow>());
                     return;
                 }
 
@@ -848,17 +875,15 @@ ORDER BY Date ASC, Id ASC;";
                     }
 
                     _vm.Valuations.Clear();
-                    if (ValuationsMiniTable != null) ValuationsMiniTable.ItemsSource = _vm.Valuations;
-
-                    BuildDeltaBars(rows);
+                    BuildRangeBars(rows);
                     return;
                 }
 
                 var first = rows.First();
                 var last = rows.Last();
 
-                if (FirstText != null) FirstText.Text = $"{first.Date:dd.MM.yyyy} • {first.Value.ToString("N2", CultureInfo.CurrentCulture)} zł";
-                if (LastText != null) LastText.Text = $"{last.Date:dd.MM.yyyy} • {last.Value.ToString("N2", CultureInfo.CurrentCulture)} zł";
+                if (FirstText != null) FirstText.Text = $"{first.Date:dd.MM.yyyy HH:mm} • {first.Value.ToString("N2", CultureInfo.CurrentCulture)} zł";
+                if (LastText != null) LastText.Text = $"{last.Date:dd.MM.yyyy HH:mm} • {last.Value.ToString("N2", CultureInfo.CurrentCulture)} zł";
 
                 var change = last.Value - first.Value;
                 var sign = change > 0 ? "+" : (change < 0 ? "−" : "");
@@ -880,7 +905,7 @@ ORDER BY Date ASC, Id ASC;";
                                             SafeGetBrush("App.Foreground", Brushes.White);
                 }
 
-                // TABLE -> MiniTable
+                // TABELA
                 _vm.Valuations.Clear();
 
                 ValuationRow? prev = null;
@@ -905,7 +930,7 @@ ORDER BY Date ASC, Id ASC;";
 
                     _vm.Valuations.Add(new HistoryRowVm
                     {
-                        Date = r.Date.ToString("dd.MM.yyyy", CultureInfo.CurrentCulture),
+                        Date = r.Date.ToString("dd.MM.yyyy HH:mm", CultureInfo.CurrentCulture),
                         Value = r.Value.ToString("N2", CultureInfo.CurrentCulture) + " zł",
                         Delta = delta,
                         DeltaPct = dpct
@@ -914,10 +939,8 @@ ORDER BY Date ASC, Id ASC;";
                     prev = r;
                 }
 
-                if (ValuationsMiniTable != null) ValuationsMiniTable.ItemsSource = _vm.Valuations;
-
-                // CHART
-                BuildDeltaBars(rows);
+                // WYKRES
+                BuildRangeBars(rows);
             }
             catch (Exception ex)
             {
@@ -928,77 +951,127 @@ ORDER BY Date ASC, Id ASC;";
                     if (DetailsCard != null) DetailsCard.Visibility = Visibility.Collapsed;
 
                     _vm.Valuations.Clear();
-                    if (ValuationsMiniTable != null) ValuationsMiniTable.ItemsSource = _vm.Valuations;
-
-                    BuildDeltaBars(Array.Empty<ValuationRow>());
+                    BuildRangeBars(Array.Empty<ValuationRow>());
                 }
                 catch { }
             }
         }
 
-        /// <summary>Wykres delta w 100% WPF</summary>
-        private void BuildDeltaBars(IReadOnlyList<ValuationRow> rows)
+        /// <summary>
+        /// Słupki: każdy słupek to ZAKRES między poprzednią i obecną wyceną.
+        /// Zielony = wzrost, czerwony = spadek. Oś Y po lewej (ticki).
+        /// </summary>
+        private void BuildRangeBars(IReadOnlyList<ValuationRow> rows)
         {
             try
             {
-                _vm.DeltaBars.Clear();
+                _vm.RangeBars.Clear();
+                _vm.AxisTicks.Clear();
 
                 if (rows == null || rows.Count < 2)
                 {
-                    if (DeltaChartHint != null) DeltaChartHint.Visibility = Visibility.Visible;
+                    if (ValuationChartHint != null) ValuationChartHint.Visibility = Visibility.Visible;
                     return;
                 }
 
-                var deltas = new List<(DateTime date, decimal delta)>();
+                if (ValuationChartHint != null) ValuationChartHint.Visibility = Visibility.Collapsed;
+
+                // Skala: bierzemy min/max ze wszystkich wartości (z lekkim marginesem)
+                var minVal = rows.Min(x => x.Value);
+                var maxVal = rows.Max(x => x.Value);
+
+                if (maxVal - minVal < 0.0001m)
+                {
+                    // prawie płasko -> zrób sztuczny zakres
+                    maxVal += 1m;
+                    minVal -= 1m;
+                }
+
+                var pad = (maxVal - minVal) * 0.08m; // 8% luzu
+                maxVal += pad;
+                minVal -= pad;
+
+                double ToY(decimal value)
+                {
+                    var span = (double)(maxVal - minVal);
+                    var v = (double)(value - minVal);
+                    // 0 (min) -> dół, 1 (max) -> góra
+                    var t = v / span;
+                    var y = (1.0 - t) * PlotHeight;
+                    if (y < 0) y = 0;
+                    if (y > PlotHeight) y = PlotHeight;
+                    return y;
+                }
+
+                // Ticki osi Y: 5 sztuk
+                const int tickCount = 5;
+                for (int i = 0; i < tickCount; i++)
+                {
+                    var t = i / (double)(tickCount - 1); // 0..1
+                    var val = maxVal - (decimal)t * (maxVal - minVal);
+                    var top = t * PlotHeight;
+
+                    _vm.AxisTicks.Add(new AxisTickVm
+                    {
+                        Top = top - 8, // lekkie przesunięcie tekstu
+                        Text = val.ToString("N2", CultureInfo.CurrentCulture)
+                    });
+                }
+
+                // Słupki zakresu: od i=1
                 for (int i = 1; i < rows.Count; i++)
-                    deltas.Add((rows[i].Date, rows[i].Value - rows[i - 1].Value));
-
-                var maxAbs = deltas.Select(x => Math.Abs(x.delta)).DefaultIfEmpty(0m).Max();
-                if (maxAbs <= 0m)
                 {
-                    if (DeltaChartHint != null) DeltaChartHint.Visibility = Visibility.Visible;
-                    return;
-                }
+                    var prev = rows[i - 1];
+                    var cur = rows[i];
 
-                if (DeltaChartHint != null) DeltaChartHint.Visibility = Visibility.Collapsed;
+                    var isUp = cur.Value > prev.Value;
+                    var isDown = cur.Value < prev.Value;
 
-                const double maxHeight = 180.0;
+                    var high = isUp ? cur.Value : prev.Value;
+                    var low = isUp ? prev.Value : cur.Value;
 
-                foreach (var (date, d) in deltas)
-                {
-                    var abs = Math.Abs(d);
+                    // Y dla high/low
+                    var yHigh = ToY(high);
+                    var yLow = ToY(low);
 
-                    var h = (double)(abs / maxAbs) * maxHeight;
-                    if (h > 0 && h < 6) h = 6;
+                    var h = Math.Abs(yLow - yHigh);
+                    if (h > 0 && h < MinBarPx) h = MinBarPx;
 
-                    var isPos = d > 0m;
-                    var isNeg = d < 0m;
-
-                    var fill = isPos ? Brushes.LimeGreen :
-                               isNeg ? Brushes.IndianRed :
+                    var fill = isUp ? Brushes.LimeGreen :
+                               isDown ? Brushes.IndianRed :
                                Brushes.Gray;
 
-                    var sign = isPos ? "+" : (isNeg ? "−" : "");
+                    var yCur = ToY(cur.Value);
+                    var dotTop = yCur - 4; // 8px dot
 
-                    var valText = $"{sign}{Math.Round(abs, 0).ToString("N0", CultureInfo.CurrentCulture)}";
+                    var label = cur.Date.ToString("dd.MM HH:mm", CultureInfo.CurrentCulture);
 
-                    _vm.DeltaBars.Add(new DeltaBarVm
+                    var tooltip =
+                        $"{cur.Date:dd.MM.yyyy HH:mm}\n" +
+                        $"Poprzednia: {prev.Value.ToString("N2", CultureInfo.CurrentCulture)} zł\n" +
+                        $"Obecna: {cur.Value.ToString("N2", CultureInfo.CurrentCulture)} zł\n" +
+                        $"Zmiana: {(cur.Value - prev.Value).ToString("N2", CultureInfo.CurrentCulture)} zł";
+
+                    _vm.RangeBars.Add(new RangeBarVm
                     {
-                        Label = date.ToString("dd.MM", CultureInfo.CurrentCulture),
+                        Label = label,
+                        CurrentText = cur.Value.ToString("N2", CultureInfo.CurrentCulture),
+                        BarTop = Math.Min(yHigh, yLow),
                         BarHeight = h,
+                        CurrentDotTop = dotTop < 0 ? 0 : (dotTop > PlotHeight - 8 ? PlotHeight - 8 : dotTop),
                         Fill = fill,
-                        ValueText = valText,
-                        Tooltip = $"{date:dd.MM.yyyy}\nDelta: {sign}{abs.ToString("N2", CultureInfo.CurrentCulture)} zł"
+                        Tooltip = tooltip
                     });
                 }
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine("BuildDeltaBars error: " + ex);
+                System.Diagnostics.Debug.WriteLine("BuildRangeBars error: " + ex);
                 try
                 {
-                    _vm.DeltaBars.Clear();
-                    if (DeltaChartHint != null) DeltaChartHint.Visibility = Visibility.Visible;
+                    _vm.RangeBars.Clear();
+                    _vm.AxisTicks.Clear();
+                    if (ValuationChartHint != null) ValuationChartHint.Visibility = Visibility.Visible;
                 }
                 catch { }
             }
@@ -1032,14 +1105,20 @@ ORDER BY Date ASC, Id ASC;";
         private static void InsertValuation(int userId, int investmentId, DateTime date, decimal value)
         {
             using var con = DatabaseService.GetConnection();
+            con.Open();
+
             using var cmd = con.CreateCommand();
+
+            // dialog zwraca datę bez godziny -> dopisujemy aktualną godzinę dodania
+            var dt = date.Date.Add(DateTime.Now.TimeOfDay);
+            dt = new DateTime(dt.Year, dt.Month, dt.Day, dt.Hour, dt.Minute, 0);
 
             cmd.CommandText = @"
 INSERT INTO InvestmentValuations(UserId, InvestmentId, Date, Value)
 VALUES($uid, $iid, $date, $val);";
             cmd.Parameters.AddWithValue("$uid", userId);
             cmd.Parameters.AddWithValue("$iid", investmentId);
-            cmd.Parameters.AddWithValue("$date", date.Date.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture));
+            cmd.Parameters.AddWithValue("$date", dt.ToString("yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture));
             cmd.Parameters.AddWithValue("$val", value);
 
             cmd.ExecuteNonQuery();
@@ -1050,6 +1129,7 @@ VALUES($uid, $iid, $date, $val);";
         private static void DeleteInvestmentFromDb(int userId, int investmentId)
         {
             using var con = DatabaseService.GetConnection();
+            con.Open();
 
             using (var cmd1 = con.CreateCommand())
             {
@@ -1074,7 +1154,7 @@ VALUES($uid, $iid, $date, $val);";
         }
 
         // ============================================================
-        // DataChanged -> reload (bezpiecznie)
+        // DataChanged -> reload
         // ============================================================
         private void DatabaseService_DataChanged(object? sender, EventArgs e)
         {
@@ -1106,7 +1186,7 @@ VALUES($uid, $iid, $date, $val);";
             }
             catch
             {
-                // ignorujemy – event może przyjść w trakcie zamykania
+                // ignore
             }
         }
     }

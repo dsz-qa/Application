@@ -72,27 +72,16 @@
             <Border Style="{StaticResource MiniTableHeaderBorder}">
                 <Grid>
                     <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="140"/>
+                        <ColumnDefinition Width="160"/>
                         <ColumnDefinition Width="*"/>
                         <ColumnDefinition Width="*"/>
                         <ColumnDefinition Width="*"/>
                     </Grid.ColumnDefinitions>
 
-                    <TextBlock Grid.Column="0"
-                               Text="Data"
-                               Style="{StaticResource MiniTableHeaderText}"/>
-
-                    <TextBlock Grid.Column="1"
-                               Text="Wartość"
-                               Style="{StaticResource MiniTableHeaderText}"/>
-
-                    <TextBlock Grid.Column="2"
-                               Text="Zmiana vs poprzednia"
-                               Style="{StaticResource MiniTableHeaderText}"/>
-
-                    <TextBlock Grid.Column="3"
-                               Text="Zmiana %"
-                               Style="{StaticResource MiniTableHeaderText}"/>
+                    <TextBlock Grid.Column="0" Text="Data" Style="{StaticResource MiniTableHeaderText}"/>
+                    <TextBlock Grid.Column="1" Text="Wartość" Style="{StaticResource MiniTableHeaderText}"/>
+                    <TextBlock Grid.Column="2" Text="Zmiana vs poprzednia" Style="{StaticResource MiniTableHeaderText}"/>
+                    <TextBlock Grid.Column="3" Text="Zmiana %" Style="{StaticResource MiniTableHeaderText}"/>
                 </Grid>
             </Border>
         </DataTemplate>
@@ -100,27 +89,71 @@
         <DataTemplate x:Key="ValuationsRowTemplate" DataType="{x:Type local:HistoryRowVm}">
             <Grid Margin="0,2">
                 <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="140"/>
+                    <ColumnDefinition Width="160"/>
                     <ColumnDefinition Width="*"/>
                     <ColumnDefinition Width="*"/>
                     <ColumnDefinition Width="*"/>
                 </Grid.ColumnDefinitions>
 
-                <TextBlock Grid.Column="0"
-                           Text="{Binding Date}"
-                           Style="{StaticResource MiniTableCellText}"/>
+                <TextBlock Grid.Column="0" Text="{Binding Date}" Style="{StaticResource MiniTableCellText}"/>
+                <TextBlock Grid.Column="1" Text="{Binding Value}" Style="{StaticResource MiniTableCellText}"/>
+                <TextBlock Grid.Column="2" Text="{Binding Delta}" Style="{StaticResource MiniTableCellText}"/>
+                <TextBlock Grid.Column="3" Text="{Binding DeltaPct}" Style="{StaticResource MiniTableCellText}"/>
+            </Grid>
+        </DataTemplate>
 
-                <TextBlock Grid.Column="1"
-                           Text="{Binding Value}"
-                           Style="{StaticResource MiniTableCellText}"/>
+        <!-- ===================== OŚ Y (tick) – Canvas.Top binding ===================== -->
+        <Style x:Key="AxisTickPresenterStyle" TargetType="ContentPresenter">
+            <Setter Property="Canvas.Top" Value="{Binding Top}"/>
+        </Style>
 
-                <TextBlock Grid.Column="2"
-                           Text="{Binding Delta}"
-                           Style="{StaticResource MiniTableCellText}"/>
+        <!-- ===================== RANGE BAR TEMPLATE ===================== -->
+        <DataTemplate x:Key="RangeBarTemplate" DataType="{x:Type local:RangeBarVm}">
+            <Grid Width="64" Margin="4,0" ToolTip="{Binding Tooltip}">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="220"/>
+                    <RowDefinition Height="Auto"/>
+                </Grid.RowDefinitions>
 
-                <TextBlock Grid.Column="3"
-                           Text="{Binding DeltaPct}"
-                           Style="{StaticResource MiniTableCellText}"/>
+                <!-- wartość (aktualna) nad słupkiem -->
+                <TextBlock Grid.Row="0"
+                           Text="{Binding CurrentText}"
+                           FontSize="11"
+                           Opacity="0.85"
+                           HorizontalAlignment="Center"
+                           Foreground="{DynamicResource App.Foreground}"/>
+
+                <!-- obszar wykresu -->
+                <Grid Grid.Row="1" Background="Transparent">
+                    <Canvas Height="220" Background="Transparent">
+                        <!-- zakres między prev i current -->
+                        <Border Canvas.Left="18"
+                                Width="28"
+                                Height="{Binding BarHeight}"
+                                CornerRadius="6"
+                                Background="{Binding Fill}"
+                                BorderThickness="1"
+                                BorderBrush="{DynamicResource Surface.Border}"
+                                Canvas.Top="{Binding BarTop}"/>
+
+                        <!-- kropka na poziomie current -->
+                        <Ellipse Width="8"
+                                 Height="8"
+                                 Fill="{DynamicResource App.Foreground}"
+                                 Opacity="0.9"
+                                 Canvas.Left="28"
+                                 Canvas.Top="{Binding CurrentDotTop}"/>
+                    </Canvas>
+                </Grid>
+
+                <!-- data+godzina pod spodem -->
+                <TextBlock Grid.Row="2"
+                           Text="{Binding Label}"
+                           FontSize="11"
+                           Opacity="0.8"
+                           HorizontalAlignment="Center"
+                           Foreground="{DynamicResource App.Foreground}"/>
             </Grid>
         </DataTemplate>
 
@@ -285,39 +318,6 @@
             </Border>
         </DataTemplate>
 
-        <!-- ITEM wykresu delta (WPF) -->
-        <DataTemplate x:Key="DeltaBarTemplate">
-            <Grid Width="44" Margin="3,0" ToolTip="{Binding Tooltip}">
-                <Grid.RowDefinitions>
-                    <RowDefinition Height="Auto"/>
-                    <RowDefinition Height="180"/>
-                    <RowDefinition Height="Auto"/>
-                </Grid.RowDefinitions>
-
-                <TextBlock Grid.Row="0"
-                           Text="{Binding ValueText}"
-                           FontSize="11"
-                           Opacity="0.85"
-                           HorizontalAlignment="Center"
-                           Foreground="{DynamicResource App.Foreground}"/>
-
-                <Border Grid.Row="1"
-                        VerticalAlignment="Bottom"
-                        Height="{Binding BarHeight}"
-                        CornerRadius="6"
-                        Background="{Binding Fill}"
-                        BorderThickness="1"
-                        BorderBrush="{DynamicResource Surface.Border}"/>
-
-                <TextBlock Grid.Row="2"
-                           Text="{Binding Label}"
-                           FontSize="11"
-                           Opacity="0.8"
-                           HorizontalAlignment="Center"
-                           Foreground="{DynamicResource App.Foreground}"/>
-            </Grid>
-        </DataTemplate>
-
     </UserControl.Resources>
 
     <Grid Margin="24" Background="Transparent">
@@ -336,7 +336,7 @@
 
             <Border Grid.Column="0" Style="{StaticResource AccentCard}">
                 <StackPanel Background="Transparent">
-                    <TextBlock Text="Wartość portfela inwestycyjnego:"
+                    <TextBlock Text="Wartość portfela inwestycyjnego"
                                Style="{StaticResource CardHeader}"
                                FontSize="18"
                                FontWeight="Bold"/>
@@ -348,7 +348,7 @@
 
             <Border Grid.Column="1" Style="{StaticResource AccentCard}">
                 <StackPanel Background="Transparent">
-                    <TextBlock Text="Zmiana od poprzedniej wyceny"
+                    <TextBlock Text="Zmiana od poprzednich wycen"
                                Style="{StaticResource CardHeader}"
                                FontSize="18"
                                FontWeight="Bold"/>
@@ -360,7 +360,7 @@
 
             <Border Grid.Column="2" Style="{StaticResource AccentCard}">
                 <StackPanel Background="Transparent">
-                    <TextBlock Text="Zmiana % (od poprzedniej)"
+                    <TextBlock Text="Zmiana % od poprzednich wycen"
                                Style="{StaticResource CardHeader}"
                                FontSize="18"
                                FontWeight="Bold"/>
@@ -532,7 +532,7 @@
                                             Background="{DynamicResource Surface.Background}"
                                             Padding="12">
                                         <StackPanel Background="Transparent">
-                                            <TextBlock Text="Zmiana (od pierwszej)"
+                                            <TextBlock Text="Zmiana od pierwszej wyceny"
                                                        Opacity="0.85"
                                                        Foreground="{DynamicResource App.Foreground}"/>
                                             <TextBlock x:Name="ChangeText"
@@ -542,7 +542,7 @@
                                     </Border>
                                 </Grid>
 
-                                <!-- WYKRES: delta (WPF) -->
+                                <!-- WYKRES: słupki zakresu (prev<->current), oś Y po lewej + daty+godzina na dole -->
                                 <Border Margin="0,12,0,0"
                                         Padding="10"
                                         CornerRadius="10"
@@ -550,29 +550,78 @@
                                         BorderBrush="{DynamicResource Surface.Border}"
                                         Background="{DynamicResource Surface.Background}">
                                     <StackPanel Background="Transparent">
-                                        <TextBlock Text="Zmiany między wycenami (delta)"
+                                        <TextBlock Text="Wartość wycen w czasie"
                                                    Foreground="{DynamicResource App.Foreground}"
                                                    Opacity="0.85"
                                                    Margin="0,0,0,8"/>
 
-                                        <ScrollViewer HorizontalScrollBarVisibility="Auto"
-                                                      VerticalScrollBarVisibility="Disabled"
-                                                      Background="Transparent">
-                                            <ItemsControl x:Name="DeltaBars"
-                                                          ItemTemplate="{StaticResource DeltaBarTemplate}">
-                                                <ItemsControl.ItemsPanel>
-                                                    <ItemsPanelTemplate>
-                                                        <StackPanel Orientation="Horizontal"/>
-                                                    </ItemsPanelTemplate>
-                                                </ItemsControl.ItemsPanel>
-                                            </ItemsControl>
-                                        </ScrollViewer>
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="84"/>
+                                                <ColumnDefinition Width="*"/>
+                                            </Grid.ColumnDefinitions>
 
-                                        <TextBlock x:Name="DeltaChartHint"
+                                            <!-- oś Y -->
+                                            <Grid Grid.Column="0" Height="220" Background="Transparent">
+                                                <Canvas Height="220" Background="Transparent">
+                                                    <ItemsControl ItemsSource="{Binding AxisTicks}"
+                                                                  ItemContainerStyle="{StaticResource AxisTickPresenterStyle}">
+                                                        <ItemsControl.ItemsPanel>
+                                                            <ItemsPanelTemplate>
+                                                                <Canvas/>
+                                                            </ItemsPanelTemplate>
+                                                        </ItemsControl.ItemsPanel>
+
+                                                        <ItemsControl.ItemTemplate>
+                                                            <DataTemplate DataType="{x:Type local:AxisTickVm}">
+                                                                <Grid Width="84">
+                                                                    <Grid.ColumnDefinitions>
+                                                                        <ColumnDefinition Width="60"/>
+                                                                        <ColumnDefinition Width="24"/>
+                                                                    </Grid.ColumnDefinitions>
+
+                                                                    <TextBlock Grid.Column="0"
+                                                                               Text="{Binding Text}"
+                                                                               FontSize="11"
+                                                                               Opacity="0.85"
+                                                                               HorizontalAlignment="Right"
+                                                                               Foreground="{DynamicResource App.Foreground}"/>
+
+                                                                    <Border Grid.Column="1"
+                                                                            Margin="6,0,0,0"
+                                                                            Height="1"
+                                                                            VerticalAlignment="Center"
+                                                                            Background="{DynamicResource Surface.Border}"
+                                                                            Opacity="0.7"/>
+                                                                </Grid>
+                                                            </DataTemplate>
+                                                        </ItemsControl.ItemTemplate>
+                                                    </ItemsControl>
+                                                </Canvas>
+                                            </Grid>
+
+                                            <!-- słupki -->
+                                            <ScrollViewer Grid.Column="1"
+                                                          HorizontalScrollBarVisibility="Auto"
+                                                          VerticalScrollBarVisibility="Disabled"
+                                                          Background="Transparent">
+                                                <ItemsControl x:Name="RangeBars"
+                                                              ItemTemplate="{StaticResource RangeBarTemplate}">
+                                                    <ItemsControl.ItemsPanel>
+                                                        <ItemsPanelTemplate>
+                                                            <StackPanel Orientation="Horizontal"/>
+                                                        </ItemsPanelTemplate>
+                                                    </ItemsControl.ItemsPanel>
+                                                </ItemsControl>
+                                            </ScrollViewer>
+                                        </Grid>
+
+                                        <TextBlock x:Name="ValuationChartHint"
                                                    Margin="0,8,0,0"
                                                    Opacity="0.7"
                                                    Foreground="{DynamicResource App.Foreground}"
-                                                   Text="Dodaj co najmniej dwie wyceny, aby zobaczyć zmiany."/>
+                                                   Text="Dodaj co najmniej dwie wyceny, aby zobaczyć wykres."
+                                                   Visibility="Collapsed"/>
                                     </StackPanel>
                                 </Border>
 
