@@ -59,23 +59,88 @@ namespace Finly.Services.SpecificPages
         public sealed class BudgetTransactionRow
         {
             public DateTime Date { get; set; }
-            public string Kind { get; set; } = ""; // "Wydatek" / "Przychód"
-            public decimal Amount { get; set; }
-            public string? Description { get; set; }
-            public string? Meta { get; set; }      // kategoria / źródło
+
+            // typ transakcji w UI
+            public bool IsIncome { get; set; }
+            public bool IsTransfer { get; set; } // na razie raczej false
             public bool IsPlanned { get; set; }
 
+            public decimal Amount { get; set; }
+            public string? Description { get; set; }
+
+            // UI meta
+            public string? CategoryName { get; set; }
+            public string? FromAccountName { get; set; }
+
+            // helper dla XAML: pokazuj "Z konta" dla wydatku / transferu
+            public bool ShowFromAccount => !IsIncome; // wydatek lub transfer
+
             public string DateText => Date.ToString("dd.MM.yyyy", CultureInfo.InvariantCulture);
-            public string Title => string.IsNullOrWhiteSpace(Description) ? "(bez opisu)" : Description!;
-            public string SubTitle
-                => $"{Kind}{(string.IsNullOrWhiteSpace(Meta) ? "" : $" • {Meta}")}{(IsPlanned ? " • Planowana" : "")}";
             public string AmountText => $"{Amount:N2} zł";
-            public bool IsExpense => Kind.Equals("Wydatek", StringComparison.OrdinalIgnoreCase);
         }
+
 
         // =========================
         //  CRUD / QUERY
         // =========================
+
+        private static bool ColumnExists(SqliteConnection con, string table, string column)
+        {
+            using var cmd = con.CreateCommand();
+            cmd.CommandText = $"PRAGMA table_info({table});";
+            using var r = cmd.ExecuteReader();
+            while (r.Read())
+            {
+                var name = r.GetString(1);
+                if (name.Equals(column, StringComparison.OrdinalIgnoreCase))
+                    return true;
+            }
+            return false;
+        }
+
+        private static string? ResolvePaymentName(SqliteConnection con, string? paymentKind, long? paymentRefId)
+        {
+            if (string.IsNullOrWhiteSpace(paymentKind) || paymentRefId == null || paymentRefId <= 0)
+                return null;
+
+            // Uwaga: dopasuj stringi do Twoich realnych wartości PaymentKind w DB.
+            // Jeżeli u Ciebie PaymentKind jest np. "BankAccount"/"Envelope"/"CashOnHand" itp., to zadziała.
+            // Jeśli inne – podmień mapowanie na swoje.
+
+            var kind = paymentKind.Trim();
+
+            try
+            {
+                if (kind.Equals("BankAccount", StringComparison.OrdinalIgnoreCase))
+                {
+                    using var cmd = con.CreateCommand();
+                    cmd.CommandText = "SELECT Name FROM BankAccounts WHERE Id = @id LIMIT 1;";
+                    cmd.Parameters.AddWithValue("@id", paymentRefId.Value);
+                    return cmd.ExecuteScalar() as string;
+                }
+
+                if (kind.Equals("Envelope", StringComparison.OrdinalIgnoreCase))
+                {
+                    using var cmd = con.CreateCommand();
+                    cmd.CommandText = "SELECT Name FROM Envelopes WHERE Id = @id LIMIT 1;";
+                    cmd.Parameters.AddWithValue("@id", paymentRefId.Value);
+                    return cmd.ExecuteScalar() as string;
+                }
+
+                if (kind.Equals("CashOnHand", StringComparison.OrdinalIgnoreCase))
+                    return "Gotówka";
+
+                if (kind.Equals("SavedCash", StringComparison.OrdinalIgnoreCase))
+                    return "Oszczędności (gotówka)";
+            }
+            catch
+            {
+                // nie wywalaj UI jeśli tabela/kolumny nie istnieją
+            }
+
+            return null;
+        }
+
 
         public static IList<Budget> GetBudgetsForUser(int userId, DateTime? from = null, DateTime? to = null)
         {
@@ -341,22 +406,30 @@ ORDER BY date(StartDate);
             con.Open();
 
             // Expenses
+            // Expenses
+            var hasPaymentKind = ColumnExists(con, "Expenses", "PaymentKind");
+            var hasPaymentRefId = ColumnExists(con, "Expenses", "PaymentRefId");
+
             using (var cmd = con.CreateCommand())
             {
+                // budujemy SELECT dynamicznie, żeby nie wysypać się na brakujących kolumnach
                 cmd.CommandText = @"
 SELECT
     e.Date,
     e.Amount,
     COALESCE(e.Title, e.Description, '') AS DescText,
     COALESCE(c.Name, '') AS CategoryName,
-    COALESCE(e.IsPlanned,0) AS IsPlanned
+    COALESCE(e.IsPlanned,0) AS IsPlanned"
+                + (hasPaymentKind ? ", e.PaymentKind AS PaymentKind" : "")
+                + (hasPaymentRefId ? ", e.PaymentRefId AS PaymentRefId" : "")
+                + @"
 FROM Expenses e
 LEFT JOIN Categories c ON c.Id = e.CategoryId
 WHERE e.UserId = @u
   AND e.BudgetId = @b
   AND date(e.Date) BETWEEN date(@from) AND date(@to)
-ORDER BY date(e.Date) DESC, e.Id DESC;
-";
+ORDER BY date(e.Date) DESC, e.Id DESC;";
+
                 cmd.Parameters.AddWithValue("@u", userId);
                 cmd.Parameters.AddWithValue("@b", budgetId);
                 cmd.Parameters.AddWithValue("@from", startDate.ToString("yyyy-MM-dd"));
@@ -371,17 +444,38 @@ ORDER BY date(e.Date) DESC, e.Id DESC;
                     var cat = r.IsDBNull(3) ? null : r.GetString(3);
                     var planned = !r.IsDBNull(4) && Convert.ToInt32(r.GetValue(4), CultureInfo.InvariantCulture) == 1;
 
+                    string? paymentKind = null;
+                    long? paymentRefId = null;
+
+                    var ord = 5;
+
+                    if (hasPaymentKind)
+                    {
+                        paymentKind = r.IsDBNull(ord) ? null : r.GetString(ord);
+                        ord++;
+                    }
+                    if (hasPaymentRefId)
+                    {
+                        if (!r.IsDBNull(ord))
+                            paymentRefId = Convert.ToInt64(r.GetValue(ord), CultureInfo.InvariantCulture);
+                    }
+
+                    var fromName = ResolvePaymentName(con, paymentKind, paymentRefId);
+
                     rows.Add(new BudgetTransactionRow
                     {
                         Date = date,
-                        Kind = "Wydatek",
+                        IsIncome = false,
+                        IsTransfer = false,
                         Amount = amount,
                         Description = desc,
-                        Meta = string.IsNullOrWhiteSpace(cat) ? null : cat,
+                        CategoryName = string.IsNullOrWhiteSpace(cat) ? null : cat,
+                        FromAccountName = fromName,
                         IsPlanned = planned
                     });
                 }
             }
+
 
             // Incomes
             using (var cmd = con.CreateCommand())
@@ -416,18 +510,21 @@ ORDER BY date(i.Date) DESC, i.Id DESC;
                     rows.Add(new BudgetTransactionRow
                     {
                         Date = date,
-                        Kind = "Przychód",
+                        IsIncome = true,
+                        IsTransfer = false,
                         Amount = amount,
                         Description = desc,
-                        Meta = string.IsNullOrWhiteSpace(src) ? null : src,
+                        CategoryName = string.IsNullOrWhiteSpace(src) ? null : src, // jeżeli chcesz, możesz to przenieść do osobnego pola
+                        FromAccountName = null,
                         IsPlanned = planned
                     });
                 }
             }
-
             rows.Sort((a, b) => b.Date.CompareTo(a.Date));
             return rows;
         }
+        
+
 
         // =========================
         //  Helpers
