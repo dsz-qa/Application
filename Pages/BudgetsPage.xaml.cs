@@ -922,7 +922,7 @@ ORDER BY date(Date);";
         ForceStepToMin = true,
 
         SeparatorsPaint = null, // możesz zmienić na delikatne kreski, jeśli chcesz
-        Labeler = v => $"{v:N0} zł",
+        Labeler = v => $"{v:N2} zł",
         TextSize = 12,
         LabelsPaint = whitePaint,
         NamePaint = whitePaint,
@@ -968,7 +968,7 @@ ORDER BY date(Date);";
                     DataLabelsPaint = whitePaint,
                     DataLabelsSize = 12,
                     DataLabelsPosition = DataLabelsPosition.Top,
-                    DataLabelsFormatter = p => $"{p.Coordinate.PrimaryValue:N0} zł"
+                    DataLabelsFormatter = p => $"{p.Coordinate.PrimaryValue:N2} zł"
                 };
 
 
@@ -981,7 +981,7 @@ ORDER BY date(Date);";
                     DataLabelsPaint = whitePaint,
                     DataLabelsSize = 12,
                     DataLabelsPosition = DataLabelsPosition.Top,
-                    DataLabelsFormatter = p => $"{p.Coordinate.PrimaryValue:N0} zł"
+                    DataLabelsFormatter = p => $"{p.Coordinate.PrimaryValue:N2} zł"
                 };
 
                 BudgetHistoryChartControl.LegendTextPaint = whitePaint;
