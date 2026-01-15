@@ -1017,7 +1017,10 @@ ORDER BY date(Date);";
                     Owner = Window.GetWindow(this)
                 };
 
+                dialog.SetMode(Views.Dialogs.EditBudgetDialog.BudgetDialogMode.Add);
+
                 var result = dialog.ShowDialog();
+
                 if (result != true || dialog.Budget == null)
                     return;
 
@@ -1045,9 +1048,11 @@ ORDER BY date(Date);";
                     Owner = Window.GetWindow(this)
                 };
 
+                dialog.SetMode(Views.Dialogs.EditBudgetDialog.BudgetDialogMode.Edit);
                 dialog.LoadBudget(row);
 
                 var result = dialog.ShowDialog();
+
                 if (result != true || dialog.Budget == null)
                     return;
 

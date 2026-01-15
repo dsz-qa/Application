@@ -95,7 +95,8 @@
                                        FontSize="18"
                                        FontWeight="Bold"
                                        Foreground="{DynamicResource App.Foreground}"/>
-                            <TextBlock Text="Ustaw okres i kwotę, a następnie zapisz budżet."
+                            <TextBlock x:Name="HeaderSubtitleText"
+                                       Text="Ustaw okres i kwotę, a następnie zapisz budżet."
                                        Opacity="0.75"
                                        Foreground="{DynamicResource App.Foreground}"/>
                         </StackPanel>

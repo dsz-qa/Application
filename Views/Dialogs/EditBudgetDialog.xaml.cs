@@ -15,6 +15,12 @@ namespace Finly.Views.Dialogs
         private bool _isEditMode;
         private bool _isCustomRange;
 
+        public enum BudgetDialogMode
+        {
+            Add,
+            Edit
+        }
+
         public EditBudgetDialog()
         {
             InitializeComponent();
@@ -22,10 +28,11 @@ namespace Finly.Views.Dialogs
             Budget = new BudgetDialogViewModel();
             DataContext = Budget;
 
+            // domyślnie: dodawanie
+            SetMode(BudgetDialogMode.Add);
+
             Loaded += (_, __) =>
             {
-                HeaderTitleText.Text = "Dodawanie budżetu";
-
                 Budget.StartDate ??= DateTime.Today;
 
                 _isCustomRange = false;
@@ -38,12 +45,27 @@ namespace Finly.Views.Dialogs
             };
         }
 
+        public void SetMode(BudgetDialogMode mode)
+        {
+            _isEditMode = mode == BudgetDialogMode.Edit;
+
+            if (HeaderTitleText != null)
+                HeaderTitleText.Text = mode == BudgetDialogMode.Add ? "Dodawanie budżetu" : "Edycja budżetu";
+
+            if (HeaderSubtitleText != null)
+            {
+                HeaderSubtitleText.Text = mode == BudgetDialogMode.Add
+                    ? "Ustaw okres i kwotę, a następnie zapisz budżet."
+                    : "Zmień dane budżetu, a następnie zapisz zmiany.";
+            }
+        }
+
         public void LoadBudget(BudgetRow row)
         {
             if (row == null) throw new ArgumentNullException(nameof(row));
 
-            _isEditMode = true;
-            HeaderTitleText.Text = "Edycja budżetu";
+            // przełącz w tryb edycji (nagłówek + opis)
+            SetMode(BudgetDialogMode.Edit);
 
             Budget.Name = row.Name;
 
@@ -85,6 +107,7 @@ namespace Finly.Views.Dialogs
                         : "Monthly";
 
             Budget.StartDate = start;
+            Budget.EndDate = null; // wyliczamy automatycznie
             Budget.PlannedAmount = row.PlannedAmount;
 
             _isCustomRange = false;
@@ -148,7 +171,6 @@ namespace Finly.Views.Dialogs
                 _isCustomRange = true;
                 CustomRangePanel.Visibility = Visibility.Visible;
 
-                // klucz: ustaw typ budżetu na Custom (Inny)
                 Budget.Type = "Custom";
 
                 if (Budget.EndDate == null && Budget.StartDate != null)
@@ -192,7 +214,6 @@ namespace Finly.Views.Dialogs
             var start = Budget.StartDate.Value.Date;
             var t = (Budget.Type ?? "Monthly").Trim();
 
-            // zabezpieczenie: gdyby ktoś ręcznie wbił "Custom", nie licz automatycznie
             if (t.Equals("Custom", StringComparison.OrdinalIgnoreCase))
                 return;
 
@@ -314,7 +335,6 @@ namespace Finly.Views.Dialogs
                     return;
                 }
 
-                // gwarancja: custom zapisuje się jako Custom
                 vm.Type = "Custom";
             }
             else

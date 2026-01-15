@@ -320,21 +320,21 @@
 
                 <Border Grid.Column="0" Style="{StaticResource KpiCard}">
                     <StackPanel Background="Transparent">
-                        <TextBlock Text="Aktywne budżety (dzisiaj)" Style="{StaticResource CardHeader}"/>
+                        <TextBlock Text="Aktywne budżety" Style="{StaticResource CardHeader}"/>
                         <TextBlock x:Name="KpiActiveBudgetsText" Style="{StaticResource KpiValueStyle}" Text="0"/>
                     </StackPanel>
                 </Border>
 
                 <Border Grid.Column="1" Style="{StaticResource KpiCard}">
                     <StackPanel Background="Transparent">
-                        <TextBlock Text="Planowane (aktywne)" Style="{StaticResource CardHeader}"/>
+                        <TextBlock Text="Planowane" Style="{StaticResource CardHeader}"/>
                         <TextBlock x:Name="KpiPlannedActiveText" Style="{StaticResource KpiValueStyle}" Text="0,00 zł"/>
                     </StackPanel>
                 </Border>
 
                 <Border Grid.Column="2" Style="{StaticResource KpiCard}" Margin="0">
                     <StackPanel Background="Transparent">
-                        <TextBlock Text="Przekroczone (aktywne)" Style="{StaticResource CardHeader}"/>
+                        <TextBlock Text="Przekroczone" Style="{StaticResource CardHeader}"/>
                         <TextBlock x:Name="KpiOverActiveText" Style="{StaticResource KpiValueStyle}" Text="0 | 0,00 zł"/>
                     </StackPanel>
                 </Border>
