@@ -334,14 +334,28 @@ namespace Finly.Pages
 
             HookDataChanged();
 
-            try { EnsureValuationsSchema(); }
-            catch (Exception ex) { SafeShowError("Błąd bazy (schema): " + ex.Message); }
+            // 1) Schema + ewentualna migracja starych rekordów (00:00 lub same yyyy-MM-dd)
+            try
+            {
+                EnsureValuationsSchema();
+
+                // Jednorazowa naprawa starych wpisów, które nie mają czasu albo mają 00:00:00
+                // (Bezpieczne – jak już było naprawione, nie popsuje nic)
+                FixMidnightTimes();
+            }
+            catch (Exception ex)
+            {
+                SafeShowError("Błąd bazy (schema): " + ex.Message);
+                // Nie wychodzimy return, bo UI nadal może działać częściowo
+            }
 
             try
             {
-                // mini table – ustaw ItemsSource w Loaded (żeby nigdy nie było puste)
-                if (ValuationsMiniTable != null) ValuationsMiniTable.ItemsSource = _vm.Valuations;
+                // 2) Mini table – ustaw ItemsSource w Loaded (żeby nigdy nie było puste)
+                if (ValuationsMiniTable != null)
+                    ValuationsMiniTable.ItemsSource = _vm.Valuations;
 
+                // 3) Load + selection
                 LoadInvestments();
                 ApplySelection(_vm.SelectedInvestment ?? _vm.Investments.FirstOrDefault());
             }
@@ -350,6 +364,7 @@ namespace Finly.Pages
                 SafeShowError("Błąd ładowania inwestycji: " + ex.Message);
             }
         }
+
 
         private void InvestmentsPage_Unloaded(object sender, RoutedEventArgs e)
         {
@@ -454,6 +469,30 @@ ON InvestmentValuations(UserId, InvestmentId, Date);
 ";
             cmd.ExecuteNonQuery();
         }
+
+        private static void FixMidnightTimes()
+        {
+            using var con = DatabaseService.GetConnection();
+            con.Open();
+
+            using var cmd = con.CreateCommand();
+
+            // 1) rekordy, gdzie Date jest tylko yyyy-MM-dd
+            cmd.CommandText = @"
+UPDATE InvestmentValuations
+SET Date = Date || ' 12:00:00'
+WHERE length(Date) = 10;";
+            cmd.ExecuteNonQuery();
+
+            // 2) rekordy, gdzie jest yyyy-MM-dd 00:00:00 -> ustaw 12:00:00
+            cmd.CommandText = @"
+UPDATE InvestmentValuations
+SET Date = substr(Date,1,10) || ' 12:00:00'
+WHERE length(Date) >= 19 AND substr(Date,12,8) = '00:00:00';";
+            cmd.ExecuteNonQuery();
+        }
+
+
 
         // ============================================================
         // LOAD
@@ -586,13 +625,18 @@ ON InvestmentValuations(UserId, InvestmentId, Date);
 
         private static readonly string[] _dateFormats = new[]
         {
-            "yyyy-MM-dd",
-            "yyyy-M-d",
-            "yyyy-MM-dd HH:mm",
-            "yyyy-MM-dd H:mm",
-            "yyyy-MM-dd HH:mm:ss",
-            "yyyy-MM-dd H:mm:ss"
-        };
+    "yyyy-MM-dd",
+    "yyyy-M-d",
+    "yyyy-MM-dd HH:mm",
+    "yyyy-MM-dd H:mm",
+    "yyyy-MM-dd HH:mm:ss",
+    "yyyy-MM-dd H:mm:ss",
+
+    // ISO z 'T' (czasem tak zapisuje SQLite / inne inserty)
+    "yyyy-MM-ddTHH:mm:ss",
+    "yyyy-MM-ddTHH:mm"
+};
+
 
         private static bool TryParseDbDate(string? s, out DateTime dt)
         {
@@ -1109,9 +1153,9 @@ ORDER BY Date ASC, Id ASC;";
 
             using var cmd = con.CreateCommand();
 
-            // dialog zwraca datę bez godziny -> dopisujemy aktualną godzinę dodania
-            var dt = date.Date.Add(DateTime.Now.TimeOfDay);
-            dt = new DateTime(dt.Year, dt.Month, dt.Day, dt.Hour, dt.Minute, 0);
+            // dzień z date, ale czas z DateTime.Now (realna godzina dodania)
+            var now = DateTime.Now;
+            var dt = new DateTime(date.Year, date.Month, date.Day, now.Hour, now.Minute, now.Second);
 
             cmd.CommandText = @"
 INSERT INTO InvestmentValuations(UserId, InvestmentId, Date, Value)
@@ -1125,6 +1169,7 @@ VALUES($uid, $iid, $date, $val);";
 
             try { DatabaseService.NotifyDataChanged(); } catch { }
         }
+
 
         private static void DeleteInvestmentFromDb(int userId, int investmentId)
         {

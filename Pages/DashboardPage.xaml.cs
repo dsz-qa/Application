@@ -57,12 +57,18 @@ namespace Finly.Pages
             // Refresh when DB changes
             DatabaseService.DataChanged += (_, __) => Dispatcher.BeginInvoke(new Action(() =>
             {
-                _vm.LoadTransactions(_startDate == default ? DateTime.Today : _startDate,
-                                     _endDate == default ? DateTime.Today : _endDate);
+                // 1) KPI (w tym Investments) muszą się przeliczyć po każdej zmianie DB
+                RefreshMoneySummary();
 
+                // 2) Reszta jak było
+                var s = _startDate == default ? DateTime.Today : _startDate;
+                var e = _endDate == default ? DateTime.Today : _endDate;
+
+                _vm.LoadTransactions(s, e);
                 LoadCharts();
                 UpdateTablesVisibility();
             }), DispatcherPriority.Background);
+
 
             // redraw trend when canvas resizes
             if (FindName("ExpenseTrendCanvas") is Canvas canvas)
@@ -89,9 +95,11 @@ namespace Finly.Pages
 
         private void DashboardPage_Loaded(object? sender, RoutedEventArgs e)
         {
+            RefreshMoneySummary();
             LoadCharts();
             UpdateTablesVisibility();
         }
+
 
         // =====================================================================
         // Podsumowanie okresu

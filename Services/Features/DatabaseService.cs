@@ -1303,7 +1303,9 @@ WHERE Id=@id AND UserId=@u;";
             var envelopesAllocated = GetTotalAllocatedInEnvelopesForUser(userId);
 
             // Inwestycje (SUM(CurrentAmount))
-            var investmentsTotal = GetInvestmentsTotal(userId);
+            // Inwestycje (SUM ostatnich wycen)
+            var investmentsTotal = GetInvestmentsTotalFromValuations(userId);
+
 
             // Wolna gotówka = cash total - saved total
             var freeCash = cashOnHandTotal - savedTotal;
@@ -1433,6 +1435,45 @@ WHERE UserId = @uid;";
             if (result == null || result == DBNull.Value) return 0m;
 
             // SQLite mo¿e zwróciæ long/double/string – Convert.ToDecimal to ogarnie
+            return Convert.ToDecimal(result, CultureInfo.InvariantCulture);
+        }
+
+        public static decimal GetInvestmentsTotalFromValuations(int userId)
+        {
+            if (userId <= 0) return 0m;
+
+            using var con = OpenAndEnsureSchema();
+            using var cmd = con.CreateCommand();
+
+            // 1 rekord na InvestmentId:
+            // - najpierw wybieramy MAX(Date) dla inwestycji
+            // - potem w ramach tej daty wybieramy MAX(Id) (tie-breaker)
+            // - finalnie sumujemy tylko te rekordy
+            cmd.CommandText = @"
+SELECT COALESCE(SUM(v.Value), 0)
+FROM InvestmentValuations v
+JOIN (
+    SELECT vv.InvestmentId, MAX(vv.Id) AS MaxId
+    FROM InvestmentValuations vv
+    JOIN (
+        SELECT InvestmentId, MAX(Date) AS MaxDate
+        FROM InvestmentValuations
+        WHERE UserId = @uid
+        GROUP BY InvestmentId
+    ) md
+    ON md.InvestmentId = vv.InvestmentId
+    AND md.MaxDate = vv.Date
+    WHERE vv.UserId = @uid
+    GROUP BY vv.InvestmentId
+) pick
+ON pick.MaxId = v.Id
+WHERE v.UserId = @uid;
+";
+            cmd.Parameters.AddWithValue("@uid", userId);
+
+            var result = cmd.ExecuteScalar();
+            if (result == null || result == DBNull.Value) return 0m;
+
             return Convert.ToDecimal(result, CultureInfo.InvariantCulture);
         }
 
