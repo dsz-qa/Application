@@ -1,13 +1,21 @@
-﻿<UserControl x:Class="Finly.Pages.CategoriesPage"
+﻿<!-- CategoriesPage.xaml -->
+<UserControl x:Class="Finly.Pages.CategoriesPage"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:ctrls="clr-namespace:Finly.Views.Controls"
              mc:Ignorable="d"
-             x:Name="Root">
+             x:Name="Root"
+             SnapsToDevicePixels="True"
+             UseLayoutRounding="True"
+             TextOptions.TextFormattingMode="Display"
+             TextOptions.TextRenderingMode="ClearType">
 
     <UserControl.Resources>
+
+        <BooleanToVisibilityConverter x:Key="BoolToVisibility" />
+
         <!-- Style KPI spójne z Dashboard -->
         <Style x:Key="KpiCard" TargetType="Border">
             <Setter Property="Background" Value="Transparent" />
@@ -22,6 +30,7 @@
             <Setter Property="FontSize" Value="16" />
             <Setter Property="FontWeight" Value="Bold" />
             <Setter Property="Foreground" Value="White" />
+            <Setter Property="TextWrapping" Value="Wrap" />
         </Style>
 
         <Style x:Key="KpiValueStyle" TargetType="TextBlock">
@@ -62,8 +71,6 @@
             </Setter>
         </Style>
 
-        <BooleanToVisibilityConverter x:Key="BoolToVisibility" />
-
         <!-- Styl karty kategorii z podświetleniem aktywnej -->
         <Style x:Key="CategoryTileBorderStyle" TargetType="Border">
             <Setter Property="Background" Value="{DynamicResource Surface.Background}" />
@@ -83,10 +90,12 @@
                 </Trigger>
             </Style.Triggers>
         </Style>
+
     </UserControl.Resources>
 
     <ScrollViewer VerticalScrollBarVisibility="Auto"
                   HorizontalScrollBarVisibility="Disabled">
+
         <Grid Margin="16">
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto" />
@@ -105,8 +114,7 @@
                 <Border Grid.Column="0" Style="{StaticResource KpiCard}">
                     <StackPanel>
                         <TextBlock Text="Najczęściej używana kategoria w tym okresie"
-                                   Style="{StaticResource KpiHeader}"
-                                   TextWrapping="Wrap" />
+                                   Style="{StaticResource KpiHeader}" />
                         <StackPanel Orientation="Horizontal" Margin="0,6,0,0" VerticalAlignment="Center">
                             <Rectangle x:Name="MostUsedColorRect"
                                        Width="14"
@@ -127,8 +135,7 @@
                 <Border Grid.Column="1" Style="{StaticResource KpiCard}">
                     <StackPanel>
                         <TextBlock Text="Najdroższa kategoria w tym okresie"
-                                   Style="{StaticResource KpiHeader}"
-                                   TextWrapping="Wrap" />
+                                   Style="{StaticResource KpiHeader}" />
                         <TextBlock x:Name="MostExpensiveNameText"
                                    Style="{StaticResource KpiValueStyle}"
                                    Text="Brak danych dla wybranego okresu" />
@@ -181,14 +188,14 @@
                 </Border>
             </Grid>
 
-            <!-- 2) Pasek okresu + tryby + kafelki + główny layout -->
+            <!-- 2) Pasek okresu + tryby + sekcje -->
             <StackPanel Grid.Row="1" Orientation="Vertical">
 
                 <ctrls:PeriodBarControl x:Name="PeriodBar"
                                         HorizontalAlignment="Center"
                                         Margin="0,0,0,6" />
 
-                <!-- TRYB: pod PeriodBar (Przychody / Wszystko / Wydatki) -->
+                <!-- TRYB -->
                 <StackPanel Orientation="Horizontal"
                             HorizontalAlignment="Center"
                             Margin="0,0,0,10">
@@ -260,7 +267,7 @@
                         <ColumnDefinition Width="*" />
                     </Grid.ColumnDefinitions>
 
-                    <!-- RAMKA: SZCZEGÓŁY KATEGORII -->
+                    <!-- 1) SZCZEGÓŁY -->
                     <Border Grid.Column="0"
                             Padding="10"
                             BorderBrush="{DynamicResource Separator.Orange}"
@@ -273,85 +280,173 @@
                                 BorderBrush="{DynamicResource Surface.Border}"
                                 BorderThickness="1"
                                 CornerRadius="8">
-                            <StackPanel>
+                            <Grid>
+                                <!-- DODANE: osobny wiersz na komunikat, żeby nic się nie nakładało -->
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="10"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="10"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                </Grid.RowDefinitions>
 
-                                <TextBlock Text="Szczegóły kategorii"
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+
+                                <TextBlock Grid.Row="0" Grid.ColumnSpan="2"
+                                           Text="Szczegóły kategorii"
                                            FontWeight="Bold"
                                            Foreground="{DynamicResource App.Foreground}"
                                            FontSize="18" />
 
-                                <TextBlock Margin="0,4,0,0"
-                                           FontSize="14"
-                                           FontWeight="SemiBold"
-                                           Foreground="{DynamicResource App.Foreground}"
-                                           Text="{Binding SelectedCategoryName}"
-                                           TextTrimming="CharacterEllipsis" />
+                                <StackPanel Grid.Row="1" Grid.Column="0" Margin="0,8,0,0">
+                                    <StackPanel Orientation="Horizontal">
+                                        <Rectangle Width="12" Height="12" RadiusX="2" RadiusY="2"
+                                                   Fill="{Binding SelectedCategoryColorBrush}"
+                                                   Margin="0,0,8,0"/>
+                                        <TextBlock Text="{Binding SelectedCategoryName}"
+                                                   FontWeight="Bold"
+                                                   Foreground="{DynamicResource App.Foreground}"
+                                                   TextTrimming="CharacterEllipsis"/>
+                                    </StackPanel>
 
-                                <TextBlock Margin="0,8,0,0"
-                                           Foreground="{DynamicResource App.Foreground}"
-                                           Opacity="0.7"
-                                           Text="Wybierz kategorię z listy, aby zobaczyć szczegóły."
-                                           Visibility="{Binding HasSelectedCategory, Converter={StaticResource BoolToVisibility}, ConverterParameter=False}" />
+                                    <TextBlock Text="{Binding SelectedCategoryDescription}"
+                                               Margin="0,6,0,0"
+                                               Foreground="{DynamicResource App.Foreground}"
+                                               Opacity="0.85"
+                                               TextWrapping="Wrap">
+                                        <TextBlock.Style>
+                                            <Style TargetType="TextBlock">
+                                                <Setter Property="Visibility" Value="Visible"/>
+                                                <Style.Triggers>
+                                                    <Trigger Property="Text" Value="">
+                                                        <Setter Property="Visibility" Value="Collapsed"/>
+                                                    </Trigger>
+                                                    <DataTrigger Binding="{Binding SelectedCategoryDescription}" Value="{x:Null}">
+                                                        <Setter Property="Visibility" Value="Collapsed"/>
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </TextBlock.Style>
+                                    </TextBlock>
+                                </StackPanel>
 
-                                <StackPanel Margin="0,10,0,0"
-                                            Visibility="{Binding HasSelectedCategory, Converter={StaticResource BoolToVisibility}}">
+                                <!-- WAŻNE: brak przycisków (Dodaj/Edytuj) w szczegółach — usunięte -->
 
-                                    <TextBlock Foreground="{DynamicResource App.Foreground}"
-                                               Text="Suma transakcji w tym okresie:" />
-                                    <TextBlock Foreground="{DynamicResource App.Foreground}"
-                                               FontWeight="SemiBold"
-                                               Text="{Binding SelectedCategoryTotalAmount, StringFormat={}{0:N2} zł}" />
+                                <!-- Statystyki (bez Sidebar.Hover, normalne tło kafelka) -->
+                                <Grid Grid.Row="3" Grid.ColumnSpan="2">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
 
-                                    <TextBlock Foreground="{DynamicResource App.Foreground}"
-                                               Margin="0,8,0,0"
-                                               Text="Liczba transakcji w okresie:" />
-                                    <TextBlock Foreground="{DynamicResource App.Foreground}"
-                                               FontWeight="SemiBold"
-                                               Text="{Binding SelectedCategoryTransactionCount}" />
-
-                                    <TextBlock Foreground="{DynamicResource App.Foreground}"
-                                               Margin="0,12,0,4"
-                                               Text="Ostatnie transakcje:" />
-
-                                    <Border MaxHeight="120"
-                                            BorderThickness="0"
-                                            Background="Transparent">
-                                        <ScrollViewer VerticalScrollBarVisibility="Auto"
-                                                      HorizontalScrollBarVisibility="Disabled">
-                                            <ItemsControl ItemsSource="{Binding SelectedCategoryRecentTransactions}">
-                                                <ItemsControl.ItemTemplate>
-                                                    <DataTemplate>
-                                                        <Grid Margin="0,2,0,2">
-                                                            <Grid.ColumnDefinitions>
-                                                                <ColumnDefinition Width="100" />
-                                                                <ColumnDefinition Width="*" />
-                                                                <ColumnDefinition Width="120" />
-                                                            </Grid.ColumnDefinitions>
-
-                                                            <TextBlock Grid.Column="0"
-                                                                       Foreground="{DynamicResource App.Foreground}"
-                                                                       Text="{Binding Date, StringFormat={}{0:yyyy-MM-dd}}" />
-                                                            <TextBlock Grid.Column="1"
-                                                                       Foreground="{DynamicResource App.Foreground}"
-                                                                       Text="{Binding Description}"
-                                                                       TextTrimming="CharacterEllipsis" />
-                                                            <TextBlock Grid.Column="2"
-                                                                       Foreground="{DynamicResource App.Foreground}"
-                                                                       TextAlignment="Right"
-                                                                       Text="{Binding Amount, StringFormat={}{0:N2} zł}" />
-                                                        </Grid>
-                                                    </DataTemplate>
-                                                </ItemsControl.ItemTemplate>
-                                            </ItemsControl>
-                                        </ScrollViewer>
+                                    <Border Grid.Column="0"
+                                            Background="{DynamicResource Surface.Background}"
+                                            BorderBrush="{DynamicResource Surface.Border}"
+                                            BorderThickness="1"
+                                            CornerRadius="8"
+                                            Padding="10"
+                                            Margin="0,0,8,0">
+                                        <StackPanel>
+                                            <TextBlock Text="Suma w okresie"
+                                                       Foreground="{DynamicResource App.Foreground}"
+                                                       Opacity="0.85"/>
+                                            <TextBlock Text="{Binding SelectedCategoryTotalAmount, StringFormat={}{0:N2} zł}"
+                                                       FontWeight="Bold"
+                                                       Foreground="{DynamicResource App.Foreground}"
+                                                       FontSize="16"/>
+                                        </StackPanel>
                                     </Border>
 
-                                </StackPanel>
-                            </StackPanel>
+                                    <Border Grid.Column="1"
+                                            Background="{DynamicResource Surface.Background}"
+                                            BorderBrush="{DynamicResource Surface.Border}"
+                                            BorderThickness="1"
+                                            CornerRadius="8"
+                                            Padding="10">
+                                        <StackPanel>
+                                            <TextBlock Text="Liczba transakcji"
+                                                       Foreground="{DynamicResource App.Foreground}"
+                                                       Opacity="0.85"/>
+                                            <TextBlock Text="{Binding SelectedCategoryTransactionCount}"
+                                                       FontWeight="Bold"
+                                                       Foreground="{DynamicResource App.Foreground}"
+                                                       FontSize="16"/>
+                                        </StackPanel>
+                                    </Border>
+                                </Grid>
+
+                                <TextBlock Grid.Row="4" Grid.ColumnSpan="2"
+                                           Margin="0,10,0,0"
+                                           Text="Ostatnie transakcje"
+                                           FontWeight="SemiBold"
+                                           Foreground="{DynamicResource App.Foreground}"/>
+
+                                <!-- lista transakcji -->
+                                <Border Grid.Row="6" Grid.ColumnSpan="2"
+                                        Background="Transparent"
+                                        MaxHeight="120">
+                                    <ScrollViewer VerticalScrollBarVisibility="Auto"
+                                                  HorizontalScrollBarVisibility="Disabled">
+                                        <ItemsControl ItemsSource="{Binding SelectedCategoryRecentTransactions}">
+                                            <ItemsControl.ItemTemplate>
+                                                <DataTemplate>
+                                                    <Grid Margin="0,2,0,2">
+                                                        <Grid.ColumnDefinitions>
+                                                            <ColumnDefinition Width="90"/>
+                                                            <ColumnDefinition Width="*"/>
+                                                            <ColumnDefinition Width="90"/>
+                                                        </Grid.ColumnDefinitions>
+
+                                                        <TextBlock Grid.Column="0"
+                                                                   Text="{Binding Date, StringFormat={}{0:yyyy-MM-dd}}"
+                                                                   Foreground="{DynamicResource App.Foreground}"
+                                                                   Opacity="0.85"/>
+
+                                                        <TextBlock Grid.Column="1"
+                                                                   Text="{Binding Description}"
+                                                                   Foreground="{DynamicResource App.Foreground}"
+                                                                   TextTrimming="CharacterEllipsis"/>
+
+                                                        <TextBlock Grid.Column="2"
+                                                                   Text="{Binding Amount, StringFormat={}{0:N2} zł}"
+                                                                   Foreground="{DynamicResource App.Foreground}"
+                                                                   TextAlignment="Right"/>
+                                                    </Grid>
+                                                </DataTemplate>
+                                            </ItemsControl.ItemTemplate>
+                                        </ItemsControl>
+                                    </ScrollViewer>
+                                </Border>
+
+                                <!-- Tekst informacyjny gdy brak zaznaczenia (OSOBNY WIERSZ) -->
+                                <TextBlock Grid.Row="7" Grid.ColumnSpan="2"
+                                           Margin="0,8,0,0"
+                                           Foreground="{DynamicResource App.Foreground}"
+                                           Opacity="0.7"
+                                           Text="Wybierz kategorię z listy, aby zobaczyć szczegóły.">
+                                    <TextBlock.Style>
+                                        <Style TargetType="TextBlock">
+                                            <Setter Property="Visibility" Value="Collapsed"/>
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding HasSelectedCategory}" Value="False">
+                                                    <Setter Property="Visibility" Value="Visible"/>
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </TextBlock.Style>
+                                </TextBlock>
+
+                            </Grid>
                         </Border>
                     </Border>
 
-                    <!-- RAMKA: TOP 3 -->
+                    <!-- 2) TOP 3 -->
                     <Border Grid.Column="1"
                             Padding="10"
                             BorderBrush="{DynamicResource Separator.Orange}"
@@ -475,7 +570,7 @@
                         </Border>
                     </Border>
 
-                    <!-- RAMKA: NAJMNIEJ UŻYWANE -->
+                    <!-- 3) NAJMNIEJ UŻYWANE -->
                     <Border Grid.Column="2"
                             Padding="10"
                             BorderBrush="{DynamicResource Separator.Orange}"
@@ -513,7 +608,7 @@
                                                            Foreground="{DynamicResource App.Foreground}"
                                                            TextAlignment="Right" />
                                                 <TextBlock Grid.Column="2"
-                                                           Text="{Binding Percent, StringFormat={}{0:N0}%}"
+                                                           Text="{Binding Percent, StringFormat={}{0:N1}%}"
                                                            Foreground="{DynamicResource App.Foreground}"
                                                            TextAlignment="Right" />
                                             </Grid>
@@ -523,9 +618,10 @@
                             </StackPanel>
                         </Border>
                     </Border>
+
                 </Grid>
 
-                <!-- GŁÓWNY GRID: LEWO = WSZYSTKIE KATEGORIE, PRAWO = ANALIZA -->
+                <!-- GŁÓWNY GRID: LEWO = KATEGORIE, PRAWO = ANALIZA -->
                 <Grid>
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*" />
@@ -571,7 +667,6 @@
                                                         MouseLeftButtonUp="CategoryItem_Click">
                                                     <Grid>
                                                         <Grid.RowDefinitions>
-                                                            <RowDefinition Height="Auto" />
                                                             <RowDefinition Height="Auto" />
                                                             <RowDefinition Height="Auto" />
                                                         </Grid.RowDefinitions>
@@ -622,133 +717,70 @@
                                                                     Orientation="Horizontal"
                                                                     HorizontalAlignment="Right"
                                                                     Margin="0,8,0,0">
-                                                            <Button Style="{StaticResource EditIconButton}"
+
+                                                            <Button x:Name="EditBtn"
+                                                                    Style="{StaticResource EditIconButton}"
                                                                     ToolTip="Edytuj"
                                                                     Click="EditCategory_Click"
                                                                     Tag="{Binding}" />
-                                                            <Button Style="{StaticResource DeleteIconButton}"
+
+                                                            <Button x:Name="DeleteBtn"
+                                                                    Style="{StaticResource DeleteIconButton}"
                                                                     ToolTip="Usuń"
                                                                     Click="ShowDeleteConfirm_Click"
                                                                     Tag="{Binding}" />
-                                                        </StackPanel>
 
-                                                        <Border Grid.Row="2"
-                                                                Grid.Column="2"
-                                                                HorizontalAlignment="Right"
-                                                                Margin="0,8,0,0"
-                                                                Background="{DynamicResource Surface.Background}"
-                                                                BorderBrush="{DynamicResource Surface.Border}"
-                                                                BorderThickness="1"
-                                                                CornerRadius="6"
-                                                                Padding="8"
-                                                                Visibility="{Binding IsDeleteConfirmVisible, Converter={StaticResource BoolToVisibility}}">
-                                                            <StackPanel>
-                                                                <TextBlock Text="Czy na pewno chcesz usunąć daną kategorię?"
-                                                                           Foreground="{DynamicResource App.Foreground}"
-                                                                           TextWrapping="Wrap" />
-                                                                <StackPanel Orientation="Horizontal"
-                                                                            HorizontalAlignment="Right"
-                                                                            Margin="0,6,0,0">
-                                                                    <Button Content="Tak"
-                                                                            Height="24"
-                                                                            MinWidth="40"
-                                                                            Padding="6,0"
-                                                                            Margin="0,0,6,0"
-                                                                            Click="DeleteConfirm_Click"
-                                                                            Tag="{Binding}" />
-                                                                    <Button Content="Nie"
-                                                                            Height="24"
-                                                                            MinWidth="40"
-                                                                            Padding="6,0"
-                                                                            Click="HideDeleteConfirm_Click"
-                                                                            Tag="{Binding}" />
-                                                                </StackPanel>
-                                                            </StackPanel>
-                                                        </Border>
+                                                            <Popup IsOpen="{Binding IsDeleteConfirmVisible, Mode=TwoWay}"
+                                                                   Placement="Right"
+                                                                   PlacementTarget="{Binding ElementName=DeleteBtn}"
+                                                                   StaysOpen="False"
+                                                                   AllowsTransparency="True">
+                                                                <Border Background="{DynamicResource Surface.Background}"
+                                                                        BorderBrush="{DynamicResource Surface.Border}"
+                                                                        BorderThickness="1"
+                                                                        CornerRadius="8"
+                                                                        Padding="10">
+                                                                    <StackPanel Width="220">
+                                                                        <TextBlock Text="Usunąć kategorię?"
+                                                                                   Foreground="{DynamicResource App.Foreground}"
+                                                                                   FontWeight="SemiBold"
+                                                                                   Margin="0,0,0,6"/>
+                                                                        <TextBlock Text="Tej operacji nie można cofnąć."
+                                                                                   Foreground="{DynamicResource App.Foreground}"
+                                                                                   Opacity="0.8"
+                                                                                   TextWrapping="Wrap"/>
+
+                                                                        <StackPanel Orientation="Horizontal"
+                                                                                    HorizontalAlignment="Right"
+                                                                                    Margin="0,10,0,0">
+                                                                            <Button Content="Tak"
+                                                                                    Height="26"
+                                                                                    MinWidth="50"
+                                                                                    Margin="0,0,8,0"
+                                                                                    Click="DeleteConfirm_Click"
+                                                                                    Tag="{Binding}" />
+                                                                            <Button Content="Nie"
+                                                                                    Height="26"
+                                                                                    MinWidth="50"
+                                                                                    Click="HideDeleteConfirm_Click"
+                                                                                    Tag="{Binding}" />
+                                                                        </StackPanel>
+                                                                    </StackPanel>
+                                                                </Border>
+                                                            </Popup>
+
+                                                        </StackPanel>
                                                     </Grid>
-                                                </Border>
-
-                                                <Border Margin="0,10,0,0"
-                                                        Background="{DynamicResource Surface.Background}"
-                                                        BorderBrush="{DynamicResource Surface.Border}"
-                                                        BorderThickness="1"
-                                                        CornerRadius="8"
-                                                        Padding="10"
-                                                        Visibility="{Binding IsEditing, Converter={StaticResource BoolToVisibility}}">
-                                                    <StackPanel>
-                                                        <TextBlock Text="{Binding Name, StringFormat=Edytujesz kategorię: {0}}"
-                                                                   FontWeight="Bold"
-                                                                   Foreground="{DynamicResource App.Foreground}"
-                                                                   Margin="0,0,0,6" />
-
-                                                        <TextBlock Text="Nazwa"
-                                                                   Margin="0,6,0,2"
-                                                                   Foreground="{DynamicResource App.Foreground}" />
-                                                        <TextBox Text="{Binding Name, UpdateSourceTrigger=PropertyChanged}"
-                                                                 Height="24" />
-
-                                                        <TextBlock Text="Opis kategorii"
-                                                                   Margin="0,6,0,2"
-                                                                   Foreground="{DynamicResource App.Foreground}" />
-                                                        <TextBox Text="{Binding Description, UpdateSourceTrigger=PropertyChanged}"
-                                                                 Height="60"
-                                                                 TextWrapping="Wrap"
-                                                                 AcceptsReturn="True" />
-
-                                                        <TextBlock Text="Kolor kategorii"
-                                                                   Margin="0,6,0,4"
-                                                                   Foreground="{DynamicResource App.Foreground}" />
-
-                                                        <WrapPanel ItemWidth="32" ItemHeight="32">
-                                                            <Button Width="32" Height="32" Margin="0,0,6,6"
-                                                                    Background="#FFED7A1A" Tag="#FFED7A1A"
-                                                                    Click="InlineColorPick_Click" />
-                                                            <Button Width="32" Height="32" Margin="0,0,6,6"
-                                                                    Background="#FF3FA7D6" Tag="#FF3FA7D6"
-                                                                    Click="InlineColorPick_Click" />
-                                                            <Button Width="32" Height="32" Margin="0,0,6,6"
-                                                                    Background="#FF7BC96F" Tag="#FF7BC96F"
-                                                                    Click="InlineColorPick_Click" />
-                                                            <Button Width="32" Height="32" Margin="0,0,6,6"
-                                                                    Background="#FFAF7AC5" Tag="#FFAF7AC5"
-                                                                    Click="InlineColorPick_Click" />
-                                                            <Button Width="32" Height="32" Margin="0,0,6,6"
-                                                                    Background="#FFF6BF26" Tag="#FFF6BF26"
-                                                                    Click="InlineColorPick_Click" />
-                                                            <Button Width="32" Height="32" Margin="0,0,6,6"
-                                                                    Background="#FF56C1A7" Tag="#FF56C1A7"
-                                                                    Click="InlineColorPick_Click" />
-                                                            <Button Width="32" Height="32" Margin="0,0,6,6"
-                                                                    Background="#FFCE6A6B" Tag="#FFCE6A6B"
-                                                                    Click="InlineColorPick_Click" />
-                                                            <Button Width="32" Height="32" Margin="0,0,6,6"
-                                                                    Background="#FF9AA0A6" Tag="#FF9AA0A6"
-                                                                    Click="InlineColorPick_Click" />
-                                                        </WrapPanel>
-
-                                                        <StackPanel Orientation="Horizontal"
-                                                                    HorizontalAlignment="Right"
-                                                                    Margin="0,10,0,0">
-                                                            <Button Content="Zapisz"
-                                                                    Width="80"
-                                                                    Margin="0,0,6,0"
-                                                                    Click="InlineSaveEdit_Click"
-                                                                    Tag="{Binding}" />
-                                                            <Button Content="Anuluj"
-                                                                    Width="80"
-                                                                    Click="InlineCancelEdit_Click"
-                                                                    Tag="{Binding}" />
-                                                        </StackPanel>
-                                                    </StackPanel>
                                                 </Border>
                                             </StackPanel>
                                         </DataTemplate>
                                     </ItemsControl.ItemTemplate>
                                 </ItemsControl>
 
+                                <!-- KAFEL "DODAJ KATEGORIĘ" -->
                                 <Button Style="{StaticResource AddTileButtonStyle}"
                                         Margin="0,0,0,0"
-                                        Click="AddCategoryTile_Click">
+                                        Click="AddCategoryDialog_Click">
                                     <StackPanel Orientation="Vertical"
                                                 HorizontalAlignment="Center"
                                                 VerticalAlignment="Center">
@@ -764,85 +796,6 @@
                                     </StackPanel>
                                 </Button>
 
-                                <Border x:Name="AddPanel"
-                                        Background="{DynamicResource Surface.Background}"
-                                        BorderBrush="{DynamicResource Surface.Border}"
-                                        BorderThickness="1"
-                                        CornerRadius="8"
-                                        Padding="12"
-                                        Margin="0,12,0,0"
-                                        Visibility="Collapsed">
-                                    <StackPanel>
-                                        <TextBlock Text="Dodaj nową kategorię"
-                                                   FontWeight="Bold"
-                                                   Foreground="{DynamicResource App.Foreground}"
-                                                   FontSize="16" />
-
-                                        <TextBlock Text="Nazwa"
-                                                   Margin="0,10,0,4"
-                                                   Foreground="{DynamicResource App.Foreground}" />
-                                        <TextBox x:Name="AddNameBox"
-                                                 Height="28"
-                                                 HorizontalAlignment="Stretch" />
-
-                                        <TextBlock Text="Opis kategorii"
-                                                   Margin="0,10,0,4"
-                                                   Foreground="{DynamicResource App.Foreground}" />
-                                        <TextBox x:Name="AddDescriptionBox"
-                                                 Height="80"
-                                                 TextWrapping="Wrap"
-                                                 AcceptsReturn="True" />
-
-                                        <TextBlock Text="Kolor kategorii"
-                                                   Margin="0,12,0,6"
-                                                   Foreground="{DynamicResource App.Foreground}" />
-
-                                        <WrapPanel x:Name="AddColorPickerPanel"
-                                                   ItemWidth="32"
-                                                   ItemHeight="32">
-                                            <Button Width="32" Height="32" Margin="0,0,6,6"
-                                                    Background="#FFED7A1A" Tag="#FFED7A1A"
-                                                    Click="ColorPick_Click" />
-                                            <Button Width="32" Height="32" Margin="0,0,6,6"
-                                                    Background="#FF3FA7D6" Tag="#FF3FA7D6"
-                                                    Click="ColorPick_Click" />
-                                            <Button Width="32" Height="32" Margin="0,0,6,6"
-                                                    Background="#FF7BC96F" Tag="#FF7BC96F"
-                                                    Click="ColorPick_Click" />
-                                            <Button Width="32" Height="32" Margin="0,0,6,6"
-                                                    Background="#FFAF7AC5" Tag="#FFAF7AC5"
-                                                    Click="ColorPick_Click" />
-                                            <Button Width="32" Height="32" Margin="0,0,6,6"
-                                                    Background="#FFF6BF26" Tag="#FFF6BF26"
-                                                    Click="ColorPick_Click" />
-                                            <Button Width="32" Height="32" Margin="0,0,6,6"
-                                                    Background="#FF56C1A7" Tag="#FF56C1A7"
-                                                    Click="ColorPick_Click" />
-                                            <Button Width="32" Height="32" Margin="0,0,6,6"
-                                                    Background="#FFCE6A6B" Tag="#FFCE6A6B"
-                                                    Click="ColorPick_Click" />
-                                            <Button Width="32" Height="32" Margin="0,0,6,6"
-                                                    Background="#FF9AA0A6" Tag="#FF9AA0A6"
-                                                    Click="ColorPick_Click" />
-                                        </WrapPanel>
-
-                                        <StackPanel Orientation="Horizontal"
-                                                    Margin="0,12,0,0"
-                                                    HorizontalAlignment="Right">
-                                            <Button Content="Dodaj"
-                                                    Width="100"
-                                                    Margin="0,0,8,0"
-                                                    Click="AddCategory_Click" />
-                                            <Button Content="Anuluj"
-                                                    Width="100"
-                                                    Click="ClearAddPanel_Click" />
-                                        </StackPanel>
-
-                                        <TextBlock x:Name="AddPanelMessage"
-                                                   Foreground="OrangeRed"
-                                                   Margin="0,8,0,0" />
-                                    </StackPanel>
-                                </Border>
                             </StackPanel>
                         </Border>
                     </StackPanel>
@@ -940,7 +893,7 @@
                                                     BorderBrush="{DynamicResource Surface.Border}"
                                                     BorderThickness="0,0,1,1"
                                                     Padding="0,2,8,2">
-                                                <TextBlock Text="{Binding Percent, StringFormat={}{0:N0}%}"
+                                                <TextBlock Text="{Binding Percent, StringFormat={}{0:N1}%}"
                                                            Foreground="{DynamicResource App.Foreground}"
                                                            TextAlignment="Right" />
                                             </Border>
@@ -966,6 +919,7 @@
                             </ItemsControl>
                         </StackPanel>
                     </Border>
+
                 </Grid>
             </StackPanel>
 

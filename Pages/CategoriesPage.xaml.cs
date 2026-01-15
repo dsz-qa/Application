@@ -1,5 +1,7 @@
-﻿using Finly.Services;
+﻿// CategoriesPage.xaml.cs
+using Finly.Services;
 using Finly.Services.Features;
+using Finly.Views.Dialogs;
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
@@ -28,7 +30,7 @@ namespace Finly.Pages
 
         private CategoryMode _mode = CategoryMode.All;
 
-        // ===== LISTA KATEGORII (lewa kolumna) =====
+        // ===== LISTA KATEGORII =====
         private readonly ObservableCollection<CategoryVm> _categories = new();
         public ObservableCollection<CategoryVm> Categories => _categories;
 
@@ -55,10 +57,11 @@ namespace Finly.Pages
 
         // ===== BINDINGI do XAML =====
         public bool HasSelectedCategory => _selectedCategory != null;
-
         public string SelectedCategoryName => _selectedCategory?.Name ?? string.Empty;
+        public string SelectedCategoryDescription => _selectedCategory?.Description ?? string.Empty;
+        public Brush SelectedCategoryColorBrush => _selectedCategory?.ColorBrush ?? Brushes.Transparent;
 
-        // ===== STATYSTYKI DLA WYBRANEJ KATEGORII (Szczegóły) =====
+        // ===== Szczegóły: statystyki =====
         private decimal _selectedCategoryTotalAmount;
         public decimal SelectedCategoryTotalAmount
         {
@@ -75,12 +78,12 @@ namespace Finly.Pages
 
         public ObservableCollection<CategoryTransactionRow> SelectedCategoryRecentTransactions { get; } = new();
 
-        // ===== STRUKTURA (prawa część) =====
+        // ===== Analizy =====
         public ObservableCollection<CategoryShareItem> CategoryShares { get; } = new();
         public ObservableCollection<CategoryShareItem> TopCategories { get; } = new();
         public ObservableCollection<CategoryShareItem> BottomCategories { get; } = new();
 
-        // ===== KPI u góry =====
+        // ===== KPI refs =====
         private TextBlock? _mostUsedName;
         private TextBlock? _mostUsedCount;
         private Rectangle? _mostUsedColor;
@@ -119,7 +122,7 @@ namespace Finly.Pages
             PeriodBar.RangeChanged += PeriodBar_RangeChanged;
         }
 
-        // ========== TRYB POD PERIODBAR ==========
+        // ========== TRYB ==========
         private void Mode_Click(object sender, RoutedEventArgs e)
         {
             if (sender is not Button b) return;
@@ -155,7 +158,7 @@ namespace Finly.Pages
             btn.Opacity = active ? 1.0 : 0.92;
         }
 
-        // ========== FILTROWANIE LISTY KATEGORII (Szukaj) ==========
+        // ========== FILTROWANIE ==========
         private bool CategoryFilter(object obj)
         {
             if (obj is not CategoryVm vm) return false;
@@ -179,7 +182,7 @@ namespace Finly.Pages
             try
             {
                 EnsureKpiRefs();
-                EnsureDefaultCategories();
+                EnsureDefaultCategoriesOncePerUser(); // <- krytyczne: już nie odtwarza po usunięciu
                 LoadCategories();
 
                 UpdateModeButtonsUi();
@@ -218,8 +221,15 @@ namespace Finly.Pages
             _inactiveCats ??= FindName("InactiveCategoriesText") as TextBlock;
         }
 
+        // ===== procenty: 0.5% kroki =====
+        private static double RoundToHalfPercent(double pct)
+        {
+            if (pct <= 0.0) return 0.0;
+            return Math.Round(pct * 2.0, MidpointRounding.AwayFromZero) / 2.0;
+        }
+
         // ============================================================
-        //  AGREGACJA (jedno miejsce): Expenses/Incomes -> per kategoria
+        //  AGREGACJA (Expenses/Incomes -> per kategoria)
         // ============================================================
         private void AccumulateCategoryAggregates(
             DateTime from, DateTime to,
@@ -230,10 +240,9 @@ namespace Finly.Pages
             bool includeIncomes)
         {
             using var con = DatabaseService.GetConnection();
+            con.Open();
             using var cmd = con.CreateCommand();
 
-            // Jedna ścieżka, jedna konwencja: Name + Amount.
-            // Uwaga: filtrujemy CategoryId NULL, żeby nie mieszać "(brak)".
             var sqlParts = new List<string>();
 
             if (includeExpenses)
@@ -282,6 +291,7 @@ WHERE i.UserId=@u AND i.Date>=@from AND i.Date<=@to
         private (decimal sum, int count) GetCategoryTotalsById(DateTime from, DateTime to, int categoryId, bool expenses, bool incomes)
         {
             using var con = DatabaseService.GetConnection();
+            con.Open();
             using var cmd = con.CreateCommand();
 
             var sqlParts = new List<string>();
@@ -326,7 +336,7 @@ WHERE i.UserId=@u AND i.CategoryId=@c AND i.Date>=@from AND i.Date<=@to");
             return (sum, count);
         }
 
-        // ========== KPI U GÓRY (zależne od okresu + trybu) ==========
+        // ========== KPI U GÓRY ==========
         private void UpdateCategoryKpis()
         {
             EnsureKpiRefs();
@@ -352,9 +362,9 @@ WHERE i.UserId=@u AND i.CategoryId=@c AND i.Date>=@from AND i.Date<=@to");
             if (counts.Count > 0)
             {
                 var mostUsed = counts.OrderByDescending(kv => kv.Value).First();
-                _mostUsedName!.Text = mostUsed.Key;
-                _mostUsedCount!.Text = $"Liczba transakcji: {mostUsed.Value}";
-                _mostUsedColor!.Fill = GetBrushForName(mostUsed.Key);
+                if (_mostUsedName != null) _mostUsedName.Text = mostUsed.Key;
+                if (_mostUsedCount != null) _mostUsedCount.Text = $"Liczba transakcji: {mostUsed.Value}";
+                if (_mostUsedColor != null) _mostUsedColor.Fill = GetBrushForName(mostUsed.Key);
             }
             else
             {
@@ -370,9 +380,12 @@ WHERE i.UserId=@u AND i.CategoryId=@c AND i.Date>=@from AND i.Date<=@to");
                 if (_mostExpName != null) _mostExpName.Text = mostExp.Key;
                 if (_mostExpAmount != null) _mostExpAmount.Text = mostExp.Value.ToString("N2", CultureInfo.CurrentCulture) + " zł";
 
-                var pct = totalSum > 0m ? (double)(mostExp.Value / totalSum * 100m) : 0.0;
+                var pctRaw = totalSum > 0m ? (double)(mostExp.Value / totalSum * 100m) : 0.0;
+                var pct = RoundToHalfPercent(pctRaw);
+
                 if (_mostExpPercentBar != null) _mostExpPercentBar.Value = pct;
-                if (_mostExpPercentText != null) _mostExpPercentText.Text = Math.Round(pct, 0).ToString(CultureInfo.CurrentCulture) + "% wszystkich transakcji";
+                if (_mostExpPercentText != null)
+                    _mostExpPercentText.Text = pct.ToString("N1", CultureInfo.CurrentCulture) + "% wszystkich transakcji";
             }
             else
             {
@@ -398,7 +411,7 @@ WHERE i.UserId=@u AND i.CategoryId=@c AND i.Date>=@from AND i.Date<=@to");
             if (_inactiveCats != null) _inactiveCats.Text = _inactiveCategoriesCount.ToString(CultureInfo.CurrentCulture);
         }
 
-        // ========== ŁADOWANIE LISTY KATEGORII (niezależne od okresu) ==========
+        // ========== ŁADOWANIE LISTY ==========
         private void LoadCategories()
         {
             _categories.Clear();
@@ -406,9 +419,16 @@ WHERE i.UserId=@u AND i.CategoryId=@c AND i.Date>=@from AND i.Date<=@to");
             var tuples = DatabaseService.GetCategoriesExtended(_uid);
             foreach (var (id, name, color, icon) in tuples)
             {
-                var brush = string.IsNullOrWhiteSpace(color)
-                    ? GetBrushForName(name)
-                    : (Brush)(new BrushConverter().ConvertFromString(color)!);
+                Brush brush;
+                if (string.IsNullOrWhiteSpace(color))
+                {
+                    brush = GetBrushForName(name);
+                }
+                else
+                {
+                    try { brush = (Brush)(new BrushConverter().ConvertFromString(color)!); }
+                    catch { brush = GetBrushForName(name); }
+                }
 
                 _categories.Add(new CategoryVm
                 {
@@ -420,10 +440,11 @@ WHERE i.UserId=@u AND i.CategoryId=@c AND i.Date>=@from AND i.Date<=@to");
                 });
             }
 
-            // opisy + kolory z bazy
+            // opisy + kolory z bazy (best-effort)
             try
             {
                 using var con = DatabaseService.GetConnection();
+                con.Open();
                 using var cmd = con.CreateCommand();
                 cmd.CommandText = "SELECT Id, Description, Color FROM Categories WHERE UserId=@u;";
                 cmd.Parameters.AddWithValue("@u", _uid);
@@ -459,152 +480,121 @@ WHERE i.UserId=@u AND i.CategoryId=@c AND i.Date>=@from AND i.Date<=@to");
             RaisePropertyChanged(nameof(Categories));
 
             UpdateCategoryStats();
-        }
 
-        // ========== DODAWANIE / EDYCJA / USUWANIE ==========
-        private void AddCategoryTile_Click(object sender, RoutedEventArgs e)
-        {
-            AddPanelMessage.Text = string.Empty;
-            AddNameBox.Text = string.Empty;
-            AddDescriptionBox.Text = string.Empty;
-            _selectedColorHex = string.Empty;
-
-            AddPanel.Visibility = Visibility.Visible;
-            try { AddPanel.UpdateLayout(); AddPanel.BringIntoView(); } catch { }
-        }
-
-        private string _selectedColorHex = string.Empty;
-
-        private void AddCategory_Click(object sender, RoutedEventArgs e)
-        {
-            var name = (AddNameBox.Text ?? string.Empty).Trim();
-            if (string.IsNullOrWhiteSpace(name))
+            // Odśwież szczegóły (jeśli usunięto wybraną kategorię)
+            if (_selectedCategory != null)
             {
-                AddPanelMessage.Text = "Podaj nazwę kategorii.";
-                return;
+                var stillExists = _categories.Any(c => c.Id == _selectedCategory.Id);
+                if (!stillExists) _selectedCategory = null;
             }
+            LoadSelectedCategoryDetails();
+        }
+
+        // ========== DODAJ / EDYTUJ (DIALOG) ==========
+        private void AddCategoryDialog_Click(object sender, RoutedEventArgs e)
+        {
+            var dlg = new EditCategoryDialog { Owner = Window.GetWindow(this) };
+            dlg.LoadForAdd();
+
+            if (dlg.ShowDialog() != true) return;
+
+            var vm = dlg.Category;
+            var name = (vm.Name ?? string.Empty).Trim();
+            if (string.IsNullOrWhiteSpace(name)) return;
 
             try
             {
                 int id = DatabaseService.GetOrCreateCategoryId(_uid, name);
-                string? colorToSave = string.IsNullOrWhiteSpace(_selectedColorHex) ? null : _selectedColorHex;
 
-                DatabaseService.UpdateCategoryFull(id, _uid, name, colorToSave, null);
+                string? colorToSave = string.IsNullOrWhiteSpace(vm.ColorHex) ? null : vm.ColorHex;
+                DatabaseService.UpdateCategoryFull(id, _uid, name, colorToSave, vm.Icon);
 
                 try
                 {
                     using var con = DatabaseService.GetConnection();
+                    con.Open();
                     using var cmd = con.CreateCommand();
                     cmd.CommandText = "UPDATE Categories SET Description=@d WHERE Id=@id;";
-                    cmd.Parameters.AddWithValue("@d", (object?)AddDescriptionBox.Text ?? DBNull.Value);
+                    cmd.Parameters.AddWithValue("@d", (object?)vm.Description ?? DBNull.Value);
                     cmd.Parameters.AddWithValue("@id", id);
                     cmd.ExecuteNonQuery();
                 }
                 catch { }
 
-                AddPanelMessage.Text = "Dodano.";
-                AddNameBox.Text = string.Empty;
-                AddDescriptionBox.Text = string.Empty;
-                _selectedColorHex = string.Empty;
+                ToastService.Success("Dodano kategorię.");
 
                 LoadCategories();
                 UpdateCategoryKpis();
                 UpdateCategoryStats();
+
+                // auto zaznacz nową po ID
+                var again = _categories.FirstOrDefault(x => x.Id == id);
+                if (again != null) SelectCategory(again);
             }
             catch (Exception ex)
             {
-                AddPanelMessage.Text = "Błąd dodawania: " + ex.Message;
+                MessageBox.Show("Błąd dodawania: " + ex.Message, "Błąd", MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
 
-        private void ClearAddPanel_Click(object sender, RoutedEventArgs e)
+        private void EditSelectedCategoryDialog_Click(object sender, RoutedEventArgs e)
         {
-            AddNameBox.Text = string.Empty;
-            AddDescriptionBox.Text = string.Empty;
-            _selectedColorHex = string.Empty;
-            AddPanelMessage.Text = string.Empty;
-            AddPanel.Visibility = Visibility.Collapsed;
+            if (_selectedCategory == null) return;
+            OpenEditDialogFor(_selectedCategory);
         }
 
         private void EditCategory_Click(object sender, RoutedEventArgs e)
         {
             if ((sender as FrameworkElement)?.Tag is CategoryVm vm)
-            {
-                _selectedCategory = vm;
-
-                foreach (var c in _categories)
-                    c.IsEditing = false;
-
-                vm.IsEditing = true;
-
-                RaisePropertyChanged(nameof(HasSelectedCategory));
-                RaisePropertyChanged(nameof(SelectedCategoryName));
-
-                LoadSelectedCategoryDetails();
-            }
+                OpenEditDialogFor(vm);
         }
 
-        private void InlineColorPick_Click(object sender, RoutedEventArgs e)
+        private void OpenEditDialogFor(CategoryVm vm)
         {
-            if (sender is Button b && b.DataContext is CategoryVm vm && b.Tag is string hex)
-            {
-                vm.ColorHex = hex;
-                vm.ColorBrush = (Brush)(new BrushConverter().ConvertFromString(hex)!);
-            }
-        }
+            var dlg = new EditCategoryDialog { Owner = Window.GetWindow(this) };
+            dlg.LoadForEdit(vm.Id, vm.Name, vm.Description, vm.ColorHex, vm.Icon);
 
-        private void InlineSaveEdit_Click(object sender, RoutedEventArgs e)
-        {
-            if ((sender as FrameworkElement)?.Tag is not CategoryVm vm) return;
+            if (dlg.ShowDialog() != true) return;
 
-            var newName = (vm.Name ?? string.Empty).Trim();
-            if (string.IsNullOrWhiteSpace(newName))
-            {
-                MessageBox.Show("Podaj nazwę kategorii.", "Błąd",
-                    MessageBoxButton.OK, MessageBoxImage.Warning);
-                return;
-            }
+            var data = dlg.Category;
+            var newName = (data.Name ?? string.Empty).Trim();
+            if (string.IsNullOrWhiteSpace(newName)) return;
 
             try
             {
-                string? colorToSave = string.IsNullOrWhiteSpace(vm.ColorHex) ? null : vm.ColorHex;
+                string? colorToSave = string.IsNullOrWhiteSpace(data.ColorHex) ? null : data.ColorHex;
 
-                DatabaseService.UpdateCategoryFull(vm.Id, _uid, newName, colorToSave, vm.Icon);
+                DatabaseService.UpdateCategoryFull(vm.Id, _uid, newName, colorToSave, data.Icon ?? vm.Icon);
 
                 try
                 {
                     using var con = DatabaseService.GetConnection();
+                    con.Open();
                     using var cmd = con.CreateCommand();
                     cmd.CommandText = "UPDATE Categories SET Description=@d WHERE Id=@id;";
-                    cmd.Parameters.AddWithValue("@d", (object?)vm.Description ?? DBNull.Value);
+                    cmd.Parameters.AddWithValue("@d", (object?)data.Description ?? DBNull.Value);
                     cmd.Parameters.AddWithValue("@id", vm.Id);
                     cmd.ExecuteNonQuery();
                 }
                 catch { }
 
-                vm.IsEditing = false;
+                ToastService.Success("Zapisano zmiany kategorii.");
 
                 LoadCategories();
+                var again = _categories.FirstOrDefault(x => x.Id == vm.Id);
+                if (again != null) SelectCategory(again);
+
                 UpdateCategoryKpis();
                 UpdateCategoryStats();
                 LoadSelectedCategoryDetails();
             }
             catch (Exception ex)
             {
-                MessageBox.Show("Błąd zapisu kategorii: " + ex.Message,
-                    "Błąd", MessageBoxButton.OK, MessageBoxImage.Error);
+                MessageBox.Show("Błąd zapisu: " + ex.Message, "Błąd", MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
 
-        private void InlineCancelEdit_Click(object sender, RoutedEventArgs e)
-        {
-            if ((sender as FrameworkElement)?.Tag is CategoryVm vm)
-            {
-                vm.IsEditing = false;
-                LoadCategories();
-            }
-        }
-
+        // ========== USUWANIE ==========
         private void ShowDeleteConfirm_Click(object sender, RoutedEventArgs e)
         {
             if (sender is FrameworkElement fe && fe.Tag is CategoryVm vm)
@@ -641,12 +631,8 @@ WHERE i.UserId=@u AND i.CategoryId=@c AND i.Date>=@from AND i.Date<=@to");
 
                 ToastService.Success("Kategoria usunięta.");
 
-                if (_selectedCategory != null && ReferenceEquals(_selectedCategory, vm))
-                {
+                if (_selectedCategory != null && _selectedCategory.Id == vm.Id)
                     _selectedCategory = null;
-                    RaisePropertyChanged(nameof(HasSelectedCategory));
-                    RaisePropertyChanged(nameof(SelectedCategoryName));
-                }
 
                 LoadCategories();
                 UpdateCategoryKpis();
@@ -660,9 +646,10 @@ WHERE i.UserId=@u AND i.CategoryId=@c AND i.Date>=@from AND i.Date<=@to");
             }
         }
 
+        // ========== ZAZNACZANIE KAFELKA ==========
         private void CategoryItem_Click(object sender, System.Windows.Input.MouseButtonEventArgs e)
         {
-            // Jeśli kliknięto w przyciski Edytuj/Usuń, nie zaznaczaj kafelka
+            // Jeśli kliknięto w przyciski, nie zaznaczaj
             if (e.OriginalSource is DependencyObject d)
             {
                 var parent = d;
@@ -674,20 +661,25 @@ WHERE i.UserId=@u AND i.CategoryId=@c AND i.Date>=@from AND i.Date<=@to");
             }
 
             if (sender is FrameworkElement fe && fe.DataContext is CategoryVm vm)
-            {
-                foreach (var c in _categories)
-                    c.IsSelected = ReferenceEquals(c, vm);
-
-                _selectedCategory = vm;
-
-                RaisePropertyChanged(nameof(HasSelectedCategory));
-                RaisePropertyChanged(nameof(SelectedCategoryName));
-
-                LoadSelectedCategoryDetails();
-            }
+                SelectCategory(vm);
         }
 
-        // ========== SZCZEGÓŁY WYBRANEJ KATEGORII (zależne od okresu + trybu) ==========
+        private void SelectCategory(CategoryVm vm)
+        {
+            foreach (var c in _categories)
+                c.IsSelected = ReferenceEquals(c, vm);
+
+            _selectedCategory = vm;
+
+            RaisePropertyChanged(nameof(HasSelectedCategory));
+            RaisePropertyChanged(nameof(SelectedCategoryName));
+            RaisePropertyChanged(nameof(SelectedCategoryDescription));
+            RaisePropertyChanged(nameof(SelectedCategoryColorBrush));
+
+            LoadSelectedCategoryDetails();
+        }
+
+        // ========== SZCZEGÓŁY WYBRANEJ KATEGORII ==========
         private void LoadSelectedCategoryDetails()
         {
             SelectedCategoryTotalAmount = 0m;
@@ -696,11 +688,18 @@ WHERE i.UserId=@u AND i.CategoryId=@c AND i.Date>=@from AND i.Date<=@to");
 
             RaisePropertyChanged(nameof(HasSelectedCategory));
             RaisePropertyChanged(nameof(SelectedCategoryName));
+            RaisePropertyChanged(nameof(SelectedCategoryDescription));
+            RaisePropertyChanged(nameof(SelectedCategoryColorBrush));
 
             if (_selectedCategory == null) return;
 
-            int? catId = DatabaseService.GetCategoryIdByName(_uid, _selectedCategory.Name);
-            if (!catId.HasValue) return;
+            int catId = _selectedCategory.Id;
+            if (catId <= 0)
+            {
+                int? byName = DatabaseService.GetCategoryIdByName(_uid, _selectedCategory.Name);
+                if (!byName.HasValue) return;
+                catId = byName.Value;
+            }
 
             DateTime from = PeriodBar.StartDate;
             DateTime to = PeriodBar.EndDate;
@@ -709,12 +708,12 @@ WHERE i.UserId=@u AND i.CategoryId=@c AND i.Date>=@from AND i.Date<=@to");
             bool incExp = _mode == CategoryMode.All || _mode == CategoryMode.Expenses;
             bool incInc = _mode == CategoryMode.All || _mode == CategoryMode.Incomes;
 
-            var (sum, cnt) = GetCategoryTotalsById(from, to, catId.Value, incExp, incInc);
+            var (sum, cnt) = GetCategoryTotalsById(from, to, catId, incExp, incInc);
 
             SelectedCategoryTotalAmount = sum;
             SelectedCategoryTransactionCount = cnt;
 
-            try { LoadRecentTransactionsForCategory(catId.Value, 5); } catch { }
+            try { LoadRecentTransactionsForCategory(catId, 5); } catch { }
         }
 
         private void LoadRecentTransactionsForCategory(int categoryId, int take)
@@ -726,6 +725,7 @@ WHERE i.UserId=@u AND i.CategoryId=@c AND i.Date>=@from AND i.Date<=@to");
             if (from > to) (from, to) = (to, from);
 
             using var con = DatabaseService.GetConnection();
+            con.Open();
             using var cmd = con.CreateCommand();
 
             var dateFrom = from.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
@@ -797,7 +797,7 @@ LIMIT @lim;";
             }
         }
 
-        // ========== STRUKTURA KATEGORII (zależne od okresu + trybu) ==========
+        // ========== STRUKTURA KATEGORII ==========
         private void UpdateCategoryStats()
         {
             DateTime from = PeriodBar.StartDate;
@@ -811,16 +811,7 @@ LIMIT @lim;";
 
             foreach (var cat in _categories)
             {
-                int? catId = null;
-                try { catId = DatabaseService.GetCategoryIdByName(_uid, cat.Name); } catch { }
-
-                if (!catId.HasValue)
-                {
-                    list.Add((cat.Name, 0m, 0));
-                    continue;
-                }
-
-                var (sum, cnt) = GetCategoryTotalsById(from, to, catId.Value, incExp, incInc);
+                var (sum, cnt) = GetCategoryTotalsById(from, to, cat.Id, incExp, incInc);
                 list.Add((cat.Name, sum, cnt));
             }
 
@@ -829,7 +820,9 @@ LIMIT @lim;";
             CategoryShares.Clear();
             foreach (var it in list.OrderByDescending(x => x.amount))
             {
-                var pct = totalAmount > 0 ? (double)(it.amount / totalAmount) * 100.0 : 0.0;
+                var pctRaw = totalAmount > 0 ? (double)(it.amount / totalAmount) * 100.0 : 0.0;
+                var pct = RoundToHalfPercent(pctRaw);
+
                 CategoryShares.Add(new CategoryShareItem
                 {
                     Name = it.name,
@@ -844,7 +837,9 @@ LIMIT @lim;";
             TopCategories.Clear();
             foreach (var it in positive.OrderByDescending(x => x.amount).Take(3))
             {
-                var pct = totalAmount > 0 ? (double)(it.amount / totalAmount) * 100.0 : 0.0;
+                var pctRaw = totalAmount > 0 ? (double)(it.amount / totalAmount) * 100.0 : 0.0;
+                var pct = RoundToHalfPercent(pctRaw);
+
                 TopCategories.Add(new CategoryShareItem { Name = it.name, Amount = it.amount, Percent = pct });
             }
             FillWithPlaceholders(TopCategories, 3);
@@ -852,9 +847,12 @@ LIMIT @lim;";
             BottomCategories.Clear();
             foreach (var it in positive.OrderBy(x => x.amount).Take(3))
             {
-                var pct = totalAmount > 0 ? (double)(it.amount / totalAmount) * 100.0 : 0.0;
+                var pctRaw = totalAmount > 0 ? (double)(it.amount / totalAmount) * 100.0 : 0.0;
+                var pct = RoundToHalfPercent(pctRaw);
+
                 BottomCategories.Add(new CategoryShareItem { Name = it.name, Amount = it.amount, Percent = pct });
             }
+            FillWithPlaceholders(BottomCategories, 3);
 
             RaisePropertyChanged(nameof(CategoryShares));
             RaisePropertyChanged(nameof(TopCategories));
@@ -881,11 +879,51 @@ LIMIT @lim;";
             return (Brush)(new BrushConverter().ConvertFromString(palette[idx])!);
         }
 
-        private void EnsureDefaultCategories()
+        private void ClearAllDeleteConfirmPanels()
+        {
+            foreach (var c in _categories)
+                if (c.IsDeleteConfirmVisible) c.IsDeleteConfirmVisible = false;
+        }
+
+        // ============================================================
+        //  SEED domyślnych kategorii TYLKO RAZ na użytkownika
+        //  (po usunięciu już nie wracają)
+        // ============================================================
+        private void EnsureDefaultCategoriesOncePerUser()
         {
             try
             {
+                using var con = DatabaseService.GetConnection();
+                con.Open();
+
+                // 1) AppSettings (idempotent)
+                using (var cmd = con.CreateCommand())
+                {
+                    cmd.CommandText = @"
+CREATE TABLE IF NOT EXISTS AppSettings(
+    Key TEXT PRIMARY KEY,
+    Value TEXT
+);";
+                    cmd.ExecuteNonQuery();
+                }
+
+                var key = $"categories_seeded_u{_uid}";
+
+                // 2) sprawdź flagę
+                var alreadySeeded = false;
+                using (var cmd = con.CreateCommand())
+                {
+                    cmd.CommandText = "SELECT Value FROM AppSettings WHERE Key=@k LIMIT 1;";
+                    cmd.Parameters.AddWithValue("@k", key);
+                    var v = cmd.ExecuteScalar() as string;
+                    alreadySeeded = string.Equals(v, "1", StringComparison.OrdinalIgnoreCase);
+                }
+
+                if (alreadySeeded) return;
+
+                // 3) seed tylko raz
                 var existing = DatabaseService.GetCategoriesByUser(_uid) ?? new List<string>();
+
                 var defaultExpenses = new[] { "Jedzenie", "Transport", "Mieszkanie", "Rachunki", "Rozrywka", "Zdrowie", "Ubrania" };
                 var defaultIncomes = new[] { "Wynagrodzenie", "Prezent", "Zwrot", "Inne" };
 
@@ -894,32 +932,27 @@ LIMIT @lim;";
                     if (!existing.Any(e => string.Equals(e, c, StringComparison.OrdinalIgnoreCase)))
                         DatabaseService.GetOrCreateCategoryId(_uid, c);
                 }
-            }
-            catch { }
-        }
 
-        private void ColorPick_Click(object sender, RoutedEventArgs e)
-        {
-            if (sender is Button b && b.Tag is string hex)
+                // 4) zapisz flagę
+                using (var cmd = con.CreateCommand())
+                {
+                    cmd.CommandText = "INSERT OR REPLACE INTO AppSettings(Key,Value) VALUES(@k,'1');";
+                    cmd.Parameters.AddWithValue("@k", key);
+                    cmd.ExecuteNonQuery();
+                }
+            }
+            catch
             {
-                _selectedColorHex = hex;
-                b.Focus();
+                // jeśli coś pójdzie nie tak, nie wywalaj UI
             }
         }
 
-        private void ClearAllDeleteConfirmPanels()
-        {
-            foreach (var c in _categories)
-                if (c.IsDeleteConfirmVisible) c.IsDeleteConfirmVisible = false;
-        }
-
-        // ===== MODELE WEWNĘTRZNE =====
+        // ===== MODELE =====
         public class CategoryVm : INotifyPropertyChanged
         {
             private Brush _colorBrush = Brushes.Gray;
             private bool _isDeleteConfirmVisible;
             private string? _description;
-            private bool _isEditing;
             private string? _colorHex;
             private bool _isSelected;
 
@@ -944,12 +977,6 @@ LIMIT @lim;";
             {
                 get => _isDeleteConfirmVisible;
                 set { _isDeleteConfirmVisible = value; OnPropertyChanged(nameof(IsDeleteConfirmVisible)); }
-            }
-
-            public bool IsEditing
-            {
-                get => _isEditing;
-                set { _isEditing = value; OnPropertyChanged(nameof(IsEditing)); }
             }
 
             public string? ColorHex
