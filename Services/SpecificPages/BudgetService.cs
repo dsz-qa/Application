@@ -87,7 +87,7 @@ namespace Finly.Services.SpecificPages
         private static bool ColumnExists(SqliteConnection con, string table, string column)
         {
             using var cmd = con.CreateCommand();
-            cmd.CommandText = $"PRAGMA table_info({table});";
+            cmd.CommandText = $"PRAGMA table_info('{table}');";
             using var r = cmd.ExecuteReader();
             while (r.Read())
             {
@@ -98,48 +98,67 @@ namespace Finly.Services.SpecificPages
             return false;
         }
 
-        private static string? ResolvePaymentName(SqliteConnection con, string? paymentKind, long? paymentRefId)
+        private static string? ResolvePaymentName(SqliteConnection con, int? paymentKind, long? paymentRefId)
         {
-            if (string.IsNullOrWhiteSpace(paymentKind) || paymentRefId == null || paymentRefId <= 0)
+            if (!paymentKind.HasValue)
                 return null;
 
-            // Uwaga: dopasuj stringi do Twoich realnych wartości PaymentKind w DB.
-            // Jeżeli u Ciebie PaymentKind jest np. "BankAccount"/"Envelope"/"CashOnHand" itp., to zadziała.
-            // Jeśli inne – podmień mapowanie na swoje.
-
-            var kind = paymentKind.Trim();
-
-            try
+            switch ((Finly.Models.PaymentKind)paymentKind.Value)
             {
-                if (kind.Equals("BankAccount", StringComparison.OrdinalIgnoreCase))
-                {
-                    using var cmd = con.CreateCommand();
-                    cmd.CommandText = "SELECT Name FROM BankAccounts WHERE Id = @id LIMIT 1;";
-                    cmd.Parameters.AddWithValue("@id", paymentRefId.Value);
-                    return cmd.ExecuteScalar() as string;
-                }
-
-                if (kind.Equals("Envelope", StringComparison.OrdinalIgnoreCase))
-                {
-                    using var cmd = con.CreateCommand();
-                    cmd.CommandText = "SELECT Name FROM Envelopes WHERE Id = @id LIMIT 1;";
-                    cmd.Parameters.AddWithValue("@id", paymentRefId.Value);
-                    return cmd.ExecuteScalar() as string;
-                }
-
-                if (kind.Equals("CashOnHand", StringComparison.OrdinalIgnoreCase))
+                case Finly.Models.PaymentKind.FreeCash:
                     return "Gotówka";
 
-                if (kind.Equals("SavedCash", StringComparison.OrdinalIgnoreCase))
+                case Finly.Models.PaymentKind.SavedCash:
                     return "Oszczędności (gotówka)";
-            }
-            catch
-            {
-                // nie wywalaj UI jeśli tabela/kolumny nie istnieją
-            }
 
-            return null;
+                case Finly.Models.PaymentKind.BankAccount:
+                    if (paymentRefId.HasValue && paymentRefId.Value > 0)
+                    {
+                        try
+                        {
+                            using var cmd = con.CreateCommand();
+                            cmd.CommandText = "SELECT AccountName FROM BankAccounts WHERE Id = @id LIMIT 1;";
+                            cmd.Parameters.AddWithValue("@id", paymentRefId.Value);
+                            var name = cmd.ExecuteScalar() as string;
+
+                            return string.IsNullOrWhiteSpace(name)
+                                ? "Konto bankowe"
+                                : $"Konto: {name}";
+                        }
+                        catch
+                        {
+                            return "Konto bankowe";
+                        }
+                    }
+                    return "Konto bankowe";
+
+                case Finly.Models.PaymentKind.Envelope:
+                    if (paymentRefId.HasValue && paymentRefId.Value > 0)
+                    {
+                        try
+                        {
+                            using var cmd = con.CreateCommand();
+                            cmd.CommandText = "SELECT Name FROM Envelopes WHERE Id = @id LIMIT 1;";
+                            cmd.Parameters.AddWithValue("@id", paymentRefId.Value);
+                            var name = cmd.ExecuteScalar() as string;
+
+                            return string.IsNullOrWhiteSpace(name)
+                                ? "Koperta"
+                                : $"Koperta: {name}";
+                        }
+                        catch
+                        {
+                            return "Koperta";
+                        }
+                    }
+                    return "Koperta";
+
+                default:
+                    return null;
+            }
         }
+
+
 
 
         public static IList<Budget> GetBudgetsForUser(int userId, DateTime? from = null, DateTime? to = null)
@@ -398,31 +417,33 @@ ORDER BY date(StartDate);
         //  TRANSAKCJE BUDŻETU (PRAWA LISTA)
         // =========================
 
-        public static List<BudgetTransactionRow> GetBudgetTransactions(int userId, int budgetId, DateTime startDate, DateTime endDate)
+        public static List<BudgetTransactionRow> GetBudgetTransactions(
+            int userId,
+            int budgetId,
+            DateTime startDate,
+            DateTime endDate)
         {
             var rows = new List<BudgetTransactionRow>();
 
             using var con = DatabaseService.GetConnection();
             con.Open();
 
-            // Expenses
-            // Expenses
             var hasPaymentKind = ColumnExists(con, "Expenses", "PaymentKind");
             var hasPaymentRefId = ColumnExists(con, "Expenses", "PaymentRefId");
 
             using (var cmd = con.CreateCommand())
             {
-                // budujemy SELECT dynamicznie, żeby nie wysypać się na brakujących kolumnach
                 cmd.CommandText = @"
 SELECT
     e.Date,
     e.Amount,
     COALESCE(e.Title, e.Description, '') AS DescText,
     COALESCE(c.Name, '') AS CategoryName,
-    COALESCE(e.IsPlanned,0) AS IsPlanned"
-                + (hasPaymentKind ? ", e.PaymentKind AS PaymentKind" : "")
-                + (hasPaymentRefId ? ", e.PaymentRefId AS PaymentRefId" : "")
-                + @"
+    COALESCE(e.IsPlanned,0) AS IsPlanned,
+    e.AccountId AS AccountId"
+            + (hasPaymentKind ? ", e.PaymentKind AS PaymentKind" : "")
+            + (hasPaymentRefId ? ", e.PaymentRefId AS PaymentRefId" : "")
+            + @"
 FROM Expenses e
 LEFT JOIN Categories c ON c.Id = e.CategoryId
 WHERE e.UserId = @u
@@ -438,29 +459,52 @@ ORDER BY date(e.Date) DESC, e.Id DESC;";
                 using var r = cmd.ExecuteReader();
                 while (r.Read())
                 {
+                    // --- STAŁE INDEKSY ---
                     var date = ParseDate(r.GetString(0));
                     var amount = ReadDecimal(r, 1);
                     var desc = r.IsDBNull(2) ? null : r.GetString(2);
                     var cat = r.IsDBNull(3) ? null : r.GetString(3);
                     var planned = !r.IsDBNull(4) && Convert.ToInt32(r.GetValue(4), CultureInfo.InvariantCulture) == 1;
+                    int? accountId = r.IsDBNull(5) ? null : Convert.ToInt32(r.GetValue(5), CultureInfo.InvariantCulture);
 
-                    string? paymentKind = null;
+                    // --- ZMIENNE DYNAMICZNE ---
+                    int? paymentKind = null;
                     long? paymentRefId = null;
 
-                    var ord = 5;
+                    // PO AccountId → zaczynamy od 6
+                    var ord = 6;
 
                     if (hasPaymentKind)
                     {
-                        paymentKind = r.IsDBNull(ord) ? null : r.GetString(ord);
+                        if (!r.IsDBNull(ord))
+                            paymentKind = Convert.ToInt32(r.GetValue(ord), CultureInfo.InvariantCulture);
                         ord++;
                     }
+
                     if (hasPaymentRefId)
                     {
                         if (!r.IsDBNull(ord))
                             paymentRefId = Convert.ToInt64(r.GetValue(ord), CultureInfo.InvariantCulture);
                     }
 
+                    // --- NAZWA KONTA ---
                     var fromName = ResolvePaymentName(con, paymentKind, paymentRefId);
+
+                    // FALLBACK: jeśli PaymentKind nic nie dał, spróbuj AccountId → BankAccounts
+                    if (string.IsNullOrWhiteSpace(fromName) && accountId.HasValue && accountId.Value > 0)
+                    {
+                        try
+                        {
+                            using var acc = con.CreateCommand();
+                            acc.CommandText = "SELECT AccountName FROM BankAccounts WHERE Id = @id LIMIT 1;";
+                            acc.Parameters.AddWithValue("@id", accountId.Value);
+                            var accName = acc.ExecuteScalar() as string;
+
+                            if (!string.IsNullOrWhiteSpace(accName))
+                                fromName = $"Konto: {accName}";
+                        }
+                        catch { }
+                    }
 
                     rows.Add(new BudgetTransactionRow
                     {
@@ -475,6 +519,8 @@ ORDER BY date(e.Date) DESC, e.Id DESC;";
                     });
                 }
             }
+
+
 
 
             // Incomes
