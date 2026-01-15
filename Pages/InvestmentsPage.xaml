@@ -45,17 +45,20 @@
         </Style>
 
         <Style x:Key="CardHeader" TargetType="TextBlock">
-            <Setter Property="FontSize" Value="13"/>
-            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="FontSize" Value="16"/>
+            <Setter Property="FontWeight" Value="Bold"/>
             <Setter Property="Foreground" Value="{DynamicResource App.Foreground}"/>
             <Setter Property="Opacity" Value="0.9"/>
+            <Setter Property="TextWrapping" Value="Wrap"/>
+            <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
         </Style>
 
         <Style x:Key="KpiValueStyle" TargetType="TextBlock">
-            <Setter Property="FontSize" Value="20"/>
+            <Setter Property="FontSize" Value="24"/>
             <Setter Property="FontWeight" Value="Bold"/>
-            <Setter Property="Margin" Value="0,4,0,0"/>
+            <Setter Property="Margin" Value="0,6,0,0"/>
             <Setter Property="Foreground" Value="{DynamicResource App.Foreground}"/>
+            <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
         </Style>
 
         <Style x:Key="DeltaBadge" TargetType="Border">
@@ -116,7 +119,6 @@
                     <RowDefinition Height="Auto"/>
                 </Grid.RowDefinitions>
 
-                <!-- wartość (aktualna) nad słupkiem -->
                 <TextBlock Grid.Row="0"
                            Text="{Binding CurrentText}"
                            FontSize="11"
@@ -124,10 +126,8 @@
                            HorizontalAlignment="Center"
                            Foreground="{DynamicResource App.Foreground}"/>
 
-                <!-- obszar wykresu -->
                 <Grid Grid.Row="1" Background="Transparent">
                     <Canvas Height="220" Background="Transparent">
-                        <!-- zakres między prev i current -->
                         <Border Canvas.Left="18"
                                 Width="28"
                                 Height="{Binding BarHeight}"
@@ -137,7 +137,6 @@
                                 BorderBrush="{DynamicResource Surface.Border}"
                                 Canvas.Top="{Binding BarTop}"/>
 
-                        <!-- kropka na poziomie current -->
                         <Ellipse Width="8"
                                  Height="8"
                                  Fill="{DynamicResource App.Foreground}"
@@ -147,7 +146,6 @@
                     </Canvas>
                 </Grid>
 
-                <!-- data+godzina pod spodem -->
                 <TextBlock Grid.Row="2"
                            Text="{Binding Label}"
                            FontSize="11"
@@ -159,20 +157,21 @@
 
         <!-- ===================== KARTA INWESTYCJI ===================== -->
         <DataTemplate DataType="{x:Type local:InvestmentVm}">
+            <!-- Brak stałych Width/MinWidth: UniformGrid sam nada szerokość (2 kolumny),
+                 a cała strona i tak skaluje się przez Viewbox u góry -->
             <Border Style="{StaticResource SelectedCard}"
-                    MinWidth="320"
+                    HorizontalAlignment="Stretch"
                     Cursor="Hand"
                     MouseLeftButtonUp="InvestmentCard_Click">
+
                 <StackPanel Background="Transparent">
 
-                    <!-- Nagłówek -->
                     <Grid Margin="0,0,0,8" Background="Transparent">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="Auto"/>
                             <ColumnDefinition Width="*"/>
                         </Grid.ColumnDefinitions>
 
-                        <!-- Ikona -->
                         <Rectangle Grid.Column="0"
                                    Width="24"
                                    Height="24"
@@ -188,7 +187,8 @@
                             <TextBlock FontSize="16"
                                        FontWeight="Bold"
                                        Foreground="{DynamicResource App.Foreground}"
-                                       TextWrapping="Wrap">
+                                       TextWrapping="Wrap"
+                                       TextTrimming="CharacterEllipsis">
                                 <Run Text="Inwestycja: "/>
                                 <Run Text="{Binding Name}"/>
                             </TextBlock>
@@ -196,7 +196,8 @@
                             <TextBlock FontSize="12"
                                        Opacity="0.85"
                                        Foreground="{DynamicResource App.Foreground}"
-                                       TextWrapping="Wrap">
+                                       TextWrapping="Wrap"
+                                       TextTrimming="CharacterEllipsis">
                                 <Run Text="{Binding TypeDisplay, Mode=OneWay}"/>
                                 <Run Text="  •  "/>
                                 <Run Text="{Binding LastDateDisplay, Mode=OneWay}"/>
@@ -204,16 +205,15 @@
                         </StackPanel>
                     </Grid>
 
-                    <!-- Ostatnia wycena -->
                     <TextBlock Text="Ostatnia wycena"
                                FontWeight="SemiBold"
                                Foreground="{DynamicResource App.Foreground}"
                                Opacity="0.9"/>
                     <TextBlock Text="{Binding LastValueDisplay, Mode=OneWay}"
                                Margin="0,2,0,8"
-                               Foreground="{DynamicResource App.Foreground}"/>
+                               Foreground="{DynamicResource App.Foreground}"
+                               TextTrimming="CharacterEllipsis"/>
 
-                    <!-- Zmiana -->
                     <TextBlock Text="Zmiana od poprzedniej wyceny"
                                FontWeight="SemiBold"
                                Foreground="{DynamicResource App.Foreground}"
@@ -221,10 +221,11 @@
                     <Border Style="{StaticResource DeltaBadge}" Margin="0,4,0,8">
                         <TextBlock Text="{Binding DeltaDisplay, Mode=OneWay}"
                                    Foreground="{Binding DeltaBrush}"
-                                   FontWeight="SemiBold"/>
+                                   FontWeight="SemiBold"
+                                   TextWrapping="Wrap"
+                                   TextTrimming="CharacterEllipsis"/>
                     </Border>
 
-                    <!-- Opis -->
                     <TextBlock Text="Opis"
                                FontWeight="SemiBold"
                                Foreground="{DynamicResource App.Foreground}"
@@ -232,9 +233,9 @@
                     <TextBlock Text="{Binding Description, Mode=OneWay}"
                                Margin="0,2,0,6"
                                TextWrapping="Wrap"
+                               TextTrimming="CharacterEllipsis"
                                Foreground="{DynamicResource App.Foreground}"/>
 
-                    <!-- Akcje -->
                     <StackPanel Orientation="Horizontal"
                                 HorizontalAlignment="Right"
                                 Margin="0,10,0,0"
@@ -252,7 +253,6 @@
                                 Style="{StaticResource DeleteIconButton}"/>
                     </StackPanel>
 
-                    <!-- Potwierdzenie usunięcia -->
                     <Border Margin="0,8,0,0"
                             Padding="10"
                             CornerRadius="8"
@@ -288,7 +288,7 @@
         <!-- KAFEL „DODAJ INWESTYCJĘ” -->
         <DataTemplate DataType="{x:Type local:AddInvestmentTile}">
             <Border Style="{StaticResource Card}"
-                    MinWidth="320"
+                    HorizontalAlignment="Stretch"
                     Cursor="Hand"
                     MouseLeftButtonUp="AddInvestmentCard_Click">
                 <Grid Background="Transparent">
@@ -320,329 +320,348 @@
 
     </UserControl.Resources>
 
-    <Grid Margin="24" Background="Transparent">
-        <Grid.RowDefinitions>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="*"/>
-        </Grid.RowDefinitions>
+    <!-- Pionowy scroll OK, poziomy scroll strony: NIE -->
+    <ScrollViewer VerticalScrollBarVisibility="Auto"
+                  HorizontalScrollBarVisibility="Disabled"
+                  Background="Transparent">
 
-        <!-- KPI PORTFELA -->
-        <Grid Grid.Row="0" Background="Transparent">
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="*"/>
-                <ColumnDefinition Width="*"/>
-                <ColumnDefinition Width="*"/>
-            </Grid.ColumnDefinitions>
+        <!-- Klucz do Twojego wymagania:
+             Viewbox skaluje CAŁĄ stronę, ale NIE zmienia układu (wciąż 3 KPI w rzędzie, 2 kafle w rzędzie).
+             To jest standardowe podejście w WPF, kiedy chcesz utrzymać stały layout i skalować UI. :contentReference[oaicite:1]{index=1} -->
+        <Viewbox Stretch="Uniform"
+                 StretchDirection="Both"
+                 HorizontalAlignment="Stretch"
+                 VerticalAlignment="Top">
 
-            <Border Grid.Column="0" Style="{StaticResource AccentCard}">
-                <StackPanel Background="Transparent">
-                    <TextBlock Text="Wartość portfela inwestycyjnego"
-                               Style="{StaticResource CardHeader}"
-                               FontSize="18"
-                               FontWeight="Bold"/>
-                    <TextBlock x:Name="TotalValueText"
-                               Style="{StaticResource KpiValueStyle}"
-                               FontSize="24"/>
-                </StackPanel>
-            </Border>
+            <!-- Ta szerokość jest "bazą projektową". Viewbox skaluje w dół i w górę.
+                 Dobierz ją pod swój “idealny” wygląd (np. laptop 15-16"). -->
+            <Grid Width="1400"
+                  Margin="24"
+                  Background="Transparent">
 
-            <Border Grid.Column="1" Style="{StaticResource AccentCard}">
-                <StackPanel Background="Transparent">
-                    <TextBlock Text="Zmiana od poprzednich wycen"
-                               Style="{StaticResource CardHeader}"
-                               FontSize="18"
-                               FontWeight="Bold"/>
-                    <TextBlock x:Name="TotalDeltaText"
-                               Style="{StaticResource KpiValueStyle}"
-                               FontSize="24"/>
-                </StackPanel>
-            </Border>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="*"/>
+                </Grid.RowDefinitions>
 
-            <Border Grid.Column="2" Style="{StaticResource AccentCard}">
-                <StackPanel Background="Transparent">
-                    <TextBlock Text="Zmiana % od poprzednich wycen"
-                               Style="{StaticResource CardHeader}"
-                               FontSize="18"
-                               FontWeight="Bold"/>
-                    <TextBlock x:Name="TotalDeltaPctText"
-                               Style="{StaticResource KpiValueStyle}"
-                               FontSize="24"/>
-                </StackPanel>
-            </Border>
-        </Grid>
+                <!-- KPI PORTFELA: zawsze 1 rząd / 3 kolumny -->
+                <Grid Grid.Row="0" Background="Transparent">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
 
-        <!-- CONTENT: LEWO (LISTA) + PRAWO (SZCZEGÓŁY) -->
-        <Grid Grid.Row="1" Margin="0,12,0,0" Background="Transparent">
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="*"/>
-                <ColumnDefinition Width="16"/>
-                <ColumnDefinition Width="*"/>
-            </Grid.ColumnDefinitions>
+                    <Border Grid.Column="0" Style="{StaticResource AccentCard}" Margin="0,16,12,0">
+                        <StackPanel Background="Transparent">
+                            <TextBlock Text="Wartość portfela inwestycyjnego"
+                                       Style="{StaticResource CardHeader}"/>
+                            <TextBlock x:Name="TotalValueText"
+                                       Style="{StaticResource KpiValueStyle}"/>
+                        </StackPanel>
+                    </Border>
 
-            <!-- LEWA STRONA -->
-            <Border Grid.Column="0"
-                    Background="{DynamicResource App.Background}"
-                    CornerRadius="10">
-                <ScrollViewer VerticalScrollBarVisibility="Auto"
-                              HorizontalScrollBarVisibility="Disabled"
-                              Background="Transparent">
-                    <StackPanel Background="Transparent">
+                    <Border Grid.Column="1" Style="{StaticResource AccentCard}" Margin="0,16,12,0">
+                        <StackPanel Background="Transparent">
+                            <TextBlock Text="Zmiana od poprzednich wycen"
+                                       Style="{StaticResource CardHeader}"/>
+                            <TextBlock x:Name="TotalDeltaText"
+                                       Style="{StaticResource KpiValueStyle}"/>
+                        </StackPanel>
+                    </Border>
 
-                        <Separator Height="1"
-                                   Background="{DynamicResource Surface.Border}"
-                                   Opacity="0.8"
-                                   Margin="0,0,0,10"/>
+                    <Border Grid.Column="2" Style="{StaticResource AccentCard}" Margin="0,16,0,0">
+                        <StackPanel Background="Transparent">
+                            <TextBlock Text="Zmiana % od poprzednich wycen"
+                                       Style="{StaticResource CardHeader}"/>
+                            <TextBlock x:Name="TotalDeltaPctText"
+                                       Style="{StaticResource KpiValueStyle}"/>
+                        </StackPanel>
+                    </Border>
+                </Grid>
 
-                        <TextBlock Text="Inwestycje"
-                                   FontSize="24"
-                                   FontWeight="Bold"
-                                   Foreground="{DynamicResource App.Foreground}"
-                                   Margin="0,4,0,12"/>
+                <!-- CONTENT: LEWO (LISTA) + PRAWO (SZCZEGÓŁY) -->
+                <Grid Grid.Row="1" Margin="0,12,0,0" Background="Transparent">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="16"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
 
-                        <TextBlock x:Name="InvestmentsErrorText"
-                                   Visibility="Collapsed"
-                                   Foreground="OrangeRed"
-                                   Margin="0,0,0,8"
-                                   TextWrapping="Wrap"/>
-
-                        <ItemsControl x:Name="InvestmentsRepeater" Margin="0,6,0,0">
-                            <ItemsControl.ItemsPanel>
-                                <ItemsPanelTemplate>
-                                    <UniformGrid Columns="2"/>
-                                </ItemsPanelTemplate>
-                            </ItemsControl.ItemsPanel>
-                        </ItemsControl>
-
-                    </StackPanel>
-                </ScrollViewer>
-            </Border>
-
-            <!-- PRAWA STRONA -->
-            <Border Grid.Column="2"
-                    Background="{DynamicResource App.Background}"
-                    CornerRadius="10">
-                <ScrollViewer VerticalScrollBarVisibility="Auto"
-                              HorizontalScrollBarVisibility="Disabled"
-                              Background="Transparent">
-                    <StackPanel Background="Transparent">
-
-                        <Separator Height="1"
-                                   Background="{DynamicResource Surface.Border}"
-                                   Opacity="0.8"
-                                   Margin="0,0,0,10"/>
-
-                        <TextBlock Text="Szczegóły inwestycji"
-                                   FontSize="24"
-                                   FontWeight="Bold"
-                                   Foreground="{DynamicResource App.Foreground}"
-                                   Margin="0,4,0,12"/>
-
-                        <!-- Placeholder gdy brak wyboru -->
-                        <Border x:Name="NoSelectionCard"
-                                Style="{StaticResource Card}"
-                                Margin="0,0,0,12">
-                            <TextBlock Text="Kliknij kafelek inwestycji po lewej, aby zobaczyć wykres i historię wycen."
-                                       Foreground="{DynamicResource App.Foreground}"
-                                       Opacity="0.85"
-                                       TextWrapping="Wrap"/>
-                        </Border>
-
-                        <!-- Panel szczegółów -->
-                        <Border x:Name="DetailsCard"
-                                Style="{StaticResource Card}"
-                                Margin="0,0,0,12"
-                                Visibility="Collapsed">
+                    <!-- LEWA STRONA -->
+                    <Border Grid.Column="0"
+                            Background="{DynamicResource App.Background}"
+                            CornerRadius="10">
+                        <ScrollViewer VerticalScrollBarVisibility="Auto"
+                                      HorizontalScrollBarVisibility="Disabled"
+                                      Background="Transparent">
                             <StackPanel Background="Transparent">
 
-                                <Grid Margin="0,0,0,10" Background="Transparent">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="*"/>
-                                        <ColumnDefinition Width="Auto"/>
-                                    </Grid.ColumnDefinitions>
+                                <Separator Height="1"
+                                           Background="{DynamicResource Surface.Border}"
+                                           Opacity="0.8"
+                                           Margin="0,0,0,10"/>
 
-                                    <StackPanel Grid.Column="0" Background="Transparent">
-                                        <TextBlock x:Name="SelectedTitleText"
-                                                   FontSize="18"
-                                                   FontWeight="Bold"
-                                                   Foreground="{DynamicResource App.Foreground}"
-                                                   TextWrapping="Wrap"/>
-                                        <TextBlock x:Name="SelectedSubtitleText"
-                                                   FontSize="12"
-                                                   Opacity="0.8"
-                                                   Foreground="{DynamicResource App.Foreground}"
-                                                   TextWrapping="Wrap"/>
-                                    </StackPanel>
+                                <TextBlock Text="Inwestycje"
+                                           FontSize="24"
+                                           FontWeight="Bold"
+                                           Foreground="{DynamicResource App.Foreground}"
+                                           Margin="0,4,0,12"/>
 
-                                    <Button Grid.Column="1"
-                                            x:Name="AddValuationRightButton"
-                                            Content="Dodaj wycenę"
-                                            Style="{StaticResource PrimaryButton}"
-                                            Padding="14,6"
-                                            Click="AddValuationRight_Click"/>
-                                </Grid>
+                                <TextBlock x:Name="InvestmentsErrorText"
+                                           Visibility="Collapsed"
+                                           Foreground="OrangeRed"
+                                           Margin="0,0,0,8"
+                                           TextWrapping="Wrap"/>
 
-                                <!-- KPI wybranej inwestycji -->
-                                <Grid Background="Transparent">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="*"/>
-                                        <ColumnDefinition Width="*"/>
-                                        <ColumnDefinition Width="*"/>
-                                    </Grid.ColumnDefinitions>
+                                <!-- ZAWSZE 2 W RZĘDZIE -->
+                                <ItemsControl x:Name="InvestmentsRepeater" Margin="0,6,0,0">
+                                    <ItemsControl.ItemsPanel>
+                                        <ItemsPanelTemplate>
+                                            <UniformGrid Columns="2"/>
+                                        </ItemsPanelTemplate>
+                                    </ItemsControl.ItemsPanel>
+                                </ItemsControl>
 
-                                    <Border Grid.Column="0"
-                                            CornerRadius="10"
-                                            BorderThickness="1"
-                                            BorderBrush="{DynamicResource Surface.Border}"
-                                            Background="{DynamicResource Surface.Background}"
-                                            Padding="12"
-                                            Margin="0,0,12,0">
-                                        <StackPanel Background="Transparent">
-                                            <TextBlock Text="Pierwsza wycena"
-                                                       Opacity="0.85"
-                                                       Foreground="{DynamicResource App.Foreground}"/>
-                                            <TextBlock x:Name="FirstText"
-                                                       FontWeight="Bold"
-                                                       FontSize="16"
-                                                       Foreground="{DynamicResource App.Foreground}"/>
-                                        </StackPanel>
-                                    </Border>
+                            </StackPanel>
+                        </ScrollViewer>
+                    </Border>
 
-                                    <Border Grid.Column="1"
-                                            CornerRadius="10"
-                                            BorderThickness="1"
-                                            BorderBrush="{DynamicResource Surface.Border}"
-                                            Background="{DynamicResource Surface.Background}"
-                                            Padding="12"
-                                            Margin="0,0,12,0">
-                                        <StackPanel Background="Transparent">
-                                            <TextBlock Text="Ostatnia wycena"
-                                                       Opacity="0.85"
-                                                       Foreground="{DynamicResource App.Foreground}"/>
-                                            <TextBlock x:Name="LastText"
-                                                       FontWeight="Bold"
-                                                       FontSize="16"
-                                                       Foreground="{DynamicResource App.Foreground}"/>
-                                        </StackPanel>
-                                    </Border>
+                    <!-- PRAWA STRONA -->
+                    <Border Grid.Column="2"
+                            Background="{DynamicResource App.Background}"
+                            CornerRadius="10">
+                        <ScrollViewer VerticalScrollBarVisibility="Auto"
+                                      HorizontalScrollBarVisibility="Disabled"
+                                      Background="Transparent">
+                            <StackPanel Background="Transparent">
 
-                                    <Border Grid.Column="2"
-                                            CornerRadius="10"
-                                            BorderThickness="1"
-                                            BorderBrush="{DynamicResource Surface.Border}"
-                                            Background="{DynamicResource Surface.Background}"
-                                            Padding="12">
-                                        <StackPanel Background="Transparent">
-                                            <TextBlock Text="Zmiana od pierwszej wyceny"
-                                                       Opacity="0.85"
-                                                       Foreground="{DynamicResource App.Foreground}"/>
-                                            <TextBlock x:Name="ChangeText"
-                                                       FontWeight="Bold"
-                                                       FontSize="16"/>
-                                        </StackPanel>
-                                    </Border>
-                                </Grid>
+                                <Separator Height="1"
+                                           Background="{DynamicResource Surface.Border}"
+                                           Opacity="0.8"
+                                           Margin="0,0,0,10"/>
 
-                                <!-- WYKRES: słupki zakresu (prev<->current), oś Y po lewej + daty+godzina na dole -->
-                                <Border Margin="0,12,0,0"
-                                        Padding="10"
-                                        CornerRadius="10"
-                                        BorderThickness="1"
-                                        BorderBrush="{DynamicResource Surface.Border}"
-                                        Background="{DynamicResource Surface.Background}">
+                                <TextBlock Text="Szczegóły inwestycji"
+                                           FontSize="24"
+                                           FontWeight="Bold"
+                                           Foreground="{DynamicResource App.Foreground}"
+                                           Margin="0,4,0,12"/>
+
+                                <!-- Placeholder gdy brak wyboru -->
+                                <Border x:Name="NoSelectionCard"
+                                        Style="{StaticResource Card}"
+                                        Margin="0,0,0,12">
+                                    <TextBlock Text="Kliknij kafelek inwestycji po lewej, aby zobaczyć wykres i historię wycen."
+                                               Foreground="{DynamicResource App.Foreground}"
+                                               Opacity="0.85"
+                                               TextWrapping="Wrap"/>
+                                </Border>
+
+                                <!-- Panel szczegółów -->
+                                <Border x:Name="DetailsCard"
+                                        Style="{StaticResource Card}"
+                                        Margin="0,0,0,12"
+                                        Visibility="Collapsed">
                                     <StackPanel Background="Transparent">
-                                        <TextBlock Text="Wartość wycen w czasie"
-                                                   Foreground="{DynamicResource App.Foreground}"
-                                                   Opacity="0.85"
-                                                   Margin="0,0,0,8"/>
 
-                                        <Grid>
+                                        <Grid Margin="0,0,0,10" Background="Transparent">
                                             <Grid.ColumnDefinitions>
-                                                <ColumnDefinition Width="84"/>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="Auto"/>
+                                            </Grid.ColumnDefinitions>
+
+                                            <StackPanel Grid.Column="0" Background="Transparent">
+                                                <TextBlock x:Name="SelectedTitleText"
+                                                           FontSize="18"
+                                                           FontWeight="Bold"
+                                                           Foreground="{DynamicResource App.Foreground}"
+                                                           TextWrapping="Wrap"
+                                                           TextTrimming="CharacterEllipsis"/>
+                                                <TextBlock x:Name="SelectedSubtitleText"
+                                                           FontSize="12"
+                                                           Opacity="0.8"
+                                                           Foreground="{DynamicResource App.Foreground}"
+                                                           TextWrapping="Wrap"
+                                                           TextTrimming="CharacterEllipsis"/>
+                                            </StackPanel>
+
+                                            <Button Grid.Column="1"
+                                                    x:Name="AddValuationRightButton"
+                                                    Content="Dodaj wycenę"
+                                                    Style="{StaticResource PrimaryButton}"
+                                                    Padding="14,6"
+                                                    Click="AddValuationRight_Click"/>
+                                        </Grid>
+
+                                        <!-- KPI wybranej inwestycji -->
+                                        <Grid Background="Transparent">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="*"/>
                                                 <ColumnDefinition Width="*"/>
                                             </Grid.ColumnDefinitions>
 
-                                            <!-- oś Y -->
-                                            <Grid Grid.Column="0" Height="220" Background="Transparent">
-                                                <Canvas Height="220" Background="Transparent">
-                                                    <ItemsControl ItemsSource="{Binding AxisTicks}"
-                                                                  ItemContainerStyle="{StaticResource AxisTickPresenterStyle}">
-                                                        <ItemsControl.ItemsPanel>
-                                                            <ItemsPanelTemplate>
-                                                                <Canvas/>
-                                                            </ItemsPanelTemplate>
-                                                        </ItemsControl.ItemsPanel>
+                                            <Border Grid.Column="0"
+                                                    CornerRadius="10"
+                                                    BorderThickness="1"
+                                                    BorderBrush="{DynamicResource Surface.Border}"
+                                                    Background="{DynamicResource Surface.Background}"
+                                                    Padding="12"
+                                                    Margin="0,0,12,0">
+                                                <StackPanel Background="Transparent">
+                                                    <TextBlock Text="Pierwsza wycena"
+                                                               Opacity="0.85"
+                                                               Foreground="{DynamicResource App.Foreground}"/>
+                                                    <TextBlock x:Name="FirstText"
+                                                               FontWeight="Bold"
+                                                               FontSize="16"
+                                                               Foreground="{DynamicResource App.Foreground}"
+                                                               TextWrapping="Wrap"
+                                                               TextTrimming="CharacterEllipsis"/>
+                                                </StackPanel>
+                                            </Border>
 
-                                                        <ItemsControl.ItemTemplate>
-                                                            <DataTemplate DataType="{x:Type local:AxisTickVm}">
-                                                                <Grid Width="84">
-                                                                    <Grid.ColumnDefinitions>
-                                                                        <ColumnDefinition Width="60"/>
-                                                                        <ColumnDefinition Width="24"/>
-                                                                    </Grid.ColumnDefinitions>
+                                            <Border Grid.Column="1"
+                                                    CornerRadius="10"
+                                                    BorderThickness="1"
+                                                    BorderBrush="{DynamicResource Surface.Border}"
+                                                    Background="{DynamicResource Surface.Background}"
+                                                    Padding="12"
+                                                    Margin="0,0,12,0">
+                                                <StackPanel Background="Transparent">
+                                                    <TextBlock Text="Ostatnia wycena"
+                                                               Opacity="0.85"
+                                                               Foreground="{DynamicResource App.Foreground}"/>
+                                                    <TextBlock x:Name="LastText"
+                                                               FontWeight="Bold"
+                                                               FontSize="16"
+                                                               Foreground="{DynamicResource App.Foreground}"
+                                                               TextWrapping="Wrap"
+                                                               TextTrimming="CharacterEllipsis"/>
+                                                </StackPanel>
+                                            </Border>
 
-                                                                    <TextBlock Grid.Column="0"
-                                                                               Text="{Binding Text}"
-                                                                               FontSize="11"
-                                                                               Opacity="0.85"
-                                                                               HorizontalAlignment="Right"
-                                                                               Foreground="{DynamicResource App.Foreground}"/>
-
-                                                                    <Border Grid.Column="1"
-                                                                            Margin="6,0,0,0"
-                                                                            Height="1"
-                                                                            VerticalAlignment="Center"
-                                                                            Background="{DynamicResource Surface.Border}"
-                                                                            Opacity="0.7"/>
-                                                                </Grid>
-                                                            </DataTemplate>
-                                                        </ItemsControl.ItemTemplate>
-                                                    </ItemsControl>
-                                                </Canvas>
-                                            </Grid>
-
-                                            <!-- słupki -->
-                                            <ScrollViewer Grid.Column="1"
-                                                          HorizontalScrollBarVisibility="Auto"
-                                                          VerticalScrollBarVisibility="Disabled"
-                                                          Background="Transparent">
-                                                <ItemsControl x:Name="RangeBars"
-                                                              ItemTemplate="{StaticResource RangeBarTemplate}">
-                                                    <ItemsControl.ItemsPanel>
-                                                        <ItemsPanelTemplate>
-                                                            <StackPanel Orientation="Horizontal"/>
-                                                        </ItemsPanelTemplate>
-                                                    </ItemsControl.ItemsPanel>
-                                                </ItemsControl>
-                                            </ScrollViewer>
+                                            <Border Grid.Column="2"
+                                                    CornerRadius="10"
+                                                    BorderThickness="1"
+                                                    BorderBrush="{DynamicResource Surface.Border}"
+                                                    Background="{DynamicResource Surface.Background}"
+                                                    Padding="12">
+                                                <StackPanel Background="Transparent">
+                                                    <TextBlock Text="Zmiana od pierwszej wyceny"
+                                                               Opacity="0.85"
+                                                               Foreground="{DynamicResource App.Foreground}"/>
+                                                    <TextBlock x:Name="ChangeText"
+                                                               FontWeight="Bold"
+                                                               FontSize="16"
+                                                               TextWrapping="Wrap"
+                                                               TextTrimming="CharacterEllipsis"/>
+                                                </StackPanel>
+                                            </Border>
                                         </Grid>
 
-                                        <TextBlock x:Name="ValuationChartHint"
-                                                   Margin="0,8,0,0"
-                                                   Opacity="0.7"
-                                                   Foreground="{DynamicResource App.Foreground}"
-                                                   Text="Dodaj co najmniej dwie wyceny, aby zobaczyć wykres."
-                                                   Visibility="Collapsed"/>
+                                        <!-- WYKRES -->
+                                        <Border Margin="0,12,0,0"
+                                                Padding="10"
+                                                CornerRadius="10"
+                                                BorderThickness="1"
+                                                BorderBrush="{DynamicResource Surface.Border}"
+                                                Background="{DynamicResource Surface.Background}">
+                                            <StackPanel Background="Transparent">
+                                                <TextBlock Text="Wartość wycen w czasie"
+                                                           Foreground="{DynamicResource App.Foreground}"
+                                                           Opacity="0.85"
+                                                           Margin="0,0,0,8"/>
+
+                                                <Grid>
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="84"/>
+                                                        <ColumnDefinition Width="*"/>
+                                                    </Grid.ColumnDefinitions>
+
+                                                    <Grid Grid.Column="0" Height="220" Background="Transparent">
+                                                        <Canvas Height="220" Background="Transparent">
+                                                            <ItemsControl ItemsSource="{Binding AxisTicks}"
+                                                                          ItemContainerStyle="{StaticResource AxisTickPresenterStyle}">
+                                                                <ItemsControl.ItemsPanel>
+                                                                    <ItemsPanelTemplate>
+                                                                        <Canvas/>
+                                                                    </ItemsPanelTemplate>
+                                                                </ItemsControl.ItemsPanel>
+
+                                                                <ItemsControl.ItemTemplate>
+                                                                    <DataTemplate DataType="{x:Type local:AxisTickVm}">
+                                                                        <Grid Width="84">
+                                                                            <Grid.ColumnDefinitions>
+                                                                                <ColumnDefinition Width="60"/>
+                                                                                <ColumnDefinition Width="24"/>
+                                                                            </Grid.ColumnDefinitions>
+
+                                                                            <TextBlock Grid.Column="0"
+                                                                                       Text="{Binding Text}"
+                                                                                       FontSize="11"
+                                                                                       Opacity="0.85"
+                                                                                       HorizontalAlignment="Right"
+                                                                                       Foreground="{DynamicResource App.Foreground}"/>
+
+                                                                            <Border Grid.Column="1"
+                                                                                    Margin="6,0,0,0"
+                                                                                    Height="1"
+                                                                                    VerticalAlignment="Center"
+                                                                                    Background="{DynamicResource Surface.Border}"
+                                                                                    Opacity="0.7"/>
+                                                                        </Grid>
+                                                                    </DataTemplate>
+                                                                </ItemsControl.ItemTemplate>
+                                                            </ItemsControl>
+                                                        </Canvas>
+                                                    </Grid>
+
+                                                    <!-- Tu poziomy scroll jest OK: wykres może mieć wiele słupków -->
+                                                    <ScrollViewer Grid.Column="1"
+                                                                  HorizontalScrollBarVisibility="Auto"
+                                                                  VerticalScrollBarVisibility="Disabled"
+                                                                  Background="Transparent">
+                                                        <ItemsControl x:Name="RangeBars"
+                                                                      ItemTemplate="{StaticResource RangeBarTemplate}">
+                                                            <ItemsControl.ItemsPanel>
+                                                                <ItemsPanelTemplate>
+                                                                    <StackPanel Orientation="Horizontal"/>
+                                                                </ItemsPanelTemplate>
+                                                            </ItemsControl.ItemsPanel>
+                                                        </ItemsControl>
+                                                    </ScrollViewer>
+                                                </Grid>
+
+                                                <TextBlock x:Name="ValuationChartHint"
+                                                           Margin="0,8,0,0"
+                                                           Opacity="0.7"
+                                                           Foreground="{DynamicResource App.Foreground}"
+                                                           Text="Dodaj co najmniej dwie wyceny, aby zobaczyć wykres."
+                                                           Visibility="Collapsed"/>
+                                            </StackPanel>
+                                        </Border>
+
+                                        <!-- TABELA -->
+                                        <Border Margin="0,12,0,0"
+                                                Style="{StaticResource MiniTableCard}">
+                                            <controls:MiniTableControl x:Name="ValuationsMiniTable"
+                                                                       HeaderTemplate="{StaticResource ValuationsHeaderTemplate}"
+                                                                       RowTemplate="{StaticResource ValuationsRowTemplate}"
+                                                                       SelectionMode="Single"
+                                                                       HorizontalScrollBarVisibility="Disabled"
+                                                                       VerticalScrollBarVisibility="Auto"/>
+                                        </Border>
+
                                     </StackPanel>
                                 </Border>
 
-                                <!-- TABELA (MiniTable) -->
-                                <Border Margin="0,12,0,0"
-                                        Style="{StaticResource MiniTableCard}">
-                                    <controls:MiniTableControl x:Name="ValuationsMiniTable"
-                                                               HeaderTemplate="{StaticResource ValuationsHeaderTemplate}"
-                                                               RowTemplate="{StaticResource ValuationsRowTemplate}"
-                                                               SelectionMode="Single"
-                                                               HorizontalScrollBarVisibility="Disabled"
-                                                               VerticalScrollBarVisibility="Auto"/>
-                                </Border>
-
                             </StackPanel>
-                        </Border>
+                        </ScrollViewer>
+                    </Border>
 
-                    </StackPanel>
-                </ScrollViewer>
-            </Border>
-
-        </Grid>
-    </Grid>
+                </Grid>
+            </Grid>
+        </Viewbox>
+    </ScrollViewer>
 </UserControl>
