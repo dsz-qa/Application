@@ -713,6 +713,24 @@ ORDER BY date(b.StartDate);";
             catch { }
         }
 
+        private static double NiceStep(double raw)
+        {
+            if (raw <= 0) return 10;
+
+            var exp = Math.Floor(Math.Log10(raw));
+            var baseVal = Math.Pow(10, exp);
+            var f = raw / baseVal;
+
+            double nice;
+            if (f <= 1) nice = 1;
+            else if (f <= 2) nice = 2;
+            else if (f <= 5) nice = 5;
+            else nice = 10;
+
+            return nice * baseVal;
+        }
+
+
         private void SetChartError(string message)
         {
             try
@@ -872,7 +890,7 @@ ORDER BY date(Date);";
                     {
                         Labels = labels,
                         LabelsRotation = 0,
-                        SeparatorsPaint = null,
+                        SeparatorsPaint = new SolidColorPaint(new SKColor(255, 255, 255, 35)),
                         TextSize = 12,
                         LabelsPaint = whitePaint,
                         NamePaint = whitePaint,
@@ -882,18 +900,36 @@ ORDER BY date(Date);";
 
                 var lastRemaining = remainingValues.LastOrDefault();
 
+                var maxSpent = cumSpentValues.Count == 0 ? 0 : cumSpentValues.Max();
+                var maxLimit = limitValues.Count == 0 ? 0 : limitValues.Max();
+                var maxY = Math.Max(maxSpent, maxLimit);
+
+                // chcemy ~4-5 podziałek
+                var step = NiceStep(maxY / 4.0);
+                if (step <= 0) step = 10;
+
+                // zaokrąglamy max do pełnego kroku (żeby ticki były „ładne”)
+                var maxAxis = Math.Ceiling(maxY / step) * step;
+                if (maxAxis < step) maxAxis = step;
+
                 BudgetHistoryChartControl.YAxes = new Axis[]
                 {
-                    new Axis
-                    {
-                        SeparatorsPaint = null,
-                        Labeler = v => $"{v:N0} zł",
-                        TextSize = 12,
-                        LabelsPaint = whitePaint,
-                        NamePaint = whitePaint,
-                        TicksPaint = whitePaint
-                    }
+    new Axis
+    {
+        MinLimit = 0,
+        MaxLimit = maxAxis,
+        MinStep = step,
+        ForceStepToMin = true,
+
+        SeparatorsPaint = null, // możesz zmienić na delikatne kreski, jeśli chcesz
+        Labeler = v => $"{v:N0} zł",
+        TextSize = 12,
+        LabelsPaint = whitePaint,
+        NamePaint = whitePaint,
+        TicksPaint = whitePaint
+    }
                 };
+
 
                 var spentSeries = new LineSeries<double>
                 {
@@ -921,6 +957,21 @@ ORDER BY date(Date);";
 
                 var lastIndex = remainingValues.Count - 1;
 
+                var lastSpent = cumSpentValues.LastOrDefault();
+
+                var spentLastPointSeries = new ScatterSeries<ObservablePoint>
+                {
+                    Name = "",
+                    IsVisibleAtLegend = false,
+                    GeometrySize = 10,
+                    Values = new[] { new ObservablePoint(lastIndex, lastSpent) },
+                    DataLabelsPaint = whitePaint,
+                    DataLabelsSize = 12,
+                    DataLabelsPosition = DataLabelsPosition.Top,
+                    DataLabelsFormatter = p => $"{p.Coordinate.PrimaryValue:N0} zł"
+                };
+
+
                 var remainingLastPointSeries = new ScatterSeries<ObservablePoint>
                 {
                     Name = "",
@@ -936,11 +987,13 @@ ORDER BY date(Date);";
                 BudgetHistoryChartControl.LegendTextPaint = whitePaint;
                 BudgetHistoryChartControl.Series = new ISeries[]
                 {
-                    spentSeries,
-                    limitSeries,
-                    remainingSeries,
-                    remainingLastPointSeries
+    spentSeries,
+    limitSeries,
+    remainingSeries,
+    spentLastPointSeries,
+    remainingLastPointSeries
                 };
+
             }
             catch (Exception ex)
             {
@@ -1113,6 +1166,9 @@ ORDER BY date(Date);";
         }
     }
 
+
+
+
     // =================== MODEL UI ===================
 
     public class BudgetRow : INotifyPropertyChanged
@@ -1192,6 +1248,7 @@ ORDER BY date(Date);";
         public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
             => Binding.DoNothing;
     }
+
 
     // =================== KONWERTER: ProgressBar fill (Value -> Width) ===================
 
