@@ -16,6 +16,8 @@ using QuestPDF.Infrastructure;
 using Microsoft.Win32;
 using SkiaSharp;
 using Finly.Services.Features;
+using LiveChartsCore.Measure;
+
 
 namespace Finly.ViewModels
 {
@@ -163,6 +165,7 @@ namespace Finly.ViewModels
 
         public void LoadStatistics()
         {
+            // ===== clear series =====
             CategoriesSeries.Clear();
             TrendSeries.Clear();
             WeekdaySeries.Clear();
@@ -172,6 +175,7 @@ namespace Finly.ViewModels
             SavedCashSeries.Clear();
             AmountBucketsSeries.Clear();
 
+            // ===== clear labels =====
             TrendLabels.Clear();
             WeekdayLabels.Clear();
             EnvelopeLabels.Clear();
@@ -180,18 +184,25 @@ namespace Finly.ViewModels
             SavedCashLabels.Clear();
             AmountBucketsLabels.Clear();
 
+            // ===== clear axes =====
             TrendXAxes.Clear();
             TrendYAxes.Clear();
+
             WeekdayXAxes.Clear();
             WeekdayYAxes.Clear();
+
             EnvelopesXAxes.Clear();
             EnvelopesYAxes.Clear();
+
             BankAccountsXAxes.Clear();
             BankAccountsYAxes.Clear();
+
             FreeCashXAxes.Clear();
             FreeCashYAxes.Clear();
+
             SavedCashXAxes.Clear();
             SavedCashYAxes.Clear();
+
             AmountBucketsXAxes.Clear();
             AmountBucketsYAxes.Clear();
 
@@ -199,7 +210,19 @@ namespace Finly.ViewModels
 
             // Paints / format
             var fg = new SolidColorPaint(SKColors.White);
-            var grid = new SolidColorPaint(new SKColor(255, 255, 255, 28)); // subtle
+            var grid = new SolidColorPaint(new SKColor(255, 255, 255, 28));
+
+            SKColor accent = SelectedMode switch
+            {
+                Mode.Expenses => new SKColor(244, 67, 54),   // red
+                Mode.Incomes => new SKColor(76, 175, 80),    // green
+                Mode.Transfer => new SKColor(156, 39, 176),  // purple
+                _ => new SKColor(255, 152, 0),               // orange (All)
+            };
+
+            var accentStroke = new SolidColorPaint(accent, 3);
+            var accentFill = new SolidColorPaint(new SKColor(accent.Red, accent.Green, accent.Blue, 90));
+
             string Pln(double v) => v.ToString("N0", CultureInfo.GetCultureInfo("pl-PL")) + " zł";
 
             try
@@ -226,7 +249,7 @@ namespace Finly.ViewModels
                             Name = cat.Name,
                             Values = new[] { (double)cat.Sum },
                             DataLabelsPaint = fg,
-                            DataLabelsFormatter = _ => "" // etykiety robisz w DonutChartControl
+                            DataLabelsFormatter = _ => ""
                         });
                     }
                 }
@@ -239,8 +262,8 @@ namespace Finly.ViewModels
                     {
                         Values = new[] { 0d },
                         GeometrySize = 8,
-                        Fill = new SolidColorPaint(new SKColor(33, 150, 243, 35)),
-                        Stroke = new SolidColorPaint(new SKColor(33, 150, 243), 3),
+                        Fill = accentFill,
+                        Stroke = accentStroke,
                         DataLabelsPaint = null
                     });
                 }
@@ -253,10 +276,9 @@ namespace Finly.ViewModels
                     {
                         Values = data.Trend.Select(t => (double)t.Value).ToArray(),
                         GeometrySize = 8,
-                        Fill = new SolidColorPaint(new SKColor(33, 150, 243, 35)),
-                        Stroke = new SolidColorPaint(new SKColor(33, 150, 243), 3),
+                        Fill = accentFill,
+                        Stroke = accentStroke,
                         DataLabelsPaint = null
-                        // TooltipLabelFormatter usunięty (w Twojej wersji API nie istnieje)
                     });
                 }
 
@@ -289,6 +311,8 @@ namespace Finly.ViewModels
                         Rx = 6,
                         Ry = 6,
                         MaxBarWidth = 46,
+                        Fill = accentFill,
+                        Stroke = accentStroke,
                         DataLabelsPaint = null
                     });
                 }
@@ -303,8 +327,11 @@ namespace Finly.ViewModels
                         Rx = 6,
                         Ry = 6,
                         MaxBarWidth = 46,
-                        DataLabelsPaint = null
-                        // TooltipLabelFormatter usunięty (w Twojej wersji API nie istnieje)
+                        Fill = accentFill,
+                        Stroke = accentStroke,
+                        DataLabelsPaint = fg,
+                        DataLabelsPosition = LiveChartsCore.Measure.DataLabelsPosition.Top,
+                        DataLabelsFormatter = p => Pln(p.Coordinate.PrimaryValue)
                     });
                 }
 
@@ -332,12 +359,15 @@ namespace Finly.ViewModels
                 {
                     WeekdayLabels.Add("-");
                     weekdayValues = new[] { 0d };
+
                     WeekdaySeries.Add(new ColumnSeries<double>
                     {
                         Values = weekdayValues,
                         Rx = 6,
                         Ry = 6,
                         MaxBarWidth = 42,
+                        Fill = accentFill,
+                        Stroke = accentStroke,
                         DataLabelsPaint = null
                     });
                 }
@@ -354,8 +384,11 @@ namespace Finly.ViewModels
                         Rx = 6,
                         Ry = 6,
                         MaxBarWidth = 42,
-                        DataLabelsPaint = null
-                        // TooltipLabelFormatter usunięty (w Twojej wersji API nie istnieje)
+                        Fill = accentFill,
+                        Stroke = accentStroke,
+                        DataLabelsPaint = fg,
+                        DataLabelsPosition = LiveChartsCore.Measure.DataLabelsPosition.Top,
+                        DataLabelsFormatter = p => Pln(p.Coordinate.PrimaryValue)
                     });
                 }
 
@@ -405,6 +438,8 @@ namespace Finly.ViewModels
                         Rx = 6,
                         Ry = 6,
                         MaxBarWidth = 46,
+                        Fill = accentFill,
+                        Stroke = accentStroke,
                         DataLabelsPaint = null
                     });
                 }
@@ -419,8 +454,11 @@ namespace Finly.ViewModels
                         Rx = 6,
                         Ry = 6,
                         MaxBarWidth = 46,
-                        DataLabelsPaint = null
-                        // TooltipLabelFormatter usunięty
+                        Fill = accentFill,
+                        Stroke = accentStroke,
+                        DataLabelsPaint = fg,
+                        DataLabelsPosition = LiveChartsCore.Measure.DataLabelsPosition.Top,
+                        DataLabelsFormatter = p => Pln(p.Coordinate.PrimaryValue)
                     });
                 }
 
@@ -452,6 +490,8 @@ namespace Finly.ViewModels
                         Rx = 6,
                         Ry = 6,
                         MaxBarWidth = 46,
+                        Fill = accentFill,
+                        Stroke = accentStroke,
                         DataLabelsPaint = null
                     });
                 }
@@ -466,8 +506,11 @@ namespace Finly.ViewModels
                         Rx = 6,
                         Ry = 6,
                         MaxBarWidth = 46,
-                        DataLabelsPaint = null
-                        // TooltipLabelFormatter usunięty
+                        Fill = accentFill,
+                        Stroke = accentStroke,
+                        DataLabelsPaint = fg,
+                        DataLabelsPosition = LiveChartsCore.Measure.DataLabelsPosition.Top,
+                        DataLabelsFormatter = p => Pln(p.Coordinate.PrimaryValue)
                     });
                 }
 
@@ -499,6 +542,8 @@ namespace Finly.ViewModels
                         Rx = 6,
                         Ry = 6,
                         MaxBarWidth = 46,
+                        Fill = accentFill,
+                        Stroke = accentStroke,
                         DataLabelsPaint = null
                     });
                 }
@@ -513,8 +558,11 @@ namespace Finly.ViewModels
                         Rx = 6,
                         Ry = 6,
                         MaxBarWidth = 46,
-                        DataLabelsPaint = null
-                        // TooltipLabelFormatter usunięty
+                        Fill = accentFill,
+                        Stroke = accentStroke,
+                        DataLabelsPaint = fg,
+                        DataLabelsPosition = LiveChartsCore.Measure.DataLabelsPosition.Top,
+                        DataLabelsFormatter = p => Pln(p.Coordinate.PrimaryValue)
                     });
                 }
 
@@ -537,7 +585,7 @@ namespace Finly.ViewModels
                 });
 
                 // ===== Amount buckets =====
-                BuildAmountBucketsChart(from, to, fg, grid);
+                BuildAmountBucketsChart(from, to, fg, grid, accentStroke, accentFill);
             }
             catch
             {
@@ -580,6 +628,8 @@ namespace Finly.ViewModels
                 AmountBucketsYAxes.Add(new Axis());
             }
         }
+
+
 
         // reszta pliku bez zmian...
 
@@ -1330,7 +1380,10 @@ namespace Finly.ViewModels
         }
 
         // ===== Amount buckets =====
-        private void BuildAmountBucketsChart(DateTime? from, DateTime? to, SolidColorPaint fg, SolidColorPaint grid)
+        private void BuildAmountBucketsChart(
+            DateTime? from, DateTime? to,
+            SolidColorPaint fg, SolidColorPaint grid,
+            SolidColorPaint accentStroke, SolidColorPaint accentFill)
         {
             var bucketsData = GetAmountBucketsData(from, to);
 
@@ -1344,6 +1397,7 @@ namespace Finly.ViewModels
                 AmountBucketsLabels.Add("-");
                 AmountBucketsSeries.Add(new ColumnSeries<double>
                 {
+                    Name = "Brak danych",
                     Values = new[] { 0d },
                     Rx = 6,
                     Ry = 6,
@@ -1356,14 +1410,20 @@ namespace Finly.ViewModels
                 foreach (var b in bucketsData)
                     AmountBucketsLabels.Add(b.Name);
 
-                // TooltipLabelFormatter USUWAMY (nie ma tego w ColumnSeries w Twojej wersji paczki)
                 AmountBucketsSeries.Add(new ColumnSeries<double>
                 {
                     Values = bucketsData.Select(b => (double)b.Sum).ToArray(),
                     Rx = 6,
                     Ry = 6,
                     MaxBarWidth = 42,
-                    DataLabelsPaint = null
+
+                    Fill = accentFill,
+                    Stroke = accentStroke,
+
+                    DataLabelsPaint = fg,
+                    DataLabelsPosition = LiveChartsCore.Measure.DataLabelsPosition.Top,
+                    DataLabelsFormatter = p =>
+                        Math.Round(p.Coordinate.PrimaryValue).ToString("0", CultureInfo.InvariantCulture)
                 });
             }
 
@@ -1383,9 +1443,10 @@ namespace Finly.ViewModels
                 NamePaint = fg,
                 TextSize = 12,
                 MinLimit = 0,
-                Labeler = v => v <= 0 ? string.Empty : v.ToString("0")
+                Labeler = v => v <= 0 ? string.Empty : v.ToString("0", CultureInfo.InvariantCulture)
             });
         }
+
 
         private List<(string Name, decimal Sum)> GetAmountBucketsData(DateTime? from, DateTime? to)
         {

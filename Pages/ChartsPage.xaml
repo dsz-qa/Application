@@ -27,7 +27,6 @@
             <Setter Property="Margin" Value="0,0,0,8"/>
         </Style>
 
-        <!-- Spójny styl dla wykresów: najważniejsze jest DrawMargin, żeby nie ucinało osi/etykiet -->
         <Style x:Key="BaseCartesianChart" TargetType="{x:Type lvcwpf:CartesianChart}">
             <Setter Property="Background" Value="Transparent"/>
             <Setter Property="Foreground" Value="{DynamicResource App.Foreground}"/>
@@ -83,7 +82,7 @@
                                          x:Name="PeriodBar"
                                          HorizontalAlignment="Center"/>
 
-                    <!-- Tryby: ALL / wydatki / przychody / transfer -->
+                    <!-- Tryby -->
                     <StackPanel Grid.Column="2"
                                 Orientation="Vertical"
                                 VerticalAlignment="Center"
@@ -197,13 +196,11 @@
                                    Text="Podział według kategorii"
                                    Style="{StaticResource CardHeader}" />
 
-                        <!-- Donut -->
                         <vc:DonutChartControl Grid.Row="1"
                                               x:Name="CategoriesDonut"
                                               Height="260"
                                               Title="Wszystkie transakcje — podział"/>
 
-                        <!-- Placeholder dla Transferów -->
                         <TextBlock x:Name="TransferCategoryHint"
                                    Grid.Row="1"
                                    Visibility="Collapsed"
@@ -225,6 +222,7 @@
                                                Style="{StaticResource BaseCartesianChart}"
                                                Series="{Binding TrendSeries}"
                                                XAxes="{Binding TrendXAxes}"
+                                               YAxes="{Binding TrendYAxes}"
                                                Height="260"/>
                     </StackPanel>
                 </Border>
@@ -237,6 +235,7 @@
                                                Style="{StaticResource BaseCartesianChart}"
                                                Series="{Binding FreeCashSeries}"
                                                XAxes="{Binding FreeCashXAxes}"
+                                               YAxes="{Binding FreeCashYAxes}"
                                                Height="200"/>
                     </StackPanel>
                 </Border>
@@ -248,6 +247,7 @@
                                                Style="{StaticResource BaseCartesianChart}"
                                                Series="{Binding SavedCashSeries}"
                                                XAxes="{Binding SavedCashXAxes}"
+                                               YAxes="{Binding SavedCashYAxes}"
                                                Height="200"/>
                     </StackPanel>
                 </Border>
@@ -260,6 +260,7 @@
                                                Style="{StaticResource BaseCartesianChart}"
                                                Series="{Binding BankAccountsSeries}"
                                                XAxes="{Binding BankAccountsXAxes}"
+                                               YAxes="{Binding BankAccountsYAxes}"
                                                Height="260"/>
                     </StackPanel>
                 </Border>
@@ -271,6 +272,7 @@
                                                Style="{StaticResource BaseCartesianChart}"
                                                Series="{Binding EnvelopesSeries}"
                                                XAxes="{Binding EnvelopesXAxes}"
+                                               YAxes="{Binding EnvelopesYAxes}"
                                                Height="260"/>
                     </StackPanel>
                 </Border>
@@ -283,6 +285,7 @@
                                                Style="{StaticResource BaseCartesianChart}"
                                                Series="{Binding WeekdaySeries}"
                                                XAxes="{Binding WeekdayXAxes}"
+                                               YAxes="{Binding WeekdayYAxes}"
                                                Height="260"/>
                     </StackPanel>
                 </Border>
