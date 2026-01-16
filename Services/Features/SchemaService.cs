@@ -180,6 +180,18 @@ CREATE TABLE IF NOT EXISTS Investments(
     FOREIGN KEY(UserId) REFERENCES Users(Id) ON DELETE CASCADE
 );
 
+-- BRAKOWAŁO: wyceny inwestycji (używane w DatabaseService)
+CREATE TABLE IF NOT EXISTS InvestmentValuations(
+    Id           INTEGER PRIMARY KEY AUTOINCREMENT,
+    UserId       INTEGER NOT NULL,
+    InvestmentId INTEGER NOT NULL,
+    Date         TEXT    NOT NULL,
+    Value        NUMERIC NOT NULL DEFAULT 0,
+    Note         TEXT    NULL,
+    FOREIGN KEY(UserId)       REFERENCES Users(Id) ON DELETE CASCADE,
+    FOREIGN KEY(InvestmentId) REFERENCES Investments(Id) ON DELETE CASCADE
+);
+
 CREATE TABLE IF NOT EXISTS Envelopes(
     Id         INTEGER PRIMARY KEY AUTOINCREMENT,
     UserId     INTEGER NOT NULL,
@@ -301,6 +313,12 @@ CREATE TABLE IF NOT EXISTS CompanyProfiles(
                 AddColumnIfMissing(con, tx, "Investments", "TargetDate", "TEXT");
                 AddColumnIfMissing(con, tx, "Investments", "Description", "TEXT");
 
+                // InvestmentValuations (na wypadek starych baz bez tej tabeli -> brak ALTER, bo to osobna tabela)
+
+                // Envelopes – brakujące kolumny używane w kodzie
+                AddColumnIfMissing(con, tx, "Envelopes", "Deadline", "TEXT");
+                AddColumnIfMissing(con, tx, "Envelopes", "GoalText", "TEXT");
+
                 // Backfill: jeśli ktoś miał Description a Title puste
                 if (ColumnExists(con, tx, "Expenses", "Title") && ColumnExists(con, tx, "Expenses", "Description"))
                 {
@@ -350,6 +368,12 @@ CREATE INDEX IF NOT EXISTS IX_Envelopes_User
 
 CREATE INDEX IF NOT EXISTS IX_Investments_User
     ON Investments(UserId);
+
+CREATE INDEX IF NOT EXISTS IX_InvestmentValuations_User_Inv_Date
+    ON InvestmentValuations(UserId, InvestmentId, Date);
+
+CREATE INDEX IF NOT EXISTS IX_InvestmentValuations_User_Date
+    ON InvestmentValuations(UserId, Date);
 
 CREATE INDEX IF NOT EXISTS IX_BankAccounts_User
     ON BankAccounts(UserId);
@@ -438,10 +462,11 @@ CREATE TABLE BankAccounts_new(
 );";
             cmd.ExecuteNonQuery();
 
+            // POPRAWKA: kopiujemy BankName wprost (bez CASE WHEN ...)
             cmd.CommandText = @"
 INSERT INTO BankAccounts_new (Id, ConnectionId, UserId, BankName, AccountName, Iban, Currency, Balance, LastSync)
 SELECT Id, ConnectionId, UserId,
-       CASE WHEN (SELECT 1) THEN BankName END,
+       BankName,
        AccountName, Iban, Currency, Balance, LastSync
 FROM BankAccounts;";
             cmd.ExecuteNonQuery();

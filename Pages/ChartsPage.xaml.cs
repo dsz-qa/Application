@@ -368,13 +368,6 @@ namespace Finly.Pages
 
             var mode = GetActiveModeTag();
 
-            if (mode == "Transfer")
-            {
-                _categoriesDonut.Visibility = Visibility.Collapsed;
-                if (_transferCategoryHint != null) _transferCategoryHint.Visibility = Visibility.Visible;
-                return;
-            }
-
             _categoriesDonut.Visibility = Visibility.Visible;
             if (_transferCategoryHint != null) _transferCategoryHint.Visibility = Visibility.Collapsed;
 
