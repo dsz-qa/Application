@@ -13,6 +13,7 @@ using System.Windows.Controls;
 using System.Windows.Data;
 using System.Windows.Media;
 using System.Windows.Shapes;
+using System.Windows.Threading;
 
 namespace Finly.Pages
 {
@@ -21,13 +22,7 @@ namespace Finly.Pages
         private readonly int _uid;
 
         // ===== TRYB (pod PeriodBar): Przychody / Wszystko / Wydatki =====
-        private enum CategoryMode
-        {
-            Incomes,
-            All,
-            Expenses
-        }
-
+        private enum CategoryMode { Incomes, All, Expenses }
         private CategoryMode _mode = CategoryMode.All;
 
         // ===== LISTA KATEGORII =====
@@ -101,6 +96,10 @@ namespace Finly.Pages
         private int _inactiveCategoriesCount;
         private int _totalCategoriesCount;
 
+        // ===== STABILNOŚĆ / unsub =====
+        private bool _isUnloaded;
+        private EventHandler? _dbChangedHandler;
+
         public event PropertyChangedEventHandler? PropertyChanged;
         private void RaisePropertyChanged(string name)
             => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
@@ -114,12 +113,63 @@ namespace Finly.Pages
             _uid = userId <= 0 ? UserService.GetCurrentUserId() : userId;
 
             DataContext = this;
-            Loaded += CategoriesPage_Loaded;
 
             _categoriesView = (CollectionView)CollectionViewSource.GetDefaultView(_categories);
             _categoriesView.Filter = CategoryFilter;
 
-            PeriodBar.RangeChanged += PeriodBar_RangeChanged;
+            Loaded += CategoriesPage_Loaded;
+            Unloaded += CategoriesPage_Unloaded;
+
+            // Hook PeriodBar events like Dashboard (bez ryzyka NRE)
+            if (FindName("PeriodBar") is Finly.Views.Controls.PeriodBarControl pb)
+            {
+                pb.RangeChanged += PeriodBar_RangeChanged;
+                pb.SearchClicked += PeriodBar_RangeChanged; // traktujemy jak reload
+                pb.ClearClicked += PeriodBar_ClearClicked;
+            }
+
+            // Refresh when DB changes (jak Dashboard)
+            _dbChangedHandler = (_, __) =>
+            {
+                if (_isUnloaded) return;
+                Dispatcher.BeginInvoke(new Action(() =>
+                {
+                    try
+                    {
+                        EnsureKpiRefs();
+                        LoadCategories();
+                        UpdateModeButtonsUi();
+                        UpdateCategoryKpis();
+                        UpdateCategoryStats();
+                        LoadSelectedCategoryDetails();
+                    }
+                    catch { }
+                }), DispatcherPriority.Background);
+            };
+            DatabaseService.DataChanged += _dbChangedHandler;
+        }
+
+        private void CategoriesPage_Unloaded(object? sender, RoutedEventArgs e)
+        {
+            _isUnloaded = true;
+
+            try
+            {
+                if (_dbChangedHandler != null)
+                    DatabaseService.DataChanged -= _dbChangedHandler;
+            }
+            catch { }
+
+            try
+            {
+                if (FindName("PeriodBar") is Finly.Views.Controls.PeriodBarControl pb)
+                {
+                    pb.RangeChanged -= PeriodBar_RangeChanged;
+                    pb.SearchClicked -= PeriodBar_RangeChanged;
+                    pb.ClearClicked -= PeriodBar_ClearClicked;
+                }
+            }
+            catch { }
         }
 
         // ========== TRYB ==========
@@ -148,12 +198,13 @@ namespace Finly.Pages
             SetModeBtn(ModeExpensesBtn, _mode == CategoryMode.Expenses);
         }
 
+        // KLUCZ: żadnego FindResource na elemencie => zero LogicalTreeLoop
         private void SetModeBtn(Button btn, bool active)
         {
-            btn.BorderBrush = active
-                ? (Brush)FindResource("Separator.Orange")
-                : (Brush)FindResource("Brand.Blue");
+            var orange = GetAppBrush("Separator.Orange", Brushes.Orange);
+            var blue = GetAppBrush("Brand.Blue", Brushes.DodgerBlue);
 
+            btn.BorderBrush = active ? orange : blue;
             btn.BorderThickness = active ? new Thickness(2) : new Thickness(1);
             btn.Opacity = active ? 1.0 : 0.92;
         }
@@ -182,7 +233,7 @@ namespace Finly.Pages
             try
             {
                 EnsureKpiRefs();
-                EnsureDefaultCategoriesOncePerUser(); // <- krytyczne: już nie odtwarza po usunięciu
+                EnsureDefaultCategoriesOncePerUser();
                 LoadCategories();
 
                 UpdateModeButtonsUi();
@@ -200,9 +251,23 @@ namespace Finly.Pages
         private void PeriodBar_RangeChanged(object? sender, EventArgs e)
         {
             EnsureKpiRefs();
+            ClearAllDeleteConfirmPanels();
             UpdateCategoryKpis();
             UpdateCategoryStats();
             LoadSelectedCategoryDetails();
+        }
+
+        private void PeriodBar_ClearClicked(object? sender, EventArgs e)
+        {
+            // zachowanie jak Dashboard: po clear wracasz do "Ten miesiąc"
+            try
+            {
+                if (FindName("PeriodBar") is Finly.Views.Controls.PeriodBarControl pb)
+                    pb.SetPreset(Finly.Models.DateRangeMode.Month);
+            }
+            catch { }
+
+            PeriodBar_RangeChanged(sender, e);
         }
 
         private void EnsureKpiRefs()
@@ -241,8 +306,8 @@ namespace Finly.Pages
         {
             using var con = DatabaseService.GetConnection();
             con.Open();
-            using var cmd = con.CreateCommand();
 
+            using var cmd = con.CreateCommand();
             var sqlParts = new List<string>();
 
             if (includeExpenses)
@@ -279,7 +344,7 @@ WHERE i.UserId=@u AND i.Date>=@from AND i.Date<=@to
                 name = (name ?? "").Trim();
                 if (string.IsNullOrWhiteSpace(name)) continue;
 
-                var amount = 0m;
+                decimal amount = 0m;
                 try { amount = Convert.ToDecimal(r.GetValue(1), CultureInfo.InvariantCulture); } catch { }
 
                 counts[name] = counts.TryGetValue(name, out var c) ? c + 1 : 1;
@@ -292,9 +357,10 @@ WHERE i.UserId=@u AND i.Date>=@from AND i.Date<=@to
         {
             using var con = DatabaseService.GetConnection();
             con.Open();
-            using var cmd = con.CreateCommand();
 
+            using var cmd = con.CreateCommand();
             var sqlParts = new List<string>();
+
             if (expenses)
             {
                 sqlParts.Add(@"
@@ -302,6 +368,7 @@ SELECT ABS(e.Amount) AS Amount
 FROM Expenses e
 WHERE e.UserId=@u AND e.CategoryId=@c AND e.Date>=@from AND e.Date<=@to");
             }
+
             if (incomes)
             {
                 sqlParts.Add(@"
@@ -341,8 +408,11 @@ WHERE i.UserId=@u AND i.CategoryId=@c AND i.Date>=@from AND i.Date<=@to");
         {
             EnsureKpiRefs();
 
-            DateTime from = PeriodBar.StartDate;
-            DateTime to = PeriodBar.EndDate;
+            var pb = FindName("PeriodBar") as Finly.Views.Controls.PeriodBarControl;
+            if (pb == null) return;
+
+            DateTime from = pb.StartDate;
+            DateTime to = pb.EndDate;
             if (from > to) (from, to) = (to, from);
 
             var counts = new Dictionary<string, int>(StringComparer.CurrentCultureIgnoreCase);
@@ -445,6 +515,7 @@ WHERE i.UserId=@u AND i.CategoryId=@c AND i.Date>=@from AND i.Date<=@to");
             {
                 using var con = DatabaseService.GetConnection();
                 con.Open();
+
                 using var cmd = con.CreateCommand();
                 cmd.CommandText = "SELECT Id, Description, Color FROM Categories WHERE UserId=@u;";
                 cmd.Parameters.AddWithValue("@u", _uid);
@@ -477,16 +548,13 @@ WHERE i.UserId=@u AND i.CategoryId=@c AND i.Date>=@from AND i.Date<=@to");
 
             ApplyCategoriesFilter();
             ClearAllDeleteConfirmPanels();
+
             RaisePropertyChanged(nameof(Categories));
 
-            UpdateCategoryStats();
+            // jeśli usunięto wybraną kategorię
+            if (_selectedCategory != null && !_categories.Any(c => c.Id == _selectedCategory.Id))
+                _selectedCategory = null;
 
-            // Odśwież szczegóły (jeśli usunięto wybraną kategorię)
-            if (_selectedCategory != null)
-            {
-                var stillExists = _categories.Any(c => c.Id == _selectedCategory.Id);
-                if (!stillExists) _selectedCategory = null;
-            }
             LoadSelectedCategoryDetails();
         }
 
@@ -527,7 +595,6 @@ WHERE i.UserId=@u AND i.CategoryId=@c AND i.Date>=@from AND i.Date<=@to");
                 UpdateCategoryKpis();
                 UpdateCategoryStats();
 
-                // auto zaznacz nową po ID
                 var again = _categories.FirstOrDefault(x => x.Id == id);
                 if (again != null) SelectCategory(again);
             }
@@ -535,12 +602,6 @@ WHERE i.UserId=@u AND i.CategoryId=@c AND i.Date>=@from AND i.Date<=@to");
             {
                 MessageBox.Show("Błąd dodawania: " + ex.Message, "Błąd", MessageBoxButton.OK, MessageBoxImage.Error);
             }
-        }
-
-        private void EditSelectedCategoryDialog_Click(object sender, RoutedEventArgs e)
-        {
-            if (_selectedCategory == null) return;
-            OpenEditDialogFor(_selectedCategory);
         }
 
         private void EditCategory_Click(object sender, RoutedEventArgs e)
@@ -563,7 +624,6 @@ WHERE i.UserId=@u AND i.CategoryId=@c AND i.Date>=@from AND i.Date<=@to");
             try
             {
                 string? colorToSave = string.IsNullOrWhiteSpace(data.ColorHex) ? null : data.ColorHex;
-
                 DatabaseService.UpdateCategoryFull(vm.Id, _uid, newName, colorToSave, data.Icon ?? vm.Icon);
 
                 try
@@ -581,6 +641,7 @@ WHERE i.UserId=@u AND i.CategoryId=@c AND i.Date>=@from AND i.Date<=@to");
                 ToastService.Success("Zapisano zmiany kategorii.");
 
                 LoadCategories();
+
                 var again = _categories.FirstOrDefault(x => x.Id == vm.Id);
                 if (again != null) SelectCategory(again);
 
@@ -649,7 +710,7 @@ WHERE i.UserId=@u AND i.CategoryId=@c AND i.Date>=@from AND i.Date<=@to");
         // ========== ZAZNACZANIE KAFELKA ==========
         private void CategoryItem_Click(object sender, System.Windows.Input.MouseButtonEventArgs e)
         {
-            // Jeśli kliknięto w przyciski, nie zaznaczaj
+            // jeśli kliknięto w przycisk, nie zaznaczaj
             if (e.OriginalSource is DependencyObject d)
             {
                 var parent = d;
@@ -701,8 +762,11 @@ WHERE i.UserId=@u AND i.CategoryId=@c AND i.Date>=@from AND i.Date<=@to");
                 catId = byName.Value;
             }
 
-            DateTime from = PeriodBar.StartDate;
-            DateTime to = PeriodBar.EndDate;
+            var pb = FindName("PeriodBar") as Finly.Views.Controls.PeriodBarControl;
+            if (pb == null) return;
+
+            DateTime from = pb.StartDate;
+            DateTime to = pb.EndDate;
             if (from > to) (from, to) = (to, from);
 
             bool incExp = _mode == CategoryMode.All || _mode == CategoryMode.Expenses;
@@ -720,8 +784,11 @@ WHERE i.UserId=@u AND i.CategoryId=@c AND i.Date>=@from AND i.Date<=@to");
         {
             SelectedCategoryRecentTransactions.Clear();
 
-            DateTime from = PeriodBar.StartDate;
-            DateTime to = PeriodBar.EndDate;
+            var pb = FindName("PeriodBar") as Finly.Views.Controls.PeriodBarControl;
+            if (pb == null) return;
+
+            DateTime from = pb.StartDate;
+            DateTime to = pb.EndDate;
             if (from > to) (from, to) = (to, from);
 
             using var con = DatabaseService.GetConnection();
@@ -756,9 +823,7 @@ SELECT Date, Amount, Description FROM (
     SELECT Date, ABS(Amount) as Amount, IFNULL(Description,'') as Description
     FROM Expenses
     WHERE UserId=@u AND CategoryId=@c AND Date>=@from AND Date<=@to
-
     UNION ALL
-
     SELECT Date, ABS(Amount) as Amount, IFNULL(Description,'') as Description
     FROM Incomes
     WHERE UserId=@u AND CategoryId=@c AND Date>=@from AND Date<=@to
@@ -800,8 +865,11 @@ LIMIT @lim;";
         // ========== STRUKTURA KATEGORII ==========
         private void UpdateCategoryStats()
         {
-            DateTime from = PeriodBar.StartDate;
-            DateTime to = PeriodBar.EndDate;
+            var pb = FindName("PeriodBar") as Finly.Views.Controls.PeriodBarControl;
+            if (pb == null) return;
+
+            DateTime from = pb.StartDate;
+            DateTime to = pb.EndDate;
             if (from > to) (from, to) = (to, from);
 
             bool incExp = _mode == CategoryMode.All || _mode == CategoryMode.Expenses;
@@ -887,7 +955,6 @@ LIMIT @lim;";
 
         // ============================================================
         //  SEED domyślnych kategorii TYLKO RAZ na użytkownika
-        //  (po usunięciu już nie wracają)
         // ============================================================
         private void EnsureDefaultCategoriesOncePerUser()
         {
@@ -896,7 +963,6 @@ LIMIT @lim;";
                 using var con = DatabaseService.GetConnection();
                 con.Open();
 
-                // 1) AppSettings (idempotent)
                 using (var cmd = con.CreateCommand())
                 {
                     cmd.CommandText = @"
@@ -909,7 +975,6 @@ CREATE TABLE IF NOT EXISTS AppSettings(
 
                 var key = $"categories_seeded_u{_uid}";
 
-                // 2) sprawdź flagę
                 var alreadySeeded = false;
                 using (var cmd = con.CreateCommand())
                 {
@@ -921,7 +986,6 @@ CREATE TABLE IF NOT EXISTS AppSettings(
 
                 if (alreadySeeded) return;
 
-                // 3) seed tylko raz
                 var existing = DatabaseService.GetCategoriesByUser(_uid) ?? new List<string>();
 
                 var defaultExpenses = new[] { "Jedzenie", "Transport", "Mieszkanie", "Rachunki", "Rozrywka", "Zdrowie", "Ubrania" };
@@ -933,7 +997,6 @@ CREATE TABLE IF NOT EXISTS AppSettings(
                         DatabaseService.GetOrCreateCategoryId(_uid, c);
                 }
 
-                // 4) zapisz flagę
                 using (var cmd = con.CreateCommand())
                 {
                     cmd.CommandText = "INSERT OR REPLACE INTO AppSettings(Key,Value) VALUES(@k,'1');";
@@ -941,10 +1004,7 @@ CREATE TABLE IF NOT EXISTS AppSettings(
                     cmd.ExecuteNonQuery();
                 }
             }
-            catch
-            {
-                // jeśli coś pójdzie nie tak, nie wywalaj UI
-            }
+            catch { }
         }
 
         // ===== MODELE =====
@@ -994,6 +1054,19 @@ CREATE TABLE IF NOT EXISTS AppSettings(
             public event PropertyChangedEventHandler? PropertyChanged;
             private void OnPropertyChanged(string prop)
                 => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(prop));
+        }
+
+        // STABILNY lookup zasobów: tylko App.TryFindResource (jak w Dashboard)
+        private static Brush GetAppBrush(string key, Brush fallback)
+        {
+            try
+            {
+                return Application.Current?.TryFindResource(key) as Brush ?? fallback;
+            }
+            catch
+            {
+                return fallback;
+            }
         }
 
         public class CategoryTransactionRow

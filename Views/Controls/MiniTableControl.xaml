@@ -1,6 +1,7 @@
 ﻿<UserControl x:Class="Finly.Views.Controls.MiniTableControl"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:sys="clr-namespace:System;assembly=mscorlib"
              x:Name="Root">
 
     <Grid>
@@ -9,12 +10,12 @@
             <RowDefinition Height="*"/>
         </Grid.RowDefinitions>
 
-        <!-- Header -->
+        <!-- Header: NIE binduj Content do DataContext -->
         <ContentControl Grid.Row="0"
-                        Content="{Binding}"
+                        Content="{x:Static sys:String.Empty}"
                         ContentTemplate="{Binding HeaderTemplate, ElementName=Root}"/>
 
-        <!-- Rows (SELEKCJA) -->
+        <!-- Rows -->
         <ListBox Grid.Row="1"
                  ItemsSource="{Binding ItemsSource, ElementName=Root}"
                  ItemTemplate="{Binding RowTemplate, ElementName=Root}"
@@ -28,7 +29,6 @@
                  Padding="0"
                  HorizontalContentAlignment="Stretch">
 
-            <!-- Estetyka zaznaczenia (żeby było widać, co wybrane) -->
             <ListBox.ItemContainerStyle>
                 <Style TargetType="ListBoxItem">
                     <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
