@@ -1,23 +1,22 @@
-﻿using System;
+﻿using Finly.Services;
+using Finly.Services.Features;
+using LiveChartsCore;
+using LiveChartsCore.Measure;
+using LiveChartsCore.SkiaSharpView;
+using LiveChartsCore.SkiaSharpView.Painting;
+using Microsoft.Win32;
+using QuestPDF.Fluent;
+using QuestPDF.Infrastructure;
+using SkiaSharp;
+using System;
+using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Data;
-using System.Linq;
-using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
+using System.Linq;
 using System.Threading.Tasks;
-using LiveChartsCore;
-using LiveChartsCore.SkiaSharpView;
-using LiveChartsCore.SkiaSharpView.Painting;
-using Finly.Services;
-using QuestPDF.Fluent;
-using QuestPDF.Infrastructure;
-using Microsoft.Win32;
-using SkiaSharp;
-using Finly.Services.Features;
-using LiveChartsCore.Measure;
-
 
 namespace Finly.ViewModels
 {
@@ -27,7 +26,7 @@ namespace Finly.ViewModels
         private void Raise(string name) => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
 
         public enum Period { Today, Week, Month, Year, All }
-        public enum Mode { All, Expenses, Incomes, Transfer } // Cashflow removed
+        public enum Mode { All, Expenses, Incomes, Transfer }
 
         private Period _selectedPeriod = Period.Month;
         public Period SelectedPeriod
@@ -93,6 +92,14 @@ namespace Finly.ViewModels
         public ObservableCollection<string> AmountBucketsLabels { get; } = new();
 
         private readonly int _userId;
+        private readonly CultureInfo _pl = CultureInfo.GetCultureInfo("pl-PL");
+
+        private SolidColorPaint _fg = new SolidColorPaint(SKColors.White);
+        private SolidColorPaint _grid = new SolidColorPaint(new SKColor(255, 255, 255, 28));
+
+        private bool _useCustomRange;
+        private DateTime? _customFrom;
+        private DateTime? _customTo;
 
         public ChartsViewModel()
         {
@@ -104,11 +111,14 @@ namespace Finly.ViewModels
             }
             catch
             {
-                // ignorujemy: VM ma działać nawet jeśli event nie jest dostępny w danym kontekście
+                // VM ma działać nawet jeśli event nie jest dostępny w danym kontekście
             }
 
             LoadStatistics();
         }
+
+        private string Pln(double v)
+            => (v < 0 ? "-" : "") + Math.Abs(v).ToString("N0", _pl) + " zł";
 
         public void SetPeriod(string period)
         {
@@ -130,10 +140,6 @@ namespace Finly.ViewModels
             LoadStatistics();
         }
 
-        private bool _useCustomRange;
-        private DateTime? _customFrom;
-        private DateTime? _customTo;
-
         private (DateTime? From, DateTime? To, string Bucket) ResolveRange()
         {
             if (_useCustomRange && _customFrom.HasValue && _customTo.HasValue)
@@ -141,7 +147,6 @@ namespace Finly.ViewModels
                 var from = _customFrom.Value.Date;
                 var to = _customTo.Value.Date;
 
-                // bucket dobrany do długości okresu
                 var span = (to - from).TotalDays;
                 string bucket = span <= 7 ? "day" : span <= 35 ? "week" : "month";
 
@@ -165,7 +170,6 @@ namespace Finly.ViewModels
 
         public void LoadStatistics()
         {
-            // ===== clear series =====
             CategoriesSeries.Clear();
             TrendSeries.Clear();
             WeekdaySeries.Clear();
@@ -175,7 +179,6 @@ namespace Finly.ViewModels
             SavedCashSeries.Clear();
             AmountBucketsSeries.Clear();
 
-            // ===== clear labels =====
             TrendLabels.Clear();
             WeekdayLabels.Clear();
             EnvelopeLabels.Clear();
@@ -184,59 +187,49 @@ namespace Finly.ViewModels
             SavedCashLabels.Clear();
             AmountBucketsLabels.Clear();
 
-            // ===== clear axes =====
             TrendXAxes.Clear();
             TrendYAxes.Clear();
-
             WeekdayXAxes.Clear();
             WeekdayYAxes.Clear();
-
             EnvelopesXAxes.Clear();
             EnvelopesYAxes.Clear();
-
             BankAccountsXAxes.Clear();
             BankAccountsYAxes.Clear();
-
             FreeCashXAxes.Clear();
             FreeCashYAxes.Clear();
-
             SavedCashXAxes.Clear();
             SavedCashYAxes.Clear();
-
             AmountBucketsXAxes.Clear();
             AmountBucketsYAxes.Clear();
 
             var (from, to, bucket) = ResolveRange();
 
-            // Paints / format
-            var fg = new SolidColorPaint(SKColors.White);
-            var grid = new SolidColorPaint(new SKColor(255, 255, 255, 28));
+            _fg = new SolidColorPaint(SKColors.White);
+            _grid = new SolidColorPaint(new SKColor(255, 255, 255, 28));
 
             SKColor accent = SelectedMode switch
             {
-                Mode.Expenses => new SKColor(244, 67, 54),   // red
-                Mode.Incomes => new SKColor(76, 175, 80),    // green
-                Mode.Transfer => new SKColor(156, 39, 176),  // purple
-                _ => new SKColor(255, 152, 0),               // orange (All)
+                Mode.Expenses => new SKColor(244, 67, 54),
+                Mode.Incomes => new SKColor(76, 175, 80),
+                Mode.Transfer => new SKColor(156, 39, 176),
+                _ => new SKColor(255, 152, 0),
             };
 
             var accentStroke = new SolidColorPaint(accent, 3);
             var accentFill = new SolidColorPaint(new SKColor(accent.Red, accent.Green, accent.Blue, 90));
 
-            string Pln(double v) => v.ToString("N0", CultureInfo.GetCultureInfo("pl-PL")) + " zł";
-
             try
             {
                 var data = BuildAggregates(from, to, bucket);
 
-                // ===== Pie (Category split) =====
+                // ===== Pie =====
                 if (data.ByCategory.Count == 0)
                 {
                     CategoriesSeries.Add(new PieSeries<double>
                     {
                         Name = "Brak danych",
                         Values = new[] { 1d },
-                        DataLabelsPaint = fg,
+                        DataLabelsPaint = _fg,
                         DataLabelsFormatter = _ => ""
                     });
                 }
@@ -248,39 +241,45 @@ namespace Finly.ViewModels
                         {
                             Name = cat.Name,
                             Values = new[] { (double)cat.Sum },
-                            DataLabelsPaint = fg,
+                            DataLabelsPaint = _fg,
                             DataLabelsFormatter = _ => ""
                         });
                     }
                 }
 
                 // ===== Trend =====
+                double[] trendValues;
                 if (data.Trend.Count == 0 || (data.Trend.Count == 1 && data.Trend[0].Label == "-" && data.Trend[0].Value == 0m))
                 {
                     TrendLabels.Add("-");
+                    trendValues = new[] { 0d };
+
                     TrendSeries.Add(new LineSeries<double>
                     {
                         Name = NoDataName(),
-                        Values = new[] { 0d },
+                        Values = trendValues,
                         GeometrySize = 0,
                         Fill = null,
                         Stroke = accentStroke,
-                        DataLabelsPaint = fg,
+                        DataLabelsPaint = _fg,
+                        DataLabelsPosition = DataLabelsPosition.Top,
                         DataLabelsFormatter = _ => NoDataName()
                     });
                 }
                 else
                 {
-                    foreach (var t in data.Trend)
-                        TrendLabels.Add(t.Label);
+                    foreach (var t in data.Trend) TrendLabels.Add(t.Label);
+                    trendValues = data.Trend.Select(t => (double)t.Value).ToArray();
 
                     TrendSeries.Add(new LineSeries<double>
                     {
-                        Values = data.Trend.Select(t => (double)t.Value).ToArray(),
+                        Values = trendValues,
                         GeometrySize = 8,
                         Fill = accentFill,
                         Stroke = accentStroke,
-                        DataLabelsPaint = null
+                        DataLabelsPaint = _fg,
+                        DataLabelsPosition = DataLabelsPosition.Top,
+                        DataLabelsFormatter = p => Pln(p.Coordinate.PrimaryValue)
                     });
                 }
 
@@ -288,310 +287,49 @@ namespace Finly.ViewModels
                 {
                     Labels = TrendLabels.ToArray(),
                     LabelsRotation = 0,
-                    LabelsPaint = fg,
-                    SeparatorsPaint = grid,
-                    NamePaint = fg,
+                    LabelsPaint = _fg,
+                    SeparatorsPaint = _grid,
+                    NamePaint = _fg,
                     TextSize = 12
                 });
 
-                TrendYAxes.Add(new Axis
-                {
-                    LabelsPaint = fg,
-                    SeparatorsPaint = grid,
-                    NamePaint = fg,
-                    TextSize = 12,
-                    Labeler = v => Pln(v)
-                });
+                ApplyAxisByMode(TrendYAxes, trendValues);
 
                 // ===== Envelopes =====
-                if (data.ByEnvelope.Count == 0)
-                {
-                    EnvelopeLabels.Add("-");
-                    EnvelopesSeries.Add(new ColumnSeries<double>
-                    {
-                        Values = new[] { 0d },
-                        Rx = 6,
-                        Ry = 6,
-                        MaxBarWidth = 46,
-                        Fill = accentFill,
-                        Stroke = accentStroke,
-                        DataLabelsPaint = null
-                    });
-                }
-                else
-                {
-                    foreach (var e in data.ByEnvelope)
-                        EnvelopeLabels.Add(e.Name);
-
-                    EnvelopesSeries.Add(new ColumnSeries<double>
-                    {
-                        Values = data.ByEnvelope.Select(e => (double)e.Sum).ToArray(),
-                        Rx = 6,
-                        Ry = 6,
-                        MaxBarWidth = 46,
-                        Fill = accentFill,
-                        Stroke = accentStroke,
-                        DataLabelsPaint = fg,
-                        DataLabelsPosition = LiveChartsCore.Measure.DataLabelsPosition.Top,
-                        DataLabelsFormatter = p => Pln(p.Coordinate.PrimaryValue)
-                    });
-                }
-
-                EnvelopesXAxes.Add(new Axis
-                {
-                    Labels = EnvelopeLabels.ToArray(),
-                    LabelsPaint = fg,
-                    SeparatorsPaint = grid,
-                    NamePaint = fg,
-                    TextSize = 12
-                });
-
-                EnvelopesYAxes.Add(new Axis
-                {
-                    LabelsPaint = fg,
-                    SeparatorsPaint = grid,
-                    NamePaint = fg,
-                    TextSize = 12,
-                    Labeler = v => Pln(v)
-                });
+                BuildColumnChart(
+                    data.ByEnvelope,
+                    EnvelopeLabels, EnvelopesSeries, EnvelopesXAxes, EnvelopesYAxes,
+                    accentStroke, accentFill, maxBarWidth: 46);
 
                 // ===== Weekday =====
-                double[] weekdayValues;
-                if (data.ByWeekday.Count == 0)
-                {
-                    WeekdayLabels.Add("-");
-                    weekdayValues = new[] { 0d };
-
-                    WeekdaySeries.Add(new ColumnSeries<double>
-                    {
-                        Values = weekdayValues,
-                        Rx = 6,
-                        Ry = 6,
-                        MaxBarWidth = 42,
-                        Fill = accentFill,
-                        Stroke = accentStroke,
-                        DataLabelsPaint = null
-                    });
-                }
-                else
-                {
-                    foreach (var d in data.ByWeekday)
-                        WeekdayLabels.Add(d.Name);
-
-                    weekdayValues = data.ByWeekday.Select(d => (double)d.Sum).ToArray();
-
-                    WeekdaySeries.Add(new ColumnSeries<double>
-                    {
-                        Values = weekdayValues,
-                        Rx = 6,
-                        Ry = 6,
-                        MaxBarWidth = 42,
-                        Fill = accentFill,
-                        Stroke = accentStroke,
-                        DataLabelsPaint = fg,
-                        DataLabelsPosition = LiveChartsCore.Measure.DataLabelsPosition.Top,
-                        DataLabelsFormatter = p => Pln(p.Coordinate.PrimaryValue)
-                    });
-                }
-
-                WeekdayXAxes.Add(new Axis
-                {
-                    Labels = WeekdayLabels.ToArray(),
-                    LabelsPaint = fg,
-                    SeparatorsPaint = grid,
-                    NamePaint = fg,
-                    TextSize = 12
-                });
-
-                var minWeekday = weekdayValues.Min();
-                var maxWeekday = weekdayValues.Max();
-                var minLimit = Math.Min(0, minWeekday);
-                var maxLimit = Math.Max(0, maxWeekday);
-
-                if (Math.Abs(maxLimit - minLimit) < 0.01)
-                {
-                    if (maxLimit == 0) { minLimit = -1; maxLimit = 1; }
-                    else
-                    {
-                        var margin = Math.Abs(maxLimit) * 0.1;
-                        minLimit -= margin;
-                        maxLimit += margin;
-                    }
-                }
-
-                WeekdayYAxes.Add(new Axis
-                {
-                    MinLimit = minLimit,
-                    MaxLimit = maxLimit,
-                    LabelsPaint = fg,
-                    SeparatorsPaint = grid,
-                    NamePaint = fg,
-                    TextSize = 12,
-                    Labeler = v => Pln(v)
-                });
+                BuildColumnChart(
+                    data.ByWeekday,
+                    WeekdayLabels, WeekdaySeries, WeekdayXAxes, WeekdayYAxes,
+                    accentStroke, accentFill, maxBarWidth: 42);
 
                 // ===== Bank accounts =====
-                if (data.ByBankAccount.Count == 0)
-                {
-                    BankAccountLabels.Add("-");
-                    BankAccountsSeries.Add(new ColumnSeries<double>
-                    {
-                        Values = new[] { 0d },
-                        Rx = 6,
-                        Ry = 6,
-                        MaxBarWidth = 46,
-                        Fill = accentFill,
-                        Stroke = accentStroke,
-                        DataLabelsPaint = null
-                    });
-                }
-                else
-                {
-                    foreach (var a in data.ByBankAccount)
-                        BankAccountLabels.Add(a.Name);
-
-                    BankAccountsSeries.Add(new ColumnSeries<double>
-                    {
-                        Values = data.ByBankAccount.Select(a => (double)a.Sum).ToArray(),
-                        Rx = 6,
-                        Ry = 6,
-                        MaxBarWidth = 46,
-                        Fill = accentFill,
-                        Stroke = accentStroke,
-                        DataLabelsPaint = fg,
-                        DataLabelsPosition = LiveChartsCore.Measure.DataLabelsPosition.Top,
-                        DataLabelsFormatter = p => Pln(p.Coordinate.PrimaryValue)
-                    });
-                }
-
-                BankAccountsXAxes.Add(new Axis
-                {
-                    Labels = BankAccountLabels.ToArray(),
-                    LabelsPaint = fg,
-                    SeparatorsPaint = grid,
-                    NamePaint = fg,
-                    TextSize = 12
-                });
-
-                BankAccountsYAxes.Add(new Axis
-                {
-                    LabelsPaint = fg,
-                    SeparatorsPaint = grid,
-                    NamePaint = fg,
-                    TextSize = 12,
-                    Labeler = v => Pln(v)
-                });
+                BuildColumnChart(
+                    data.ByBankAccount,
+                    BankAccountLabels, BankAccountsSeries, BankAccountsXAxes, BankAccountsYAxes,
+                    accentStroke, accentFill, maxBarWidth: 46);
 
                 // ===== Free cash =====
-                if (data.FreeCash.Count == 0)
-                {
-                    FreeCashLabels.Add("-");
-                    FreeCashSeries.Add(new ColumnSeries<double>
-                    {
-                        Values = new[] { 0d },
-                        Rx = 6,
-                        Ry = 6,
-                        MaxBarWidth = 46,
-                        Fill = accentFill,
-                        Stroke = accentStroke,
-                        DataLabelsPaint = null
-                    });
-                }
-                else
-                {
-                    foreach (var a in data.FreeCash)
-                        FreeCashLabels.Add(a.Name);
-
-                    FreeCashSeries.Add(new ColumnSeries<double>
-                    {
-                        Values = data.FreeCash.Select(a => (double)a.Sum).ToArray(),
-                        Rx = 6,
-                        Ry = 6,
-                        MaxBarWidth = 46,
-                        Fill = accentFill,
-                        Stroke = accentStroke,
-                        DataLabelsPaint = fg,
-                        DataLabelsPosition = LiveChartsCore.Measure.DataLabelsPosition.Top,
-                        DataLabelsFormatter = p => Pln(p.Coordinate.PrimaryValue)
-                    });
-                }
-
-                FreeCashXAxes.Add(new Axis
-                {
-                    Labels = FreeCashLabels.ToArray(),
-                    LabelsPaint = fg,
-                    SeparatorsPaint = grid,
-                    NamePaint = fg,
-                    TextSize = 12
-                });
-
-                FreeCashYAxes.Add(new Axis
-                {
-                    LabelsPaint = fg,
-                    SeparatorsPaint = grid,
-                    NamePaint = fg,
-                    TextSize = 12,
-                    Labeler = v => Pln(v)
-                });
+                BuildColumnChart(
+                    data.FreeCash,
+                    FreeCashLabels, FreeCashSeries, FreeCashXAxes, FreeCashYAxes,
+                    accentStroke, accentFill, maxBarWidth: 46);
 
                 // ===== Saved cash =====
-                if (data.SavedCash.Count == 0)
-                {
-                    SavedCashLabels.Add("-");
-                    SavedCashSeries.Add(new ColumnSeries<double>
-                    {
-                        Values = new[] { 0d },
-                        Rx = 6,
-                        Ry = 6,
-                        MaxBarWidth = 46,
-                        Fill = accentFill,
-                        Stroke = accentStroke,
-                        DataLabelsPaint = null
-                    });
-                }
-                else
-                {
-                    foreach (var a in data.SavedCash)
-                        SavedCashLabels.Add(a.Name);
-
-                    SavedCashSeries.Add(new ColumnSeries<double>
-                    {
-                        Values = data.SavedCash.Select(a => (double)a.Sum).ToArray(),
-                        Rx = 6,
-                        Ry = 6,
-                        MaxBarWidth = 46,
-                        Fill = accentFill,
-                        Stroke = accentStroke,
-                        DataLabelsPaint = fg,
-                        DataLabelsPosition = LiveChartsCore.Measure.DataLabelsPosition.Top,
-                        DataLabelsFormatter = p => Pln(p.Coordinate.PrimaryValue)
-                    });
-                }
-
-                SavedCashXAxes.Add(new Axis
-                {
-                    Labels = SavedCashLabels.ToArray(),
-                    LabelsPaint = fg,
-                    SeparatorsPaint = grid,
-                    NamePaint = fg,
-                    TextSize = 12
-                });
-
-                SavedCashYAxes.Add(new Axis
-                {
-                    LabelsPaint = fg,
-                    SeparatorsPaint = grid,
-                    NamePaint = fg,
-                    TextSize = 12,
-                    Labeler = v => Pln(v)
-                });
+                BuildColumnChart(
+                    data.SavedCash,
+                    SavedCashLabels, SavedCashSeries, SavedCashXAxes, SavedCashYAxes,
+                    accentStroke, accentFill, maxBarWidth: 46);
 
                 // ===== Amount buckets =====
-                BuildAmountBucketsChart(from, to, fg, grid, accentStroke, accentFill);
+                BuildAmountBucketsChart(from, to, accentStroke, accentFill);
             }
             catch
             {
-                // minimal fallback, żeby nie wysypać UI
                 CategoriesSeries.Add(new PieSeries<double> { Name = "Brak danych", Values = new[] { 1d } });
 
                 TrendLabels.Add("-");
@@ -631,11 +369,282 @@ namespace Finly.ViewModels
             }
         }
 
+        // =========================
+        // One unified column builder
+        // =========================
 
+        private void BuildColumnChart(
+            List<(string Name, decimal Sum)> rows,
+            ObservableCollection<string> labels,
+            ObservableCollection<ISeries> series,
+            ObservableCollection<Axis> xAxes,
+            ObservableCollection<Axis> yAxes,
+            SolidColorPaint accentStroke,
+            SolidColorPaint accentFill,
+            double maxBarWidth)
+        {
+            labels.Clear();
+            series.Clear();
+            xAxes.Clear();
+            yAxes.Clear();
 
-        // reszta pliku bez zmian...
+            double[] values;
 
-        // ===== Export PDF / CSV =====
+            if (rows == null || rows.Count == 0)
+            {
+                labels.Add("-");
+                values = new[] { 0d };
+
+                series.Add(new ColumnSeries<double>
+                {
+                    Values = values,
+                    Rx = 6,
+                    Ry = 6,
+                    MaxBarWidth = maxBarWidth,
+                    Fill = accentFill,
+                    Stroke = accentStroke,
+                    DataLabelsPaint = null
+                });
+            }
+            else
+            {
+                foreach (var r in rows) labels.Add(r.Name);
+
+                values = rows.Select(r => Sign((double)r.Sum)).ToArray();
+
+                series.Add(new ColumnSeries<double>
+                {
+                    Values = values,
+                    Rx = 6,
+                    Ry = 6,
+                    MaxBarWidth = maxBarWidth,
+                    Fill = accentFill,
+                    Stroke = accentStroke,
+                    DataLabelsPaint = _fg,
+                    DataLabelsPosition = DataLabelsPosition.Top,
+                    DataLabelsFormatter = p => Pln(p.Coordinate.PrimaryValue)
+                });
+            }
+
+            xAxes.Add(new Axis
+            {
+                Labels = labels.ToArray(),
+                LabelsPaint = _fg,
+                SeparatorsPaint = _grid,
+                NamePaint = _fg,
+                TextSize = 12
+            });
+
+            ApplyAxisByMode(yAxes, values);
+        }
+
+        // =========================
+        // Helpers (ONLY ONE COPY)
+        // =========================
+
+        private double Sign(double v)
+            => SelectedMode == Mode.Expenses ? -Math.Abs(v) : Math.Abs(v);
+
+        private void ApplyAxisByMode(ObservableCollection<Axis> yAxes, double[] values)
+        {
+            double min = values.Length == 0 ? 0 : values.Min();
+            double max = values.Length == 0 ? 0 : values.Max();
+
+            double minLimit, maxLimit;
+
+            if (SelectedMode == Mode.Expenses)
+            {
+                maxLimit = 0;
+                minLimit = Math.Min(0, min);
+            }
+            else if (SelectedMode == Mode.Incomes || SelectedMode == Mode.Transfer)
+            {
+                minLimit = 0;
+                maxLimit = Math.Max(0, max);
+            }
+            else
+            {
+                minLimit = Math.Min(0, min);
+                maxLimit = Math.Max(0, max);
+            }
+
+            var span = Math.Abs(maxLimit - minLimit);
+            if (span < 0.01) span = 1;
+            var pad = span * 0.12;
+
+            // headroom na etykiety
+            maxLimit += pad;
+            minLimit -= pad;
+
+            yAxes.Clear();
+            yAxes.Add(new Axis
+            {
+                MinLimit = minLimit,
+                MaxLimit = maxLimit,
+                LabelsPaint = _fg,
+                SeparatorsPaint = _grid,
+                NamePaint = _fg,
+                TextSize = 12,
+                Labeler = v => Pln(v)
+            });
+        }
+
+        private string NoDataName() => SelectedMode switch
+        {
+            Mode.Incomes => "Brak przychodów",
+            Mode.Transfer => "Brak transferów",
+            Mode.Expenses => "Brak wydatków",
+            _ => "Brak danych"
+        };
+
+        // =========================
+        // Amount buckets
+        // =========================
+
+        private void BuildAmountBucketsChart(
+            DateTime? from, DateTime? to,
+            SolidColorPaint accentStroke, SolidColorPaint accentFill)
+        {
+            var bucketsData = GetAmountBucketsData(from, to);
+
+            AmountBucketsLabels.Clear();
+            AmountBucketsSeries.Clear();
+            AmountBucketsXAxes.Clear();
+            AmountBucketsYAxes.Clear();
+
+            double[] values;
+
+            if (bucketsData == null || bucketsData.Count == 0 || bucketsData.All(b => b.Sum == 0))
+            {
+                AmountBucketsLabels.Add("-");
+                values = new[] { 0d };
+
+                AmountBucketsSeries.Add(new ColumnSeries<double>
+                {
+                    Values = values,
+                    Rx = 6,
+                    Ry = 6,
+                    MaxBarWidth = 42,
+                    Fill = accentFill,
+                    Stroke = accentStroke,
+                    DataLabelsPaint = null
+                });
+            }
+            else
+            {
+                foreach (var b in bucketsData)
+                    AmountBucketsLabels.Add(b.Name);
+
+                // to jest histogram liczności -> dodatnie zawsze
+                values = bucketsData.Select(b => (double)b.Sum).ToArray();
+
+                AmountBucketsSeries.Add(new ColumnSeries<double>
+                {
+                    Values = values,
+                    Rx = 6,
+                    Ry = 6,
+                    MaxBarWidth = 42,
+                    Fill = accentFill,
+                    Stroke = accentStroke,
+                    DataLabelsPaint = _fg,
+                    DataLabelsPosition = DataLabelsPosition.Top,
+                    DataLabelsFormatter = p =>
+                    {
+                        var v = p.Coordinate.PrimaryValue;
+                        if (double.IsNaN(v) || double.IsInfinity(v) || v <= 0) return "";
+                        return Math.Round(v).ToString("N0", _pl);
+                    }
+                });
+            }
+
+            AmountBucketsXAxes.Add(new Axis
+            {
+                Labels = AmountBucketsLabels.ToArray(),
+                LabelsPaint = _fg,
+                SeparatorsPaint = _grid,
+                NamePaint = _fg,
+                TextSize = 12
+            });
+
+            // histogram: od 0 w górę
+            ApplyAxisForceZeroToMax(AmountBucketsYAxes, values);
+        }
+
+        private void ApplyAxisForceZeroToMax(ObservableCollection<Axis> yAxes, double[] values)
+        {
+            var max = values.Length == 0 ? 0 : values.Max();
+            var maxLimit = Math.Max(0, max);
+
+            var span = Math.Abs(maxLimit - 0);
+            if (span < 0.01) span = 1;
+            var pad = span * 0.12;
+
+            yAxes.Clear();
+            yAxes.Add(new Axis
+            {
+                MinLimit = 0,
+                MaxLimit = maxLimit + pad,
+                LabelsPaint = _fg,
+                SeparatorsPaint = _grid,
+                NamePaint = _fg,
+                TextSize = 12,
+                Labeler = v => v <= 0 ? "0" : v.ToString("N0", _pl)
+            });
+        }
+
+        private List<(string Name, decimal Sum)> GetAmountBucketsData(DateTime? from, DateTime? to)
+        {
+            var amounts = new List<decimal>();
+
+            if (SelectedMode == Mode.All)
+            {
+                var exp = DatabaseService.GetExpenses(_userId, from, to);
+                amounts.AddRange(exp.AsEnumerable().Select(r => Math.Abs(SafeDecimal(r["Amount"]))));
+
+                var inc = DatabaseService.GetIncomes(_userId, from, to);
+                amounts.AddRange(inc.AsEnumerable().Select(r => Math.Abs(SafeDecimal(r["Amount"]))));
+            }
+            else if (SelectedMode == Mode.Incomes || SelectedMode == Mode.Transfer)
+            {
+                var inc = DatabaseService.GetIncomes(_userId, from, to)
+                    .AsEnumerable()
+                    .Select(r => Math.Abs(SafeDecimal(r["Amount"])));
+
+                amounts.AddRange(inc);
+            }
+            else // Expenses
+            {
+                var exp = DatabaseService.GetExpenses(_userId, from, to);
+                amounts.AddRange(exp.AsEnumerable().Select(r => Math.Abs(SafeDecimal(r["Amount"]))));
+            }
+
+            return BuildAmountBuckets(amounts);
+        }
+
+        private static List<(string Name, decimal Sum)> BuildAmountBuckets(IEnumerable<decimal> amounts)
+        {
+            var result = new Dictionary<string, decimal>(StringComparer.OrdinalIgnoreCase);
+
+            foreach (var v in amounts)
+            {
+                string label =
+                    v <= 50 ? "0–50" :
+                    v <= 100 ? "50–100" :
+                    v <= 200 ? "100–200" :
+                    v <= 500 ? "200–500" :
+                    v <= 1000 ? "500–1000" :
+                    ">1000";
+
+                result[label] = result.TryGetValue(label, out var cur) ? cur + 1 : 1;
+            }
+
+            var ordered = new[] { "0–50", "50–100", "100–200", "200–500", "500–1000", ">1000" };
+            return ordered.Select(l => (l, result.TryGetValue(l, out var c) ? c : 0m)).ToList();
+        }
+
+        // =========================
+        // Export PDF / CSV
+        // =========================
 
         public async Task ExportToPdfAsync()
         {
@@ -721,106 +730,6 @@ namespace Finly.ViewModels
                                     t.Cell().Text(r2.Value.ToString("N2"));
                                 }
                             });
-
-                            col.Item().PaddingTop(10).Text("Rachunki bankowe").Bold();
-                            col.Item().Table(t =>
-                            {
-                                t.ColumnsDefinition(c =>
-                                {
-                                    c.ConstantColumn(260);
-                                    c.RelativeColumn();
-                                });
-                                t.Header(h =>
-                                {
-                                    h.Cell().Text("Nazwa").Bold();
-                                    h.Cell().Text("Suma [PLN]").Bold();
-                                });
-                                foreach (var r2 in data.ByBankAccount)
-                                {
-                                    t.Cell().Text(r2.Name);
-                                    t.Cell().Text(r2.Sum.ToString("N2"));
-                                }
-                            });
-
-                            col.Item().PaddingTop(10).Text("Wolna gotówka").Bold();
-                            col.Item().Table(t =>
-                            {
-                                t.ColumnsDefinition(c =>
-                                {
-                                    c.ConstantColumn(260);
-                                    c.RelativeColumn();
-                                });
-                                t.Header(h =>
-                                {
-                                    h.Cell().Text("Nazwa").Bold();
-                                    h.Cell().Text("Suma [PLN]").Bold();
-                                });
-                                foreach (var r2 in data.FreeCash)
-                                {
-                                    t.Cell().Text(r2.Name);
-                                    t.Cell().Text(r2.Sum.ToString("N2"));
-                                }
-                            });
-
-                            col.Item().PaddingTop(10).Text("Odłożona gotówka").Bold();
-                            col.Item().Table(t =>
-                            {
-                                t.ColumnsDefinition(c =>
-                                {
-                                    c.ConstantColumn(260);
-                                    c.RelativeColumn();
-                                });
-                                t.Header(h =>
-                                {
-                                    h.Cell().Text("Nazwa").Bold();
-                                    h.Cell().Text("Suma [PLN]").Bold();
-                                });
-                                foreach (var r2 in data.SavedCash)
-                                {
-                                    t.Cell().Text(r2.Name);
-                                    t.Cell().Text(r2.Sum.ToString("N2"));
-                                }
-                            });
-
-                            col.Item().PaddingTop(10).Text("Koperty").Bold();
-                            col.Item().Table(t =>
-                            {
-                                t.ColumnsDefinition(c =>
-                                {
-                                    c.ConstantColumn(260);
-                                    c.RelativeColumn();
-                                });
-                                t.Header(h =>
-                                {
-                                    h.Cell().Text("Nazwa").Bold();
-                                    h.Cell().Text("Suma [PLN]").Bold();
-                                });
-                                foreach (var r2 in data.ByEnvelope)
-                                {
-                                    t.Cell().Text(r2.Name);
-                                    t.Cell().Text(r2.Sum.ToString("N2"));
-                                }
-                            });
-
-                            col.Item().PaddingTop(10).Text("Dni tygodnia").Bold();
-                            col.Item().Table(t =>
-                            {
-                                t.ColumnsDefinition(c =>
-                                {
-                                    c.ConstantColumn(120);
-                                    c.RelativeColumn();
-                                });
-                                t.Header(h =>
-                                {
-                                    h.Cell().Text("Dzień").Bold();
-                                    h.Cell().Text("Suma [PLN]").Bold();
-                                });
-                                foreach (var r2 in data.ByWeekday)
-                                {
-                                    t.Cell().Text(r2.Name);
-                                    t.Cell().Text(r2.Sum.ToString("N2"));
-                                }
-                            });
                         });
 
                         page.Footer().AlignRight().Text($"Wygenerowano: {DateTime.Now:yyyy-MM-dd HH:mm}");
@@ -854,47 +763,10 @@ namespace Finly.ViewModels
                 using var w = new StreamWriter(sfd.FileName);
 
                 w.WriteLine($"Finly;Tryb;{SelectedMode};Okres;{DescribePeriod(from, to)}");
-
                 w.WriteLine();
                 w.WriteLine("Podział wg kategorii");
                 w.WriteLine("Nazwa;Suma");
                 foreach (var r in data.ByCategory)
-                    w.WriteLine($"{Escape(r.Name)};{r.Sum.ToString("N2", CultureInfo.InvariantCulture)}");
-
-                w.WriteLine();
-                w.WriteLine("Trend");
-                w.WriteLine("Okres;Suma");
-                foreach (var r in data.Trend)
-                    w.WriteLine($"{Escape(r.Label)};{r.Value.ToString("N2", CultureInfo.InvariantCulture)}");
-
-                w.WriteLine();
-                w.WriteLine("Rachunki bankowe");
-                w.WriteLine("Nazwa;Suma");
-                foreach (var r in data.ByBankAccount)
-                    w.WriteLine($"{Escape(r.Name)};{r.Sum.ToString("N2", CultureInfo.InvariantCulture)}");
-
-                w.WriteLine();
-                w.WriteLine("Wolna gotówka");
-                w.WriteLine("Nazwa;Suma");
-                foreach (var r in data.FreeCash)
-                    w.WriteLine($"{Escape(r.Name)};{r.Sum.ToString("N2", CultureInfo.InvariantCulture)}");
-
-                w.WriteLine();
-                w.WriteLine("Odłożona gotówka");
-                w.WriteLine("Nazwa;Suma");
-                foreach (var r in data.SavedCash)
-                    w.WriteLine($"{Escape(r.Name)};{r.Sum.ToString("N2", CultureInfo.InvariantCulture)}");
-
-                w.WriteLine();
-                w.WriteLine("Koperty");
-                w.WriteLine("Nazwa;Suma");
-                foreach (var r in data.ByEnvelope)
-                    w.WriteLine($"{Escape(r.Name)};{r.Sum.ToString("N2", CultureInfo.InvariantCulture)}");
-
-                w.WriteLine();
-                w.WriteLine("Dni tygodnia");
-                w.WriteLine("Dzień;Suma");
-                foreach (var r in data.ByWeekday)
                     w.WriteLine($"{Escape(r.Name)};{r.Sum.ToString("N2", CultureInfo.InvariantCulture)}");
 
                 ToastService.Success($"Zapisano CSV: {sfd.FileName}");
@@ -905,8 +777,7 @@ namespace Finly.ViewModels
             }
         }
 
-        private static string Escape(string? s) =>
-            string.IsNullOrEmpty(s) ? "" : s.Replace(";", ",");
+        private static string Escape(string? s) => string.IsNullOrEmpty(s) ? "" : s.Replace(";", ",");
 
         private string DescribePeriod(DateTime? from, DateTime? to)
         {
@@ -914,6 +785,10 @@ namespace Finly.ViewModels
             if (from == to) return from?.ToString("yyyy-MM-dd") ?? "";
             return $"{from:yyyy-MM-dd} – {to:yyyy-MM-dd}";
         }
+
+        // =========================
+        // Aggregates (core)
+        // =========================
 
         private (decimal SummaryTotal, decimal TotalIncomes, decimal TotalExpenses,
                  List<(string Name, decimal Sum)> ByCategory,
@@ -927,7 +802,6 @@ namespace Finly.ViewModels
         {
             var snapshot = DatabaseService.GetMoneySnapshot(_userId);
 
-            // ===== ALL =====
             if (SelectedMode == Mode.All)
             {
                 var expDt = DatabaseService.GetExpenses(_userId, from, to);
@@ -935,9 +809,7 @@ namespace Finly.ViewModels
                 {
                     Date = SafeDate(r["Date"]),
                     Amount = Math.Abs(SafeDecimal(r["Amount"])),
-                    Category = (r.Table.Columns.Contains("CategoryName")
-                        ? (r["CategoryName"]?.ToString() ?? "(brak)")
-                        : "(brak)").Trim()
+                    Category = (r.Table.Columns.Contains("CategoryName") ? (r["CategoryName"]?.ToString() ?? "(brak)") : "(brak)").Trim()
                 }).ToList();
 
                 var incDt = DatabaseService.GetIncomes(_userId, from, to);
@@ -945,9 +817,7 @@ namespace Finly.ViewModels
                 {
                     Date = SafeDate(r["Date"]),
                     Amount = Math.Abs(SafeDecimal(r["Amount"])),
-                    Category = (r.Table.Columns.Contains("CategoryName")
-                        ? (r["CategoryName"]?.ToString() ?? "(brak)")
-                        : "(brak)").Trim()
+                    Category = (r.Table.Columns.Contains("CategoryName") ? (r["CategoryName"]?.ToString() ?? "(brak)") : "(brak)").Trim()
                 }).ToList();
 
                 var incomeTotal = incRows.Sum(x => x.Amount);
@@ -970,8 +840,8 @@ namespace Finly.ViewModels
                 }
 
                 var byCategory = catDict
-                    .Select(kv => (kv.Key, kv.Value))
-                    .OrderByDescending(x => x.Value)
+                    .Select(kv => (Name: kv.Key, Sum: kv.Value))
+                    .OrderByDescending(x => x.Sum)
                     .ToList();
 
                 var merged = new List<(DateTime Date, decimal Amount)>();
@@ -992,12 +862,12 @@ namespace Finly.ViewModels
                 var weekdays = GroupByWeekday(merged, null);
                 var order = new[]
                 {
-            DayOfWeek.Monday, DayOfWeek.Tuesday, DayOfWeek.Wednesday,
-            DayOfWeek.Thursday, DayOfWeek.Friday, DayOfWeek.Saturday, DayOfWeek.Sunday
-        };
+                    DayOfWeek.Monday, DayOfWeek.Tuesday, DayOfWeek.Wednesday,
+                    DayOfWeek.Thursday, DayOfWeek.Friday, DayOfWeek.Saturday, DayOfWeek.Sunday
+                };
 
                 var byWeekday = order
-                    .Select(d => (PolishShortDayName(d), weekdays.TryGetValue(d, out var v) ? v : 0m))
+                    .Select(d => (Name: PolishShortDayName(d), Sum: weekdays.TryGetValue(d, out var v) ? v : 0m))
                     .ToList();
 
                 var summaryNet = incomeTotal - expenseTotal;
@@ -1008,7 +878,6 @@ namespace Finly.ViewModels
                         byEnvelope, byWeekday);
             }
 
-            // ===== INCOMES =====
             if (SelectedMode == Mode.Incomes)
             {
                 var dt = DatabaseService.GetIncomes(_userId, from, to);
@@ -1016,20 +885,16 @@ namespace Finly.ViewModels
                 {
                     Date = SafeDate(r["Date"]),
                     Amount = SafeDecimal(r["Amount"]),
-                    Category = (r.Table.Columns.Contains("CategoryName")
-                        ? (r["CategoryName"]?.ToString() ?? "(brak)")
-                        : "(brak)").Trim(),
-                    Source = (r.Table.Columns.Contains("Source")
-                        ? (r["Source"]?.ToString() ?? "Przychody")
-                        : "Przychody").Trim()
+                    Category = (r.Table.Columns.Contains("CategoryName") ? (r["CategoryName"]?.ToString() ?? "(brak)") : "(brak)").Trim(),
+                    Source = (r.Table.Columns.Contains("Source") ? (r["Source"]?.ToString() ?? "Przychody") : "Przychody").Trim()
                 }).ToList();
 
                 var total = rows.Sum(x => Math.Abs(x.Amount));
 
                 var byCategory = rows
                     .GroupBy(x => string.IsNullOrWhiteSpace(x.Category) ? "(brak)" : x.Category)
-                    .Select(g => (g.Key, g.Sum(x => Math.Abs(x.Amount))))
-                    .OrderByDescending(x => x.Item2)
+                    .Select(g => (Name: g.Key, Sum: g.Sum(x => Math.Abs(x.Amount))))
+                    .OrderByDescending(x => x.Sum)
                     .ToList();
 
                 var trend = BuildTrendList(
@@ -1058,19 +923,17 @@ namespace Finly.ViewModels
                         byBank[name] = byBank.TryGetValue(name, out var cur) ? cur + amount : amount;
                 }
 
-                var byEnvelope = new List<(string, decimal)>();
+                var byEnvelope = new List<(string Name, decimal Sum)>();
 
-                var weekdaysDict = GroupByWeekday(
-                    rows.Select(r => (r.Date, r.Amount)), false);
-
+                var weekdaysDict = GroupByWeekday(rows.Select(r => (r.Date, r.Amount)), false);
                 var orderInc = new[]
                 {
-            DayOfWeek.Monday, DayOfWeek.Tuesday, DayOfWeek.Wednesday,
-            DayOfWeek.Thursday, DayOfWeek.Friday, DayOfWeek.Saturday, DayOfWeek.Sunday
-        };
+                    DayOfWeek.Monday, DayOfWeek.Tuesday, DayOfWeek.Wednesday,
+                    DayOfWeek.Thursday, DayOfWeek.Friday, DayOfWeek.Saturday, DayOfWeek.Sunday
+                };
 
                 var byWeekday = orderInc
-                    .Select(d => (PolishShortDayName(d), weekdaysDict.TryGetValue(d, out var v) ? v : 0m))
+                    .Select(d => (Name: PolishShortDayName(d), Sum: weekdaysDict.TryGetValue(d, out var v) ? v : 0m))
                     .ToList();
 
                 if (byFree.Count == 0 && snapshot.Cash != 0m)
@@ -1090,12 +953,9 @@ namespace Finly.ViewModels
                         byEnvelope, byWeekday);
             }
 
-            // ===== TRANSFER =====
-            // ===== TRANSFER =====
             if (SelectedMode == Mode.Transfer)
             {
                 var dt = DatabaseService.GetTransfers(_userId, from, to);
-
                 var rows = dt.AsEnumerable().Select(r => new
                 {
                     Date = SafeDate(r["Date"]),
@@ -1106,7 +966,6 @@ namespace Finly.ViewModels
 
                 var total = rows.Sum(x => x.Amount);
 
-                // „Kategorie” transferów = kierunek przepływu
                 string Human(string kind) => kind.ToLowerInvariant() switch
                 {
                     "freecash" => "Wolna gotówka",
@@ -1118,16 +977,15 @@ namespace Finly.ViewModels
 
                 var byCategory = rows
                     .GroupBy(x => $"{Human(x.FromKind)} → {Human(x.ToKind)}")
-                    .Select(g => (g.Key, g.Sum(x => x.Amount)))
-                    .OrderByDescending(x => x.Item2)
+                    .Select(g => (Name: g.Key, Sum: g.Sum(x => x.Amount)))
+                    .OrderByDescending(x => x.Sum)
                     .ToList();
 
                 var trend = BuildTrendList(
                     rows.Select(r => (r.Date, (decimal)r.Amount)),
                     from, to, bucket, false);
 
-                // Resztę (bank/free/saved/envelopes/weekday) możesz na razie zostawić jako placeholder albo wyliczyć podobnie.
-                var byAccount = new List<(string Name, decimal Sum)>(); // jeśli chcesz — rozbij na From/To
+                var byAccount = new List<(string Name, decimal Sum)>();
                 var byFreeCash = new List<(string Name, decimal Sum)>();
                 var bySavedCash = new List<(string Name, decimal Sum)>();
                 var byEnvelope = new List<(string Name, decimal Sum)>();
@@ -1135,11 +993,12 @@ namespace Finly.ViewModels
                 var weekdaysDict = GroupByWeekday(rows.Select(r => (r.Date, (decimal)r.Amount)), false);
                 var orderTr = new[]
                 {
-        DayOfWeek.Monday, DayOfWeek.Tuesday, DayOfWeek.Wednesday,
-        DayOfWeek.Thursday, DayOfWeek.Friday, DayOfWeek.Saturday, DayOfWeek.Sunday
-    };
+                    DayOfWeek.Monday, DayOfWeek.Tuesday, DayOfWeek.Wednesday,
+                    DayOfWeek.Thursday, DayOfWeek.Friday, DayOfWeek.Saturday, DayOfWeek.Sunday
+                };
+
                 var byWeekday = orderTr
-                    .Select(d => (PolishShortDayName(d), weekdaysDict.TryGetValue(d, out var v) ? v : 0m))
+                    .Select(d => (Name: PolishShortDayName(d), Sum: weekdaysDict.TryGetValue(d, out var v) ? v : 0m))
                     .ToList();
 
                 return (total, 0m, 0m,
@@ -1147,17 +1006,14 @@ namespace Finly.ViewModels
                     byAccount, byFreeCash, bySavedCash, byEnvelope, byWeekday);
             }
 
-
-            // ===== EXPENSES (default) =====
+            // ===== EXPENSES =====
             {
                 var dt = DatabaseService.GetExpenses(_userId, from, to);
                 var rows = dt.AsEnumerable().Select(r => new
                 {
                     Date = SafeDate(r["Date"]),
                     Amount = SafeDecimal(r["Amount"]),
-                    Category = (r.Table.Columns.Contains("CategoryName")
-                        ? (r["CategoryName"]?.ToString() ?? "(brak)")
-                        : "(brak)").Trim(),
+                    Category = (r.Table.Columns.Contains("CategoryName") ? (r["CategoryName"]?.ToString() ?? "(brak)") : "(brak)").Trim(),
                     AccountText = (r.Table.Columns.Contains("Account") ? (r["Account"]?.ToString() ?? string.Empty) : string.Empty).Trim(),
                     AccountId = SafeNullableInt(r.Table.Columns.Contains("AccountId") ? r["AccountId"] : null)
                 }).ToList();
@@ -1166,13 +1022,11 @@ namespace Finly.ViewModels
 
                 var byCategory = rows
                     .GroupBy(x => string.IsNullOrWhiteSpace(x.Category) ? "(brak)" : x.Category)
-                    .Select(g => (g.Key, g.Sum(x => Math.Abs(x.Amount))))
-                    .OrderByDescending(x => x.Item2)
+                    .Select(g => (Name: g.Key, Sum: g.Sum(x => Math.Abs(x.Amount))))
+                    .OrderByDescending(x => x.Sum)
                     .ToList();
 
-                var trend = BuildTrendList(
-                    rows.Select(r => (r.Date, r.Amount)),
-                    from, to, bucket, true);
+                var trend = BuildTrendList(rows.Select(r => (r.Date, r.Amount)), from, to, bucket, true);
 
                 var byBank = new Dictionary<string, decimal>(StringComparer.OrdinalIgnoreCase);
                 var byFree = new Dictionary<string, decimal>(StringComparer.OrdinalIgnoreCase);
@@ -1228,17 +1082,15 @@ namespace Finly.ViewModels
                     }
                 }
 
-                var weekdaysDict = GroupByWeekday(
-                    rows.Select(r => (r.Date, r.Amount)), true);
-
+                var weekdaysDict = GroupByWeekday(rows.Select(r => (r.Date, r.Amount)), true);
                 var orderExp = new[]
                 {
-            DayOfWeek.Monday, DayOfWeek.Tuesday, DayOfWeek.Wednesday,
-            DayOfWeek.Thursday, DayOfWeek.Friday, DayOfWeek.Saturday, DayOfWeek.Sunday
-        };
+                    DayOfWeek.Monday, DayOfWeek.Tuesday, DayOfWeek.Wednesday,
+                    DayOfWeek.Thursday, DayOfWeek.Friday, DayOfWeek.Saturday, DayOfWeek.Sunday
+                };
 
                 var byWeekday = orderExp
-                    .Select(d => (PolishShortDayName(d), weekdaysDict.TryGetValue(d, out var v) ? v : 0m))
+                    .Select(d => (Name: PolishShortDayName(d), Sum: weekdaysDict.TryGetValue(d, out var v) ? v : 0m))
                     .ToList();
 
                 if (byFree.Count == 0 && snapshot.Cash != 0m)
@@ -1259,6 +1111,10 @@ namespace Finly.ViewModels
                         byWeekday);
             }
         }
+
+        // =========================
+        // Trend + weekday
+        // =========================
 
         private List<(string Label, decimal Value)> BuildTrendList(
             IEnumerable<(DateTime Date, decimal Amount)> items,
@@ -1348,6 +1204,10 @@ namespace Finly.ViewModels
             _ => d.ToString()
         };
 
+        // =========================
+        // Safe conversions
+        // =========================
+
         private static DateTime SafeDate(object? o)
         {
             if (o == null || o is DBNull) return DateTime.Today;
@@ -1383,156 +1243,5 @@ namespace Finly.ViewModels
                 ? parsed
                 : (int?)null;
         }
-
-        // ===== Amount buckets =====
-        private void BuildAmountBucketsChart(
-            DateTime? from, DateTime? to,
-            SolidColorPaint fg, SolidColorPaint grid,
-            SolidColorPaint accentStroke, SolidColorPaint accentFill)
-        {
-            var bucketsData = GetAmountBucketsData(from, to);
-
-            AmountBucketsLabels.Clear();
-            AmountBucketsSeries.Clear();
-            AmountBucketsXAxes.Clear();
-            AmountBucketsYAxes.Clear();
-
-            // Jeśli brak danych albo same zera -> minimalny placeholder
-            if (bucketsData == null || bucketsData.Count == 0 || bucketsData.All(b => b.Sum == 0))
-            {
-                AmountBucketsLabels.Add("-");
-
-                AmountBucketsSeries.Add(new ColumnSeries<double>
-                {
-                    Values = new[] { 0d },
-                    Rx = 6,
-                    Ry = 6,
-                    MaxBarWidth = 42,
-                    Fill = accentFill,
-                    Stroke = accentStroke,
-                    DataLabelsPaint = null
-                });
-            }
-            else
-            {
-                foreach (var b in bucketsData)
-                    AmountBucketsLabels.Add(b.Name);
-
-                AmountBucketsSeries.Add(new ColumnSeries<double>
-                {
-                    Values = bucketsData.Select(b => (double)b.Sum).ToArray(),
-                    Rx = 6,
-                    Ry = 6,
-                    MaxBarWidth = 42,
-
-                    Fill = accentFill,
-                    Stroke = accentStroke,
-
-                    DataLabelsPaint = fg,
-                    DataLabelsPosition = LiveChartsCore.Measure.DataLabelsPosition.Top,
-                    DataLabelsFormatter = p =>
-                    {
-                        var v = p.Coordinate.PrimaryValue;
-                        if (double.IsNaN(v) || double.IsInfinity(v) || v <= 0) return "";
-                        return Math.Round(v).ToString("N0", CultureInfo.GetCultureInfo("pl-PL"));
-                    }
-                });
-            }
-
-            AmountBucketsXAxes.Add(new Axis
-            {
-                Labels = AmountBucketsLabels.ToArray(),
-                LabelsPaint = fg,
-                SeparatorsPaint = grid,
-                NamePaint = fg,
-                TextSize = 12
-            });
-
-            AmountBucketsYAxes.Add(new Axis
-            {
-                LabelsPaint = fg,
-                SeparatorsPaint = grid,
-                NamePaint = fg,
-                TextSize = 12,
-                MinLimit = 0,
-                Labeler = v => v <= 0 ? "" : v.ToString("N0", CultureInfo.GetCultureInfo("pl-PL"))
-            });
-        }
-
-        string NoDataName() => SelectedMode switch
-        {
-            Mode.Incomes => "Brak przychodów",
-            Mode.Transfer => "Brak transferów",
-            Mode.Expenses => "Brak wydatków",
-            _ => "Brak danych"
-        };
-
-
-
-
-        private List<(string Name, decimal Sum)> GetAmountBucketsData(DateTime? from, DateTime? to)
-        {
-            var amounts = new List<decimal>();
-
-            if (SelectedMode == Mode.All)
-            {
-                var exp = DatabaseService.GetExpenses(_userId, from, to);
-                amounts.AddRange(exp.AsEnumerable().Select(r => Math.Abs(SafeDecimal(r["Amount"]))));
-
-                var inc = DatabaseService.GetIncomes(_userId, from, to);
-                amounts.AddRange(inc.AsEnumerable().Select(r => Math.Abs(SafeDecimal(r["Amount"]))));
-            }
-            else if (SelectedMode == Mode.Incomes || SelectedMode == Mode.Transfer)
-            {
-                var inc = DatabaseService.GetIncomes(_userId, from, to)
-                    .AsEnumerable()
-                    .Select(r => new
-                    {
-                        Amount = Math.Abs(SafeDecimal(r["Amount"])),
-                        Source = (r.Table.Columns.Contains("Source") ? (r["Source"]?.ToString() ?? "") : "").Trim()
-                    });
-
-                if (SelectedMode == Mode.Transfer)
-                {
-                    amounts.AddRange(inc
-                        .Where(x => x.Source.Equals("Przelew", StringComparison.OrdinalIgnoreCase)
-                                 || x.Source.StartsWith("Konto:", StringComparison.OrdinalIgnoreCase))
-                        .Select(x => x.Amount));
-                }
-                else
-                {
-                    amounts.AddRange(inc.Select(x => x.Amount));
-                }
-            }
-            else // Expenses
-            {
-                var exp = DatabaseService.GetExpenses(_userId, from, to);
-                amounts.AddRange(exp.AsEnumerable().Select(r => Math.Abs(SafeDecimal(r["Amount"]))));
-            }
-
-            return BuildAmountBuckets(amounts);
-        }
-
-        private static List<(string Name, decimal Sum)> BuildAmountBuckets(IEnumerable<decimal> amounts)
-        {
-            var result = new Dictionary<string, decimal>(StringComparer.OrdinalIgnoreCase);
-
-            foreach (var v in amounts)
-            {
-                string label =
-                    v <= 50 ? "0–50" :
-                    v <= 100 ? "50–100" :
-                    v <= 200 ? "100–200" :
-                    v <= 500 ? "200–500" :
-                    v <= 1000 ? "500–1000" :
-                    ">1000";
-
-                result[label] = result.TryGetValue(label, out var cur) ? cur + 1 : 1;
-            }
-
-            var ordered = new[] { "0–50", "50–100", "100–200", "200–500", "500–1000", ">1000" };
-            return ordered.Select(l => (l, result.TryGetValue(l, out var c) ? c : 0m)).ToList();
-        }
     }
 }
-
