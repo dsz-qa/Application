@@ -56,6 +56,19 @@ namespace Finly.Pages
         public string SelectedCategoryDescription => _selectedCategory?.Description ?? string.Empty;
         public Brush SelectedCategoryColorBrush => _selectedCategory?.ColorBrush ?? Brushes.Transparent;
 
+        // ===== Ostatnia transakcja (TYLKO 1) =====
+        private CategoryTransactionRow? _lastTransaction;
+        public bool HasLastTransaction => _lastTransaction != null;
+
+        public string LastTransactionDateText
+            => _lastTransaction == null ? string.Empty : _lastTransaction.Date.ToString("yyyy-MM-dd", CultureInfo.CurrentCulture);
+
+        public string LastTransactionDescription
+            => _lastTransaction?.Description ?? string.Empty;
+
+        public string LastTransactionAmountText
+            => _lastTransaction == null ? string.Empty : _lastTransaction.Amount.ToString("N2", CultureInfo.CurrentCulture) + " zł";
+
         // ===== Szczegóły: statystyki =====
         private decimal _selectedCategoryTotalAmount;
         public decimal SelectedCategoryTotalAmount
@@ -70,8 +83,6 @@ namespace Finly.Pages
             get => _selectedCategoryTransactionCount;
             set { _selectedCategoryTransactionCount = value; RaisePropertyChanged(nameof(SelectedCategoryTransactionCount)); }
         }
-
-        public ObservableCollection<CategoryTransactionRow> SelectedCategoryRecentTransactions { get; } = new();
 
         // ===== Analizy =====
         public ObservableCollection<CategoryShareItem> CategoryShares { get; } = new();
@@ -745,7 +756,12 @@ WHERE i.UserId=@u AND i.CategoryId=@c AND i.Date>=@from AND i.Date<=@to");
         {
             SelectedCategoryTotalAmount = 0m;
             SelectedCategoryTransactionCount = 0;
-            SelectedCategoryRecentTransactions.Clear();
+
+            _lastTransaction = null;
+            RaisePropertyChanged(nameof(HasLastTransaction));
+            RaisePropertyChanged(nameof(LastTransactionDateText));
+            RaisePropertyChanged(nameof(LastTransactionDescription));
+            RaisePropertyChanged(nameof(LastTransactionAmountText));
 
             RaisePropertyChanged(nameof(HasSelectedCategory));
             RaisePropertyChanged(nameof(SelectedCategoryName));
@@ -777,12 +793,12 @@ WHERE i.UserId=@u AND i.CategoryId=@c AND i.Date>=@from AND i.Date<=@to");
             SelectedCategoryTotalAmount = sum;
             SelectedCategoryTransactionCount = cnt;
 
-            try { LoadRecentTransactionsForCategory(catId, 5); } catch { }
+            try { LoadLastTransactionForCategory(catId); } catch { }
         }
 
-        private void LoadRecentTransactionsForCategory(int categoryId, int take)
+        private void LoadLastTransactionForCategory(int categoryId)
         {
-            SelectedCategoryRecentTransactions.Clear();
+            _lastTransaction = null;
 
             var pb = FindName("PeriodBar") as Finly.Views.Controls.PeriodBarControl;
             if (pb == null) return;
@@ -805,7 +821,7 @@ SELECT Date, ABS(Amount) as Amount, IFNULL(Description,'') as Description
 FROM Expenses
 WHERE UserId=@u AND CategoryId=@c AND Date>=@from AND Date<=@to
 ORDER BY Date DESC
-LIMIT @lim;";
+LIMIT 1;";
             }
             else if (_mode == CategoryMode.Incomes)
             {
@@ -814,7 +830,7 @@ SELECT Date, ABS(Amount) as Amount, IFNULL(Description,'') as Description
 FROM Incomes
 WHERE UserId=@u AND CategoryId=@c AND Date>=@from AND Date<=@to
 ORDER BY Date DESC
-LIMIT @lim;";
+LIMIT 1;";
             }
             else
             {
@@ -829,17 +845,16 @@ SELECT Date, Amount, Description FROM (
     WHERE UserId=@u AND CategoryId=@c AND Date>=@from AND Date<=@to
 )
 ORDER BY Date DESC
-LIMIT @lim;";
+LIMIT 1;";
             }
 
             cmd.Parameters.AddWithValue("@u", _uid);
             cmd.Parameters.AddWithValue("@c", categoryId);
             cmd.Parameters.AddWithValue("@from", dateFrom);
             cmd.Parameters.AddWithValue("@to", dateTo);
-            cmd.Parameters.AddWithValue("@lim", take);
 
             using var r = cmd.ExecuteReader();
-            while (r.Read())
+            if (r.Read())
             {
                 try
                 {
@@ -851,15 +866,23 @@ LIMIT @lim;";
 
                     var desc = r.IsDBNull(2) ? "" : r.GetString(2);
 
-                    SelectedCategoryRecentTransactions.Add(new CategoryTransactionRow
+                    _lastTransaction = new CategoryTransactionRow
                     {
                         Date = dt,
                         Amount = amt,
                         Description = desc
-                    });
+                    };
                 }
-                catch { }
+                catch
+                {
+                    _lastTransaction = null;
+                }
             }
+
+            RaisePropertyChanged(nameof(HasLastTransaction));
+            RaisePropertyChanged(nameof(LastTransactionDateText));
+            RaisePropertyChanged(nameof(LastTransactionDescription));
+            RaisePropertyChanged(nameof(LastTransactionAmountText));
         }
 
         // ========== STRUKTURA KATEGORII ==========
