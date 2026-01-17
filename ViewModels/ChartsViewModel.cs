@@ -472,7 +472,6 @@ namespace Finly.ViewModels
             if (span < 0.01) span = 1;
             var pad = span * 0.12;
 
-            // headroom na etykiety
             maxLimit += pad;
             minLimit -= pad;
 
@@ -535,7 +534,7 @@ namespace Finly.ViewModels
                 foreach (var b in bucketsData)
                     AmountBucketsLabels.Add(b.Name);
 
-                // to jest histogram liczności -> dodatnie zawsze
+                // histogram liczności -> dodatnie zawsze
                 values = bucketsData.Select(b => (double)b.Sum).ToArray();
 
                 AmountBucketsSeries.Add(new ColumnSeries<double>
@@ -566,7 +565,6 @@ namespace Finly.ViewModels
                 TextSize = 12
             });
 
-            // histogram: od 0 w górę
             ApplyAxisForceZeroToMax(AmountBucketsYAxes, values);
         }
 
@@ -604,13 +602,15 @@ namespace Finly.ViewModels
                 var inc = DatabaseService.GetIncomes(_userId, from, to);
                 amounts.AddRange(inc.AsEnumerable().Select(r => Math.Abs(SafeDecimal(r["Amount"]))));
             }
-            else if (SelectedMode == Mode.Incomes || SelectedMode == Mode.Transfer)
+            else if (SelectedMode == Mode.Transfer)
             {
-                var inc = DatabaseService.GetIncomes(_userId, from, to)
-                    .AsEnumerable()
-                    .Select(r => Math.Abs(SafeDecimal(r["Amount"])));
-
-                amounts.AddRange(inc);
+                var tr = DatabaseService.GetTransfers(_userId, from, to);
+                amounts.AddRange(tr.AsEnumerable().Select(r => Math.Abs(SafeDecimal(r["Amount"]))));
+            }
+            else if (SelectedMode == Mode.Incomes)
+            {
+                var inc = DatabaseService.GetIncomes(_userId, from, to);
+                amounts.AddRange(inc.AsEnumerable().Select(r => Math.Abs(SafeDecimal(r["Amount"]))));
             }
             else // Expenses
             {
@@ -641,6 +641,7 @@ namespace Finly.ViewModels
             var ordered = new[] { "0–50", "50–100", "100–200", "200–500", "500–1000", ">1000" };
             return ordered.Select(l => (l, result.TryGetValue(l, out var c) ? c : 0m)).ToList();
         }
+
 
         // =========================
         // Export PDF / CSV
@@ -680,56 +681,56 @@ namespace Finly.ViewModels
                         page.Header().Row(r =>
                         {
                             r.RelativeItem().Text("Finly – Statystyki").SemiBold().FontSize(18);
-                            r.ConstantItem(220).AlignRight().Text($"{modeText} – {periodText}");
+                            r.ConstantItem(260).AlignRight().Text($"{modeText} – {periodText}");
                         });
 
                         page.Content().Column(col =>
                         {
-                            col.Item().Text($"Suma: {data.SummaryTotal:N2} PLN");
+                            // ===== PODSUMOWANIE =====
+                            col.Item().Text($"Suma: {data.SummaryTotal.ToString("N2", _pl)} PLN").SemiBold();
 
-                            col.Item().PaddingTop(10).Text("Podział wg kategorii").Bold();
-                            col.Item().Table(t =>
+                            if (SelectedMode == Mode.All)
                             {
-                                t.ColumnsDefinition(c =>
-                                {
-                                    c.ConstantColumn(260);
-                                    c.RelativeColumn();
-                                });
+                                col.Item().Text($"Przychody: {data.TotalIncomes.ToString("N2", _pl)} PLN");
+                                col.Item().Text($"Wydatki: {data.TotalExpenses.ToString("N2", _pl)} PLN");
+                                col.Item().Text($"Bilans: {(data.TotalIncomes - data.TotalExpenses).ToString("N2", _pl)} PLN");
+                            }
 
-                                t.Header(h =>
-                                {
-                                    h.Cell().Text("Kategoria").Bold();
-                                    h.Cell().Text("Suma [PLN]").Bold();
-                                });
+                            // ===== 1) Podział wg kategorii =====
+                            col.Item().PaddingTop(12).Text("Podział wg kategorii").Bold();
+                            AddTwoColTable(col, "Kategoria", "Suma [PLN]", data.ByCategory);
 
-                                foreach (var r2 in data.ByCategory)
-                                {
-                                    t.Cell().Text(r2.Name);
-                                    t.Cell().Text(r2.Sum.ToString("N2"));
-                                }
-                            });
+                            // ===== 2) Trend =====
+                            col.Item().PaddingTop(12).Text("Trend").Bold();
+                            AddTwoColTable(col, "Okres", "Suma [PLN]",
+                                data.Trend.Select(t => (t.Label, t.Value)).ToList());
 
-                            col.Item().PaddingTop(10).Text("Trend").Bold();
-                            col.Item().Table(t =>
-                            {
-                                t.ColumnsDefinition(c =>
-                                {
-                                    c.ConstantColumn(160);
-                                    c.RelativeColumn();
-                                });
+                            // ===== 3) Dzień tygodnia =====
+                            col.Item().PaddingTop(12).Text("Dzień tygodnia").Bold();
+                            AddTwoColTable(col, "Dzień", "Suma [PLN]", data.ByWeekday);
 
-                                t.Header(h =>
-                                {
-                                    h.Cell().Text("Okres").Bold();
-                                    h.Cell().Text("Suma [PLN]").Bold();
-                                });
+                            // ===== 4) Konta bankowe =====
+                            col.Item().PaddingTop(12).Text("Konta bankowe").Bold();
+                            AddTwoColTable(col, "Konto", "Suma [PLN]", data.ByBankAccount);
 
-                                foreach (var r2 in data.Trend)
-                                {
-                                    t.Cell().Text(r2.Label);
-                                    t.Cell().Text(r2.Value.ToString("N2"));
-                                }
-                            });
+                            // ===== 5) Wolna gotówka =====
+                            col.Item().PaddingTop(12).Text("Wolna gotówka").Bold();
+                            AddTwoColTable(col, "Źródło", "Suma [PLN]", data.FreeCash);
+
+                            // ===== 6) Odłożona gotówka =====
+                            col.Item().PaddingTop(12).Text("Odłożona gotówka").Bold();
+                            AddTwoColTable(col, "Źródło", "Suma [PLN]", data.SavedCash);
+
+                            // ===== 7) Koperty =====
+                            col.Item().PaddingTop(12).Text("Koperty").Bold();
+                            AddTwoColTable(col, "Koperta", "Suma [PLN]", data.ByEnvelope);
+
+                            // ===== 8) Histogram kwot (liczność) =====
+                            col.Item().PaddingTop(12).Text("Liczba transakcji wg przedziału kwot").Bold();
+                            var buckets = GetAmountBucketsData(from, to);
+                            AddTwoColTable(col, "Przedział", "Liczba", buckets);
+
+                            col.Item().PaddingTop(10).Text("Źródło: opracowanie własne.").FontSize(9);
                         });
 
                         page.Footer().AlignRight().Text($"Wygenerowano: {DateTime.Now:yyyy-MM-dd HH:mm}");
@@ -744,6 +745,47 @@ namespace Finly.ViewModels
             }
 
             await Task.CompletedTask;
+        }
+
+        private void AddTwoColTable(
+            QuestPDF.Fluent.ColumnDescriptor col,
+            string leftHeader,
+            string rightHeader,
+            List<(string Name, decimal Sum)> rows)
+        {
+            col.Item().Table(t =>
+            {
+                t.ColumnsDefinition(c =>
+                {
+                    c.RelativeColumn();
+                    c.ConstantColumn(140);
+                });
+
+                t.Header(h =>
+                {
+                    h.Cell().Text(leftHeader).Bold();
+                    h.Cell().AlignRight().Text(rightHeader).Bold();
+                });
+
+                if (rows == null || rows.Count == 0)
+                {
+                    t.Cell().Text("-");
+                    t.Cell().AlignRight().Text("0");
+                    return;
+                }
+
+                foreach (var r in rows)
+                {
+                    var name = string.IsNullOrWhiteSpace(r.Name) ? "(brak)" : r.Name;
+                    t.Cell().Text(name);
+
+                    // UWAGA: w histogramie "Sum" to liczność, więc pokazujemy bez .N2
+                    if (rightHeader.Contains("Liczba", StringComparison.OrdinalIgnoreCase))
+                        t.Cell().AlignRight().Text(r.Sum.ToString("N0", _pl));
+                    else
+                        t.Cell().AlignRight().Text(r.Sum.ToString("N2", _pl));
+                }
+            });
         }
 
         public void ExportToCsv()
@@ -804,25 +846,31 @@ namespace Finly.ViewModels
 
             if (SelectedMode == Mode.All)
             {
+                // ===== EXPENSES =====
                 var expDt = DatabaseService.GetExpenses(_userId, from, to);
                 var expRows = expDt.AsEnumerable().Select(r => new
                 {
                     Date = SafeDate(r["Date"]),
                     Amount = Math.Abs(SafeDecimal(r["Amount"])),
-                    Category = (r.Table.Columns.Contains("CategoryName") ? (r["CategoryName"]?.ToString() ?? "(brak)") : "(brak)").Trim()
+                    Category = (r.Table.Columns.Contains("CategoryName") ? (r["CategoryName"]?.ToString() ?? "(brak)") : "(brak)").Trim(),
+                    AccountText = (r.Table.Columns.Contains("Account") ? (r["Account"]?.ToString() ?? string.Empty) : string.Empty).Trim(),
+                    AccountId = SafeNullableInt(r.Table.Columns.Contains("AccountId") ? r["AccountId"] : null)
                 }).ToList();
 
+                // ===== INCOMES =====
                 var incDt = DatabaseService.GetIncomes(_userId, from, to);
                 var incRows = incDt.AsEnumerable().Select(r => new
                 {
                     Date = SafeDate(r["Date"]),
                     Amount = Math.Abs(SafeDecimal(r["Amount"])),
-                    Category = (r.Table.Columns.Contains("CategoryName") ? (r["CategoryName"]?.ToString() ?? "(brak)") : "(brak)").Trim()
+                    Category = (r.Table.Columns.Contains("CategoryName") ? (r["CategoryName"]?.ToString() ?? "(brak)") : "(brak)").Trim(),
+                    Source = (r.Table.Columns.Contains("Source") ? (r["Source"]?.ToString() ?? "Przychody") : "Przychody").Trim()
                 }).ToList();
 
                 var incomeTotal = incRows.Sum(x => x.Amount);
                 var expenseTotal = expRows.Sum(x => x.Amount);
 
+                // ===== Category split (Income + Expense prefixes) =====
                 var catDict = new Dictionary<string, decimal>(StringComparer.OrdinalIgnoreCase);
 
                 foreach (var r in incRows)
@@ -844,21 +892,125 @@ namespace Finly.ViewModels
                     .OrderByDescending(x => x.Sum)
                     .ToList();
 
+                // ===== Trend (net: incomes positive, expenses negative) =====
                 var merged = new List<(DateTime Date, decimal Amount)>();
                 merged.AddRange(incRows.Select(x => (x.Date, x.Amount)));
                 merged.AddRange(expRows.Select(x => (x.Date, -x.Amount)));
 
                 var trend = BuildTrendList(merged, from, to, bucket, null);
 
-                var byBankAccount = new List<(string Name, decimal Sum)>();
-                var byFreeCash = new List<(string Name, decimal Sum)>();
-                var bySavedCash = new List<(string Name, decimal Sum)>();
-                var byEnvelope = new List<(string Name, decimal Sum)>();
+                // ===== Accounts breakdown for charts/tables =====
+                // (w All chcemy realne "konta bankowe", a nie pustą listę)
+                var byBank = new Dictionary<string, decimal>(StringComparer.OrdinalIgnoreCase);
+                var byFree = new Dictionary<string, decimal>(StringComparer.OrdinalIgnoreCase);
+                var bySaved = new Dictionary<string, decimal>(StringComparer.OrdinalIgnoreCase);
+                var byEnv = new Dictionary<string, decimal>(StringComparer.OrdinalIgnoreCase);
 
-                if (snapshot.Cash != 0m) byFreeCash.Add(("Wolna gotówka", Math.Abs(snapshot.Cash)));
-                if (snapshot.Saved != 0m) bySavedCash.Add(("Odłożona gotówka", Math.Abs(snapshot.Saved)));
-                if (snapshot.Envelopes != 0m) byEnvelope.Add(("Koperty", Math.Abs(snapshot.Envelopes)));
+                Dictionary<int, string>? accountsCache = null;
 
+                // expenses -> Account/AccountId
+                foreach (var row in expRows)
+                {
+                    var amount = row.Amount;
+                    var acc = row.AccountText ?? string.Empty;
+
+                    if (acc.StartsWith("Koperta:", StringComparison.OrdinalIgnoreCase))
+                    {
+                        var name = acc.Substring("Koperta:".Length).Trim();
+                        if (string.IsNullOrWhiteSpace(name)) name = "(bez nazwy)";
+                        byEnv[name] = byEnv.TryGetValue(name, out var cur) ? cur + amount : amount;
+                    }
+                    else if (acc.StartsWith("Konto:", StringComparison.OrdinalIgnoreCase))
+                    {
+                        var name = acc.Substring("Konto:".Length).Trim();
+                        if (string.IsNullOrWhiteSpace(name)) name = "(konto)";
+                        byBank[name] = byBank.TryGetValue(name, out var cur) ? cur + amount : amount;
+                    }
+                    else if (string.Equals(acc, "Wolna gotówka", StringComparison.OrdinalIgnoreCase))
+                    {
+                        byFree["Wolna gotówka"] = byFree.TryGetValue("Wolna gotówka", out var cur) ? cur + amount : amount;
+                    }
+                    else if (string.Equals(acc, "Odłożona gotówka", StringComparison.OrdinalIgnoreCase))
+                    {
+                        bySaved["Odłożona gotówka"] = bySaved.TryGetValue("Odłożona gotówka", out var cur) ? cur + amount : amount;
+                    }
+                    else
+                    {
+                        string name;
+                        if (row.AccountId is int id)
+                        {
+                            accountsCache ??= DatabaseService
+                                .GetAccounts(_userId)
+                                .ToDictionary(
+                                    a => a.Id,
+                                    a => string.IsNullOrWhiteSpace(a.AccountName)
+                                        ? (a.BankName ?? $"Konto {a.Id}")
+                                        : a.AccountName);
+
+                            name = accountsCache.TryGetValue(id, out var n) ? n : $"Konto {id}";
+                        }
+                        else
+                        {
+                            name = string.IsNullOrWhiteSpace(acc) ? "Inne" : acc;
+                        }
+
+                        byBank[name] = byBank.TryGetValue(name, out var cur) ? cur + amount : amount;
+                    }
+                }
+
+                // incomes -> Source
+                foreach (var row in incRows)
+                {
+                    var name = row.Source ?? "Przychody";
+                    var amount = row.Amount;
+
+                    if (string.Equals(name, "Wolna gotówka", StringComparison.OrdinalIgnoreCase))
+                        byFree["Wolna gotówka"] = byFree.TryGetValue("Wolna gotówka", out var cur) ? cur + amount : amount;
+                    else if (string.Equals(name, "Odłożona gotówka", StringComparison.OrdinalIgnoreCase))
+                        bySaved["Odłożona gotówka"] = bySaved.TryGetValue("Odłożona gotówka", out var cur) ? cur + amount : amount;
+                    else if (name.StartsWith("Konto:", StringComparison.OrdinalIgnoreCase))
+                    {
+                        var key = name.Substring("Konto:".Length).Trim();
+                        if (string.IsNullOrWhiteSpace(key)) key = "(konto)";
+                        byBank[key] = byBank.TryGetValue(key, out var cur) ? cur + amount : amount;
+                    }
+                    else
+                    {
+                        byBank[name] = byBank.TryGetValue(name, out var cur) ? cur + amount : amount;
+                    }
+                }
+
+                // fallback z snapshotu (żeby sekcje nie były puste, gdy brak transakcji w okresie)
+                if (byFree.Count == 0 && snapshot.Cash != 0m)
+                    byFree["Wolna gotówka"] = Math.Abs(snapshot.Cash);
+
+                if (bySaved.Count == 0 && snapshot.Saved != 0m)
+                    bySaved["Odłożona gotówka"] = Math.Abs(snapshot.Saved);
+
+                if (byEnv.Count == 0 && snapshot.Envelopes != 0m)
+                    byEnv["Koperty"] = Math.Abs(snapshot.Envelopes);
+
+                var byBankAccount = byBank
+                    .Select(kv => (Name: kv.Key, Sum: kv.Value))
+                    .OrderByDescending(x => x.Sum)
+                    .ToList();
+
+                var byFreeCash = byFree
+                    .Select(kv => (Name: kv.Key, Sum: kv.Value))
+                    .OrderByDescending(x => x.Sum)
+                    .ToList();
+
+                var bySavedCash = bySaved
+                    .Select(kv => (Name: kv.Key, Sum: kv.Value))
+                    .OrderByDescending(x => x.Sum)
+                    .ToList();
+
+                var byEnvelope = byEnv
+                    .Select(kv => (Name: kv.Key, Sum: kv.Value))
+                    .OrderByDescending(x => x.Sum)
+                    .ToList();
+
+                // weekday (net)
                 var weekdays = GroupByWeekday(merged, null);
                 var order = new[]
                 {
@@ -985,6 +1137,7 @@ namespace Finly.ViewModels
                     rows.Select(r => (r.Date, (decimal)r.Amount)),
                     from, to, bucket, false);
 
+                // Transfery nie są "salda kont" – zostawiamy puste listy (jak wcześniej)
                 var byAccount = new List<(string Name, decimal Sum)>();
                 var byFreeCash = new List<(string Name, decimal Sum)>();
                 var bySavedCash = new List<(string Name, decimal Sum)>();
@@ -1245,3 +1398,4 @@ namespace Finly.ViewModels
         }
     }
 }
+

@@ -84,7 +84,6 @@ namespace Finly.Pages
             _vm.SetMode("All");
 
             AttachFirstRenderFix();
-
             RefreshCategoriesDonutDeferred();
         }
 
@@ -174,6 +173,7 @@ namespace Finly.Pages
             TryRedraw(_envelopesChart);
             TryRedraw(_weekdayChart);
             TryRedraw(_amountBucketsChart);
+            TryRedraw(_categoriesDonut);
         }
 
         private static void TryRedraw(FrameworkElement? fe)
@@ -215,11 +215,9 @@ namespace Finly.Pages
                 var evt = target.GetType().GetEvent(eventName, BindingFlags.Instance | BindingFlags.Public);
                 if (evt == null) return null;
 
-                // Typ delegata eventu
                 var handlerType = evt.EventHandlerType;
                 if (handlerType == null) return null;
 
-                // Nasza metoda musi pasować sygnaturą: (object?, EventArgs)
                 var mi = GetType().GetMethod(localHandlerName, BindingFlags.Instance | BindingFlags.NonPublic);
                 if (mi == null) return null;
 
@@ -248,7 +246,6 @@ namespace Finly.Pages
             }
         }
 
-        // Handlery okresu (wywoływane refleksją)
         private void PeriodBar_RangeChanged_Reflection(object? sender, EventArgs e) => ApplyPeriodBarRange();
         private void PeriodBar_SearchClicked_Reflection(object? sender, EventArgs e) => ApplyPeriodBarRange();
 
@@ -261,6 +258,7 @@ namespace Finly.Pages
             if (start == null || end == null) return;
 
             _vm.SetCustomRange(start.Value, end.Value);
+
             RefreshCategoriesDonutDeferred();
             Dispatcher.BeginInvoke(new Action(ForceChartsRedraw), DispatcherPriority.Background);
         }
@@ -272,7 +270,6 @@ namespace Finly.Pages
                 var p = target.GetType().GetProperty(propName, BindingFlags.Instance | BindingFlags.Public);
                 var v = p?.GetValue(target);
                 if (v is DateTime dt) return dt;
-                if (v is DateTime ndt) return ndt;
                 return null;
             }
             catch
@@ -371,7 +368,6 @@ namespace Finly.Pages
             _categoriesDonut.Visibility = Visibility.Visible;
             if (_transferCategoryHint != null) _transferCategoryHint.Visibility = Visibility.Collapsed;
 
-            // Ustaw tytuł jeśli kontrolka ma właściwość Title
             TrySetProperty(_categoriesDonut, "Title", mode switch
             {
                 "Expenses" => "Wydatki według kategorii",
@@ -382,8 +378,13 @@ namespace Finly.Pages
             var dict = BuildCategoryTotalsFromVm();
             var total = dict.Values.Sum();
 
-            // Wywołaj Draw(dict,total,palette) jeśli istnieje
             TryInvokeDraw(_categoriesDonut, dict, total, DonutPalette);
+
+            // po zmianie danych - redraw
+            Dispatcher.BeginInvoke(new Action(() =>
+            {
+                TryRedraw(_categoriesDonut);
+            }), DispatcherPriority.Background);
         }
 
         private static void TrySetProperty(object target, string propName, object? value)
@@ -403,7 +404,6 @@ namespace Finly.Pages
         {
             try
             {
-                // Szukamy metody Draw(Dictionary<string,decimal>, decimal, Brush[])
                 var mi = donutControl.GetType()
                     .GetMethods(BindingFlags.Instance | BindingFlags.Public)
                     .FirstOrDefault(m =>
@@ -420,7 +420,7 @@ namespace Finly.Pages
             }
             catch
             {
-                // jeśli kontrolka nie ma Draw albo inna sygnatura – ignorujemy
+                // ignorujemy
             }
         }
 
@@ -435,7 +435,6 @@ namespace Finly.Pages
 
                 decimal sum = 0m;
 
-                // PieSeries<double> zwykle ma Values typu IEnumerable<double>
                 object? valuesObj = null;
                 try
                 {
@@ -480,7 +479,16 @@ namespace Finly.Pages
 
         private async void ExportPdf_Click(object sender, RoutedEventArgs e)
         {
-            await _vm.ExportToPdfAsync();
+            // PDF: tylko dane statystyczne (bez zrzutów wykresów)
+            try
+            {
+                await _vm.ExportToPdfAsync();
+            }
+            catch (Exception ex)
+            {
+                try { Finly.Services.ToastService.Error($"Błąd eksportu PDF: {ex.Message}"); }
+                catch { }
+            }
         }
 
         private void ExportCsv_Click(object sender, RoutedEventArgs e)
