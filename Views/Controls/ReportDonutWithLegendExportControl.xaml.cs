@@ -1,4 +1,6 @@
-﻿using System.Collections.ObjectModel;
+﻿using System;
+using System.Collections.Generic;
+using System.Collections.ObjectModel;
 using System.Globalization;
 using System.Linq;
 using System.Windows;
@@ -42,6 +44,9 @@ namespace Finly.Views.Controls
         {
             InitializeComponent();
 
+            // Kluczowe: legendy i DP pochodzą z tej kontrolki (nie z ReportsViewModel)
+            DataContext = this;
+
             // ===== JASNE ZASOBY TYLKO DLA EKSPORTU =====
             Resources["App.Foreground"] = Brushes.Black;
             Resources["Surface.Background"] = Brushes.White;
@@ -55,35 +60,60 @@ namespace Finly.Views.Controls
             if (vm == null)
                 return;
 
-            LegendItems.Clear();
+            if (maxItems < 1) maxItems = 1;
 
-            // wymuś layout zanim rysujemy wykres
-            UpdateLayout();
+            LegendItems.Clear();
+            OthersInfo = string.Empty;
+            OthersInfoVisibility = Visibility.Collapsed;
 
             // ===== DONUT =====
-            Chart.Draw(
-                vm.ChartTotals ?? new(),
-                vm.ChartTotalAll,
-                brushes);
+            var totals = vm.ChartTotals ?? new Dictionary<string, decimal>();
+            var totalAll = vm.ChartTotalAll;
+
+            // Jeżeli totalAll nie jest policzone, policz z totals (bez ryzyka dzielenia przez 0)
+            if (totalAll <= 0 && totals.Count > 0)
+                totalAll = totals.Values.Sum();
+
+            Chart.Draw(totals, totalAll, brushes);
 
             // ===== LEGENDA =====
-            var details = vm.Details?
+            // 1) Preferuj CategoryBreakdown (Name/Amount/SharePercent już przygotowane w VM)
+            var details = (vm.CategoryBreakdown ?? new ObservableCollection<ReportsViewModel.CategoryAmount>())
                 .OrderByDescending(x => x.Amount)
-                .ToList()
-                ?? new();
+                .ToList();
+
+            // 2) Fallback na ChartTotals, jeżeli CategoryBreakdown puste
+            if (details.Count == 0 && totals.Count > 0)
+            {
+                var denom = totalAll <= 0 ? totals.Values.Sum() : totalAll;
+
+                details = totals
+                    .OrderByDescending(kv => kv.Value)
+                    .Select(kv => new ReportsViewModel.CategoryAmount
+                    {
+                        Name = kv.Key,
+                        Amount = kv.Value,
+                        SharePercent = denom > 0 ? (double)(kv.Value / denom * 100m) : 0.0
+                    })
+                    .ToList();
+            }
+
+            if (details.Count == 0)
+                return;
 
             var take = details.Take(maxItems).ToList();
 
             for (int i = 0; i < take.Count; i++)
             {
                 var d = take[i];
+
                 var brush = (brushes != null && brushes.Length > 0)
                     ? brushes[i % brushes.Length]
                     : Brushes.DimGray;
 
                 LegendItems.Add(new LegendItemVm
                 {
-                    Name = d.Name,
+                    Name = d.Name ?? string.Empty,
                     AmountStr = d.Amount.ToString("N2", CultureInfo.CurrentCulture) + " zł",
                     PercentStr = d.SharePercent.ToString("N1", CultureInfo.CurrentCulture) + " %",
                     BulletBrush = brush
@@ -95,11 +125,6 @@ namespace Finly.Views.Controls
             {
                 OthersInfo = $"Pozostałe kategorie: {rest}";
                 OthersInfoVisibility = Visibility.Visible;
-            }
-            else
-            {
-                OthersInfo = string.Empty;
-                OthersInfoVisibility = Visibility.Collapsed;
             }
         }
 

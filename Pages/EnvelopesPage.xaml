@@ -62,7 +62,7 @@
                                    TextWrapping="Wrap"
                                    MaxWidth="280"
                                    VerticalAlignment="Center">
-                            <Run Text="{Binding Row[Name]}"/>
+                            <Run Text="{Binding Row[Name], Mode=OneWay}"/>
                         </TextBlock>
                     </StackPanel>
 

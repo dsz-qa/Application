@@ -1,6 +1,6 @@
 ﻿using Finly.Helpers;
 using Finly.Models;
-using Finly.Pages; // for GoalVm
+using Finly.Pages;                 // GoalVm (masz to u siebie)
 using Finly.Services;
 using Finly.Services.Features;
 using Finly.Services.SpecificPages;
@@ -10,19 +10,20 @@ using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Data;
 using System.Globalization;
-using System.IO;
 using System.Linq;
-using System.Text;
 using System.Windows;
 using System.Windows.Input;
 
 namespace Finly.ViewModels
 {
-    public class ReportsViewModel : INotifyPropertyChanged
+    public sealed class ReportsViewModel : INotifyPropertyChanged
     {
         public event PropertyChangedEventHandler? PropertyChanged;
-        protected void Raise(string name) => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
+        private void Raise(string name) => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
 
+        // =========================
+        // Ctor
+        // =========================
         public ReportsViewModel()
         {
             var today = DateTime.Today;
@@ -32,357 +33,91 @@ namespace Finly.ViewModels
             _fromDate = startOfMonth;
             _toDate = endOfMonth;
 
-            // initialize collections to be filled dynamically
-            Accounts = new ObservableCollection<string>();
             Categories = new ObservableCollection<string>();
-            Envelopes = new ObservableCollection<string>();
-            Tags = new ObservableCollection<string> { "Brak", "Podróże", "Praca" };
-            Currencies = new ObservableCollection<string> { "PLN", "EUR", "USD" };
-            Templates = new ObservableCollection<string> { "Domyślny", "Miesięczny przegląd" };
+            MoneyPlaces = new ObservableCollection<string>();
 
-            Insights = new ObservableCollection<string>();
-            KPIList = new ObservableCollection<KeyValuePair<string, string>>();
+            TransactionTypes = new ObservableCollection<string>
+            {
+                "Wszystko",
+                "Wydatki",
+                "Przychody",
+                "Transfery"
+            };
 
-            SelectedSource = SourceType.All;
+            // Zakładki – kolekcje
+            OverviewTopExpenses = new ObservableCollection<TxLine>();
+            OverviewTopIncomes = new ObservableCollection<TxLine>();
 
-            RefreshCommand = new RelayCommand(_ => Refresh());
-            SavePresetCommand = new RelayCommand(_ => SavePreset());
-            ExportCsvCommand = new RelayCommand(_ => ExportCsv());
-            ExportExcelCommand = new RelayCommand(_ => ExportExcel());
-            ExportPdfCommand = new RelayCommand(_ => ExportPdf());
-            BackCommand = new RelayCommand(_ => BackToSummary());
-
-            BankAccounts = new ObservableCollection<BankAccountModel>();
-            Details = new ObservableCollection<CategoryAmount>();
-            FilteredTransactions = new ObservableCollection<TransactionDto>();
-            _transactionsSnapshot = new List<TransactionDto>();
-
-            // unified rows collection for KPI/exports
-            Rows = new ObservableCollection<ReportsService.ReportItem>();
-
-            // podsumowania dla zakładki „Kategorie”
+            CategoryBreakdown = new ObservableCollection<CategoryAmount>();
             ExpenseCategoriesSummary = new ObservableCollection<CategoryAmount>();
             IncomeCategoriesSummary = new ObservableCollection<CategoryAmount>();
+            TransferCategoriesSummary = new ObservableCollection<CategoryAmount>();
 
-            // NEW: collections for other tabs
-            BudgetsSummary = new ObservableCollection<BudgetService.BudgetSummary>();
-            GoalsList = new ObservableCollection<GoalVm>();
-            LoansList = new ObservableCollection<LoanModel>();
+            Budgets = new ObservableCollection<BudgetRow>();
+            Loans = new ObservableCollection<LoanRow>();
+            Goals = new ObservableCollection<GoalRow>();
+            Investments = new ObservableCollection<InvestmentRow>();
+            PlannedSim = new ObservableCollection<PlannedRow>();
 
-            LoadAccountsAndEnvelopes();
-            LoadMoneyPlaces();
-        }
+            // Wspólne dane bazowe
+            Rows = new ObservableCollection<ReportsService.ReportItem>();
 
-        // Podsumowania kategorii dla zakładki "Kategorie"
-        public ObservableCollection<CategoryAmount> ExpenseCategoriesSummary { get; }
-        public ObservableCollection<CategoryAmount> IncomeCategoriesSummary { get; }
-
-        // NEW: budżety / cele / kredyty
-        public ObservableCollection<BudgetService.BudgetSummary> BudgetsSummary { get; }
-        public ObservableCollection<GoalVm> GoalsList { get; }
-        public ObservableCollection<LoanModel> LoansList { get; }
-
-        private void LoadAccountsAndEnvelopes()
-        {
-            try
+            RefreshCommand = new RelayCommand(_ => Refresh());
+            ExportPdfCommand = new RelayCommand(_ => ExportPdf());
+            ResetFiltersCommand = new RelayCommand(_ =>
             {
-                var uid = UserService.GetCurrentUserId();
+                ResetFilters();
+                Refresh();
+            });
 
-                // ===== Konta bankowe =====
-                BankAccounts = new ObservableCollection<BankAccountModel>();
-                BankAccounts.Add(new BankAccountModel
-                {
-                    Id = 0,
-                    UserId = uid,
-                    AccountName = "Wszystkie konta bankowe",
-                    BankName = ""
-                });
-                foreach (var a in DatabaseService.GetAccounts(uid))
-                    BankAccounts.Add(a);
-
-                // ===== Koperty =====
-                try
-                {
-                    var envs = DatabaseService.GetEnvelopesNames(uid) ?? new List<string>();
-                    Envelopes.Clear();
-                    Envelopes.Add("Wszystkie koperty");
-                    foreach (var e in envs)
-                        Envelopes.Add(e);
-                }
-                catch { }
-
-                // ===== Kategorie =====
-                try
-                {
-                    var cats = DatabaseService.GetCategoriesByUser(uid) ?? new List<string>();
-                    Categories.Clear();
-                    Categories.Add("Wszystkie kategorie");
-                    foreach (var c in cats)
-                        Categories.Add(c);
-                }
-                catch { }
-            }
-            catch { }
+            LoadFilters();
         }
 
-        public enum SourceType { All = 0, FreeCash = 1, SavedCash = 2, BankAccounts = 3, Envelopes = 4 }
-        public Array SourceOptions => Enum.GetValues(typeof(SourceType));
-
-        // map enum source to UI string used in DB
-        private string GetSourceString()
-        {
-            return SelectedSource switch
-            {
-                SourceType.FreeCash => "Wolna gotówka",
-                SourceType.SavedCash => "Odłożona gotówka",
-                SourceType.BankAccounts => "Konta bankowe",
-                SourceType.Envelopes => "Koperty",
-                _ => "Wszystko"
-            };
-        }
-
-        // Rodzaj wybranego okresu czasowego
-        private enum PeriodKind
-        {
-            Custom,
-            Today,
-            ThisWeek,
-            ThisMonth,
-            ThisQuarter,
-            ThisYear
-        }
-
-        private string _currentPeriodName = "ten okres";
-        public string CurrentPeriodName
-        {
-            get => _currentPeriodName;
-            private set { _currentPeriodName = value; Raise(nameof(CurrentPeriodName)); }
-        }
-
-        private string _previousPeriodName = "poprzedni okres";
-        public string PreviousPeriodName
-        {
-            get => _previousPeriodName;
-            private set { _previousPeriodName = value; Raise(nameof(PreviousPeriodName)); }
-        }
-
-        // Alias properties expected by XAML
-        public string CurrentPeriodLabel => CurrentPeriodName;
-        public string PreviousPeriodLabel => PreviousPeriodName;
-
-        // Teksty do kart po prawej (używane też w PDF)
-        private string _analyzedPeriodLabel = string.Empty;
-        public string AnalyzedPeriodLabel
-        {
-            get => _analyzedPeriodLabel;
-            private set { _analyzedPeriodLabel = value; Raise(nameof(AnalyzedPeriodLabel)); }
-        }
-
-        private string _comparisonPeriodLabel = string.Empty;
-        public string ComparisonPeriodLabel
-        {
-            get => _comparisonPeriodLabel;
-            private set { _comparisonPeriodLabel = value; Raise(nameof(ComparisonPeriodLabel)); }
-        }
-
-        private static PeriodKind DetectPeriodKind(DateTime from, DateTime to, DateTime today)
-        {
-            from = from.Date;
-            to = to.Date;
-            today = today.Date;
-
-            if (from == today && to == today)
-                return PeriodKind.Today;
-
-            var startOfWeek = StartOfWeek(today, DayOfWeek.Monday);
-            var endOfWeek = startOfWeek.AddDays(6);
-            if (from == startOfWeek && to == endOfWeek)
-                return PeriodKind.ThisWeek;
-
-            var startOfMonth = new DateTime(today.Year, today.Month, 1);
-            var endOfMonth = startOfMonth.AddMonths(1).AddDays(-1);
-            if (from == startOfMonth && to == endOfMonth)
-                return PeriodKind.ThisMonth;
-
-            int quarterIndex = (today.Month - 1) / 3;
-            var startOfQuarter = new DateTime(today.Year, quarterIndex * 3 + 1, 1);
-            var endOfQuarter = startOfQuarter.AddMonths(3).AddDays(-1);
-            if (from == startOfQuarter && to == endOfQuarter)
-                return PeriodKind.ThisQuarter;
-
-            var startOfYear = new DateTime(today.Year, 1, 1);
-            var endOfYear = new DateTime(today.Year, 12, 31);
-            if (from == startOfYear && to == endOfYear)
-                return PeriodKind.ThisYear;
-
-            return PeriodKind.Custom;
-        }
-
-        private static DateTime StartOfWeek(DateTime dt, DayOfWeek startOfWeek)
-        {
-            int diff = (7 + (dt.DayOfWeek - startOfWeek)) % 7;
-            return dt.AddDays(-1 * diff).Date;
-        }
-
-        private static (string current, string previous) GetPeriodNames(PeriodKind kind)
-        {
-            return kind switch
-            {
-                PeriodKind.Today => ("dzisiaj", "wczoraj"),
-                PeriodKind.ThisWeek => ("ten tydzień", "poprzedni tydzień"),
-                PeriodKind.ThisMonth => ("ten miesiąc", "poprzedni miesiąc"),
-                PeriodKind.ThisQuarter => ("ten kwartał", "poprzedni kwartał"),
-                PeriodKind.ThisYear => ("ten rok", "poprzedni rok"),
-                _ => ("ten okres", "poprzedni okres")
-            };
-        }
-
-        // ========= zakres dat (powiązany z PeriodBarControl) =========
+        // =========================
+        // Daty (PeriodBarControl)
+        // =========================
         private DateTime _fromDate;
-        private DateTime _toDate;
-
         public DateTime FromDate
         {
             get => _fromDate;
             set
             {
-                if (_fromDate != value)
+                var v = value.Date;
+                if (_fromDate != v)
                 {
-                    _fromDate = value;
+                    _fromDate = v;
                     Raise(nameof(FromDate));
+                    Raise(nameof(PeriodLabel)); // <-- DOKŁADNIE TO DOPISZ
                 }
             }
         }
 
+
+        private DateTime _toDate;
         public DateTime ToDate
         {
             get => _toDate;
             set
             {
-                if (_toDate != value)
+                var v = value.Date;
+                if (_toDate != v)
                 {
-                    _toDate = value;
+                    _toDate = v;
                     Raise(nameof(ToDate));
+                    Raise(nameof(PeriodLabel)); // <-- DOKŁADNIE TO DOPISZ
                 }
             }
         }
 
-        // ========= listy do filtrów =========
-        public ObservableCollection<string> Accounts { get; }
+
+        public string PeriodLabel => $"{FromDate:dd.MM.yyyy} – {ToDate:dd.MM.yyyy}";
+
+        // =========================
+        // Filtry wspólne (wpływają na każdą zakładkę)
+        // =========================
         public ObservableCollection<string> Categories { get; }
-        public ObservableCollection<string> Envelopes { get; }
-        public ObservableCollection<string> Tags { get; }
-        public ObservableCollection<string> Currencies { get; }
-        public ObservableCollection<string> Templates { get; }
-
-        // unified rows of current period
-        public ObservableCollection<ReportsService.ReportItem> Rows { get; private set; }
-
-        // Typ transakcji: wszystko / tylko wydatki / tylko przychody
-        public ObservableCollection<string> TransactionTypes { get; } =
-            new ObservableCollection<string>
-            {
-                "Wszystko",
-                "Wydatki",
-                "Przychody"
-            };
-
-        // pojedyncze pole dla SelectedTransactionType
-        private string _selectedTransactionType = "Wszystko";
-        public string SelectedTransactionType
-        {
-            get => _selectedTransactionType;
-            set
-            {
-                var newValue = string.IsNullOrWhiteSpace(value) ? "Wszystko" : value;
-                if (_selectedTransactionType != newValue)
-                {
-                    _selectedTransactionType = newValue;
-                    Raise(nameof(SelectedTransactionType));
-                    Refresh();
-                }
-            }
-        }
-
-        // Lista konkretnych miejsc: gotówka, koperty, konta bankowe
-        public ObservableCollection<string> MoneyPlaces { get; } = new();
-
-        private string _selectedMoneyPlace = "Wszystko";
-        public string SelectedMoneyPlace
-        {
-            get => _selectedMoneyPlace;
-            set
-            {
-                if (_selectedMoneyPlace != value)
-                {
-                    _selectedMoneyPlace = string.IsNullOrWhiteSpace(value)
-                        ? "Wszystko"
-                        : value;
-
-                    Raise(nameof(SelectedMoneyPlace));
-                    Refresh();
-                }
-            }
-        }
-
-        // Czy combobox z kontem/kopertą ma być aktywny
-        private bool _isMoneyPlaceFilterEnabled;
-        public bool IsMoneyPlaceFilterEnabled
-        {
-            get => _isMoneyPlaceFilterEnabled;
-            set
-            {
-                if (_isMoneyPlaceFilterEnabled != value)
-                {
-                    _isMoneyPlaceFilterEnabled = value;
-                    Raise(nameof(IsMoneyPlaceFilterEnabled));
-                }
-            }
-        }
-
-        private void LoadMoneyPlaces()
-        {
-            MoneyPlaces.Clear();
-            MoneyPlaces.Add("Wszystko");
-
-            // stałe pozycje – wolna / odłożona gotówka
-            MoneyPlaces.Add("Wolna gotówka");
-            MoneyPlaces.Add("Odłożona gotówka");
-
-            try
-            {
-                var uid = UserService.GetCurrentUserId();
-                var envs = DatabaseService.GetEnvelopesNames(uid) ?? new List<string>();
-                foreach (var env in envs)
-                    MoneyPlaces.Add($"Koperta: {env}");
-            }
-            catch { }
-
-            try
-            {
-                var uid = UserService.GetCurrentUserId();
-                var accs = DatabaseService.GetAccounts(uid) ?? new List<BankAccountModel>();
-                foreach (var acc in accs)
-                    MoneyPlaces.Add($"Konto: {acc.AccountName}");
-            }
-            catch { }
-
-            SelectedMoneyPlace = MoneyPlaces.FirstOrDefault() ?? "Wszystko";
-        }
-
-        private string _selectedAccount = "Wszystkie konta";
-        public string SelectedAccount
-        {
-            get => _selectedAccount;
-            set
-            {
-                if (_selectedAccount != value)
-                {
-                    _selectedAccount = value;
-                    Raise(nameof(SelectedAccount));
-                }
-            }
-        }
+        public ObservableCollection<string> MoneyPlaces { get; }
+        public ObservableCollection<string> TransactionTypes { get; }
 
         private string _selectedCategory = "Wszystkie kategorie";
         public string SelectedCategory
@@ -390,145 +125,161 @@ namespace Finly.ViewModels
             get => _selectedCategory;
             set
             {
-                if (_selectedCategory != value)
+                var v = string.IsNullOrWhiteSpace(value) ? "Wszystkie kategorie" : value;
+                if (_selectedCategory != v)
                 {
-                    _selectedCategory = value;
+                    _selectedCategory = v;
                     Raise(nameof(SelectedCategory));
                 }
             }
         }
 
-        private string _selectedTemplate = "Domyślny";
-        public string SelectedTemplate
+        private string _selectedMoneyPlace = "Wszystko";
+        public string SelectedMoneyPlace
         {
-            get => _selectedTemplate;
+            get => _selectedMoneyPlace;
             set
             {
-                if (_selectedTemplate != value)
+                var v = string.IsNullOrWhiteSpace(value) ? "Wszystko" : value;
+                if (_selectedMoneyPlace != v)
                 {
-                    _selectedTemplate = value;
-                    Raise(nameof(SelectedTemplate));
+                    _selectedMoneyPlace = v;
+                    Raise(nameof(SelectedMoneyPlace));
                 }
             }
         }
 
-        private SourceType _selectedSource;
-        public SourceType SelectedSource
+        private string _selectedTransactionType = "Wszystko";
+        public string SelectedTransactionType
         {
-            get => _selectedSource;
+            get => _selectedTransactionType;
             set
             {
-                if (_selectedSource != value)
+                var v = string.IsNullOrWhiteSpace(value) ? "Wszystko" : value;
+                if (_selectedTransactionType != v)
                 {
-                    _selectedSource = value;
-                    Raise(nameof(SelectedSource));
-                    Raise(nameof(ShowBankSelector));
-                    Raise(nameof(ShowEnvelopeSelector));
-
-                    UpdateMoneyPlaceFilterState();
-                    Refresh();
+                    _selectedTransactionType = v;
+                    Raise(nameof(SelectedTransactionType));
                 }
             }
         }
-
-        public bool ShowBankSelector => SelectedSource == SourceType.BankAccounts;
-        public bool ShowEnvelopeSelector => SelectedSource == SourceType.Envelopes;
-
-        private void UpdateMoneyPlaceFilterState()
-        {
-            if (SelectedSource == SourceType.BankAccounts ||
-                SelectedSource == SourceType.Envelopes)
-            {
-                IsMoneyPlaceFilterEnabled = true;
-            }
-            else
-            {
-                IsMoneyPlaceFilterEnabled = false;
-                SelectedMoneyPlace = MoneyPlaces.FirstOrDefault() ?? "Wszystko";
-            }
-        }
-
-        private ObservableCollection<BankAccountModel> _bankAccounts = new();
-        public ObservableCollection<BankAccountModel> BankAccounts
-        {
-            get => _bankAccounts;
-            set
-            {
-                _bankAccounts = value;
-                Raise(nameof(BankAccounts));
-            }
-        }
-
-        private BankAccountModel? _selectedBankAccount;
-        public BankAccountModel? SelectedBankAccount
-        {
-            get => _selectedBankAccount;
-            set
-            {
-                _selectedBankAccount = value;
-                Raise(nameof(SelectedBankAccount));
-            }
-        }
-
-        private string _selectedEnvelope = "Wszystkie koperty";
-        public string SelectedEnvelope
-        {
-            get => _selectedEnvelope;
-            set
-            {
-                _selectedEnvelope = value;
-                Raise(nameof(SelectedEnvelope));
-            }
-        }
-
-        public ObservableCollection<string> Insights { get; }
-        public ObservableCollection<KeyValuePair<string, string>> KPIList { get; }
-
-        // ========= komendy =========
-        public ICommand RefreshCommand { get; }
-        public ICommand SavePresetCommand { get; }
-        public ICommand ExportCsvCommand { get; }
-        public ICommand ExportExcelCommand { get; }
-        public ICommand ExportPdfCommand { get; }
-        public ICommand BackCommand { get; }
 
         public void ResetFilters()
         {
-            SelectedAccount = Accounts.Count > 0 ? Accounts[0] : string.Empty;
-            SelectedCategory = Categories.Count > 0 ? Categories[0] : string.Empty;
-            SelectedTemplate = Templates.Count > 0 ? Templates[0] : string.Empty;
-
-            SelectedSource = SourceType.All;
-            SelectedBankAccount = BankAccounts.FirstOrDefault();
-            SelectedEnvelope = Envelopes.Count > 0 ? Envelopes[0] : "Wszystkie koperty";
-            SelectedTransactionType = TransactionTypes.FirstOrDefault() ?? "Wszystko";
+            SelectedCategory = Categories.FirstOrDefault() ?? "Wszystkie kategorie";
             SelectedMoneyPlace = MoneyPlaces.FirstOrDefault() ?? "Wszystko";
-
-            UpdateMoneyPlaceFilterState();
+            SelectedTransactionType = TransactionTypes.FirstOrDefault() ?? "Wszystko";
         }
 
-        // ========= modele danych do widoku =========
-
-        public class CategoryAmount
+        private void LoadFilters()
         {
-            public string Name { get; set; } = "";
-            public decimal Amount { get; set; }
-            public double SharePercent { get; set; }
+            try
+            {
+                var uid = UserService.GetCurrentUserId();
+                if (uid <= 0) return;
+
+                Categories.Clear();
+                Categories.Add("Wszystkie kategorie");
+                foreach (var c in DatabaseService.GetCategoriesByUser(uid) ?? new List<string>())
+                    Categories.Add(c);
+
+                MoneyPlaces.Clear();
+                MoneyPlaces.Add("Wszystko");
+                MoneyPlaces.Add("Wolna gotówka");
+                MoneyPlaces.Add("Odłożona gotówka");
+
+                foreach (var env in DatabaseService.GetEnvelopesNames(uid) ?? new List<string>())
+                    MoneyPlaces.Add($"Koperta: {env}");
+
+                foreach (var acc in DatabaseService.GetAccounts(uid) ?? new List<BankAccountModel>())
+                    MoneyPlaces.Add($"Konto: {acc.AccountName}");
+
+                ResetFilters();
+            }
+            catch
+            {
+                // celowo cicho – filtry nie mogą wysypać strony
+            }
         }
 
-        public class TransactionDto
+        // =========================
+        // Komendy
+        // =========================
+        public ICommand RefreshCommand { get; }
+        public ICommand ExportPdfCommand { get; }
+        public ICommand ResetFiltersCommand { get; }
+
+        // =========================
+        // Zakładki – indeks
+        // =========================
+        private int _selectedTabIndex;
+        public int SelectedTabIndex
         {
-            public int Id { get; set; }
-            public DateTime Date { get; set; }
-            public decimal Amount { get; set; }
-            public string Description { get; set; } = "";
-            public string Category { get; set; } = "";
+            get => _selectedTabIndex;
+            set
+            {
+                if (_selectedTabIndex != value)
+                {
+                    _selectedTabIndex = value;
+                    Raise(nameof(SelectedTabIndex));
+                }
+            }
         }
 
-        public ObservableCollection<CategoryAmount> Details { get; private set; } = new();
-        public ObservableCollection<TransactionDto> FilteredTransactions { get; private set; } = new();
-        private List<TransactionDto> _transactionsSnapshot;
+        // =========================
+        // Dane wspólne (zaciągane raz, używane w wielu zakładkach)
+        // =========================
+        public ObservableCollection<ReportsService.ReportItem> Rows { get; }
 
+        private decimal _totalExpenses;
+        public decimal TotalExpenses
+        {
+            get => _totalExpenses;
+            private set
+            {
+                if (_totalExpenses != value)
+                {
+                    _totalExpenses = value;
+                    Raise(nameof(TotalExpenses));
+                    Raise(nameof(TotalExpensesStr));
+                }
+            }
+        }
+        public string TotalExpensesStr => TotalExpenses.ToString("N2", CultureInfo.CurrentCulture) + " zł";
+
+        private decimal _totalIncomes;
+        public decimal TotalIncomes
+        {
+            get => _totalIncomes;
+            private set
+            {
+                if (_totalIncomes != value)
+                {
+                    _totalIncomes = value;
+                    Raise(nameof(TotalIncomes));
+                    Raise(nameof(TotalIncomesStr));
+                }
+            }
+        }
+        public string TotalIncomesStr => TotalIncomes.ToString("N2", CultureInfo.CurrentCulture) + " zł";
+
+        private decimal _balance;
+        public decimal Balance
+        {
+            get => _balance;
+            private set
+            {
+                if (_balance != value)
+                {
+                    _balance = value;
+                    Raise(nameof(Balance));
+                    Raise(nameof(BalanceStr));
+                }
+            }
+        }
+        public string BalanceStr => Balance.ToString("N2", CultureInfo.CurrentCulture) + " zł";
+
+        // Donut: słownik dla DonutChartControl (jak masz obecnie)
         private Dictionary<string, decimal> _chartTotals = new();
         public Dictionary<string, decimal> ChartTotals
         {
@@ -540,7 +291,7 @@ namespace Finly.ViewModels
             }
         }
 
-        private decimal _chartTotalAll = 0m;
+        private decimal _chartTotalAll;
         public decimal ChartTotalAll
         {
             get => _chartTotalAll;
@@ -551,7 +302,6 @@ namespace Finly.ViewModels
             }
         }
 
-        // ====== opis środka wykresu (Przegląd) ======
         private string _selectedSliceInfo = "Kliknij kategorię na wykresie";
         public string SelectedSliceInfo
         {
@@ -566,7 +316,6 @@ namespace Finly.ViewModels
             }
         }
 
-        // Metoda wołana z ReportsPage.xaml.cs przy najechaniu/kliknięciu na slice
         public void UpdateSelectedSliceInfo(params object[] args)
         {
             if (args == null || args.Length == 0)
@@ -575,320 +324,186 @@ namespace Finly.ViewModels
                 return;
             }
 
-            // Spróbujmy złożyć sensowny opis z przekazanych parametrów
-            // (np. kategoria, kwota, udział %)
             var parts = args
                 .Where(a => a != null)
                 .Select(a => a.ToString())
                 .Where(s => !string.IsNullOrWhiteSpace(s));
 
             var text = string.Join(" • ", parts);
-            if (string.IsNullOrWhiteSpace(text))
-                text = "Kliknij kategorię na wykresie";
-
-            SelectedSliceInfo = text;
+            SelectedSliceInfo = string.IsNullOrWhiteSpace(text)
+                ? "Kliknij kategorię na wykresie"
+                : text;
         }
 
-
-        private bool _isDrilldown = false;
-        public bool IsDrilldownActive
+        // =========================
+        // PRZEGLĄD
+        // =========================
+        public sealed class TxLine
         {
-            get => _isDrilldown;
-            private set
-            {
-                _isDrilldown = value;
-                Raise(nameof(IsDrilldownActive));
-                Raise(nameof(IsSummaryActive));
-            }
+            public DateTime Date { get; set; }
+            public string Category { get; set; } = "";
+            public string Description { get; set; } = "";
+            public decimal Amount { get; set; }
+            public string AmountStr => Amount.ToString("N2", CultureInfo.CurrentCulture) + " zł";
         }
-        public bool IsSummaryActive => !IsDrilldownActive;
 
-        // ======== PRZEGLĄD – środek donuta + mini-podsumowanie ========
-        private string _overviewCenterTitle = "Wszystkie transakcje";
-        public string OverviewCenterTitle
+        public ObservableCollection<TxLine> OverviewTopExpenses { get; }
+        public ObservableCollection<TxLine> OverviewTopIncomes { get; }
+
+        // Trend (cashflow) – proste wiadra dzienne (VM gotowy pod wykres liniowy)
+        public sealed class TrendPoint
         {
-            get => _overviewCenterTitle;
-            set
-            {
-                if (_overviewCenterTitle != value)
-                {
-                    _overviewCenterTitle = value;
-                    Raise(nameof(OverviewCenterTitle));
-                }
-            }
+            public DateTime Date { get; set; }
+            public decimal Incomes { get; set; }
+            public decimal Expenses { get; set; }
+            public decimal Balance => Incomes - Expenses;
         }
 
-        private string _overviewCenterSubtitle = string.Empty;
-        public string OverviewCenterSubtitle
+        public ObservableCollection<TrendPoint> Trend { get; } = new();
+
+        // =========================
+        // KATEGORIE
+        // =========================
+        public sealed class CategoryAmount
         {
-            get => _overviewCenterSubtitle;
-            set
-            {
-                if (_overviewCenterSubtitle != value)
-                {
-                    _overviewCenterSubtitle = value;
-                    Raise(nameof(OverviewCenterSubtitle));
-                }
-            }
+            public string Name { get; set; } = "";
+            public decimal Amount { get; set; }
+            public double SharePercent { get; set; }
         }
 
-        public string OverviewTransactionsCountStr
-            => $"{_transactionsSnapshot.Count} transakcji";
+        // „Donut w kategoriach” + tabelki zależnie od filtra
+        public ObservableCollection<CategoryAmount> CategoryBreakdown { get; }
+        public ObservableCollection<CategoryAmount> ExpenseCategoriesSummary { get; }
+        public ObservableCollection<CategoryAmount> IncomeCategoriesSummary { get; }
+        public ObservableCollection<CategoryAmount> TransferCategoriesSummary { get; }
 
-        public string OverviewTotalAmountStr
+        // =========================
+        // BUDŻETY
+        // =========================
+        public sealed class BudgetRow
         {
-            get
-            {
-                var total = _transactionsSnapshot.Sum(t => t.Amount);
-                return total.ToString("N2", CultureInfo.CurrentCulture) + " zł";
-            }
+            public int Id { get; set; }
+            public string Name { get; set; } = "";
+            public decimal Planned { get; set; }
+            public decimal Spent { get; set; }
+            public decimal Remaining => Planned - Spent;
+            public bool IsOver => Spent > Planned;
+
+            public decimal UsedPercent => Planned <= 0 ? 0 : (Spent / Planned * 100m);
+
+            public string PlannedStr => Planned.ToString("N2", CultureInfo.CurrentCulture) + " zł";
+            public string SpentStr => Spent.ToString("N2", CultureInfo.CurrentCulture) + " zł";
+            public string RemainingStr => Remaining.ToString("N2", CultureInfo.CurrentCulture) + " zł";
+            public string UsedPercentStr => UsedPercent.ToString("N1", CultureInfo.CurrentCulture) + " %";
         }
 
-        public string OverviewTopCategoryStr
+        public ObservableCollection<BudgetRow> Budgets { get; }
+
+        private int _budgetsOkCount;
+        public int BudgetsOkCount
         {
-            get
-            {
-                if (_transactionsSnapshot.Count == 0) return "(brak danych)";
-
-                var top = _transactionsSnapshot
-                    .GroupBy(t => t.Category ?? "(brak)")
-                    .Select(g => new { Name = g.Key, Total = g.Sum(x => x.Amount) })
-                    .OrderByDescending(x => Math.Abs(x.Total))
-                    .FirstOrDefault();
-
-                if (top == null) return "(brak danych)";
-
-                return $"{top.Name} – {top.Total.ToString("N2", CultureInfo.CurrentCulture)} zł";
-            }
+            get => _budgetsOkCount;
+            private set { _budgetsOkCount = value; Raise(nameof(BudgetsOkCount)); }
         }
 
-        // ========= prawa kolumna: sumy bieżącego okresu =========
-        private decimal _expensesTotal = 0m;
-        public decimal ExpensesTotal
+        private int _budgetsOverCount;
+        public int BudgetsOverCount
         {
-            get => _expensesTotal;
-            private set
-            {
-                if (_expensesTotal != value)
-                {
-                    _expensesTotal = value;
-                    Raise(nameof(ExpensesTotal));
-                    Raise(nameof(ExpensesTotalStr));
-                }
-            }
+            get => _budgetsOverCount;
+            private set { _budgetsOverCount = value; Raise(nameof(BudgetsOverCount)); }
         }
-        public string ExpensesTotalStr => ExpensesTotal.ToString("N2", CultureInfo.CurrentCulture) + " zł";
 
-        private decimal _incomesTotal = 0m;
-        public decimal IncomesTotal
+        // =========================
+        // INWESTYCJE (placeholder – gotowe pod źródło danych)
+        // =========================
+        public sealed class InvestmentRow
         {
-            get => _incomesTotal;
-            private set
-            {
-                if (_incomesTotal != value)
-                {
-                    _incomesTotal = value;
-                    Raise(nameof(IncomesTotal));
-                    Raise(nameof(IncomesTotalStr));
-                }
-            }
-        }
-        public string IncomesTotalStr => IncomesTotal.ToString("N2", CultureInfo.CurrentCulture) + " zł";
+            public string Name { get; set; } = "";
+            public decimal StartValue { get; set; }
+            public decimal EndValue { get; set; }
+            public decimal Profit => EndValue - StartValue;
 
-        private decimal _balanceTotal = 0m;
-        public decimal BalanceTotal
+            public string StartValueStr => StartValue.ToString("N2", CultureInfo.CurrentCulture) + " zł";
+            public string EndValueStr => EndValue.ToString("N2", CultureInfo.CurrentCulture) + " zł";
+            public string ProfitStr => Profit.ToString("N2", CultureInfo.CurrentCulture) + " zł";
+        }
+
+        public ObservableCollection<InvestmentRow> Investments { get; }
+
+        // =========================
+        // KREDYTY
+        // =========================
+        public sealed class LoanRow
         {
-            get => _balanceTotal;
-            private set
-            {
-                if (_balanceTotal != value)
-                {
-                    _balanceTotal = value;
-                    Raise(nameof(BalanceTotal));
-                    Raise(nameof(BalanceTotalStr));
-                }
-            }
+            public int Id { get; set; }
+            public string Name { get; set; } = "";
+            public decimal Principal { get; set; }
+            public decimal InterestRate { get; set; }
+            public int TermMonths { get; set; }
+
+            public decimal EstimatedMonthlyPayment { get; set; }
+            public decimal PaidInPeriod { get; set; }        // do podpięcia z tabelą operacji
+            public decimal OverpaidInPeriod { get; set; }    // do podpięcia z tabelą operacji
+            public decimal RemainingToPay { get; set; }      // do podpięcia z harmonogramu / salda
+
+            public string EstimatedMonthlyPaymentStr => EstimatedMonthlyPayment.ToString("N2", CultureInfo.CurrentCulture) + " zł";
+            public string PaidInPeriodStr => PaidInPeriod.ToString("N2", CultureInfo.CurrentCulture) + " zł";
+            public string OverpaidInPeriodStr => OverpaidInPeriod.ToString("N2", CultureInfo.CurrentCulture) + " zł";
+            public string RemainingToPayStr => RemainingToPay.ToString("N2", CultureInfo.CurrentCulture) + " zł";
         }
-        public string BalanceTotalStr => BalanceTotal.ToString("N2", CultureInfo.CurrentCulture) + " zł";
 
-        // ========= poprzedni okres + różnice =========
-        private DateTime _previousFromDate;
-        private DateTime _previousToDate;
+        public ObservableCollection<LoanRow> Loans { get; }
 
-        private decimal _previousExpensesTotal;
-        public decimal PreviousExpensesTotal
+        // =========================
+        // CELE
+        // =========================
+        public sealed class GoalRow
         {
-            get => _previousExpensesTotal;
-            private set
-            {
-                _previousExpensesTotal = value;
-                Raise(nameof(PreviousExpensesTotal));
-                Raise(nameof(PreviousExpensesTotalStr));
-            }
-        }
-        public string PreviousExpensesTotalStr => PreviousExpensesTotal.ToString("N2", CultureInfo.CurrentCulture) + " zł";
+            public string Name { get; set; } = "";
+            public decimal Target { get; set; }
+            public decimal Current { get; set; }
+            public DateTime? DueDate { get; set; }
 
-        private decimal _previousIncomesTotal;
-        public decimal PreviousIncomesTotal
+            public decimal ProgressPercent => Target <= 0 ? 0 : (Current / Target * 100m);
+            public decimal Missing => Math.Max(0, Target - Current);
+
+            public string TargetStr => Target.ToString("N2", CultureInfo.CurrentCulture) + " zł";
+            public string CurrentStr => Current.ToString("N2", CultureInfo.CurrentCulture) + " zł";
+            public string ProgressPercentStr => ProgressPercent.ToString("N1", CultureInfo.CurrentCulture) + " %";
+            public string MissingStr => Missing.ToString("N2", CultureInfo.CurrentCulture) + " zł";
+
+            // „ile trzeba w kolejnym okresie”
+            public decimal NeededNextPeriod { get; set; }
+            public string NeededNextPeriodStr => NeededNextPeriod.ToString("N2", CultureInfo.CurrentCulture) + " zł";
+        }
+
+        public ObservableCollection<GoalRow> Goals { get; }
+
+        // =========================
+        // SYMULACJA MAJĄTKU (planowane transakcje)
+        // =========================
+        public sealed class PlannedRow
         {
-            get => _previousIncomesTotal;
-            private set
-            {
-                _previousIncomesTotal = value;
-                Raise(nameof(PreviousIncomesTotal));
-                Raise(nameof(PreviousIncomesTotalStr));
-            }
+            public DateTime Date { get; set; }
+            public string Type { get; set; } = ""; // Wydatek/Przychód/Transfer (jak podepniesz)
+            public string Description { get; set; } = "";
+            public decimal Amount { get; set; }
+            public string AmountStr => Amount.ToString("N2", CultureInfo.CurrentCulture) + " zł";
         }
-        public string PreviousIncomesTotalStr => PreviousIncomesTotal.ToString("N2", CultureInfo.CurrentCulture) + " zł";
 
-        private decimal _previousBalanceTotal;
-        public decimal PreviousBalanceTotal
+        public ObservableCollection<PlannedRow> PlannedSim { get; }
+
+        private decimal _simBalanceDelta;
+        public decimal SimBalanceDelta
         {
-            get => _previousBalanceTotal;
-            private set
-            {
-                _previousBalanceTotal = value;
-                Raise(nameof(PreviousBalanceTotal));
-                Raise(nameof(PreviousBalanceTotalStr));
-            }
+            get => _simBalanceDelta;
+            private set { _simBalanceDelta = value; Raise(nameof(SimBalanceDelta)); Raise(nameof(SimBalanceDeltaStr)); }
         }
-        public string PreviousBalanceTotalStr => PreviousBalanceTotal.ToString("N2", CultureInfo.CurrentCulture) + " zł";
+        public string SimBalanceDeltaStr => SimBalanceDelta.ToString("N2", CultureInfo.CurrentCulture) + " zł";
 
-        private string _expensesChangePercentStr = "0%";
-        public string ExpensesChangePercentStr
-        {
-            get => _expensesChangePercentStr;
-            private set
-            {
-                _expensesChangePercentStr = value;
-                Raise(nameof(ExpensesChangePercentStr));
-                Raise(nameof(ExpensesChangeStr));
-            }
-        }
-
-        private string _incomesChangePercentStr = "0%";
-        public string IncomesChangePercentStr
-        {
-            get => _incomesChangePercentStr;
-            private set
-            {
-                _incomesChangePercentStr = value;
-                Raise(nameof(IncomesChangePercentStr));
-                Raise(nameof(IncomesChangeStr));
-            }
-        }
-
-        private string _balanceChangePercentStr = "0%";
-        public string BalanceChangePercentStr
-        {
-            get => _balanceChangePercentStr;
-            private set
-            {
-                _balanceChangePercentStr = value;
-                Raise(nameof(BalanceChangePercentStr));
-                Raise(nameof(BalanceChangeStr));
-            }
-        }
-
-        // Aliasy na potrzeby XAML
-        public string ExpensesChangeStr => ExpensesChangePercentStr;
-        public string IncomesChangeStr => IncomesChangePercentStr;
-        public string BalanceChangeStr => BalanceChangePercentStr;
-
-        // ========= pomocnicze metody agregujące =========
-
-        private void PopulateFromDataTable(DataTable dt)
-        {
-            _transactionsSnapshot.Clear();
-            FilteredTransactions.Clear();
-
-            foreach (DataRow r in dt.Rows)
-            {
-                var t = new TransactionDto
-                {
-                    Id = dt.Columns.Contains("Id") && r["Id"] != DBNull.Value ? Convert.ToInt32(r["Id"]) : 0,
-                    Date = dt.Columns.Contains("Date") && r["Date"] != DBNull.Value ? DateTime.Parse(r["Date"].ToString()!) : DateTime.MinValue,
-                    Amount = dt.Columns.Contains("Amount") && r["Amount"] != DBNull.Value ? Convert.ToDecimal(r["Amount"]) : 0m,
-                    Description = dt.Columns.Contains("Description") && r["Description"] != DBNull.Value ? r["Description"].ToString()! : "",
-                    Category = dt.Columns.Contains("CategoryName") && r["CategoryName"] != DBNull.Value ? r["CategoryName"].ToString()! : "(brak)"
-                };
-
-                _transactionsSnapshot.Add(t);
-                FilteredTransactions.Add(t);
-            }
-
-            _detailsClearAndGroup(dt);
-        }
-
-        private void _detailsClearAndGroup(DataTable dt)
-        {
-            Details.Clear();
-            var groups = dt.AsEnumerable()
-                .GroupBy(r => r.Field<string>("CategoryName") ?? "(brak)")
-                .Select(g => new
-                {
-                    Name = g.Key,
-                    Total = g.Sum(r => Convert.ToDecimal(r.Field<object>("Amount")))
-                })
-                .OrderByDescending(x => x.Total)
-                .ToList();
-
-            var total = groups.Sum(x => x.Total);
-            ChartTotals = groups.ToDictionary(x => x.Name, x => x.Total);
-            ChartTotalAll = total;
-
-            foreach (var g in groups)
-            {
-                Details.Add(new CategoryAmount
-                {
-                    Name = g.Name,
-                    Amount = g.Total,
-                    SharePercent = total > 0 ? (double)(g.Total / total * 100m) : 0.0
-                });
-            }
-        }
-
-        public void ShowDrilldown(string category)
-        {
-            if (string.IsNullOrWhiteSpace(category)) return;
-            IsDrilldownActive = true;
-
-            var list = _transactionsSnapshot
-                .Where(t => string.Equals(t.Category, category, StringComparison.OrdinalIgnoreCase))
-                .OrderByDescending(t => t.Date)
-                .ToList();
-
-            FilteredTransactions.Clear();
-            foreach (var t in list)
-                FilteredTransactions.Add(t);
-
-            // Tekst w środku donuta – dla wybranej kategorii
-            var total = list.Sum(t => t.Amount);
-            OverviewCenterTitle = category;
-            OverviewCenterSubtitle = $"{list.Count} transakcji · {total.ToString("N2", CultureInfo.CurrentCulture)} zł";
-
-            Raise(nameof(OverviewTransactionsCountStr));
-            Raise(nameof(OverviewTotalAmountStr));
-            Raise(nameof(OverviewTopCategoryStr));
-        }
-
-        public void BackToSummary()
-        {
-            IsDrilldownActive = false;
-            FilteredTransactions.Clear();
-            foreach (var t in _transactionsSnapshot.OrderByDescending(t => t.Date))
-                FilteredTransactions.Add(t);
-
-            // Powrót do widoku wszystkich transakcji
-            OverviewCenterTitle = "Wszystkie transakcje";
-            OverviewCenterSubtitle = $"{_transactionsSnapshot.Count} transakcje w wybranym okresie";
-
-            Raise(nameof(OverviewTransactionsCountStr));
-            Raise(nameof(OverviewTotalAmountStr));
-            Raise(nameof(OverviewTopCategoryStr));
-        }
-
-        // ==================== GŁÓWNE ODŚWIEŻANIE ====================
+        // =========================
+        // GŁÓWNE ODŚWIEŻENIE
+        // =========================
         private void Refresh()
         {
             try
@@ -901,488 +516,489 @@ namespace Finly.ViewModels
                     return;
                 }
 
-                int? accountId = null;
-                if (SelectedSource == SourceType.BankAccounts &&
-                    SelectedBankAccount != null &&
-                    SelectedBankAccount.Id > 0)
-                {
-                    accountId = SelectedBankAccount.Id;
-                }
+                // 1) bazowe transakcje (Rows) – respektuje filtry typu/kategorii/miejsca + okres
+                LoadRows(uid);
 
-                // unified wiersze dla bieżącego okresu
-                var currentRows = ReportsService.LoadReport(
-                    uid,
-                    GetSourceString(),
-                    SelectedCategory,
-                    SelectedTransactionType,
-                    SelectedMoneyPlace,
-                    FromDate,
-                    ToDate
-                ).ToList();
+                // 2) sumy globalne
+                RecalcTotals();
 
-                // ====== aktualny okres – DataTable z wydatków do wykresu ======
-                var currentDt = GetFilteredExpensesDataTable(uid, FromDate, ToDate, accountId);
+                // 3) PRZEGLĄD
+                BuildOverview();
 
-                Rows.Clear();
-                foreach (var row in currentRows)
-                    Rows.Add(row);
+                // 4) KATEGORIE (donut + tabelki zależnie od SelectedTransactionType)
+                BuildCategories();
 
-                RebuildCategorySummariesFromRows();
+                // 5) BUDŻETY (analiza budżetów w kontekście wydatków z okresu)
+                BuildBudgets(uid);
 
-                var totalExpenses = currentRows.Where(r => r.Amount < 0m).Sum(r => -r.Amount);
-                var totalIncomes = currentRows.Where(r => r.Amount > 0m).Sum(r => r.Amount);
+                // 6) KREDYTY
+                BuildLoans(uid);
 
-                ExpensesTotal = totalExpenses;
-                IncomesTotal = totalIncomes;
-                BalanceTotal = totalIncomes - totalExpenses;
+                // 7) CELE
+                BuildGoals(uid);
 
-                // ====== poprzedni okres o tej samej długości ======
-                var prev = GetPreviousPeriod(FromDate, ToDate);
-                _previousFromDate = prev.PrevFrom;
-                _previousToDate = prev.PrevTo;
+                // 8) INWESTYCJE (na razie puste – gotowe do podpięcia)
+                BuildInvestments(uid);
 
-                var previousRows = ReportsService.LoadReport(
-                    uid,
-                    GetSourceString(),
-                    SelectedCategory,
-                    SelectedTransactionType,
-                    SelectedMoneyPlace,
-                    _previousFromDate,
-                    _previousToDate
-                ).ToList();
-
-                PreviousExpensesTotal = previousRows.Where(r => r.Amount < 0m).Sum(r => -r.Amount);
-                PreviousIncomesTotal = previousRows.Where(r => r.Amount > 0m).Sum(r => r.Amount);
-                PreviousBalanceTotal = PreviousIncomesTotal - PreviousExpensesTotal;
-
-                var kind = DetectPeriodKind(FromDate.Date, ToDate.Date, DateTime.Today);
-                var (currentName, previousName) = GetPeriodNames(kind);
-                CurrentPeriodName = currentName;
-                PreviousPeriodName = previousName;
-
-                AnalyzedPeriodLabel = $"{CurrentPeriodName} ({FromDate:dd.MM.yyyy} – {ToDate:dd.MM.yyyy})";
-                ComparisonPeriodLabel = $"{PreviousPeriodName} ({prev.PrevFrom:dd.MM.yyyy} – {prev.PrevTo:dd.MM.yyyy})";
-
-                // ====== różnice procentowe ======
-                ExpensesChangePercentStr = FormatPercentChange(PreviousExpensesTotal, ExpensesTotal);
-                IncomesChangePercentStr = FormatPercentChange(PreviousIncomesTotal, IncomesTotal);
-                BalanceChangePercentStr = FormatPercentChange(PreviousBalanceTotal, BalanceTotal);
-
-                IsDrilldownActive = false;
-                SelectedSliceInfo = "Kliknij kategorię na wykresie";
-
-                // ====== KPI & insighty ======
-                KPIList.Clear();
-                KPIList.Add(new KeyValuePair<string, string>($"Suma wydatków ({CurrentPeriodName})", ExpensesTotalStr));
-                KPIList.Add(new KeyValuePair<string, string>($"Suma wydatków ({PreviousPeriodName})", PreviousExpensesTotalStr));
-                KPIList.Add(new KeyValuePair<string, string>("Zmiana wydatków", ExpensesChangePercentStr));
-
-                KPIList.Add(new KeyValuePair<string, string>($"Suma przychodów ({CurrentPeriodName})", IncomesTotalStr));
-                KPIList.Add(new KeyValuePair<string, string>($"Suma przychodów ({PreviousPeriodName})", PreviousIncomesTotalStr));
-                KPIList.Add(new KeyValuePair<string, string>("Zmiana przychodów", IncomesChangePercentStr));
-
-                KPIList.Add(new KeyValuePair<string, string>($"Saldo ({CurrentPeriodName})", BalanceTotalStr));
-                KPIList.Add(new KeyValuePair<string, string>($"Saldo ({PreviousPeriodName})", PreviousBalanceTotalStr));
-                KPIList.Add(new KeyValuePair<string, string>("Zmiana salda", BalanceChangePercentStr));
-
-                Insights.Clear();
-                Insights.Add($"Filtrowanie: źródło = {SelectedSource}, typ transakcji = {SelectedTransactionType}, miejsce = {SelectedMoneyPlace}");
-                Insights.Add($"Analizowany okres: {AnalyzedPeriodLabel}");
-                Insights.Add($"Porównanie z okresem: {ComparisonPeriodLabel}");
-                Insights.Add($"Wydajesz {ExpensesChangePercentStr} {(ExpensesTotal > PreviousExpensesTotal ? "więcej" : ExpensesTotal < PreviousExpensesTotal ? "mniej" : "(bez zmian)")} niż w {PreviousPeriodName}.");
-                Insights.Add($"Twoje przychody są {IncomesChangePercentStr} {(IncomesTotal > PreviousIncomesTotal ? "wyższe" : IncomesTotal < PreviousIncomesTotal ? "niższe" : "(bez zmian)")} niż w {PreviousPeriodName}.");
-
-                // ====== wykres i szczegóły kategorii – z wydatków ======
-                var currentExpensesDt = GetFilteredExpensesDataTable(uid, FromDate, ToDate, accountId);
-                FilteredTransactions.Clear();
-                Details.Clear();
-                if (currentExpensesDt.Rows.Count > 0)
-                    PopulateFromDataTable(currentExpensesDt);
-                else
-                {
-                    ChartTotals = new Dictionary<string, decimal>();
-                    ChartTotalAll = 0m;
-                }
-
-                OverviewCenterTitle = "Wszystkie transakcje";
-                OverviewCenterSubtitle = $"{_transactionsSnapshot.Count} transakcji w wybranym okresie";
-
-                Raise(nameof(Details));
-                Raise(nameof(ChartTotals));
-                Raise(nameof(ChartTotalAll));
-                Raise(nameof(FilteredTransactions));
-                Raise(nameof(OverviewTransactionsCountStr));
-                Raise(nameof(OverviewTotalAmountStr));
-                Raise(nameof(OverviewTopCategoryStr));
-
-                // ====== LOAD Budgets / Goals / Loans for other tabs =====
-                try
-                {
-                    BudgetsSummary.Clear();
-                    var budgets = BudgetService.GetBudgetsWithSummary(uid) ?? new List<BudgetService.BudgetSummary>();
-                    foreach (var b in budgets)
-                        BudgetsSummary.Add(b);
-                }
-                catch { }
-
-                try
-                {
-                    GoalsList.Clear();
-
-                    // If shared GoalsService is empty, try to load envelope goals from DB
-                    if (GoalsService.Goals == null || GoalsService.Goals.Count == 0)
-                    {
-                        try
-                        {
-                            var envGoals = DatabaseService.GetEnvelopeGoals(uid);
-                            if (envGoals != null)
-                            {
-                                foreach (var g in envGoals)
-                                {
-                                    var goalTitle = string.Empty;
-                                    var description = string.Empty;
-                                    try
-                                    {
-                                        var raw = (g.GoalText as string) ?? string.Empty;
-                                        var lines = raw.Split(new[] { '\n' }, StringSplitOptions.RemoveEmptyEntries);
-                                        var descLines = new List<string>();
-                                        foreach (var rawLine in lines)
-                                        {
-                                            var line = rawLine.Trim();
-                                            if (line.StartsWith("Cel:", StringComparison.OrdinalIgnoreCase))
-                                                goalTitle = line.Substring(4).Trim();
-                                            else if (line.StartsWith("Termin:", StringComparison.OrdinalIgnoreCase))
-                                                continue;
-                                            else
-                                                descLines.Add(line);
-                                        }
-                                        if (string.IsNullOrWhiteSpace(goalTitle)) goalTitle = g.Name ?? string.Empty;
-                                        description = string.Join(Environment.NewLine, descLines);
-                                    }
-                                    catch { }
-
-                                    var vm = new GoalVm
-                                    {
-                                        EnvelopeId = g.EnvelopeId,
-                                        Name = g.Name ?? string.Empty,
-                                        GoalTitle = goalTitle,
-                                        TargetAmount = g.Target,
-                                        CurrentAmount = g.Allocated,
-                                        DueDate = g.Deadline,
-                                        Description = description
-                                    };
-
-                                    GoalsService.Goals.Add(vm);
-                                }
-                            }
-                        }
-                        catch { }
-                    }
-
-                    foreach (var g in GoalsService.Goals)
-                        GoalsList.Add(g);
-                }
-                catch { }
-
-                try
-                {
-                    LoansList.Clear();
-                    LoansViewList.Clear();
-
-                    var loans = DatabaseService.GetLoans(uid) ?? new List<LoanModel>();
-                    foreach (var l in loans)
-                        LoansList.Add(l);
-
-                    foreach (var l in loans)
-                    {
-                        var monthly = LoansService.CalculateMonthlyPayment(l.Principal, l.InterestRate, l.TermMonths);
-                        string nextInfo = monthly.ToString("N2", CultureInfo.CurrentCulture) + " zł";
-                        try
-                        {
-                            var today = DateTime.Today;
-                            DateTime nextDate;
-                            if (l.PaymentDay <= 0)
-                                nextDate = l.StartDate.AddMonths(1);
-                            else
-                            {
-                                int daysInThisMonth = DateTime.DaysInMonth(today.Year, today.Month);
-                                int day = Math.Min(l.PaymentDay, daysInThisMonth);
-                                var candidate = new DateTime(today.Year, today.Month, day);
-                                if (candidate <= today)
-                                {
-                                    var nextMonth = new DateTime(today.Year, today.Month, 1).AddMonths(1);
-                                    day = Math.Min(l.PaymentDay, DateTime.DaysInMonth(nextMonth.Year, nextMonth.Month));
-                                    candidate = new DateTime(nextMonth.Year, nextMonth.Month, day);
-                                }
-                                nextDate = candidate;
-                            }
-                            nextInfo += " · " + nextDate.ToString("dd.MM.yyyy");
-                        }
-                        catch { }
-
-                        LoansViewList.Add(new ReportsLoanVm
-                        {
-                            Id = l.Id,
-                            Name = l.Name,
-                            Principal = l.Principal,
-                            InterestRate = l.InterestRate,
-                            TermMonths = l.TermMonths,
-                            MonthlyPaymentStr = monthly.ToString("N2", CultureInfo.CurrentCulture) + " zł",
-                            NextPaymentInfo = nextInfo
-                        });
-                    }
-                }
-                catch { }
-
-                // If some sections are empty (no DB data), try to load missing data again from DB
-                FillMissingFromDatabase(uid);
-
-                // If still empty, populate demo/sample data so UI looks informative in dev mode
-                EnsureDemoData(uid);
-
-                Raise(nameof(BudgetsSummary));
-                Raise(nameof(GoalsList));
-                Raise(nameof(LoansList));
-                Raise(nameof(LoansViewList));
+                // 9) SYMULACJA (planowane transakcje w przyszłość o długości wybranego okresu)
+                BuildPlannedSimulation(uid);
             }
             catch (Exception ex)
             {
-                MessageBox.Show("Błąd odczytu raportu: " + ex.Message,
+                MessageBox.Show("Błąd odświeżania raportów: " + ex.Message,
                     "Błąd", MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
 
-        // Try to fill missing collections from database (called before falling back to demo data)
-        private void FillMissingFromDatabase(int uid)
+        private void LoadRows(int uid)
         {
+            Rows.Clear();
+
+            var rows = ReportsService.LoadReport(
+                uid,
+                source: "Wszystko", // na razie spójnie z Twoimi filtrami (MoneyPlaces obsługujemy po stronie DB poniżej)
+                category: SelectedCategory,
+                transactionType: SelectedTransactionType,
+                moneyPlace: SelectedMoneyPlace,
+                from: FromDate,
+                to: ToDate
+            );
+
+            foreach (var r in rows)
+                Rows.Add(r);
+
+            Raise(nameof(Rows));
+        }
+
+        private void RecalcTotals()
+        {
+            // Uwaga: w Rows przychód dodatni, wydatek dodatni? – w Twoim ReportsService: Wydatek ma Amount = e.Amount * -1
+            // czyli Wydatek jest dodatni po stronie raportu? Nie – tam jest e.Amount * -1, a w DB e.Amount zwykle dodatnie,
+            // więc w raporcie wyjdzie ujemny. Trzymamy logikę:
+            var expenses = Rows.Where(r => r.Type == "Wydatek").Sum(r => Math.Abs(r.Amount));
+            var incomes = Rows.Where(r => r.Type == "Przychód").Sum(r => Math.Abs(r.Amount));
+
+            TotalExpenses = expenses;
+            TotalIncomes = incomes;
+            Balance = TotalIncomes - TotalExpenses;
+        }
+
+        // =========================
+        // PRZEGLĄD
+        // =========================
+        private void BuildOverview()
+        {
+            OverviewTopExpenses.Clear();
+            OverviewTopIncomes.Clear();
+            Trend.Clear();
+
+            // Top wydatki / przychody (po kwocie)
+            var topExp = Rows
+                .Where(r => r.Type == "Wydatek")
+                .OrderByDescending(r => Math.Abs(r.Amount))
+                .Take(8)
+                .Select(r => new TxLine
+                {
+                    Date = r.Date,
+                    Category = r.Category,
+                    Description = "",
+                    Amount = Math.Abs(r.Amount)
+                });
+
+            foreach (var x in topExp) OverviewTopExpenses.Add(x);
+
+            var topInc = Rows
+                .Where(r => r.Type == "Przychód")
+                .OrderByDescending(r => Math.Abs(r.Amount))
+                .Take(8)
+                .Select(r => new TxLine
+                {
+                    Date = r.Date,
+                    Category = r.Category,
+                    Description = "",
+                    Amount = Math.Abs(r.Amount)
+                });
+
+            foreach (var x in topInc) OverviewTopIncomes.Add(x);
+
+            // Donut (w przeglądzie) – domyślnie: według kategorii dla WYBRANEGO typu
+            BuildDonutForCurrentMode();
+
+            // Trend dzienny (prosty): incomes/expenses per dzień
+            var byDay = Rows
+                .GroupBy(r => r.Date.Date)
+                .OrderBy(g => g.Key)
+                .Select(g =>
+                {
+                    var inc = g.Where(x => x.Type == "Przychód").Sum(x => Math.Abs(x.Amount));
+                    var exp = g.Where(x => x.Type == "Wydatek").Sum(x => Math.Abs(x.Amount));
+                    return new TrendPoint { Date = g.Key, Incomes = inc, Expenses = exp };
+                });
+
+            foreach (var p in byDay) Trend.Add(p);
+
+            Raise(nameof(OverviewTopExpenses));
+            Raise(nameof(OverviewTopIncomes));
+            Raise(nameof(Trend));
+        }
+
+        private void BuildDonutForCurrentMode()
+        {
+            IEnumerable<ReportsService.ReportItem> scope = Rows;
+
+            // Donut wg aktualnego SelectedTransactionType:
+            scope = SelectedTransactionType switch
+            {
+                "Wydatki" => scope.Where(r => r.Type == "Wydatek"),
+                "Przychody" => scope.Where(r => r.Type == "Przychód"),
+                "Transfery" => scope.Where(r => r.Type == "Transfer"),
+                _ => scope
+            };
+
+            var groups = scope
+                .GroupBy(r => string.IsNullOrWhiteSpace(r.Category) ? "(brak kategorii)" : r.Category)
+                .Select(g => new { Name = g.Key, Total = g.Sum(x => Math.Abs(x.Amount)) })
+                .OrderByDescending(x => x.Total)
+                .ToList();
+
+            var total = groups.Sum(x => x.Total);
+
+            ChartTotals = groups.ToDictionary(x => x.Name, x => x.Total);
+            ChartTotalAll = total;
+
+            SelectedSliceInfo = "Kliknij kategorię na wykresie";
+        }
+
+        // =========================
+        // KATEGORIE
+        // =========================
+        private void BuildCategories()
+        {
+            CategoryBreakdown.Clear();
+            ExpenseCategoriesSummary.Clear();
+            IncomeCategoriesSummary.Clear();
+            TransferCategoriesSummary.Clear();
+
+            // (A) Donut tabelka – zależnie od SelectedTransactionType
+            IEnumerable<ReportsService.ReportItem> scope = Rows;
+            scope = SelectedTransactionType switch
+            {
+                "Wydatki" => scope.Where(r => r.Type == "Wydatek"),
+                "Przychody" => scope.Where(r => r.Type == "Przychód"),
+                "Transfery" => scope.Where(r => r.Type == "Transfer"),
+                _ => scope
+            };
+
+            var groups = scope
+                .GroupBy(r => string.IsNullOrWhiteSpace(r.Category) ? "(brak kategorii)" : r.Category)
+                .Select(g => new { Name = g.Key, Total = g.Sum(x => Math.Abs(x.Amount)) })
+                .OrderByDescending(x => x.Total)
+                .ToList();
+
+            var total = groups.Sum(x => x.Total);
+
+            foreach (var g in groups)
+            {
+                CategoryBreakdown.Add(new CategoryAmount
+                {
+                    Name = g.Name,
+                    Amount = g.Total,
+                    SharePercent = total > 0 ? (double)(g.Total / total * 100m) : 0.0
+                });
+            }
+
+            // (B) Równolegle: trzy tabelki (wydatki / przychody / transfery) – ale UI może pokazywać tylko te,
+            // które odpowiadają filtrowi (to już XAML/em)
+            FillCategoryTable(ExpenseCategoriesSummary, Rows.Where(r => r.Type == "Wydatek"));
+            FillCategoryTable(IncomeCategoriesSummary, Rows.Where(r => r.Type == "Przychód"));
+            FillCategoryTable(TransferCategoriesSummary, Rows.Where(r => r.Type == "Transfer"));
+
+            Raise(nameof(CategoryBreakdown));
+            Raise(nameof(ExpenseCategoriesSummary));
+            Raise(nameof(IncomeCategoriesSummary));
+            Raise(nameof(TransferCategoriesSummary));
+        }
+
+        private static void FillCategoryTable(ObservableCollection<CategoryAmount> target, IEnumerable<ReportsService.ReportItem> rows)
+        {
+            target.Clear();
+
+            var groups = rows
+                .GroupBy(r => string.IsNullOrWhiteSpace(r.Category) ? "(brak kategorii)" : r.Category)
+                .Select(g => new { Name = g.Key, Total = g.Sum(x => Math.Abs(x.Amount)) })
+                .OrderByDescending(x => x.Total)
+                .ToList();
+
+            var total = groups.Sum(x => x.Total);
+
+            foreach (var g in groups)
+            {
+                target.Add(new CategoryAmount
+                {
+                    Name = g.Name,
+                    Amount = g.Total,
+                    SharePercent = total > 0 ? (double)(g.Total / total * 100m) : 0.0
+                });
+            }
+        }
+
+        // =========================
+        // BUDŻETY
+        // =========================
+        private void BuildBudgets(int uid)
+        {
+            Budgets.Clear();
+
+            // Wydatki per kategoria w wybranym okresie – to jest baza do “spent”
+            var spentByCategory = Rows
+                .Where(r => r.Type == "Wydatek")
+                .GroupBy(r => string.IsNullOrWhiteSpace(r.Category) ? "(brak kategorii)" : r.Category)
+                .ToDictionary(g => g.Key, g => g.Sum(x => Math.Abs(x.Amount)));
+
+            // BudgetsService: nie znamy 1:1 mapowania budżetu->kategoria w Twoim modelu,
+            // więc robimy bezpiecznie:
+            // - jeżeli BudgetSummary ma Name odpowiadający nazwie kategorii – zadziała “jak złoto”
+            // - jeżeli nie – dalej pokazujemy Planned/Spent z BudgetSummary (jeśli jest)
             try
             {
-                if (uid <= 0) return;
+                var raw = BudgetService.GetBudgetsWithSummary(uid) ?? new List<BudgetService.BudgetSummary>();
 
-                if (BudgetsSummary.Count == 0)
+                foreach (var b in raw)
                 {
-                    try
+                    decimal planned = b.PlannedAmount;
+                    decimal spent = b.Spent;
+
+                    // jeśli umiemy policzyć “spent w okresie” po nazwie:
+                    if (!string.IsNullOrWhiteSpace(b.Name) && spentByCategory.TryGetValue(b.Name, out var inPeriod))
+                        spent = inPeriod;
+
+                    Budgets.Add(new BudgetRow
                     {
-                        var budgets = BudgetService.GetBudgetsWithSummary(uid) ?? new List<BudgetService.BudgetSummary>();
-                        foreach (var b in budgets)
-                            BudgetsSummary.Add(b);
-                    }
-                    catch (Exception ex)
-                    {
-                        System.Diagnostics.Debug.WriteLine("FillMissingFromDatabase Budgets error: " + ex.Message);
-                    }
+                        Id = b.Id,
+                        Name = b.Name ?? "(budżet)",
+                        Planned = planned,
+                        Spent = spent
+                    });
                 }
+            }
+            catch
+            {
+                // jeśli budżety nie działają – nie wysypujemy raportów
+            }
 
-                if (GoalsList.Count == 0)
+            BudgetsOkCount = Budgets.Count(b => !b.IsOver);
+            BudgetsOverCount = Budgets.Count(b => b.IsOver);
+
+            Raise(nameof(Budgets));
+        }
+
+        // =========================
+        // KREDYTY
+        // =========================
+        private void BuildLoans(int uid)
+        {
+            Loans.Clear();
+
+            try
+            {
+                var loans = DatabaseService.GetLoans(uid) ?? new List<LoanModel>();
+
+                foreach (var l in loans)
                 {
-                    try
+                    var monthly = LoansService.CalculateMonthlyPayment(l.Principal, l.InterestRate, l.TermMonths);
+
+                    // Paid/Overpaid/Remaining – jeśli masz tabelę operacji kredytu:
+                    // tutaj wstaw agregację po okresie (FromDate..ToDate).
+                    // Na ten moment: zostawiamy 0 bezpiecznie, żeby UI działał i nie kłamał.
+                    Loans.Add(new LoanRow
                     {
-                        var envGoals = DatabaseService.GetEnvelopeGoals(uid);
-                        if (envGoals != null)
+                        Id = l.Id,
+                        Name = l.Name ?? "Kredyt",
+                        Principal = l.Principal,
+                        InterestRate = l.InterestRate,
+                        TermMonths = l.TermMonths,
+                        EstimatedMonthlyPayment = monthly,
+                        PaidInPeriod = 0m,
+                        OverpaidInPeriod = 0m,
+                        RemainingToPay = 0m
+                    });
+                }
+            }
+            catch
+            {
+                // cicho
+            }
+
+            Raise(nameof(Loans));
+        }
+
+        // =========================
+        // CELE
+        // =========================
+        private void BuildGoals(int uid)
+        {
+            Goals.Clear();
+
+            try
+            {
+                // Prefer DB (koperty cele) – jest u Ciebie używane w innych miejscach
+                var envGoals = DatabaseService.GetEnvelopeGoals(uid);
+
+                if (envGoals != null)
+                {
+                    var periodLenDays = Math.Max(1, (ToDate.Date - FromDate.Date).Days + 1);
+
+                    foreach (var g in envGoals)
+                    {
+                        var row = new GoalRow
                         {
-                            foreach (var g in envGoals)
-                            {
-                                try
-                                {
-                                    var vm = new GoalVm
-                                    {
-                                        EnvelopeId = g.EnvelopeId,
-                                        Name = g.Name ?? string.Empty,
-                                        GoalTitle = (g.GoalText as string) ?? string.Empty,
-                                        TargetAmount = g.Target,
-                                        CurrentAmount = g.Allocated,
-                                        DueDate = g.Deadline,
-                                        Description = g.GoalText as string ?? string.Empty
-                                    };
-                                    GoalsList.Add(vm);
-                                }
-                                catch (Exception ex)
-                                {
-                                    System.Diagnostics.Debug.WriteLine("FillMissingFromDatabase Goals item error: " + ex.Message);
-                                }
-                            }
-                        }
+                            Name = g.Name ?? "Cel",
+                            Target = g.Target,
+                            Current = g.Allocated,
+                            DueDate = g.Deadline
+                        };
+
+                        // „ile w kolejnym okresie”
+                        // jeżeli cel nie dowieziony: rozkładamy brakującą kwotę na kolejny okres
+                        row.NeededNextPeriod = row.Missing <= 0 ? 0 : (row.Missing / periodLenDays * periodLenDays);
+
+                        Goals.Add(row);
                     }
-                    catch (Exception ex)
-                    {
-                        System.Diagnostics.Debug.WriteLine("FillMissingFromDatabase Goals error: " + ex.Message);
-                    }
-                }
-
-                if (LoansViewList.Count == 0)
-                {
-                    try
-                    {
-                        var loans = DatabaseService.GetLoans(uid) ?? new List<LoanModel>();
-                        foreach (var l in loans)
-                        {
-                            var monthly = LoansService.CalculateMonthlyPayment(l.Principal, l.InterestRate, l.TermMonths);
-                            string nextInfo = monthly.ToString("N2", CultureInfo.CurrentCulture) + " zł";
-                            try
-                            {
-                                var today = DateTime.Today;
-                                DateTime nextDate;
-                                if (l.PaymentDay <= 0)
-                                    nextDate = l.StartDate.AddMonths(1);
-                                else
-                                {
-                                    int daysInThisMonth = DateTime.DaysInMonth(today.Year, today.Month);
-                                    int day = Math.Min(l.PaymentDay, daysInThisMonth);
-                                    var candidate = new DateTime(today.Year, today.Month, day);
-                                    if (candidate <= today)
-                                    {
-                                        var nextMonth = new DateTime(today.Year, today.Month, 1).AddMonths(1);
-                                        day = Math.Min(l.PaymentDay, DateTime.DaysInMonth(nextMonth.Year, nextMonth.Month));
-                                        candidate = new DateTime(nextMonth.Year, nextMonth.Month, day);
-                                    }
-                                    nextDate = candidate;
-                                }
-                                nextInfo += " · " + nextDate.ToString("dd.MM.yyyy");
-                            }
-                            catch { }
-
-                            LoansViewList.Add(new ReportsLoanVm
-                            {
-                                Id = l.Id,
-                                Name = l.Name,
-                                Principal = l.Principal,
-                                InterestRate = l.InterestRate,
-                                TermMonths = l.TermMonths,
-                                MonthlyPaymentStr = monthly.ToString("N2", CultureInfo.CurrentCulture) + " zł",
-                                NextPaymentInfo = nextInfo
-                            });
-                        }
-                    }
-                    catch (Exception ex)
-                    {
-                        System.Diagnostics.Debug.WriteLine("FillMissingFromDatabase Loans error: " + ex.Message);
-                    }
-                }
-
-                // Ensure Envelopes (filter) is populated
-                try
-                {
-                    var envs = DatabaseService.GetEnvelopesNames(uid) ?? new List<string>();
-                    Envelopes.Clear();
-                    Envelopes.Add("Wszystkie koperty");
-                    foreach (var e in envs)
-                        Envelopes.Add(e);
-                }
-                catch (Exception ex)
-                {
-                    System.Diagnostics.Debug.WriteLine("FillMissingFromDatabase Envelopes error: " + ex.Message);
-                }
-
-                // Ensure Categories & Accounts
-                try
-                {
-                    var cats = DatabaseService.GetCategoriesByUser(uid) ?? new List<string>();
-                    Categories.Clear();
-                    Categories.Add("Wszystkie kategorie");
-                    foreach (var c in cats)
-                        Categories.Add(c);
-                }
-                catch (Exception ex)
-                {
-                    System.Diagnostics.Debug.WriteLine("FillMissingFromDatabase Categories error: " + ex.Message);
-                }
-
-                try
-                {
-                    BankAccounts.Clear();
-                    BankAccounts.Add(new BankAccountModel { Id = 0, UserId = uid, AccountName = "Wszystkie konta bankowe", BankName = "" });
-                    foreach (var a in DatabaseService.GetAccounts(uid) ?? new List<BankAccountModel>())
-                        BankAccounts.Add(a);
-                }
-                catch (Exception ex)
-                {
-                    System.Diagnostics.Debug.WriteLine("FillMissingFromDatabase Accounts error: " + ex.Message);
                 }
             }
-            catch (Exception ex)
+            catch
             {
-                System.Diagnostics.Debug.WriteLine("FillMissingFromDatabase general error: " + ex.Message);
+                // cicho
             }
+
+            Raise(nameof(Goals));
         }
 
-        private void SavePreset()
+        // =========================
+        // INWESTYCJE (placeholder)
+        // =========================
+        private void BuildInvestments(int uid)
         {
-            MessageBox.Show($"Zapisano preset: {SelectedTemplate}",
-                "Informacja", MessageBoxButton.OK, MessageBoxImage.Information);
+            Investments.Clear();
+
+            // Tu podepniesz źródło danych:
+            // - tabela Investments / holdings / wartości dzienne
+            // - albo integracja z API
+            // VM jest gotowy, UI nie wybuchnie – po prostu będzie pusto.
+
+            Raise(nameof(Investments));
         }
 
-        private void ExportCsv()
+        // =========================
+        // SYMULACJA: planowane transakcje w przyszłość (długość = wybrany okres)
+        // =========================
+        private void BuildPlannedSimulation(int uid)
         {
+            PlannedSim.Clear();
+            SimBalanceDelta = 0m;
+
+            var periodLenDays = Math.Max(1, (ToDate.Date - FromDate.Date).Days + 1);
+            var simFrom = ToDate.Date.AddDays(1);
+            var simTo = simFrom.AddDays(periodLenDays - 1);
+
+            // Jeśli masz w DB IsPlanned w Expenses/Incomes – to pobieramy z SQL bezpośrednio.
+            // Filtry: SelectedTransactionType + SelectedCategory.
             try
             {
-                var path = Path.Combine(
-                    Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory),
-                    "report_export.csv");
+                using var con = DatabaseService.GetConnection();
+                using var cmd = con.CreateCommand();
 
-                var sb = new StringBuilder();
-                sb.AppendLine("Category,Amount,SharePercent");
-                foreach (var d in Details)
-                    sb.AppendLine($"{d.Name},{d.Amount:N2},{d.SharePercent:N1}");
+                // Budujemy query warunkowo wg filtra typu:
+                var parts = new List<string>();
 
-                File.WriteAllText(path, sb.ToString(), Encoding.UTF8);
-                MessageBox.Show($"Eksport CSV zapisano na pulpicie: {path}",
-                    "Eksport", MessageBoxButton.OK, MessageBoxImage.Information);
+                bool wantExpenses = SelectedTransactionType == "Wydatki" || SelectedTransactionType == "Wszystko";
+                bool wantIncomes = SelectedTransactionType == "Przychody" || SelectedTransactionType == "Wszystko";
+
+                if (wantExpenses)
+                {
+                    parts.Add(@"
+SELECT e.Date as TxDate, 'Wydatek' as TxType, COALESCE(e.Description,'') as TxDesc, (e.Amount * -1) as Amount, COALESCE(c.Name,'(brak kategorii)') as CategoryName
+FROM Expenses e
+LEFT JOIN Categories c ON c.Id = e.CategoryId
+WHERE e.UserId=@u
+  AND IFNULL(e.IsPlanned,0)=1
+  AND e.Date>=@from AND e.Date<=@to
+");
+                }
+
+                if (wantIncomes)
+                {
+                    parts.Add(@"
+SELECT i.Date as TxDate, 'Przychód' as TxType, COALESCE(i.Description,'') as TxDesc, (i.Amount) as Amount, COALESCE(c.Name,'(brak kategorii)') as CategoryName
+FROM Incomes i
+LEFT JOIN Categories c ON c.Id = i.CategoryId
+WHERE i.UserId=@u
+  AND IFNULL(i.IsPlanned,0)=1
+  AND i.Date>=@from AND i.Date<=@to
+");
+                }
+
+                if (parts.Count == 0)
+                {
+                    Raise(nameof(PlannedSim));
+                    return;
+                }
+
+                var sql = $@"
+SELECT * FROM (
+{string.Join("\nUNION ALL\n", parts)}
+) t
+WHERE 1=1
+";
+
+                if (!string.IsNullOrWhiteSpace(SelectedCategory) && SelectedCategory != "Wszystkie kategorie")
+                    sql += " AND t.CategoryName = @cat";
+
+                sql += " ORDER BY t.TxDate ASC;";
+
+                cmd.CommandText = sql;
+                cmd.Parameters.AddWithValue("@u", uid);
+                cmd.Parameters.AddWithValue("@from", simFrom.ToString("yyyy-MM-dd"));
+                cmd.Parameters.AddWithValue("@to", simTo.ToString("yyyy-MM-dd"));
+                if (!string.IsNullOrWhiteSpace(SelectedCategory) && SelectedCategory != "Wszystkie kategorie")
+                    cmd.Parameters.AddWithValue("@cat", SelectedCategory);
+
+                using var r = cmd.ExecuteReader();
+                while (r.Read())
+                {
+                    var d = DateTime.Parse(r["TxDate"].ToString() ?? simFrom.ToString("yyyy-MM-dd"));
+                    var type = r["TxType"]?.ToString() ?? "";
+                    var desc = r["TxDesc"]?.ToString() ?? "";
+                    var amount = Convert.ToDecimal(r["Amount"]);
+
+                    PlannedSim.Add(new PlannedRow
+                    {
+                        Date = d,
+                        Type = type,
+                        Description = desc,
+                        Amount = amount
+                    });
+
+                    // delta salda: przychód +, wydatek -
+                    SimBalanceDelta += amount;
+                }
             }
-            catch (Exception ex)
+            catch
             {
-                MessageBox.Show($"Błąd eksportu CSV: {ex.Message}",
-                    "Błąd", MessageBoxButton.OK, MessageBoxImage.Error);
+                // cicho
             }
+
+            Raise(nameof(PlannedSim));
         }
 
-        private void ExportExcel()
-        {
-            try
-            {
-                var path = Path.Combine(
-                    Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory),
-                    "report_export.xlsx");
-
-                var sb = new StringBuilder();
-                sb.AppendLine("Category\tAmount\tSharePercent");
-                foreach (var d in Details)
-                    sb.AppendLine($"{d.Name}\t{d.Amount:N2}\t{d.SharePercent:N1}");
-
-                File.WriteAllText(path, sb.ToString(), Encoding.UTF8);
-                MessageBox.Show($"Eksport Excel (TSV) zapisano na pulpicie: {path}",
-                    "Eksport", MessageBoxButton.OK, MessageBoxImage.Information);
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show($"Błąd eksportu Excel: {ex.Message}",
-                    "Błąd", MessageBoxButton.OK, MessageBoxImage.Error);
-            }
-        }
-
+        // =========================
+        // PDF export – docelowo ma brać dane z każdej zakładki zgodnie z filtrami
+        // =========================
         private void ExportPdf()
         {
             try
             {
-                var vm = this;
-
-                var brushes = new System.Windows.Media.Brush[]
-                {
-            System.Windows.Media.Brushes.DodgerBlue,
-            System.Windows.Media.Brushes.MediumSeaGreen,
-            System.Windows.Media.Brushes.Orange,
-            System.Windows.Media.Brushes.CadetBlue,
-            System.Windows.Media.Brushes.MediumPurple
-                };
-
-                // Kontrolka eksportowa – tworzona tylko do renderu PNG (nie może mieć Parent)
-                var exportControl = new Finly.Views.Controls.ReportDonutWithLegendExportControl();
-                exportControl.Build(vm, brushes, maxItems: 9);
-
-                // To jest "ramka" na wykres w raporcie – FIT zrobi skalowanie, więc nic nie utnie.
-                // Możesz to potem dopasować, ale na start będzie lepiej niż obecne cięcie.
-                byte[] png = UiRenderHelper.RenderToPngFit(exportControl, width: 900, height: 260, dpi: 192);
-
-                var path = PdfExportService.ExportReportsPdf(vm, png);
+                var path = PdfExportService.ExportReportsPdf(this, null);
                 ToastService.Success($"Raport PDF zapisano na pulpicie:\n{path}");
             }
             catch (Exception ex)
@@ -1391,351 +1007,5 @@ namespace Finly.ViewModels
             }
         }
 
-
-
-
-
-        // ======= pomocnicze: budowanie podsumowań kategorii z Rows =======
-        private void RebuildCategorySummariesFromRows()
-        {
-            ExpenseCategoriesSummary.Clear();
-            IncomeCategoriesSummary.Clear();
-
-            if (Rows == null || Rows.Count == 0)
-                return;
-
-            // Wydatki według kategorii
-            var expenseGroups = Rows
-                .Where(r => r.Amount < 0m)
-                .GroupBy(r => string.IsNullOrWhiteSpace(r.Category) ? "(brak kategorii)" : r.Category);
-
-            decimal totalExpenses = expenseGroups.Sum(g => -g.Sum(x => x.Amount));
-
-            foreach (var g in expenseGroups.OrderByDescending(g => -g.Sum(x => x.Amount)))
-            {
-                var sum = -g.Sum(x => x.Amount);
-                var share = totalExpenses > 0m ? (double)(sum / totalExpenses * 100m) : 0.0;
-
-                ExpenseCategoriesSummary.Add(new CategoryAmount
-                {
-                    Name = g.Key,
-                    Amount = sum,
-                    SharePercent = share
-                });
-            }
-
-            // Przychody według kategorii
-            var incomeGroups = Rows
-                .Where(r => r.Amount > 0m)
-                .GroupBy(r => string.IsNullOrWhiteSpace(r.Category) ? "(brak kategorii)" : r.Category);
-
-            decimal totalIncomes = incomeGroups.Sum(g => g.Sum(x => x.Amount));
-
-            foreach (var g in incomeGroups.OrderByDescending(g => g.Sum(x => x.Amount)))
-            {
-                var sum = g.Sum(x => x.Amount);
-                var share = totalIncomes > 0m ? (double)(sum / totalIncomes * 100m) : 0.0;
-
-                IncomeCategoriesSummary.Add(new CategoryAmount
-                {
-                    Name = g.Key,
-                    Amount = sum,
-                    SharePercent = share
-                });
-            }
-
-            Raise(nameof(ExpenseCategoriesSummary));
-            Raise(nameof(IncomeCategoriesSummary));
-        }
-
-        // ====== poprzedni okres o tej samej długości ======
-        private (DateTime PrevFrom, DateTime PrevTo) GetPreviousPeriod(DateTime currentFrom, DateTime currentTo)
-        {
-            var from = currentFrom.Date;
-            var to = currentTo.Date;
-
-            if (to < from)
-            {
-                var tmp = from;
-                from = to;
-                to = tmp;
-            }
-
-            int length = (to - from).Days + 1;
-            var prevTo = from.AddDays(-1);
-            var prevFrom = prevTo.AddDays(-length + 1);
-            return (prevFrom, prevTo);
-        }
-
-        // ====== filtrowanie wydatków do wykresu ======
-        private DataTable GetFilteredExpensesDataTable(int uid, DateTime from, DateTime to, int? accountId)
-        {
-            DataTable dt = DatabaseService.GetExpenses(uid, from, to, null, null, accountId);
-
-            IEnumerable<DataRow> rows = dt.AsEnumerable();
-
-            if (SelectedSource == SourceType.FreeCash)
-            {
-                rows = rows.Where(r => r.IsNull("AccountId"));
-            }
-            else if (SelectedSource == SourceType.SavedCash)
-            {
-                rows = rows.Where(r => r.IsNull("AccountId"));
-            }
-            else if (SelectedSource == SourceType.Envelopes)
-            {
-                if (!string.IsNullOrWhiteSpace(SelectedEnvelope) &&
-                    SelectedEnvelope != "Wszystkie koperty")
-                {
-                    rows = rows.Where(r =>
-                        (r.Field<string>("Description") ?? "")
-                        .IndexOf(SelectedEnvelope, StringComparison.OrdinalIgnoreCase) >= 0);
-                }
-                else
-                {
-                    rows = rows.Where(r => r.IsNull("AccountId"));
-                }
-            }
-
-            return rows.CopyToDataTableOrEmpty();
-        }
-
-        private string FormatPercentChange(decimal previous, decimal current)
-        {
-            if (previous == 0m)
-            {
-                if (current == 0m) return "0% (bez zmian)";
-                return "n/d (brak danych)";
-            }
-
-            var diffPct = (current - previous) / previous * 100m;
-            var sign = diffPct > 0 ? "+" : "";
-            return sign + diffPct.ToString("N1", CultureInfo.CurrentCulture) + " %";
-        }
-
-        // ====== Zakładki raportów (indeks) ======
-        private int _selectedTabIndex = 0;
-        public int SelectedTabIndex
-        {
-            get => _selectedTabIndex;
-            set
-            {
-                if (_selectedTabIndex != value)
-                {
-                    _selectedTabIndex = value;
-                    Raise(nameof(SelectedTabIndex));
-                    Raise(nameof(IsOverviewTab));
-                    Raise(nameof(IsCategoriesTab));
-                    // Removed direct Refresh() call to avoid exceptions during tab switch.
-                }
-            }
-        }
-
-        public bool IsOverviewTab => SelectedTabIndex == 0;
-        public bool IsCategoriesTab => SelectedTabIndex == 1;
-
-        // NEW: pretty view model for loans shown in Reports page
-        public class ReportsLoanVm
-        {
-            public int Id { get; set; }
-            public string Name { get; set; } = "";
-            public decimal Principal { get; set; }
-            public decimal InterestRate { get; set; }
-            public int TermMonths { get; set; }
-            public string PrincipalStr => Principal.ToString("N2", CultureInfo.CurrentCulture) + " zł";
-            public string InterestRateStr => InterestRate.ToString("N2", CultureInfo.CurrentCulture) + " %";
-            public string MonthlyPaymentStr { get; set; } = "0,00 zł";
-            public string NextPaymentInfo { get; set; } = "-";
-        }
-
-        public ObservableCollection<ReportsLoanVm> LoansViewList { get; } = new();
-
-        // NEW: fallback demo data if some DB collections are empty
-        private void EnsureDemoData(int uid)
-        {
-            // Basic demo data for empty setup
-            try
-            {
-                // Budgets
-                if (BudgetsSummary.Count == 0)
-                {
-                    BudgetsSummary.Add(new BudgetService.BudgetSummary
-                    {
-                        Id = -1,
-                        Name = "Domowy budżet",
-                        Type = "Miesięczny",
-                        StartDate = DateTime.Today.AddMonths(-1),
-                        EndDate = DateTime.Today.AddMonths(1),
-                        PlannedAmount = 5000m,
-                        Spent = 3120.45m,
-                        IncomesForBudget = 0m
-                    });
-                }
-
-                // Goals
-                if (GoalsList.Count == 0)
-                {
-                    GoalsList.Add(new GoalVm { EnvelopeId = -1, Name = "Wakacje", GoalTitle = "Wakacje", TargetAmount = 6000m, CurrentAmount = 1500m, DueDate = DateTime.Today.AddMonths(12), Description = "Demo" });
-                }
-
-                // Loans view
-                if (LoansViewList.Count == 0)
-                {
-                    LoansViewList.Add(new ReportsLoanVm { Id = -1, Name = "Kredyt demo", Principal = 250000m, InterestRate = 3.6m, TermMonths = 360, MonthlyPaymentStr = LoansService.CalculateMonthlyPayment(250000m, 3.6m, 360).ToString("N2", CultureInfo.CurrentCulture) + " zł", NextPaymentInfo = DateTime.Today.AddDays(14).ToString("dd.MM.yyyy") });
-                }
-            }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine("EnsureDemoData error: " + ex.Message);
-            }
-        }
-
-        // Public explicit loaders for individual tabs so ReportsPage can call them on demand
-        public void LoadBudgets()
-        {
-            try
-            {
-                var uid = UserService.GetCurrentUserId();
-                BudgetsSummary.Clear();
-                var budgets = BudgetService.GetBudgetsWithSummary(uid) ?? new List<BudgetService.BudgetSummary>();
-                foreach (var b in budgets)
-                    BudgetsSummary.Add(b);
-                Raise(nameof(BudgetsSummary));
-            }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine("LoadBudgets error: " + ex.Message);
-            }
-        }
-
-        public void LoadGoals()
-        {
-            try
-            {
-                var uid = UserService.GetCurrentUserId();
-                GoalsList.Clear();
-
-                try
-                {
-                    // Load directly from DB so we don't miss goals stored in Note/GoalText
-                    var envGoals = DatabaseService.GetEnvelopeGoals(uid) ?? new List<DatabaseService.EnvelopeGoalDto>();
-
-                    // also refresh shared cache
-                    GoalsService.Goals.Clear();
-
-                    foreach (var g in envGoals)
-                    {
-                        try
-                        {
-                            var raw = (g.GoalText as string) ?? string.Empty;
-                            var goalTitle = string.Empty;
-                            var descLines = new List<string>();
-                            var lines = raw.Split(new[] { '\n' }, StringSplitOptions.RemoveEmptyEntries);
-                            foreach (var rawLine in lines)
-                            {
-                                var line = rawLine.Trim();
-                                if (line.StartsWith("Cel:", StringComparison.OrdinalIgnoreCase))
-                                    goalTitle = line.Substring(4).Trim();
-                                else if (line.StartsWith("Termin:", StringComparison.OrdinalIgnoreCase))
-                                    continue;
-                                else
-                                    descLines.Add(line);
-                            }
-                            if (string.IsNullOrWhiteSpace(goalTitle)) goalTitle = g.Name ?? string.Empty;
-
-                            var vm = new GoalVm
-                            {
-                                EnvelopeId = g.EnvelopeId,
-                                Name = g.Name ?? string.Empty,
-                                GoalTitle = goalTitle,
-                                TargetAmount = g.Target,
-                                CurrentAmount = g.Allocated,
-                                DueDate = g.Deadline,
-                                Description = string.Join(Environment.NewLine, descLines)
-                            };
-
-                            GoalsList.Add(vm);
-                            GoalsService.Goals.Add(vm);
-                        }
-                        catch (Exception ex)
-                        {
-                            System.Diagnostics.Debug.WriteLine("LoadGoals item error: " + ex.Message);
-                        }
-                    }
-                }
-                catch (Exception ex)
-                {
-                    System.Diagnostics.Debug.WriteLine("LoadGoals error: " + ex.Message);
-                }
-
-                Raise(nameof(GoalsList));
-            }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine("LoadGoals error: " + ex.Message);
-            }
-        }
-
-        public void LoadEnvelopes()
-        {
-            try
-            {
-                var uid = UserService.GetCurrentUserId();
-                Envelopes.Clear();
-                Envelopes.Add("Wszystkie koperty");
-                var envs = DatabaseService.GetEnvelopesNames(uid) ?? new List<string>();
-                foreach (var e in envs)
-                    Envelopes.Add(e);
-                Raise(nameof(Envelopes));
-            }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine("LoadEnvelopes error: " + ex.Message);
-            }
-        }
-
-        public void LoadCategoryStats()
-        {
-            try
-            {
-                var uid = UserService.GetCurrentUserId();
-                // rebuild expense/income summaries using current Rows if present, otherwise read fresh rows
-                if (Rows == null || Rows.Count == 0)
-                {
-                    // load unified rows for current period
-                    var currentRows = ReportsService.LoadReport(
-                        uid,
-                        GetSourceString(),
-                        SelectedCategory,
-                        SelectedTransactionType,
-                        SelectedMoneyPlace,
-                        FromDate,
-                        ToDate
-                    ).ToList();
-
-                    Rows.Clear();
-                    foreach (var row in currentRows)
-                        Rows.Add(row);
-                }
-
-                RebuildCategorySummariesFromRows();
-                Raise(nameof(ExpenseCategoriesSummary));
-                Raise(nameof(IncomeCategoriesSummary));
-            }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine("LoadCategoryStats error: " + ex.Message);
-            }
-        }
-    }
-
-    static class DataTableExtensions
-    {
-        public static DataTable CopyToDataTableOrEmpty(this IEnumerable<DataRow> rows)
-        {
-            var list = rows.ToList();
-            if (list.Count == 0) return new DataTable();
-            return list.CopyToDataTable();
-        }
     }
 }

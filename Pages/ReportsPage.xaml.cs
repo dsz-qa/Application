@@ -1,10 +1,12 @@
-﻿using System.Windows.Controls;
-using Finly.ViewModels;
+﻿using System;
 using System.ComponentModel;
 using System.Windows;
-using Finly.Views.Controls; // add namespace for custom controls and event args
-using Finly.Services;
+using System.Windows.Controls;
+using System.Windows.Media;
 using Finly.Helpers;
+using Finly.Services;
+using Finly.ViewModels;
+using Finly.Views.Controls;
 
 namespace Finly.Pages
 {
@@ -12,113 +14,164 @@ namespace Finly.Pages
     {
         private readonly int _userId;
 
+        // zabezpieczenie przed wielokrotnym podpinaniem eventów (WPF potrafi ponownie wywołać Loaded)
+        private bool _eventsHooked;
+
         public ReportsPage()
         {
             InitializeComponent();
+            DataContext = new ReportsViewModel();
 
-            // DataContext jest ustawiony w XAML, ale na wszelki wypadek zostawiamy fallback
-            if (DataContext == null)
-                DataContext = new ReportsViewModel();
-
-            // Podpinamy zachowanie paska okresu i reagowanie na zmiany w ViewModelu
-            Loaded += (_, __) =>
-            {
-                if (DataContext is ReportsViewModel vm && PeriodBar != null)
-                {
-                    // Przy zmianie zakresu / kliknięciu "Szukaj" – odśwież raporty
-                    PeriodBar.SearchClicked += (s, e) =>
-                    {
-                        if (vm.RefreshCommand.CanExecute(null))
-                            vm.RefreshCommand.Execute(null);
-                    };
-
-                    PeriodBar.RangeChanged += (s, e) =>
-                    {
-                        if (vm.RefreshCommand.CanExecute(null))
-                            vm.RefreshCommand.Execute(null);
-                    };
-
-                    // Wyczyść filtry + odśwież
-                    PeriodBar.ClearClicked += (s, e) =>
-                    {
-                        vm.ResetFilters();
-                        if (vm.RefreshCommand.CanExecute(null))
-                            vm.RefreshCommand.Execute(null);
-                    };
-
-                    vm.PropertyChanged += Vm_PropertyChanged;
-
-                    // Pierwsze odświeżenie po załadowaniu strony
-                    if (vm.RefreshCommand.CanExecute(null))
-                        vm.RefreshCommand.Execute(null);
-                }
-            };
-
-            Unloaded += (_, __) =>
-            {
-                if (DataContext is ReportsViewModel vm)
-                {
-                    vm.PropertyChanged -= Vm_PropertyChanged;
-                }
-            };
+            Loaded += ReportsPage_Loaded;
+            Unloaded += ReportsPage_Unloaded;
         }
 
         public ReportsPage(int userId) : this()
         {
             _userId = userId;
-            // W przyszłości możesz przekazywać userId do VM, jeśli będzie potrzeba.
+        }
+
+        private void ReportsPage_Loaded(object sender, RoutedEventArgs e)
+        {
+            // kluczowe: nie podpinamy drugi raz
+            if (_eventsHooked) return;
+            _eventsHooked = true;
+
+            try
+            {
+                if (DataContext is not ReportsViewModel vm)
+                    return;
+
+                // PeriodBar może być null, jeśli XAML się nie zbudował lub kontrolka nie istnieje
+                if (PeriodBar != null)
+                {
+                    PeriodBar.SearchClicked += PeriodBar_SearchClicked;
+                    PeriodBar.RangeChanged += PeriodBar_RangeChanged;
+                    PeriodBar.ClearClicked += PeriodBar_ClearClicked;
+                }
+
+                vm.PropertyChanged += Vm_PropertyChanged;
+
+                // Pierwsze odświeżenie po załadowaniu strony
+                SafeExecute(vm.RefreshCommand);
+            }
+            catch
+            {
+                // celowo: brak MessageBox – nie chcemy blokować UI w razie problemu w czasie ładowania
+            }
+        }
+
+        private void ReportsPage_Unloaded(object sender, RoutedEventArgs e)
+        {
+            if (!_eventsHooked) return;
+            _eventsHooked = false;
+
+            try
+            {
+                if (DataContext is ReportsViewModel vm)
+                    vm.PropertyChanged -= Vm_PropertyChanged;
+
+                if (PeriodBar != null)
+                {
+                    PeriodBar.SearchClicked -= PeriodBar_SearchClicked;
+                    PeriodBar.RangeChanged -= PeriodBar_RangeChanged;
+                    PeriodBar.ClearClicked -= PeriodBar_ClearClicked;
+                }
+
+                // MainChart może być null (np. XAML nie zdążył w pełni wejść)
+                if (MainChart != null)
+                    MainChart.SliceClicked -= MainChart_SliceClicked;
+            }
+            catch
+            {
+                // bez wyjątków przy odpinaniu
+            }
+        }
+
+        private void PeriodBar_SearchClicked(object? sender, EventArgs e)
+        {
+            try
+            {
+                if (DataContext is ReportsViewModel vm)
+                    SafeExecute(vm.RefreshCommand);
+            }
+            catch { }
+        }
+
+        private void PeriodBar_RangeChanged(object? sender, EventArgs e)
+        {
+            try
+            {
+                if (DataContext is ReportsViewModel vm)
+                    SafeExecute(vm.RefreshCommand);
+            }
+            catch { }
+        }
+
+        private void PeriodBar_ClearClicked(object? sender, EventArgs e)
+        {
+            try
+            {
+                if (DataContext is not ReportsViewModel vm)
+                    return;
+
+                vm.ResetFilters();
+                SafeExecute(vm.RefreshCommand);
+            }
+            catch { }
         }
 
         private void Vm_PropertyChanged(object? sender, PropertyChangedEventArgs e)
         {
-            if (sender is ReportsViewModel vm)
+            try
             {
-                if (e.PropertyName == nameof(vm.ChartTotals) || e.PropertyName == nameof(vm.ChartTotalAll))
-                {
-                    // Rysowanie wykresu donut na podstawie słownika ChartTotals
-                    try
-                    {
-                        var dict = vm.ChartTotals ?? new System.Collections.Generic.Dictionary<string, decimal>();
-                        var brushes = new System.Windows.Media.Brush[]
-                        {
-                            (System.Windows.Media.Brush)FindResource("Accent"),
-                            System.Windows.Media.Brushes.MediumSeaGreen,
-                            System.Windows.Media.Brushes.Orange,
-                            System.Windows.Media.Brushes.CadetBlue,
-                            System.Windows.Media.Brushes.MediumPurple
-                        };
+                if (sender is not ReportsViewModel vm)
+                    return;
 
-                        MainChart.Draw(dict, vm.ChartTotalAll, brushes);
-                        MainChart.SliceClicked -= MainChart_SliceClicked;
-                        MainChart.SliceClicked += MainChart_SliceClicked;
-                    }
-                    catch
-                    {
-                        // cicho – nie chcemy wysypywać się na braku zasobów itp.
-                    }
-                }
+                // UWAGA: MainChart może być null
+                if (MainChart == null)
+                    return;
+
+                if (e.PropertyName != nameof(vm.ChartTotals) &&
+                    e.PropertyName != nameof(vm.ChartTotalAll))
+                    return;
+
+                var dict = vm.ChartTotals ?? new System.Collections.Generic.Dictionary<string, decimal>();
+
+                // Brush "Accent" może nie istnieć (FindResource rzuca wyjątek). Używamy TryFindResource.
+                var accent = TryFindResource("Accent") as Brush ?? Brushes.DodgerBlue;
+
+                var brushes = new Brush[]
+                {
+                    accent,
+                    Brushes.MediumSeaGreen,
+                    Brushes.Orange,
+                    Brushes.CadetBlue,
+                    Brushes.MediumPurple
+                };
+
+                // Draw może rzucić wyjątek np. przy pustych danych/niegotowym layout
+                MainChart.Draw(dict, vm.ChartTotalAll, brushes);
+
+                // podpinamy handler raz (odpinamy i podpinamy, ale bez wyjątku)
+                MainChart.SliceClicked -= MainChart_SliceClicked;
+                MainChart.SliceClicked += MainChart_SliceClicked;
+            }
+            catch
+            {
+                // zero wyjątków z VM PropertyChanged, bo inaczej UI może się wysypać
             }
         }
 
         private void MainChart_SliceClicked(object? sender, SliceClickedEventArgs e)
         {
-            if (DataContext is ReportsViewModel vm)
+            try
             {
-                // opis w środku dona zamiast drilldownu
-                vm.UpdateSelectedSliceInfo(e.Name);
-                // jeśli chcesz także drilldown w tabeli:
-                // vm.ShowDrilldown(e.Name);
+                if (DataContext is ReportsViewModel vm)
+                    vm.UpdateSelectedSliceInfo(e?.Name ?? string.Empty);
             }
+            catch { }
         }
-
-        // BackButton w XAML ma Command={Binding BackCommand}, więc ten handler nie jest już używany,
-        // ale zostawiamy go na wypadek gdybyś kiedyś podpięła Click w XAML.
-        private void BackButton_Click(object sender, RoutedEventArgs e)
-        {
-            if (DataContext is ReportsViewModel vm)
-                vm.BackToSummary();
-        }
-
 
         private void ExportButton_Click(object sender, RoutedEventArgs e)
         {
@@ -127,33 +180,33 @@ namespace Finly.Pages
 
             try
             {
-                var brushes = new System.Windows.Media.Brush[]
+                var accent = TryFindResource("Accent") as Brush ?? Brushes.DodgerBlue;
+
+                var brushes = new Brush[]
                 {
-            (System.Windows.Media.Brush)FindResource("Accent"),
-            System.Windows.Media.Brushes.MediumSeaGreen,
-            System.Windows.Media.Brushes.Orange,
-            System.Windows.Media.Brushes.CadetBlue,
-            System.Windows.Media.Brushes.MediumPurple
+                    accent,
+                    Brushes.MediumSeaGreen,
+                    Brushes.Orange,
+                    Brushes.CadetBlue,
+                    Brushes.MediumPurple
                 };
 
                 const int w = 900;
                 const int h = 360;
 
-                var export = new Finly.Views.Controls.ReportDonutWithLegendExportControl
+                var export = new ReportDonutWithLegendExportControl
                 {
                     Width = w,
                     Height = h
                 };
 
-                // 1) NAJPIERW rozkład (żeby kontrolka miała wymiary)
+                // rozkład aby kontrolka miała realne wymiary
                 export.Measure(new Size(w, h));
                 export.Arrange(new Rect(0, 0, w, h));
                 export.UpdateLayout();
 
-                // 2) DOPIERO TERAZ rysowanie (bo DonutChartControl ma już rozmiar)
                 export.Build(vm, brushes, maxItems: 9);
 
-                // 3) I jeszcze raz layout po wypełnieniu legendy / rysowaniu
                 export.UpdateLayout();
 
                 var png = UiRenderHelper.RenderToPng(export, w, h, dpi: 192);
@@ -167,9 +220,17 @@ namespace Finly.Pages
             }
         }
 
-
-
-
-
+        private static void SafeExecute(System.Windows.Input.ICommand? command)
+        {
+            try
+            {
+                if (command != null && command.CanExecute(null))
+                    command.Execute(null);
+            }
+            catch
+            {
+                // nie propagujemy wyjątków z komend
+            }
+        }
     }
 }

@@ -190,7 +190,7 @@
                                        TextWrapping="Wrap"
                                        TextTrimming="CharacterEllipsis">
                                 <Run Text="Inwestycja: "/>
-                                <Run Text="{Binding Name}"/>
+                                <Run Text="{Binding Name, Mode=OneWay}"/>
                             </TextBlock>
 
                             <TextBlock FontSize="12"

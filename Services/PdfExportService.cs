@@ -6,31 +6,28 @@ using Finly.ViewModels;
 using QuestPDF.Fluent;
 using QuestPDF.Helpers;
 using QuestPDF.Infrastructure;
-using Finly.Services.SpecificPages;
 
 namespace Finly.Services
 {
     /// <summary>
-    /// Serwis odpowiedzialny za eksport pełnego raportu finansowego do PDF
-    /// z wykorzystaniem biblioteki QuestPDF.
+    /// Serwis odpowiedzialny za eksport pełnego raportu finansowego do PDF (QuestPDF).
+    /// WERSJA zgodna z aktualnym ReportsViewModel (bez: KPIList/Details/FilteredTransactions/Insights/ComparisonPeriodLabel).
     /// </summary>
     public static class PdfExportService
     {
-        /// <summary>
-        /// Generuje raport PDF na podstawie bieżącego stanu ReportsViewModel.
-        /// Zwraca pełną ścieżkę do wygenerowanego pliku.
-        /// </summary>
         public static string ExportReportsPdf(ReportsViewModel vm)
             => ExportReportsPdf(vm, null);
 
         /// <summary>
-        /// donutChartPng – obraz PNG z samego wykresu (donut). Legenda jest generowana po prawej w PDF.
+        /// donutChartPng – PNG wykresu donut (opcjonalnie).
         /// </summary>
         public static string ExportReportsPdf(ReportsViewModel vm, byte[]? donutChartPng)
         {
             var desktop = Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory);
-            var fileName = ReportsService.BuildDefaultReportFileName(vm.FromDate, vm.ToDate);
+            var fileName = BuildDefaultReportFileName(vm.FromDate, vm.ToDate);
             var path = Path.Combine(desktop, fileName);
+
+            QuestPDF.Settings.License = LicenseType.Community;
 
             var document = Document.Create(container =>
             {
@@ -52,13 +49,9 @@ namespace Finly.Services
 
                         col.Item().Text($"Okres: {vm.FromDate:dd.MM.yyyy} – {vm.ToDate:dd.MM.yyyy}");
 
-                        if (!string.IsNullOrWhiteSpace(vm.ComparisonPeriodLabel))
-                            col.Item().Text(vm.ComparisonPeriodLabel);
-
                         col.Item().Element(c => KpiSection(c, vm));
 
-                        // ===== WYKRES + LEGENDA =====
-                        // ===== WYKRES + LEGENDA =====
+                        // ===== WYKRES DONUT (opcjonalnie) =====
                         if (donutChartPng != null && donutChartPng.Length > 0)
                         {
                             col.Item().PaddingTop(6)
@@ -74,13 +67,16 @@ namespace Finly.Services
                                .Height(270)
                                .Image(donutChartPng)
                                .FitArea();
-
                         }
-
 
                         col.Item().Element(c => CategoriesSection(c, vm));
                         col.Item().Element(c => TransactionsSection(c, vm));
-                        col.Item().Element(c => InsightsSection(c, vm));
+
+                        // Opcjonalne zakładki (jeśli chcesz mieć w PDF):
+                        col.Item().Element(c => BudgetsSection(c, vm));
+                        col.Item().Element(c => LoansSection(c, vm));
+                        col.Item().Element(c => GoalsSection(c, vm));
+                        col.Item().Element(c => PlannedSection(c, vm));
                     });
 
                     page.Footer()
@@ -97,73 +93,16 @@ namespace Finly.Services
             return path;
         }
 
-        private static void LegendSection(IContainer container, ReportsViewModel vm)
-        {
-            var details = vm.Details ?? new System.Collections.ObjectModel.ObservableCollection<ReportsViewModel.CategoryAmount>();
+        // =========================
+        // Helpers
+        // =========================
 
-            var items = details
-                .OrderByDescending(x => x.Amount)
-                .Take(10) // legenda max 10 pozycji
-                .ToList();
+        private static string BuildDefaultReportFileName(DateTime from, DateTime to)
+            => $"finly-raport-{from:yyyyMMdd}-{to:yyyyMMdd}.pdf";
 
-            container.Column(col =>
-            {
-                col.Spacing(4);
-
-                col.Item().Text("Legenda").SemiBold();
-
-                if (items.Count == 0)
-                {
-                    col.Item().Text("(brak danych)").FontColor(Colors.Grey.Darken1);
-                    return;
-                }
-
-                col.Item().Table(t =>
-                {
-                    t.ColumnsDefinition(cols =>
-                    {
-                        cols.ConstantColumn(12);  // "kropka"
-                        cols.RelativeColumn(4);   // nazwa
-                        cols.RelativeColumn(2);   // kwota
-                        cols.RelativeColumn(1);   // %
-                    });
-
-                    t.Header(h =>
-                    {
-                        h.Cell().Text("");
-                        h.Cell().Text("Kategoria").SemiBold();
-                        h.Cell().AlignRight().Text("Kwota").SemiBold();
-                        h.Cell().AlignRight().Text("%").SemiBold();
-                    });
-
-                    foreach (var it in items)
-                    {
-                        // ZAMIENNIK DrawEllipse: mały zaokrąglony kwadrat jako "kropka"
-                        t.Cell().AlignMiddle().Element(e => e
-                            .Width(10)
-                            .Height(10)
-                            .Background(Colors.Grey.Darken2)
-                            .CornerRadius(5)
-                        );
-
-                        t.Cell().Text(it.Name).FontSize(10);
-                        t.Cell().AlignRight().Text(it.Amount.ToString("N2") + " zł").FontSize(10);
-                        t.Cell().AlignRight().Text(it.SharePercent.ToString("N1")).FontSize(10);
-                    }
-                });
-
-                if (details.Count > items.Count)
-                {
-                    col.Item()
-                        .PaddingTop(4)
-                        .Text($"Pozostałe kategorie: {details.Count - items.Count}")
-                        .FontSize(9)
-                        .FontColor(Colors.Grey.Darken1);
-                }
-            });
-        }
-
-        // ===== Sekcje dokumentu =====
+        // =========================
+        // Sekcje PDF
+        // =========================
 
         private static void KpiSection(IContainer container, ReportsViewModel vm)
         {
@@ -173,268 +112,305 @@ namespace Finly.Services
                     .Bold()
                     .FontSize(13);
 
-                var kpis = vm.KPIList ?? new System.Collections.ObjectModel.ObservableCollection<KeyValuePair<string, string>>();
-                if (kpis.Count == 0)
+                col.Item().Table(t =>
                 {
-                    col.Item().Text("(brak danych)").FontColor(Colors.Grey.Darken1);
-                    return;
-                }
-
-                col.Item().Table(table =>
-                {
-                    table.ColumnsDefinition(cols =>
+                    t.ColumnsDefinition(cols =>
                     {
                         cols.RelativeColumn(2);
                         cols.RelativeColumn(3);
                     });
 
-                    table.Header(header =>
-                    {
-                        header.Cell().Element(c =>
-                            c.DefaultTextStyle(x => x.SemiBold())
-                             .Padding(4)
-                             .Background(Colors.Grey.Lighten3))
-                             .Text("Nazwa");
-
-                        header.Cell().Element(c =>
-                            c.DefaultTextStyle(x => x.SemiBold())
-                             .Padding(4)
-                             .Background(Colors.Grey.Lighten3))
-                             .Text("Wartość");
-                    });
-
-                    foreach (var kv in kpis)
-                    {
-                        table.Cell().Element(c => c.Padding(4)).Text(kv.Key);
-                        table.Cell().Element(c => c.Padding(4)).Text(kv.Value);
-                    }
+                    Row(t, "Wydatki", vm.TotalExpensesStr);
+                    Row(t, "Przychody", vm.TotalIncomesStr);
+                    Row(t, "Saldo", vm.BalanceStr);
+                    Row(t, "Budżety OK", vm.BudgetsOkCount.ToString());
+                    Row(t, "Budżety przekroczone", vm.BudgetsOverCount.ToString());
+                    Row(t, "Delta salda (planowane)", vm.SimBalanceDeltaStr);
                 });
             });
+
+            static void Row(TableDescriptor t, string k, string v)
+            {
+                t.Cell().Element(c => c.Padding(4)).Text(k).SemiBold();
+                t.Cell().Element(c => c.Padding(4)).Text(v);
+            }
         }
 
         private static void CategoriesSection(IContainer container, ReportsViewModel vm)
         {
-            var details = vm.Details ?? new System.Collections.ObjectModel.ObservableCollection<ReportsViewModel.CategoryAmount>();
-
-            container.Column(col =>
-            {
-                col.Item().Text("Kategorie wydatków (ten okres)")
-                    .Bold()
-                    .FontSize(13);
-
-                if (details.Count == 0)
-                {
-                    col.Item().Text("(brak danych)").FontColor(Colors.Grey.Darken1);
-                    return;
-                }
-
-                col.Item().Table(table =>
-                {
-                    table.ColumnsDefinition(cols =>
-                    {
-                        cols.RelativeColumn(3);
-                        cols.RelativeColumn(2);
-                        cols.RelativeColumn(2);
-                    });
-
-                    table.Header(header =>
-                    {
-                        header.Cell().Element(c =>
-                            c.DefaultTextStyle(x => x.SemiBold())
-                             .Padding(4)
-                             .Background(Colors.Grey.Lighten3))
-                             .Text("Kategoria");
-
-                        header.Cell().Element(c =>
-                            c.DefaultTextStyle(x => x.SemiBold())
-                             .Padding(4)
-                             .Background(Colors.Grey.Lighten3))
-                             .Text("Kwota");
-
-                        header.Cell().Element(c =>
-                            c.DefaultTextStyle(x => x.SemiBold())
-                             .Padding(4)
-                             .Background(Colors.Grey.Lighten3))
-                             .Text("Udział %");
-                    });
-
-                    foreach (var row in details)
-                    {
-                        table.Cell().Element(c => c.Padding(4)).Text(row.Name);
-                        table.Cell().Element(c => c.Padding(4)).Text(row.Amount.ToString("N2"));
-                        table.Cell().Element(c => c.Padding(4)).Text(row.SharePercent.ToString("N1"));
-                    }
-                });
-            });
-        }
-
-        private static void TransactionsSection(IContainer container, ReportsViewModel vm)
-        {
-            var transactions = (vm.FilteredTransactions ?? new System.Collections.ObjectModel.ObservableCollection<ReportsViewModel.TransactionDto>())
-                .OrderByDescending(t => t.Date)
+            var rows = (vm.CategoryBreakdown ?? new System.Collections.ObjectModel.ObservableCollection<ReportsViewModel.CategoryAmount>())
+                .OrderByDescending(x => x.Amount)
                 .ToList();
 
             container.Column(col =>
             {
-                col.Item().Text("Transakcje (ten okres)")
+                col.Item().Text("Kategorie (wg filtra typu transakcji)")
                     .Bold()
                     .FontSize(13);
 
-                if (transactions.Count == 0)
+                if (rows.Count == 0)
                 {
                     col.Item().Text("(brak danych)").FontColor(Colors.Grey.Darken1);
                     return;
                 }
 
-                col.Item().Table(table =>
+                col.Item().Table(t =>
                 {
-                    table.ColumnsDefinition(cols =>
+                    t.ColumnsDefinition(cols =>
                     {
-                        cols.RelativeColumn(2); // data
-                        cols.RelativeColumn(3); // kategoria
-                        cols.RelativeColumn(5); // opis
-                        cols.RelativeColumn(2); // kwota
+                        cols.RelativeColumn(4);
+                        cols.RelativeColumn(2);
+                        cols.RelativeColumn(2);
                     });
 
-                    table.Header(header =>
+                    Header(t, "Kategoria", "Kwota", "Udział %");
+
+                    foreach (var r in rows)
                     {
-                        header.Cell().Element(c =>
-                            c.DefaultTextStyle(x => x.SemiBold())
-                             .Padding(4)
-                             .Background(Colors.Grey.Lighten3))
-                             .Text("Data");
+                        t.Cell().Element(c => c.Padding(4)).Text(r.Name);
+                        t.Cell().Element(c => c.Padding(4)).AlignRight().Text($"{r.Amount:N2} zł");
+                        t.Cell().Element(c => c.Padding(4)).AlignRight().Text($"{r.SharePercent:N1}");
+                    }
+                });
+            });
 
-                        header.Cell().Element(c =>
-                            c.DefaultTextStyle(x => x.SemiBold())
-                             .Padding(4)
-                             .Background(Colors.Grey.Lighten3))
-                             .Text("Kategoria");
+            static void Header(TableDescriptor t, string c1, string c2, string c3)
+            {
+                t.Header(h =>
+                {
+                    h.Cell().Element(c => c.DefaultTextStyle(x => x.SemiBold()).Padding(4).Background(Colors.Grey.Lighten3)).Text(c1);
+                    h.Cell().Element(c => c.DefaultTextStyle(x => x.SemiBold()).Padding(4).Background(Colors.Grey.Lighten3)).AlignRight().Text(c2);
+                    h.Cell().Element(c => c.DefaultTextStyle(x => x.SemiBold()).Padding(4).Background(Colors.Grey.Lighten3)).AlignRight().Text(c3);
+                });
+            }
+        }
 
-                        header.Cell().Element(c =>
-                            c.DefaultTextStyle(x => x.SemiBold())
-                             .Padding(4)
-                             .Background(Colors.Grey.Lighten3))
-                             .Text("Opis");
+        private static void TransactionsSection(IContainer container, ReportsViewModel vm)
+        {
+            var tx = (vm.Rows ?? new System.Collections.ObjectModel.ObservableCollection<Finly.Services.SpecificPages.ReportsService.ReportItem>())
+                .OrderByDescending(x => x.Date)
+                .Take(40) // ograniczamy PDF, żeby nie był gigantyczny
+                .ToList();
 
-                        header.Cell().Element(c =>
-                            c.DefaultTextStyle(x => x.SemiBold())
-                             .Padding(4)
-                             .Background(Colors.Grey.Lighten3))
-                             .Text("Kwota");
+            container.Column(col =>
+            {
+                col.Item().Text("Transakcje (po filtrach) – ostatnie 40")
+                    .Bold()
+                    .FontSize(13);
+
+                if (tx.Count == 0)
+                {
+                    col.Item().Text("(brak danych)").FontColor(Colors.Grey.Darken1);
+                    return;
+                }
+
+                col.Item().Table(t =>
+                {
+                    t.ColumnsDefinition(cols =>
+                    {
+                        cols.ConstantColumn(70);  // data
+                        cols.ConstantColumn(70);  // typ
+                        cols.RelativeColumn(3);   // kategoria
+                        cols.RelativeColumn(2);   // kwota
                     });
 
-                    foreach (var t in transactions)
+                    t.Header(h =>
                     {
-                        table.Cell().Element(c => c.Padding(4)).Text(t.Date.ToString("dd.MM.yyyy"));
-                        table.Cell().Element(c => c.Padding(4)).Text(t.Category);
-                        table.Cell().Element(c => c.Padding(4)).Text(t.Description);
-                        table.Cell().Element(c => c.Padding(4)).Text(t.Amount.ToString("N2"));
+                        h.Cell().Element(c => c.DefaultTextStyle(x => x.SemiBold()).Padding(4).Background(Colors.Grey.Lighten3)).Text("Data");
+                        h.Cell().Element(c => c.DefaultTextStyle(x => x.SemiBold()).Padding(4).Background(Colors.Grey.Lighten3)).Text("Typ");
+                        h.Cell().Element(c => c.DefaultTextStyle(x => x.SemiBold()).Padding(4).Background(Colors.Grey.Lighten3)).Text("Kategoria");
+                        h.Cell().Element(c => c.DefaultTextStyle(x => x.SemiBold()).Padding(4).Background(Colors.Grey.Lighten3)).AlignRight().Text("Kwota");
+                    });
+
+                    foreach (var r in tx)
+                    {
+                        t.Cell().Element(c => c.Padding(4)).Text(r.Date.ToString("dd.MM.yyyy"));
+                        t.Cell().Element(c => c.Padding(4)).Text(r.Type);
+                        t.Cell().Element(c => c.Padding(4)).Text(r.Category);
+                        t.Cell().Element(c => c.Padding(4)).AlignRight().Text($"{r.Amount:N2}");
                     }
                 });
             });
         }
 
-        private static void InsightsSection(IContainer container, ReportsViewModel vm)
+        private static void BudgetsSection(IContainer container, ReportsViewModel vm)
         {
-            var insights = vm.Insights ?? new System.Collections.ObjectModel.ObservableCollection<string>();
-            if (insights.Count == 0)
-                return;
+            var rows = (vm.Budgets ?? new System.Collections.ObjectModel.ObservableCollection<ReportsViewModel.BudgetRow>()).ToList();
 
             container.Column(col =>
             {
-                col.Item().Text("Wnioski finansowe")
+                col.Item().Text("Budżety")
                     .Bold()
                     .FontSize(13);
 
-                foreach (var insight in insights)
-                    col.Item().Text("• " + insight);
-            });
-        }
-
-        // ===== Lekkie modele danych na potrzeby prostego eksportu (zostawiam bez zmian) =====
-
-        public static string ExportPeriodReport(
-            DateTime start,
-            DateTime end,
-            PeriodSummary curr,
-            PeriodSummary prev,
-            IEnumerable<CategoryDetail> categories,
-            Dictionary<string, decimal> chartTotals)
-        {
-            var path = Path.Combine(
-                Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory),
-                $"Finly_Raport_{start:yyyyMMdd}-{end:yyyyMMdd}.pdf");
-
-            var doc = Document.Create(container =>
-            {
-                container.Page(page =>
+                if (rows.Count == 0)
                 {
-                    page.Margin(30);
-                    page.Size(PageSizes.A4);
-                    page.DefaultTextStyle(x => x.FontSize(11));
+                    col.Item().Text("(brak danych)").FontColor(Colors.Grey.Darken1);
+                    return;
+                }
 
-                    page.Header().Text($"Raport finansowy – {start:dd.MM.yyyy} – {end:dd.MM.yyyy}")
-                        .FontSize(20).Bold().AlignLeft();
-
-                    page.Content().Column(col =>
+                col.Item().Table(t =>
+                {
+                    t.ColumnsDefinition(cols =>
                     {
-                        col.Item().Text("Podsumowanie bieżącego okresu")
-                            .FontSize(16).Bold();
-
-                        col.Item().Text($@"
-Suma wydatków: {curr.Expenses:N2} zł
-Suma przychodów: {curr.Incomes:N2} zł
-Saldo: {curr.Saldo:N2} zł
-").FontSize(12);
-
-                        col.Item().PaddingTop(10).Text("Podsumowanie poprzedniego okresu")
-                            .FontSize(16).Bold();
-
-                        col.Item().Text($@"
-Suma wydatków: {prev.Expenses:N2} zł
-Suma przychodów: {prev.Incomes:N2} zł
-Saldo: {prev.Saldo:N2} zł
-").FontSize(12);
-
-                        col.Item().PaddingTop(10).Text("Porównanie okresów")
-                            .FontSize(16).Bold();
-
-                        col.Item().Text($@"
-Zmiana wydatków: {curr.ExpensesChangeText}
-Zmiana przychodów: {curr.IncomesChangeText}
-Zmiana salda: {curr.SaldoChangeText}
-").FontSize(12);
-
-                        col.Item().PaddingTop(10).Text("Kategorie").FontSize(16).Bold();
-
-                        if (categories != null)
-                        {
-                            foreach (var c in categories)
-                                col.Item().Text($"{c.Name} – {c.Amount:N2} zł ({c.Percent:N2}%)");
-                        }
+                        cols.RelativeColumn(4);
+                        cols.RelativeColumn(2);
+                        cols.RelativeColumn(2);
+                        cols.RelativeColumn(2);
                     });
+
+                    t.Header(h =>
+                    {
+                        h.Cell().Element(c => c.DefaultTextStyle(x => x.SemiBold()).Padding(4).Background(Colors.Grey.Lighten3)).Text("Budżet");
+                        h.Cell().Element(c => c.DefaultTextStyle(x => x.SemiBold()).Padding(4).Background(Colors.Grey.Lighten3)).AlignRight().Text("Plan");
+                        h.Cell().Element(c => c.DefaultTextStyle(x => x.SemiBold()).Padding(4).Background(Colors.Grey.Lighten3)).AlignRight().Text("Wydane");
+                        h.Cell().Element(c => c.DefaultTextStyle(x => x.SemiBold()).Padding(4).Background(Colors.Grey.Lighten3)).AlignRight().Text("Pozostało");
+                    });
+
+                    foreach (var b in rows)
+                    {
+                        t.Cell().Element(c => c.Padding(4)).Text(b.Name);
+                        t.Cell().Element(c => c.Padding(4)).AlignRight().Text(b.PlannedStr);
+                        t.Cell().Element(c => c.Padding(4)).AlignRight().Text(b.SpentStr);
+                        t.Cell().Element(c => c.Padding(4)).AlignRight().Text(b.RemainingStr);
+                    }
                 });
             });
-
-            doc.GeneratePdf(path);
-            return path;
         }
 
-        public class PeriodSummary
+        private static void LoansSection(IContainer container, ReportsViewModel vm)
         {
-            public decimal Expenses { get; set; }
-            public decimal Incomes { get; set; }
-            public decimal Saldo { get; set; }
-            public string ExpensesChangeText { get; set; } = string.Empty;
-            public string IncomesChangeText { get; set; } = string.Empty;
-            public string SaldoChangeText { get; set; } = string.Empty;
+            var rows = (vm.Loans ?? new System.Collections.ObjectModel.ObservableCollection<ReportsViewModel.LoanRow>()).ToList();
+
+            container.Column(col =>
+            {
+                col.Item().Text("Kredyty")
+                    .Bold()
+                    .FontSize(13);
+
+                if (rows.Count == 0)
+                {
+                    col.Item().Text("(brak danych)").FontColor(Colors.Grey.Darken1);
+                    return;
+                }
+
+                col.Item().Table(t =>
+                {
+                    t.ColumnsDefinition(cols =>
+                    {
+                        cols.RelativeColumn(4);
+                        cols.RelativeColumn(2);
+                        cols.RelativeColumn(2);
+                    });
+
+                    t.Header(h =>
+                    {
+                        h.Cell().Element(c => c.DefaultTextStyle(x => x.SemiBold()).Padding(4).Background(Colors.Grey.Lighten3)).Text("Nazwa");
+                        h.Cell().Element(c => c.DefaultTextStyle(x => x.SemiBold()).Padding(4).Background(Colors.Grey.Lighten3)).AlignRight().Text("Rata (est.)");
+                        h.Cell().Element(c => c.DefaultTextStyle(x => x.SemiBold()).Padding(4).Background(Colors.Grey.Lighten3)).AlignRight().Text("Spłacono");
+                    });
+
+                    foreach (var l in rows)
+                    {
+                        t.Cell().Element(c => c.Padding(4)).Text(l.Name);
+                        t.Cell().Element(c => c.Padding(4)).AlignRight().Text(l.EstimatedMonthlyPaymentStr);
+                        t.Cell().Element(c => c.Padding(4)).AlignRight().Text(l.PaidInPeriodStr);
+                    }
+                });
+            });
         }
 
-        public class CategoryDetail
+        private static void GoalsSection(IContainer container, ReportsViewModel vm)
         {
-            public string Name { get; set; } = string.Empty;
-            public decimal Amount { get; set; }
-            public decimal Percent { get; set; }
+            var rows = (vm.Goals ?? new System.Collections.ObjectModel.ObservableCollection<ReportsViewModel.GoalRow>()).ToList();
+
+            container.Column(col =>
+            {
+                col.Item().Text("Cele")
+                    .Bold()
+                    .FontSize(13);
+
+                if (rows.Count == 0)
+                {
+                    col.Item().Text("(brak danych)").FontColor(Colors.Grey.Darken1);
+                    return;
+                }
+
+                col.Item().Table(t =>
+                {
+                    t.ColumnsDefinition(cols =>
+                    {
+                        cols.RelativeColumn(4);
+                        cols.RelativeColumn(2);
+                        cols.RelativeColumn(2);
+                        cols.RelativeColumn(2);
+                    });
+
+                    t.Header(h =>
+                    {
+                        h.Cell().Element(c => c.DefaultTextStyle(x => x.SemiBold()).Padding(4).Background(Colors.Grey.Lighten3)).Text("Cel");
+                        h.Cell().Element(c => c.DefaultTextStyle(x => x.SemiBold()).Padding(4).Background(Colors.Grey.Lighten3)).AlignRight().Text("Docelowo");
+                        h.Cell().Element(c => c.DefaultTextStyle(x => x.SemiBold()).Padding(4).Background(Colors.Grey.Lighten3)).AlignRight().Text("Aktualnie");
+                        h.Cell().Element(c => c.DefaultTextStyle(x => x.SemiBold()).Padding(4).Background(Colors.Grey.Lighten3)).AlignRight().Text("Brakuje");
+                    });
+
+                    foreach (var g in rows)
+                    {
+                        t.Cell().Element(c => c.Padding(4)).Text(g.Name);
+                        t.Cell().Element(c => c.Padding(4)).AlignRight().Text(g.TargetStr);
+                        t.Cell().Element(c => c.Padding(4)).AlignRight().Text(g.CurrentStr);
+                        t.Cell().Element(c => c.Padding(4)).AlignRight().Text(g.MissingStr);
+                    }
+                });
+            });
+        }
+
+        private static void PlannedSection(IContainer container, ReportsViewModel vm)
+        {
+            var rows = (vm.PlannedSim ?? new System.Collections.ObjectModel.ObservableCollection<ReportsViewModel.PlannedRow>())
+                .OrderBy(x => x.Date)
+                .Take(40)
+                .ToList();
+
+            container.Column(col =>
+            {
+                col.Item().Text("Symulacja – planowane transakcje (do 40)")
+                    .Bold()
+                    .FontSize(13);
+
+                if (rows.Count == 0)
+                {
+                    col.Item().Text("(brak danych)").FontColor(Colors.Grey.Darken1);
+                    return;
+                }
+
+                col.Item().Table(t =>
+                {
+                    t.ColumnsDefinition(cols =>
+                    {
+                        cols.ConstantColumn(70);
+                        cols.ConstantColumn(70);
+                        cols.RelativeColumn(4);
+                        cols.RelativeColumn(2);
+                    });
+
+                    t.Header(h =>
+                    {
+                        h.Cell().Element(c => c.DefaultTextStyle(x => x.SemiBold()).Padding(4).Background(Colors.Grey.Lighten3)).Text("Data");
+                        h.Cell().Element(c => c.DefaultTextStyle(x => x.SemiBold()).Padding(4).Background(Colors.Grey.Lighten3)).Text("Typ");
+                        h.Cell().Element(c => c.DefaultTextStyle(x => x.SemiBold()).Padding(4).Background(Colors.Grey.Lighten3)).Text("Opis");
+                        h.Cell().Element(c => c.DefaultTextStyle(x => x.SemiBold()).Padding(4).Background(Colors.Grey.Lighten3)).AlignRight().Text("Kwota");
+                    });
+
+                    foreach (var r in rows)
+                    {
+                        t.Cell().Element(c => c.Padding(4)).Text(r.Date.ToString("dd.MM.yyyy"));
+                        t.Cell().Element(c => c.Padding(4)).Text(r.Type);
+                        t.Cell().Element(c => c.Padding(4)).Text(r.Description);
+                        t.Cell().Element(c => c.Padding(4)).AlignRight().Text(r.AmountStr);
+                    }
+                });
+            });
         }
     }
 }

@@ -182,14 +182,15 @@
 						<ItemsControl x:Name="InsightsList">
 							<ItemsControl.ItemTemplate>
 								<DataTemplate DataType="{x:Type vm:LoanInsightVm}">
-									<TextBlock Foreground="{DynamicResource App.Foreground}"
-                                               Margin="0,2,0,2"
-                                               TextWrapping="Wrap">
-										<Run Text="{Binding Label}"/>
-										<Run Text=": "/>
-										<Run Text="{Binding Value}" FontWeight="Bold"/>
-									</TextBlock>
-								</DataTemplate>
+                                    <TextBlock Foreground="{DynamicResource App.Foreground}"
+           Margin="0,2,0,2"
+           TextWrapping="Wrap">
+    <Run Text="{Binding Label, Mode=OneWay}"/>
+    <Run Text=": "/>
+    <Run Text="{Binding Value, Mode=OneWay}" FontWeight="Bold"/>
+                                    </TextBlock>
+
+                                </DataTemplate>
 							</ItemsControl.ItemTemplate>
 						</ItemsControl>
 

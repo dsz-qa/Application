@@ -55,7 +55,7 @@
                         <!-- Zawijanie celu, aby całość mieściła się w kafelku -->
                         <TextBlock FontSize="16" FontWeight="Bold" Foreground="{DynamicResource App.Foreground}" TextWrapping="Wrap" MaxWidth="280" VerticalAlignment="Center">
                             <Run Text="Cel: "/>
-                            <Run Text="{Binding GoalTitle}"/>
+                            <Run Text="{Binding GoalTitle, Mode=OneWay}"/>
                         </TextBlock>
                     </StackPanel>
 
