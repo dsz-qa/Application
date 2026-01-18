@@ -2,7 +2,6 @@
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:ctrls="clr-namespace:Finly.Views.Controls"
-             xmlns:vm="clr-namespace:Finly.ViewModels"
              x:Name="Root"
              Background="{DynamicResource App.Background}"
              SnapsToDevicePixels="True"
@@ -11,36 +10,31 @@
              TextOptions.TextRenderingMode="ClearType"
              Foreground="{DynamicResource App.Foreground}">
 
-    <UserControl.DataContext>
-        <vm:ReportsViewModel/>
-    </UserControl.DataContext>
-
     <UserControl.Resources>
 
-        <!-- ===================== KPI (jak w GoalsPage) ===================== -->
-
+        <!-- ===================== CARDS / KPI ===================== -->
         <Style x:Key="Card" TargetType="Border">
-            <Setter Property="Background"      Value="{DynamicResource Surface.Background}"/>
-            <Setter Property="BorderBrush"     Value="{DynamicResource Surface.Border}"/>
+            <Setter Property="Background" Value="{DynamicResource Surface.Background}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource Surface.Border}"/>
             <Setter Property="BorderThickness" Value="1"/>
-            <Setter Property="CornerRadius"    Value="10"/>
-            <Setter Property="Padding"         Value="12"/>
+            <Setter Property="CornerRadius" Value="10"/>
+            <Setter Property="Padding" Value="12"/>
         </Style>
 
         <Style x:Key="AccentCard" TargetType="Border" BasedOn="{StaticResource Card}">
-            <Setter Property="BorderBrush"     Value="{DynamicResource Brand.Blue}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource Brand.Blue}"/>
             <Setter Property="BorderThickness" Value="2"/>
         </Style>
 
         <Style x:Key="CardHeader" TargetType="TextBlock">
-            <Setter Property="FontSize"   Value="13"/>
+            <Setter Property="FontSize" Value="13"/>
             <Setter Property="FontWeight" Value="SemiBold"/>
             <Setter Property="Foreground" Value="{DynamicResource App.Foreground}"/>
-            <Setter Property="Opacity"    Value="0.9"/>
+            <Setter Property="Opacity" Value="0.9"/>
         </Style>
 
         <Style x:Key="KpiValueStyle" TargetType="TextBlock">
-            <Setter Property="FontSize"   Value="18"/>
+            <Setter Property="FontSize" Value="18"/>
             <Setter Property="FontWeight" Value="Bold"/>
             <Setter Property="Foreground" Value="{DynamicResource App.Foreground}"/>
         </Style>
@@ -49,9 +43,10 @@
             <Setter Property="Margin" Value="0,0,6,6"/>
         </Style>
 
-        <Style x:Key="KpiInlineValue" TargetType="TextBlock" BasedOn="{StaticResource KpiValueStyle}">
+        <Style x:Key="KpiInlineValueNormal" TargetType="TextBlock" BasedOn="{StaticResource KpiValueStyle}">
+            <Setter Property="FontWeight" Value="Normal"/>
+            <Setter Property="Opacity" Value="0.85"/>
             <Setter Property="Margin" Value="0,0,0,6"/>
-            <Setter Property="Opacity" Value="0.95"/>
         </Style>
 
         <Style x:Key="KpiSubHeader" TargetType="TextBlock" BasedOn="{StaticResource CardHeader}">
@@ -59,85 +54,50 @@
             <Setter Property="Margin" Value="0,4,0,10"/>
         </Style>
 
-        <!-- Wartości KPI bez bolda (dla "Brak danych do porównania") -->
-        <Style x:Key="KpiInlineValueNormal" TargetType="TextBlock" BasedOn="{StaticResource KpiValueStyle}">
-            <Setter Property="FontWeight" Value="Normal"/>
-            <Setter Property="Opacity" Value="0.85"/>
-        </Style>
+        <!-- ===================== TABCONTROL: zakładki niebieskie + aktywna pomarańczowa ramka ===================== -->
+        <SolidColorBrush x:Key="Reports.TabBlue" Color="#1E66F5"/>
+        <SolidColorBrush x:Key="Reports.TabBlueHover" Color="#2A74FF"/>
+        <SolidColorBrush x:Key="Reports.TabOrange" Color="#FF8A00"/>
+        <SolidColorBrush x:Key="Reports.TabText" Color="#FFFFFF"/>
 
-
-        <!-- ===================== MINI TABLE ===================== -->
-
-        <Style x:Key="MiniTableCard" TargetType="Border">
+        <Style x:Key="ReportsTabControlStyle" TargetType="TabControl">
             <Setter Property="Background" Value="Transparent"/>
-            <Setter Property="BorderBrush" Value="{DynamicResource Surface.Border}"/>
-            <Setter Property="BorderThickness" Value="1"/>
-            <Setter Property="CornerRadius" Value="10"/>
-            <Setter Property="Padding" Value="12"/>
-        </Style>
-
-        <Style x:Key="MiniTableHeaderBorder" TargetType="Border">
-            <Setter Property="Background" Value="{DynamicResource Surface.Background}"/>
-            <Setter Property="Padding" Value="6,4"/>
-            <Setter Property="Margin" Value="0,0,0,6"/>
-            <Setter Property="CornerRadius" Value="6"/>
-        </Style>
-
-        <Style x:Key="MiniTableHeaderText" TargetType="TextBlock">
-            <Setter Property="FontSize" Value="11"/>
-            <Setter Property="FontWeight" Value="SemiBold"/>
-            <Setter Property="Foreground" Value="{DynamicResource App.Foreground}"/>
-            <Setter Property="Opacity" Value="0.8"/>
-        </Style>
-
-        <Style x:Key="MiniTableCellText" TargetType="TextBlock">
-            <Setter Property="Foreground" Value="{DynamicResource App.Foreground}"/>
-            <Setter Property="VerticalAlignment" Value="Top"/>
-            <Setter Property="Margin" Value="6,2,6,2"/>
-            <Setter Property="TextWrapping" Value="Wrap"/>
-            <Setter Property="TextTrimming" Value="None"/>
-        </Style>
-
-        <!-- ===================== FILTERS ===================== -->
-
-        <Style x:Key="FilterHeaderTextStyle" TargetType="TextBlock">
-            <Setter Property="FontSize" Value="16"/>
-            <Setter Property="FontWeight" Value="Bold"/>
-            <Setter Property="Foreground" Value="{DynamicResource App.Foreground}"/>
-        </Style>
-
-        <Style x:Key="FilterPanelStyle" TargetType="GroupBox">
-            <Setter Property="Height" Value="120"/>
-            <Setter Property="MinHeight" Value="120"/>
-            <Setter Property="Margin" Value="0,0,12,0"/>
-            <Setter Property="Foreground" Value="{DynamicResource App.Foreground}"/>
-            <Setter Property="Background" Value="Transparent"/>
-            <Setter Property="BorderBrush" Value="{DynamicResource Brand.Orange}"/>
-            <Setter Property="BorderThickness" Value="2"/>
+            <Setter Property="BorderThickness" Value="0"/>
             <Setter Property="Padding" Value="0"/>
+            <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+            <Setter Property="VerticalContentAlignment" Value="Stretch"/>
             <Setter Property="Template">
                 <Setter.Value>
-                    <ControlTemplate TargetType="GroupBox">
-                        <Grid Height="{TemplateBinding Height}" ClipToBounds="True">
+                    <ControlTemplate TargetType="TabControl">
+                        <Grid SnapsToDevicePixels="True">
                             <Grid.RowDefinitions>
-                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="64"/>
                                 <RowDefinition Height="*"/>
                             </Grid.RowDefinitions>
 
-                            <ContentPresenter Grid.Row="0"
-                                              Content="{TemplateBinding Header}"
-                                              Margin="0,0,0,6"
-                                              VerticalAlignment="Center"/>
-
-                            <Border Grid.Row="1"
+                            <!-- Pasek zakładek -->
+                            <Border Grid.Row="0"
                                     Background="{DynamicResource Surface.Background}"
-                                    BorderBrush="{TemplateBinding BorderBrush}"
-                                    BorderThickness="{TemplateBinding BorderThickness}"
+                                    BorderBrush="{DynamicResource Surface.Border}"
+                                    BorderThickness="1"
                                     CornerRadius="10"
-                                    Padding="12"
+                                    Padding="6"
                                     SnapsToDevicePixels="True">
-                                <ContentPresenter VerticalAlignment="Stretch"
-                                                  HorizontalAlignment="Stretch"/>
+                                <UniformGrid Rows="1"
+                                             IsItemsHost="True"
+                                             VerticalAlignment="Stretch"
+                                             HorizontalAlignment="Stretch"/>
+                            </Border>
+
+                            <!-- Content -->
+                            <Border Grid.Row="1"
+                                    Background="Transparent"
+                                    Padding="0"
+                                    SnapsToDevicePixels="True">
+                                <ContentPresenter x:Name="PART_SelectedContentHost"
+                                                  ContentSource="SelectedContent"
+                                                  HorizontalAlignment="Stretch"
+                                                  VerticalAlignment="Stretch"/>
                             </Border>
                         </Grid>
                     </ControlTemplate>
@@ -145,44 +105,47 @@
             </Setter>
         </Style>
 
-        <!-- ===================== TABCONTROL ===================== -->
-
-        <Style x:Key="ReportsTabControlStyle" TargetType="TabControl">
-            <Setter Property="Background" Value="Transparent"/>
-            <Setter Property="BorderThickness" Value="0"/>
-            <Setter Property="Padding" Value="0"/>
-            <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
-        </Style>
-
         <Style x:Key="ReportsTabItemStyle" TargetType="TabItem">
-            <Setter Property="FontSize" Value="15"/>
+            <Setter Property="FontSize" Value="16"/>
             <Setter Property="FontWeight" Value="Bold"/>
-            <Setter Property="Margin" Value="0,0,10,0"/>
-            <Setter Property="Foreground" Value="{DynamicResource Brand.Blue}"/>
+            <Setter Property="Foreground" Value="{StaticResource Reports.TabText}"/>
+            <Setter Property="Background" Value="{StaticResource Reports.TabBlue}"/>
+            <Setter Property="BorderBrush" Value="Transparent"/>
+            <Setter Property="BorderThickness" Value="3"/>
+            <Setter Property="Padding" Value="12,0"/>
+            <Setter Property="Margin" Value="4,0,4,0"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="HorizontalContentAlignment" Value="Center"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
+            <Setter Property="VerticalAlignment" Value="Stretch"/>
+            <Setter Property="HorizontalAlignment" Value="Stretch"/>
+
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="TabItem">
                         <Border x:Name="Bd"
-                                Background="{DynamicResource Surface.Background}"
-                                BorderBrush="{DynamicResource Brand.Blue}"
-                                BorderThickness="2"
-                                CornerRadius="12"
-                                Padding="18,10"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="0"
                                 SnapsToDevicePixels="True">
                             <ContentPresenter ContentSource="Header"
-                                              VerticalAlignment="Center"
-                                              HorizontalAlignment="Center"
+                                              HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                              VerticalAlignment="{TemplateBinding VerticalContentAlignment}"
                                               RecognizesAccessKey="True"/>
                         </Border>
 
                         <ControlTemplate.Triggers>
-                            <Trigger Property="IsSelected" Value="True">
-                                <Setter TargetName="Bd" Property="BorderBrush" Value="{DynamicResource Brand.Orange}"/>
-                                <Setter Property="Foreground" Value="{DynamicResource Brand.Orange}"/>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter TargetName="Bd" Property="Opacity" Value="0.55"/>
                             </Trigger>
 
-                            <Trigger Property="IsEnabled" Value="False">
-                                <Setter Property="Opacity" Value="0.55"/>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="{StaticResource Reports.TabBlueHover}"/>
+                            </Trigger>
+
+                            <Trigger Property="IsSelected" Value="True">
+                                <Setter TargetName="Bd" Property="BorderBrush" Value="{StaticResource Reports.TabOrange}"/>
                             </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
@@ -196,18 +159,11 @@
     <Grid Margin="12,0,12,12">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
-            <!-- KPI -->
             <RowDefinition Height="Auto"/>
-            <!-- PeriodBar -->
             <RowDefinition Height="Auto"/>
-            <!-- Export -->
-            <RowDefinition Height="Auto"/>
-            <!-- Filters -->
             <RowDefinition Height="*"/>
-            <!-- Tabs -->
         </Grid.RowDefinitions>
 
-        <!-- ROW 0: KPI -->
         <!-- ROW 0: KPI -->
         <Grid Grid.Row="0" Margin="0,0,0,12">
             <Grid.ColumnDefinitions>
@@ -218,41 +174,27 @@
 
             <!-- Obecny okres -->
             <Border Grid.Column="0" Style="{StaticResource AccentCard}" Margin="0,0,10,0">
-                <Border.Resources>
-                    <!-- Lokalny styl TYLKO dla tego kafelka -->
-                    <Style x:Key="KpiInlineValueBig"
-               TargetType="TextBlock"
-               BasedOn="{StaticResource KpiInlineValueNormal}">
-                        <Setter Property="FontSize" Value="18"/>
-                        <Setter Property="FontWeight" Value="Bold"/>
-                    </Style>
-                </Border.Resources>
-
                 <StackPanel>
-                    <TextBlock Text="Obecny okres"
-                       Style="{StaticResource CardHeader}"
-                       FontSize="18"
-                       FontWeight="Bold"/>
-
+                    <TextBlock Text="Obecny okres" Style="{StaticResource CardHeader}" FontSize="18" FontWeight="Bold"/>
                     <TextBlock Text="{Binding PeriodLabel, FallbackValue=Brak danych, TargetNullValue=Brak danych}"
-                       Style="{StaticResource KpiSubHeader}"/>
+                               Style="{StaticResource KpiSubHeader}"/>
 
                     <StackPanel Orientation="Horizontal">
                         <TextBlock Text="Wydatki:" Style="{StaticResource KpiInlineLabel}"/>
-                        <TextBlock Text="{Binding TotalExpensesStr, FallbackValue=Brak danych do porównania, TargetNullValue=Brak danych do porównania}"
-                           Style="{StaticResource KpiInlineValueNormal}"/>
+                        <TextBlock Text="{Binding TotalExpensesStr, FallbackValue=Brak danych, TargetNullValue=Brak danych}"
+                                   Style="{StaticResource KpiInlineValueNormal}"/>
                     </StackPanel>
 
                     <StackPanel Orientation="Horizontal">
                         <TextBlock Text="Przychody:" Style="{StaticResource KpiInlineLabel}"/>
-                        <TextBlock Text="{Binding TotalIncomesStr, FallbackValue=Brak danych do porównania, TargetNullValue=Brak danych do porównania}"
-                           Style="{StaticResource KpiInlineValueNormal}"/>
+                        <TextBlock Text="{Binding TotalIncomesStr, FallbackValue=Brak danych, TargetNullValue=Brak danych}"
+                                   Style="{StaticResource KpiInlineValueNormal}"/>
                     </StackPanel>
 
                     <StackPanel Orientation="Horizontal">
                         <TextBlock Text="Bilans:" Style="{StaticResource KpiInlineLabel}" Margin="0,0,6,0"/>
-                        <TextBlock Text="{Binding BalanceStr, FallbackValue=Brak danych do porównania, TargetNullValue=Brak danych do porównania}"
-                           Style="{StaticResource KpiInlineValueNormal}" Margin="0,0,0,0"/>
+                        <TextBlock Text="{Binding BalanceStr, FallbackValue=Brak danych, TargetNullValue=Brak danych}"
+                                   Style="{StaticResource KpiInlineValueNormal}" Margin="0,0,0,0"/>
                     </StackPanel>
                 </StackPanel>
             </Border>
@@ -260,31 +202,26 @@
             <!-- Poprzedni okres -->
             <Border Grid.Column="1" Style="{StaticResource AccentCard}" Margin="0,0,10,0">
                 <StackPanel>
-                    <TextBlock Text="Poprzedni okres"
-                       Style="{StaticResource CardHeader}"
-                       FontSize="18"
-                       FontWeight="Bold"/>
-
-                    <!-- data poprzedniego okresu -->
+                    <TextBlock Text="Poprzedni okres" Style="{StaticResource CardHeader}" FontSize="18" FontWeight="Bold"/>
                     <TextBlock Text="{Binding PreviousPeriodLabel, FallbackValue=Brak danych, TargetNullValue=Brak danych}"
-                       Style="{StaticResource KpiSubHeader}"/>
+                               Style="{StaticResource KpiSubHeader}"/>
 
                     <StackPanel Orientation="Horizontal">
                         <TextBlock Text="Wydatki:" Style="{StaticResource KpiInlineLabel}"/>
-                        <TextBlock Text="{Binding PreviousTotalExpensesStr, FallbackValue=Brak danych do porównania, TargetNullValue=Brak danych do porównania}"
-                           Style="{StaticResource KpiInlineValueNormal}"/>
+                        <TextBlock Text="{Binding PreviousTotalExpensesStr, FallbackValue=Brak danych, TargetNullValue=Brak danych}"
+                                   Style="{StaticResource KpiInlineValueNormal}"/>
                     </StackPanel>
 
                     <StackPanel Orientation="Horizontal">
                         <TextBlock Text="Przychody:" Style="{StaticResource KpiInlineLabel}"/>
-                        <TextBlock Text="{Binding PreviousTotalIncomesStr, FallbackValue=Brak danych do porównania, TargetNullValue=Brak danych do porównania}"
-                           Style="{StaticResource KpiInlineValueNormal}"/>
+                        <TextBlock Text="{Binding PreviousTotalIncomesStr, FallbackValue=Brak danych, TargetNullValue=Brak danych}"
+                                   Style="{StaticResource KpiInlineValueNormal}"/>
                     </StackPanel>
 
                     <StackPanel Orientation="Horizontal">
                         <TextBlock Text="Bilans:" Style="{StaticResource KpiInlineLabel}" Margin="0,0,6,0"/>
-                        <TextBlock Text="{Binding PreviousBalanceStr, FallbackValue=Brak danych do porównania, TargetNullValue=Brak danych do porównania}"
-                           Style="{StaticResource KpiInlineValueNormal}" Margin="0,0,0,0"/>
+                        <TextBlock Text="{Binding PreviousBalanceStr, FallbackValue=Brak danych, TargetNullValue=Brak danych}"
+                                   Style="{StaticResource KpiInlineValueNormal}" Margin="0,0,0,0"/>
                     </StackPanel>
                 </StackPanel>
             </Border>
@@ -292,12 +229,8 @@
             <!-- Porównanie okresów -->
             <Border Grid.Column="2" Style="{StaticResource AccentCard}">
                 <StackPanel>
-                    <TextBlock Text="Porównanie okresów"
-                       Style="{StaticResource CardHeader}"
-                       FontSize="18"
-                       FontWeight="Bold"/>
+                    <TextBlock Text="Porównanie okresów" Style="{StaticResource CardHeader}" FontSize="18" FontWeight="Bold"/>
 
-                    <!-- dwie daty porównywanych okresów -->
                     <Grid Margin="0,4,0,10">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*"/>
@@ -305,334 +238,92 @@
                         </Grid.ColumnDefinitions>
 
                         <StackPanel Grid.Column="0" Orientation="Horizontal">
-                            <TextBlock Text="Poprzedni okres: " Style="{StaticResource CardHeader}" Opacity="0.75"/>
+                            <TextBlock Text="Poprzedni: " Style="{StaticResource CardHeader}" Opacity="0.75"/>
                             <TextBlock Text="{Binding PreviousPeriodLabel}" Style="{StaticResource CardHeader}" Opacity="0.75"/>
                         </StackPanel>
 
                         <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Right">
-                            <TextBlock Text="Obecny okres: " Style="{StaticResource CardHeader}" Opacity="0.75"/>
+                            <TextBlock Text="Obecny: " Style="{StaticResource CardHeader}" Opacity="0.75"/>
                             <TextBlock Text="{Binding PeriodLabel}" Style="{StaticResource CardHeader}" Opacity="0.75"/>
                         </StackPanel>
                     </Grid>
 
-
                     <StackPanel Orientation="Horizontal">
                         <TextBlock Text="Wydatki:" Style="{StaticResource KpiInlineLabel}"/>
-                        <TextBlock Text="{Binding DeltaExpensesStr, FallbackValue=Brak danych do porównania, TargetNullValue=Brak danych do porównania}"
-                           Style="{StaticResource KpiInlineValueNormal}"/>
+                        <TextBlock Text="{Binding DeltaExpensesStr, FallbackValue=Brak danych, TargetNullValue=Brak danych}"
+                                   Style="{StaticResource KpiInlineValueNormal}"/>
                     </StackPanel>
 
                     <StackPanel Orientation="Horizontal">
                         <TextBlock Text="Przychody:" Style="{StaticResource KpiInlineLabel}"/>
-                        <TextBlock Text="{Binding DeltaIncomesStr, FallbackValue=Brak danych do porównania, TargetNullValue=Brak danych do porównania}"
-                           Style="{StaticResource KpiInlineValueNormal}"/>
+                        <TextBlock Text="{Binding DeltaIncomesStr, FallbackValue=Brak danych, TargetNullValue=Brak danych}"
+                                   Style="{StaticResource KpiInlineValueNormal}"/>
                     </StackPanel>
 
                     <StackPanel Orientation="Horizontal">
                         <TextBlock Text="Bilans:" Style="{StaticResource KpiInlineLabel}" Margin="0,0,6,0"/>
-                        <TextBlock Text="{Binding DeltaBalanceStr, FallbackValue=Brak danych do porównania, TargetNullValue=Brak danych do porównania}"
-                           Style="{StaticResource KpiInlineValueNormal}" Margin="0,0,0,0"/>
+                        <TextBlock Text="{Binding DeltaBalanceStr, FallbackValue=Brak danych, TargetNullValue=Brak danych}"
+                                   Style="{StaticResource KpiInlineValueNormal}" Margin="0,0,0,0"/>
                     </StackPanel>
                 </StackPanel>
             </Border>
         </Grid>
 
-
         <!-- ROW 1: PeriodBar -->
         <Border Grid.Row="1" Background="Transparent" Margin="0,0,0,8">
             <ctrls:PeriodBarControl x:Name="PeriodBar"
                                     HorizontalAlignment="Center"
-                                    StartDate="{Binding FromDate, Mode=TwoWay}"
-                                    EndDate="{Binding ToDate, Mode=TwoWay}"/>
+                                    StartDate="{Binding FromDate, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                    EndDate="{Binding ToDate, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
         </Border>
 
-        <!-- ROW 2: Export -->
+        <!-- ROW 2: Global Export -->
         <Border Grid.Row="2" Background="Transparent" Margin="0,0,0,12">
             <Button Content="Pobierz raport całościowy (PDF)"
                     Style="{StaticResource PrimaryButton}"
                     HorizontalAlignment="Center"
-                    Padding="22,10"
+                    FontSize="18"
+                    FontWeight="Bold"
+                    Padding="34,16"
+                    MinWidth="420"
                     Click="ExportButton_Click"/>
         </Border>
 
-        <!-- ROW 4: Tabs -->
-        <Border Grid.Row="4" Background="Transparent">
+        <!-- ROW 3: Tabs (puste treści) -->
+        <Border Grid.Row="3" Background="Transparent">
             <TabControl Style="{StaticResource ReportsTabControlStyle}"
                         SelectedIndex="{Binding SelectedTabIndex, Mode=TwoWay}">
-
-                <TabControl.ItemsPanel>
-                    <ItemsPanelTemplate>
-                        <WrapPanel IsItemsHost="True"
-                                   HorizontalAlignment="Center"
-                                   VerticalAlignment="Top"/>
-                    </ItemsPanelTemplate>
-                </TabControl.ItemsPanel>
 
                 <TabControl.ItemContainerStyle>
                     <Style TargetType="TabItem" BasedOn="{StaticResource ReportsTabItemStyle}"/>
                 </TabControl.ItemContainerStyle>
 
                 <TabItem Header="Przegląd ogólny">
-                    <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
-                        <StackPanel Margin="0,12,0,0">
-
-                            <Grid Margin="0,0,0,12">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*"/>
-                                    <ColumnDefinition Width="*"/>
-                                </Grid.ColumnDefinitions>
-
-                                <Border Grid.Column="0" Style="{StaticResource MiniTableCard}" Margin="0,0,12,0">
-                                    <StackPanel>
-                                        <TextBlock Text="Top wydatki" FontWeight="SemiBold" FontSize="14"/>
-                                        <TextBlock Text="{Binding PeriodLabel}" Opacity="0.75" Margin="0,4,0,10"/>
-
-                                        <ctrls:MiniTableControl ItemsSource="{Binding OverviewTopExpenses}">
-                                            <ctrls:MiniTableControl.HeaderTemplate>
-                                                <DataTemplate>
-                                                    <Border Style="{StaticResource MiniTableHeaderBorder}">
-                                                        <Grid>
-                                                            <Grid.ColumnDefinitions>
-                                                                <ColumnDefinition Width="130"/>
-                                                                <ColumnDefinition Width="*"/>
-                                                                <ColumnDefinition Width="140"/>
-                                                            </Grid.ColumnDefinitions>
-                                                            <TextBlock Grid.Column="0" Text="Data" Style="{StaticResource MiniTableHeaderText}"/>
-                                                            <TextBlock Grid.Column="1" Text="Kategoria" Style="{StaticResource MiniTableHeaderText}"/>
-                                                            <TextBlock Grid.Column="2" Text="Kwota" Style="{StaticResource MiniTableHeaderText}" HorizontalAlignment="Right"/>
-                                                        </Grid>
-                                                    </Border>
-                                                </DataTemplate>
-                                            </ctrls:MiniTableControl.HeaderTemplate>
-
-                                            <ctrls:MiniTableControl.RowTemplate>
-                                                <DataTemplate>
-                                                    <Grid>
-                                                        <Grid.ColumnDefinitions>
-                                                            <ColumnDefinition Width="130"/>
-                                                            <ColumnDefinition Width="*"/>
-                                                            <ColumnDefinition Width="140"/>
-                                                        </Grid.ColumnDefinitions>
-
-                                                        <TextBlock Grid.Column="0"
-                                                                   Text="{Binding Date, StringFormat={}{0:yyyy-MM-dd}}"
-                                                                   Style="{StaticResource MiniTableCellText}"/>
-
-                                                        <TextBlock Grid.Column="1"
-                                                                   Text="{Binding Category}"
-                                                                   Style="{StaticResource MiniTableCellText}"/>
-
-                                                        <TextBlock Grid.Column="2"
-                                                                   Text="{Binding AmountStr}"
-                                                                   Style="{StaticResource MiniTableCellText}"
-                                                                   HorizontalAlignment="Right"/>
-                                                    </Grid>
-                                                </DataTemplate>
-                                            </ctrls:MiniTableControl.RowTemplate>
-                                        </ctrls:MiniTableControl>
-                                    </StackPanel>
-                                </Border>
-
-                                <Border Grid.Column="1" Style="{StaticResource MiniTableCard}">
-                                    <StackPanel>
-                                        <TextBlock Text="Top przychody" FontWeight="SemiBold" FontSize="14"/>
-                                        <TextBlock Text="{Binding PeriodLabel}" Opacity="0.75" Margin="0,4,0,10"/>
-
-                                        <ctrls:MiniTableControl ItemsSource="{Binding OverviewTopIncomes}">
-                                            <ctrls:MiniTableControl.HeaderTemplate>
-                                                <DataTemplate>
-                                                    <Border Style="{StaticResource MiniTableHeaderBorder}">
-                                                        <Grid>
-                                                            <Grid.ColumnDefinitions>
-                                                                <ColumnDefinition Width="130"/>
-                                                                <ColumnDefinition Width="*"/>
-                                                                <ColumnDefinition Width="140"/>
-                                                            </Grid.ColumnDefinitions>
-                                                            <TextBlock Grid.Column="0" Text="Data" Style="{StaticResource MiniTableHeaderText}"/>
-                                                            <TextBlock Grid.Column="1" Text="Kategoria" Style="{StaticResource MiniTableHeaderText}"/>
-                                                            <TextBlock Grid.Column="2" Text="Kwota" Style="{StaticResource MiniTableHeaderText}" HorizontalAlignment="Right"/>
-                                                        </Grid>
-                                                    </Border>
-                                                </DataTemplate>
-                                            </ctrls:MiniTableControl.HeaderTemplate>
-
-                                            <ctrls:MiniTableControl.RowTemplate>
-                                                <DataTemplate>
-                                                    <Grid>
-                                                        <Grid.ColumnDefinitions>
-                                                            <ColumnDefinition Width="130"/>
-                                                            <ColumnDefinition Width="*"/>
-                                                            <ColumnDefinition Width="140"/>
-                                                        </Grid.ColumnDefinitions>
-
-                                                        <TextBlock Grid.Column="0"
-                                                                   Text="{Binding Date, StringFormat={}{0:yyyy-MM-dd}}"
-                                                                   Style="{StaticResource MiniTableCellText}"/>
-
-                                                        <TextBlock Grid.Column="1"
-                                                                   Text="{Binding Category}"
-                                                                   Style="{StaticResource MiniTableCellText}"/>
-
-                                                        <TextBlock Grid.Column="2"
-                                                                   Text="{Binding AmountStr}"
-                                                                   Style="{StaticResource MiniTableCellText}"
-                                                                   HorizontalAlignment="Right"/>
-                                                    </Grid>
-                                                </DataTemplate>
-                                            </ctrls:MiniTableControl.RowTemplate>
-                                        </ctrls:MiniTableControl>
-                                    </StackPanel>
-                                </Border>
-                            </Grid>
-
-                            <Border Style="{StaticResource MiniTableCard}">
-                                <StackPanel>
-                                    <TextBlock Text="Transakcje w okresie (po filtrach)" FontWeight="SemiBold" Margin="0,0,0,8"/>
-
-                                    <ctrls:MiniTableControl ItemsSource="{Binding Rows}">
-                                        <ctrls:MiniTableControl.HeaderTemplate>
-                                            <DataTemplate>
-                                                <Border Style="{StaticResource MiniTableHeaderBorder}">
-                                                    <Grid>
-                                                        <Grid.ColumnDefinitions>
-                                                            <ColumnDefinition Width="130"/>
-                                                            <ColumnDefinition Width="130"/>
-                                                            <ColumnDefinition Width="*"/>
-                                                            <ColumnDefinition Width="140"/>
-                                                        </Grid.ColumnDefinitions>
-
-                                                        <TextBlock Grid.Column="0" Text="Data" Style="{StaticResource MiniTableHeaderText}"/>
-                                                        <TextBlock Grid.Column="1" Text="Typ" Style="{StaticResource MiniTableHeaderText}"/>
-                                                        <TextBlock Grid.Column="2" Text="Kategoria" Style="{StaticResource MiniTableHeaderText}"/>
-                                                        <TextBlock Grid.Column="3" Text="Kwota" Style="{StaticResource MiniTableHeaderText}" HorizontalAlignment="Right"/>
-                                                    </Grid>
-                                                </Border>
-                                            </DataTemplate>
-                                        </ctrls:MiniTableControl.HeaderTemplate>
-
-                                        <ctrls:MiniTableControl.RowTemplate>
-                                            <DataTemplate>
-                                                <Grid>
-                                                    <Grid.ColumnDefinitions>
-                                                        <ColumnDefinition Width="130"/>
-                                                        <ColumnDefinition Width="130"/>
-                                                        <ColumnDefinition Width="*"/>
-                                                        <ColumnDefinition Width="140"/>
-                                                    </Grid.ColumnDefinitions>
-
-                                                    <TextBlock Grid.Column="0"
-                                                               Text="{Binding Date, StringFormat={}{0:yyyy-MM-dd}}"
-                                                               Style="{StaticResource MiniTableCellText}"/>
-
-                                                    <TextBlock Grid.Column="1"
-                                                               Text="{Binding Type}"
-                                                               Style="{StaticResource MiniTableCellText}"/>
-
-                                                    <TextBlock Grid.Column="2"
-                                                               Text="{Binding Category}"
-                                                               Style="{StaticResource MiniTableCellText}"/>
-
-                                                    <TextBlock Grid.Column="3"
-                                                               Text="{Binding Amount, StringFormat=N2}"
-                                                               Style="{StaticResource MiniTableCellText}"
-                                                               HorizontalAlignment="Right"/>
-                                                </Grid>
-                                            </DataTemplate>
-                                        </ctrls:MiniTableControl.RowTemplate>
-                                    </ctrls:MiniTableControl>
-                                </StackPanel>
-                            </Border>
-
-                        </StackPanel>
-                    </ScrollViewer>
-                </TabItem>
-
-                <TabItem Header="Kategorie">
-                    <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
-                        <StackPanel Margin="0,12,0,0">
-                            <Border Style="{StaticResource MiniTableCard}">
-                                <StackPanel>
-                                    <TextBlock Text="Tabela kategorii" FontWeight="SemiBold" Margin="0,0,0,8"/>
-
-                                    <ctrls:MiniTableControl ItemsSource="{Binding CategoryBreakdown}">
-                                        <ctrls:MiniTableControl.HeaderTemplate>
-                                            <DataTemplate>
-                                                <Border Style="{StaticResource MiniTableHeaderBorder}">
-                                                    <Grid>
-                                                        <Grid.ColumnDefinitions>
-                                                            <ColumnDefinition Width="*"/>
-                                                            <ColumnDefinition Width="160"/>
-                                                            <ColumnDefinition Width="140"/>
-                                                        </Grid.ColumnDefinitions>
-
-                                                        <TextBlock Grid.Column="0" Text="Kategoria" Style="{StaticResource MiniTableHeaderText}"/>
-                                                        <TextBlock Grid.Column="1" Text="Kwota" Style="{StaticResource MiniTableHeaderText}" HorizontalAlignment="Right"/>
-                                                        <TextBlock Grid.Column="2" Text="Udział (%)" Style="{StaticResource MiniTableHeaderText}" HorizontalAlignment="Right"/>
-                                                    </Grid>
-                                                </Border>
-                                            </DataTemplate>
-                                        </ctrls:MiniTableControl.HeaderTemplate>
-
-                                        <ctrls:MiniTableControl.RowTemplate>
-                                            <DataTemplate>
-                                                <Grid>
-                                                    <Grid.ColumnDefinitions>
-                                                        <ColumnDefinition Width="*"/>
-                                                        <ColumnDefinition Width="160"/>
-                                                        <ColumnDefinition Width="140"/>
-                                                    </Grid.ColumnDefinitions>
-
-                                                    <TextBlock Grid.Column="0" Text="{Binding Name}" Style="{StaticResource MiniTableCellText}"/>
-                                                    <TextBlock Grid.Column="1" Text="{Binding Amount, StringFormat=N2}" Style="{StaticResource MiniTableCellText}" HorizontalAlignment="Right"/>
-                                                    <TextBlock Grid.Column="2" Text="{Binding SharePercent, StringFormat=N1}" Style="{StaticResource MiniTableCellText}" HorizontalAlignment="Right"/>
-                                                </Grid>
-                                            </DataTemplate>
-                                        </ctrls:MiniTableControl.RowTemplate>
-                                    </ctrls:MiniTableControl>
-                                </StackPanel>
-                            </Border>
-                        </StackPanel>
-                    </ScrollViewer>
+                    <Grid/>
                 </TabItem>
 
                 <TabItem Header="Budżety">
-                    <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
-                        <StackPanel Margin="0,12,0,0">
-                            <Border Style="{StaticResource MiniTableCard}">
-                                <TextBlock Text="(do uzupełnienia danymi)" Opacity="0.7"/>
-                            </Border>
-                        </StackPanel>
-                    </ScrollViewer>
+                    <Grid/>
+                </TabItem>
+
+                <TabItem Header="Inwestycje">
+                    <Grid/>
+                </TabItem>
+
+                <TabItem Header="Kategorie">
+                    <Grid/>
                 </TabItem>
 
                 <TabItem Header="Kredyty">
-                    <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
-                        <StackPanel Margin="0,12,0,0">
-                            <Border Style="{StaticResource MiniTableCard}">
-                                <TextBlock Text="(do uzupełnienia danymi)" Opacity="0.7"/>
-                            </Border>
-                        </StackPanel>
-                    </ScrollViewer>
+                    <Grid/>
                 </TabItem>
 
                 <TabItem Header="Cele">
-                    <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
-                        <StackPanel Margin="0,12,0,0">
-                            <Border Style="{StaticResource MiniTableCard}">
-                                <TextBlock Text="(do uzupełnienia danymi)" Opacity="0.7"/>
-                            </Border>
-                        </StackPanel>
-                    </ScrollViewer>
+                    <Grid/>
                 </TabItem>
 
                 <TabItem Header="Symulacja">
-                    <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
-                        <StackPanel Margin="0,12,0,0">
-                            <Border Style="{StaticResource MiniTableCard}">
-                                <TextBlock Text="(do uzupełnienia danymi)" Opacity="0.7"/>
-                            </Border>
-                        </StackPanel>
-                    </ScrollViewer>
+                    <Grid/>
                 </TabItem>
 
             </TabControl>
@@ -640,4 +331,3 @@
 
     </Grid>
 </UserControl>
-

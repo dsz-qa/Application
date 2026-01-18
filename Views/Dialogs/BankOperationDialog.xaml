@@ -1,0 +1,235 @@
+﻿<Window x:Class="Finly.Views.Dialogs.BankOperationDialog"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:shell="clr-namespace:System.Windows.Shell;assembly=PresentationFramework"
+        Title="Operacja"
+        WindowStartupLocation="CenterOwner"
+        SizeToContent="WidthAndHeight"
+        ResizeMode="NoResize"
+        WindowStyle="None"
+        Background="{DynamicResource App.Background}"
+        Foreground="{DynamicResource App.Foreground}"
+        Icon="/Assets/Icons/logoFinly.ico">
+
+	<shell:WindowChrome.WindowChrome>
+		<shell:WindowChrome CaptionHeight="40"
+                            ResizeBorderThickness="0"
+                            CornerRadius="0"
+                            UseAeroCaptionButtons="False"/>
+	</shell:WindowChrome.WindowChrome>
+
+	<Window.Resources>
+
+		<!-- "Pigułkowe" radio: ciemne tło + pomarańczowa ramka po zaznaczeniu -->
+		<Style x:Key="PillRadio" TargetType="{x:Type RadioButton}">
+			<Setter Property="Foreground" Value="{DynamicResource App.Foreground}"/>
+			<Setter Property="Background" Value="{DynamicResource Surface.Background}"/>
+			<Setter Property="BorderBrush" Value="{DynamicResource Surface.Border}"/>
+			<Setter Property="BorderThickness" Value="1"/>
+			<Setter Property="Padding" Value="10,6"/>
+			<Setter Property="Cursor" Value="Hand"/>
+			<Setter Property="FocusVisualStyle" Value="{x:Null}"/>
+			<Setter Property="Template">
+				<Setter.Value>
+					<ControlTemplate TargetType="{x:Type RadioButton}">
+						<Border x:Name="Bd"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="8"
+                                SnapsToDevicePixels="True">
+							<ContentPresenter Margin="0"
+                                              HorizontalAlignment="Center"
+                                              VerticalAlignment="Center"
+                                              RecognizesAccessKey="True"/>
+						</Border>
+
+						<ControlTemplate.Triggers>
+							<Trigger Property="IsMouseOver" Value="True">
+								<Setter TargetName="Bd" Property="Opacity" Value="0.95"/>
+							</Trigger>
+
+							<Trigger Property="IsChecked" Value="True">
+								<Setter TargetName="Bd" Property="BorderBrush" Value="{DynamicResource Brand.Orange}"/>
+								<Setter TargetName="Bd" Property="BorderThickness" Value="1.5"/>
+							</Trigger>
+
+							<Trigger Property="IsEnabled" Value="False">
+								<Setter TargetName="Bd" Property="Opacity" Value="0.5"/>
+							</Trigger>
+						</ControlTemplate.Triggers>
+					</ControlTemplate>
+				</Setter.Value>
+			</Setter>
+		</Style>
+
+	</Window.Resources>
+
+	<Grid>
+		<Grid.RowDefinitions>
+			<RowDefinition Height="40"/>
+			<RowDefinition Height="Auto"/>
+		</Grid.RowDefinitions>
+
+		<!-- Titlebar -->
+		<Grid Grid.Row="0"
+              Background="{DynamicResource TitleBar.Background}"
+              MouseLeftButtonDown="TitleBar_MouseLeftButtonDown">
+			<Grid.ColumnDefinitions>
+				<ColumnDefinition/>
+				<ColumnDefinition Width="Auto"/>
+			</Grid.ColumnDefinitions>
+
+			<TextBlock Text="Operacja na koncie"
+                       VerticalAlignment="Center"
+                       Margin="12,0,0,0"
+                       Foreground="{DynamicResource App.Foreground}"
+                       FontSize="13"
+                       shell:WindowChrome.IsHitTestVisibleInChrome="True"/>
+
+			<StackPanel Grid.Column="1" Orientation="Horizontal">
+				<Button Width="46" Height="32" Padding="0"
+                        Background="Transparent"
+                        BorderBrush="{x:Null}"
+                        Foreground="{DynamicResource App.Foreground}"
+                        Cursor="Hand"
+                        FocusVisualStyle="{x:Null}"
+                        shell:WindowChrome.IsHitTestVisibleInChrome="True"
+                        Click="Close_Click">
+					<TextBlock Text="✕" FontSize="12"
+                               HorizontalAlignment="Center"
+                               VerticalAlignment="Center"/>
+				</Button>
+			</StackPanel>
+		</Grid>
+
+		<!-- Content -->
+		<Border Grid.Row="1"
+                Margin="14"
+                Padding="16"
+                Background="{DynamicResource App.Background}"
+                BorderBrush="{DynamicResource Surface.Border}"
+                BorderThickness="1"
+                CornerRadius="12"
+                MinWidth="560">
+
+			<Border Padding="16"
+                    Background="{DynamicResource Surface.Background}"
+                    BorderBrush="{DynamicResource Surface.Border}"
+                    BorderThickness="1"
+                    CornerRadius="10">
+
+				<Grid>
+					<Grid.RowDefinitions>
+						<RowDefinition Height="Auto"/>
+						<RowDefinition Height="12"/>
+						<RowDefinition Height="Auto"/>
+						<RowDefinition Height="Auto"/>
+						<RowDefinition Height="Auto"/>
+						<RowDefinition Height="18"/>
+						<RowDefinition Height="Auto"/>
+					</Grid.RowDefinitions>
+
+					<Grid.ColumnDefinitions>
+						<ColumnDefinition Width="180"/>
+						<ColumnDefinition Width="*"/>
+					</Grid.ColumnDefinitions>
+
+					<!-- Header -->
+					<Grid Grid.Row="0" Grid.ColumnSpan="2" Margin="0,0,0,6">
+						<StackPanel>
+							<TextBlock x:Name="HeaderTitleText"
+                                       Text="Operacja"
+                                       FontSize="18"
+                                       FontWeight="Bold"
+                                       Foreground="{DynamicResource App.Foreground}"/>
+							<TextBlock x:Name="HeaderSubtitleText"
+                                       Text="Wprowadź kwotę i wybierz źródło / cel."
+                                       Opacity="0.75"
+                                       Foreground="{DynamicResource App.Foreground}"/>
+						</StackPanel>
+					</Grid>
+
+					<!-- Kwota -->
+					<TextBlock Grid.Row="2" Grid.Column="0"
+                               Text="Kwota:"
+                               VerticalAlignment="Center"
+                               Margin="0,0,10,0"/>
+
+					<StackPanel Grid.Row="2" Grid.Column="1">
+						<TextBox x:Name="AmountBox"
+                                 Height="26"
+                                 HorizontalContentAlignment="Right"
+                                 VerticalContentAlignment="Center"
+                                 GotFocus="AmountBox_GotFocus"
+                                 LostFocus="AmountBox_LostFocus"/>
+
+						<TextBlock x:Name="ErrorText"
+                                   Margin="2,4,0,0"
+                                   Foreground="{DynamicResource Brand.Red}"
+                                   FontSize="11"
+                                   TextWrapping="Wrap"
+                                   Visibility="Collapsed"/>
+					</StackPanel>
+
+					<!-- Typ -->
+					<TextBlock Grid.Row="3" Grid.Column="0"
+                               Text="Typ:"
+                               VerticalAlignment="Top"
+                               Margin="0,10,10,0"/>
+
+					<Grid Grid.Row="3" Grid.Column="1" Margin="0,10,0,0">
+						<UniformGrid Columns="3" HorizontalAlignment="Left">
+							<RadioButton x:Name="FreeRadio"
+                                         Content="Wolna gotówka"
+                                         Tag="free"
+                                         IsChecked="True"
+                                         Style="{StaticResource PillRadio}"
+                                         Margin="0,0,10,0"/>
+
+							<RadioButton x:Name="SavedRadio"
+                                         Content="Odłożona gotówka"
+                                         Tag="saved"
+                                         Style="{StaticResource PillRadio}"
+                                         Margin="0,0,10,0"/>
+
+							<RadioButton x:Name="EnvelopeRadio"
+                                         Content="Koperta"
+                                         Tag="envelope"
+                                         Style="{StaticResource PillRadio}"/>
+						</UniformGrid>
+					</Grid>
+
+					<!-- Koperta -->
+					<TextBlock Grid.Row="4" Grid.Column="0"
+                               Text="Koperta:"
+                               VerticalAlignment="Center"
+                               Margin="0,10,10,0"/>
+
+					<ComboBox x:Name="EnvelopeCombo"
+                              Grid.Row="4" Grid.Column="1"
+                              Margin="0,10,0,0"
+                              MinWidth="260"
+                              Visibility="Collapsed"/>
+
+					<!-- Buttons -->
+					<StackPanel Grid.Row="6"
+                                Grid.ColumnSpan="2"
+                                Orientation="Horizontal"
+                                HorizontalAlignment="Right">
+						<Button Content="Anuluj"
+                                Style="{StaticResource SecondaryButton}"
+                                IsCancel="True"
+                                Click="Cancel_Click"/>
+
+						<Button Content="Zapisz"
+                                Style="{StaticResource PrimaryButton}"
+                                Margin="8,0,0,0"
+                                IsDefault="True"
+                                Click="Ok_Click"/>
+					</StackPanel>
+				</Grid>
+			</Border>
+		</Border>
+	</Grid>
+</Window>

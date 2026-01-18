@@ -1,0 +1,236 @@
+﻿<Window x:Class="Finly.Views.Dialogs.EnvelopeEditDialog"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:shell="clr-namespace:System.Windows.Shell;assembly=PresentationFramework"
+        Title="Koperta"
+        WindowStartupLocation="CenterOwner"
+        ResizeMode="NoResize"
+        WindowStyle="None"
+        Width="820"
+        Height="620"
+        MinWidth="820"
+        MinHeight="620"
+        Background="{DynamicResource App.Background}"
+        Foreground="{DynamicResource App.Foreground}"
+        Icon="/Assets/Icons/logoFinly.ico"
+        SnapsToDevicePixels="True"
+        UseLayoutRounding="True"
+        TextOptions.TextFormattingMode="Display"
+        TextOptions.TextRenderingMode="ClearType">
+
+	<shell:WindowChrome.WindowChrome>
+		<shell:WindowChrome CaptionHeight="40"
+                            ResizeBorderThickness="0"
+                            CornerRadius="0"
+                            UseAeroCaptionButtons="False"/>
+	</shell:WindowChrome.WindowChrome>
+
+	<Grid>
+		<Grid.RowDefinitions>
+			<RowDefinition Height="40"/>
+			<RowDefinition Height="*"/>
+		</Grid.RowDefinitions>
+
+		<!-- TITLE BAR -->
+		<Grid Grid.Row="0"
+              Background="{DynamicResource TitleBar.Background}"
+              MouseLeftButtonDown="TitleBar_MouseLeftButtonDown">
+			<Grid.ColumnDefinitions>
+				<ColumnDefinition/>
+				<ColumnDefinition Width="Auto"/>
+			</Grid.ColumnDefinitions>
+
+			<TextBlock Text="Koperta"
+                       VerticalAlignment="Center"
+                       Margin="12,0,0,0"
+                       Foreground="{DynamicResource App.Foreground}"
+                       FontSize="13"
+                       shell:WindowChrome.IsHitTestVisibleInChrome="True"/>
+
+			<Button Grid.Column="1"
+                    Width="46"
+                    Height="32"
+                    Background="Transparent"
+                    BorderBrush="{x:Null}"
+                    Foreground="{DynamicResource App.Foreground}"
+                    Cursor="Hand"
+                    FocusVisualStyle="{x:Null}"
+                    shell:WindowChrome.IsHitTestVisibleInChrome="True"
+                    Click="Close_Click">
+				<TextBlock Text="✕"
+                           FontSize="12"
+                           HorizontalAlignment="Center"
+                           VerticalAlignment="Center"/>
+			</Button>
+		</Grid>
+
+		<!-- CONTENT -->
+		<Border Grid.Row="1"
+                Margin="14"
+                Padding="16"
+                Background="{DynamicResource App.Background}"
+                BorderBrush="{DynamicResource Surface.Border}"
+                BorderThickness="1"
+                CornerRadius="12">
+
+			<Border Padding="16"
+                    Background="{DynamicResource Surface.Background}"
+                    BorderBrush="{DynamicResource Surface.Border}"
+                    BorderThickness="1"
+                    CornerRadius="10">
+
+				<!-- Najważniejsze: Description dostaje wiersz "*" żeby NIE wypychać przycisków -->
+				<Grid>
+					<Grid.RowDefinitions>
+						<RowDefinition Height="Auto"/>
+						<!-- Header -->
+						<RowDefinition Height="12"/>
+
+						<RowDefinition Height="Auto"/>
+						<!-- Nazwa -->
+						<RowDefinition Height="Auto"/>
+						<!-- Przydzielono -->
+						<RowDefinition Height="Auto"/>
+						<!-- Docelowa -->
+						<RowDefinition Height="Auto"/>
+						<!-- Cel -->
+
+						<RowDefinition Height="*"/>
+						<!-- Opis (rozciąga się, ale nie wypycha przycisków) -->
+
+						<RowDefinition Height="Auto"/>
+						<!-- Termin -->
+
+						<RowDefinition Height="0"/>
+						<!-- MonthlyRequiredText (ukryty, tylko dla code-behind) -->
+
+						<RowDefinition Height="18"/>
+						<RowDefinition Height="Auto"/>
+						<!-- Buttons -->
+					</Grid.RowDefinitions>
+
+					<Grid.ColumnDefinitions>
+						<ColumnDefinition Width="190"/>
+						<ColumnDefinition Width="*"/>
+					</Grid.ColumnDefinitions>
+
+					<!-- HEADER -->
+					<StackPanel Grid.Row="0"
+                                Grid.ColumnSpan="2"
+                                Margin="0,0,0,6">
+						<TextBlock x:Name="HeaderTitleText"
+                                   Text="Dodaj kopertę"
+                                   FontSize="18"
+                                   FontWeight="Bold"
+                                   Foreground="{DynamicResource App.Foreground}"/>
+						<TextBlock x:Name="HeaderSubtitleText"
+                                   Text="Uzupełnij dane koperty i zapisz."
+                                   Opacity="0.75"
+                                   Foreground="{DynamicResource App.Foreground}"/>
+					</StackPanel>
+
+					<!-- NAZWA -->
+					<TextBlock Grid.Row="2" Grid.Column="0"
+                               Text="Nazwa:"
+                               VerticalAlignment="Center"
+                               Margin="0,0,10,0"/>
+					<TextBox x:Name="NameBox"
+                             Grid.Row="2" Grid.Column="1"
+                             Height="28"
+                             VerticalContentAlignment="Center"/>
+
+					<!-- ALLOCATED -->
+					<TextBlock Grid.Row="3" Grid.Column="0"
+                               Text="Przydzielono:"
+                               VerticalAlignment="Center"
+                               Margin="0,10,10,0"/>
+					<TextBox x:Name="AllocatedBox"
+                             Grid.Row="3" Grid.Column="1"
+                             Margin="0,10,0,0"
+                             Height="28"
+                             HorizontalContentAlignment="Right"
+                             VerticalContentAlignment="Center"
+                             GotFocus="MoneyBox_GotFocus"
+                             LostFocus="MoneyBox_LostFocus"/>
+
+					<!-- TARGET -->
+					<TextBlock Grid.Row="4" Grid.Column="0"
+                               Text="Docelowa kwota:"
+                               VerticalAlignment="Center"
+                               Margin="0,10,10,0"/>
+					<TextBox x:Name="TargetBox"
+                             Grid.Row="4" Grid.Column="1"
+                             Margin="0,10,0,0"
+                             Height="28"
+                             HorizontalContentAlignment="Right"
+                             VerticalContentAlignment="Center"
+                             GotFocus="MoneyBox_GotFocus"
+                             LostFocus="MoneyBox_LostFocus"/>
+
+					<!-- CEL -->
+					<TextBlock Grid.Row="5" Grid.Column="0"
+                               Text="Cel:"
+                               VerticalAlignment="Top"
+                               Margin="0,10,10,0"/>
+					<TextBox x:Name="GoalBox"
+                             Grid.Row="5" Grid.Column="1"
+                             Margin="0,10,0,0"
+                             Height="70"
+                             TextWrapping="Wrap"
+                             AcceptsReturn="True"
+                             VerticalScrollBarVisibility="Disabled"/>
+
+					<!-- OPIS -->
+					<TextBlock Grid.Row="6" Grid.Column="0"
+                               Text="Opis:"
+                               VerticalAlignment="Top"
+                               Margin="0,10,10,0"/>
+					<TextBox x:Name="DescriptionBox"
+                             Grid.Row="6" Grid.Column="1"
+                             Margin="0,10,0,0"
+                             TextWrapping="Wrap"
+                             AcceptsReturn="True"
+                             VerticalScrollBarVisibility="Disabled"
+                             VerticalAlignment="Stretch"/>
+
+					<!-- TERMIN -->
+					<TextBlock Grid.Row="7" Grid.Column="0"
+                               Text="Termin (data):"
+                               VerticalAlignment="Center"
+                               Margin="0,10,10,0"/>
+					<DatePicker x:Name="DeadlinePicker"
+                                Grid.Row="7" Grid.Column="1"
+                                Margin="0,10,0,0"
+                                Height="30"
+                                SelectedDateChanged="DeadlinePicker_SelectedDateChanged"/>
+
+					<!-- UKRYTE, ALE ZOSTAJE DLA CODE-BEHIND -->
+					<TextBlock x:Name="MonthlyRequiredText"
+                               Grid.Row="8"
+                               Grid.ColumnSpan="2"
+                               Visibility="Collapsed"
+                               Text=""/>
+
+					<!-- BUTTONS -->
+					<StackPanel Grid.Row="10"
+                                Grid.ColumnSpan="2"
+                                Orientation="Horizontal"
+                                HorizontalAlignment="Right">
+						<Button Content="Anuluj"
+                                Style="{StaticResource SecondaryButton}"
+                                IsCancel="True"
+                                Click="Cancel_Click"/>
+
+						<Button x:Name="SaveBtn"
+                                Content="Zapisz"
+                                Style="{StaticResource PrimaryButton}"
+                                Margin="8,0,0,0"
+                                IsDefault="True"
+                                Click="Ok_Click"/>
+					</StackPanel>
+
+				</Grid>
+			</Border>
+		</Border>
+	</Grid>
+</Window>

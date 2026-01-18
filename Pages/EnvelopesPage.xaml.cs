@@ -1,4 +1,6 @@
-﻿using Finly.Services.Features;
+﻿using Finly.Services;
+using Finly.Services.Features;
+using Finly.Views.Dialogs;
 using System;
 using System.Collections.ObjectModel;
 using System.Data;
@@ -8,7 +10,6 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
-using System.Windows.Media.Imaging;
 
 namespace Finly.Pages
 {
@@ -19,7 +20,6 @@ namespace Finly.Pages
     {
         private int _userId;
         private DataTable? _dt;
-        private int? _editingId = null;
 
         // kolekcja kart (koperty + kafelek Dodaj)
         private readonly ObservableCollection<object> _cards = new();
@@ -31,10 +31,10 @@ namespace Finly.Pages
         {
             InitializeComponent();
             EnvelopesCards.ItemsSource = _cards;
+
             Loaded += EnvelopesPage_Loaded;
             Unloaded += EnvelopesPage_Unloaded;
 
-            // subskrybuj zmiany w DB żeby UI odświeżało się automatycznie
             DatabaseService.DataChanged += DatabaseService_DataChanged;
         }
 
@@ -52,7 +52,6 @@ namespace Finly.Pages
                 return;
 
             LoadAll();
-            FormBorder.Visibility = Visibility.Collapsed;
         }
 
         // ===================== LOAD =====================
@@ -61,50 +60,26 @@ namespace Finly.Pages
         {
             try
             {
-                // 1) odłożona gotówka (total saved cash)
                 _savedTotal = DatabaseService.GetSavedCash(_userId);
-
-                // 2) cała gotówka (wolna + odłożona + w kopertach)
                 var cashOnHand = DatabaseService.GetCashOnHand(_userId);
 
-                // 3) tabela kopert
                 _dt = DatabaseService.GetEnvelopesTable(_userId);
 
                 if (_dt != null)
                 {
-                    if (!_dt.Columns.Contains("Remaining"))
-                        _dt.Columns.Add("Remaining", typeof(decimal));
-
-                    if (!_dt.Columns.Contains("GoalText"))
-                        _dt.Columns.Add("GoalText", typeof(string));
-
-                    if (!_dt.Columns.Contains("Description"))
-                        _dt.Columns.Add("Description", typeof(string));
-
-                    if (!_dt.Columns.Contains("Deadline"))
-                        _dt.Columns.Add("Deadline", typeof(string));
-
-                    if (!_dt.Columns.Contains("MonthlyRequired"))
-                        _dt.Columns.Add("MonthlyRequired", typeof(decimal));
+                    EnsureComputedColumns(_dt);
 
                     foreach (DataRow r in _dt.Rows)
                     {
                         var target = SafeDec(r["Target"]);
                         var alloc = SafeDec(r["Allocated"]);
+
                         r["Remaining"] = target - alloc;
 
                         SplitNote(r["Note"]?.ToString(), out var goal, out var description, out var deadline);
 
-                        // Cel
-                        r["GoalText"] = string.IsNullOrWhiteSpace(goal)
-                            ? "Brak"
-                            : goal;
-
-                        // Opis
-                        r["Description"] = string.IsNullOrWhiteSpace(description)
-                            ? "Brak"
-                            : description;
-
+                        r["GoalText"] = string.IsNullOrWhiteSpace(goal) ? "Brak" : goal;
+                        r["Description"] = string.IsNullOrWhiteSpace(description) ? "Brak" : description;
 
                         if (deadline.HasValue)
                         {
@@ -127,7 +102,6 @@ namespace Finly.Pages
                             r["Deadline"] = "Brak";
                             r["MonthlyRequired"] = 0m;
                         }
-
                     }
                 }
 
@@ -140,50 +114,217 @@ namespace Finly.Pages
                 _cards.Add(new AddEnvelopeTile());
 
                 // ===== AGREGATY =====
-                var allocated = _dt?.AsEnumerable().Sum(r => SafeDec(r["Allocated"])) ?? 0m;
+                var allocatedSum = _dt?.AsEnumerable().Sum(r => SafeDec(r["Allocated"])) ?? 0m;
 
-                // wolna gotówka do wydawania = cała gotówka - (odłożona całkowita)
-                // cashOnHand = free + savedTotal, so free = cashOnHand - savedTotal
                 var freeSpending = cashOnHand - _savedTotal;
                 if (freeSpending < 0m) freeSpending = 0m;
 
-                // Gotówka w kopertach
-                TotalEnvelopesText.Text = allocated.ToString("N2") + " zł";
+                TotalEnvelopesText.Text = allocatedSum.ToString("N2", CultureInfo.CurrentCulture) + " zł";
+                SavedCashText.Text = freeSpending.ToString("N2", CultureInfo.CurrentCulture) + " zł";
 
-                // Wolna gotówka
-                SavedCashText.Text = freeSpending.ToString("N2") + " zł";
-
-                // Odłożona gotówka (POZA kopertami) -> pokaż pulę do rozdysponowania
-                // Pula odłożonej gotówki do rozdysponowania na koperty = SavedTotal - suma Allocated
-                var distributable = _savedTotal - allocated;
-                EnvelopesSumText.Text = distributable.ToString("N2") + " zł";
+                var distributable = _savedTotal - allocatedSum;
+                EnvelopesSumText.Text = distributable.ToString("N2", CultureInfo.CurrentCulture) + " zł";
                 EnvelopesSumText.Foreground = distributable < 0
                     ? Brushes.IndianRed
                     : (Brush)FindResource("App.Foreground");
             }
             catch (Exception ex)
             {
-                FormMessage.Text = "Błąd odczytu: " + ex.Message;
+                ToastService.Error("Błąd odczytu kopert: " + ex.Message);
             }
         }
 
+        private static void EnsureComputedColumns(DataTable dt)
+        {
+            if (!dt.Columns.Contains("Remaining"))
+                dt.Columns.Add("Remaining", typeof(decimal));
 
+            if (!dt.Columns.Contains("GoalText"))
+                dt.Columns.Add("GoalText", typeof(string));
+
+            if (!dt.Columns.Contains("Description"))
+                dt.Columns.Add("Description", typeof(string));
+
+            if (!dt.Columns.Contains("Deadline"))
+                dt.Columns.Add("Deadline", typeof(string));
+
+            if (!dt.Columns.Contains("MonthlyRequired"))
+                dt.Columns.Add("MonthlyRequired", typeof(decimal));
+        }
+
+        // ===================== UI: Add/Edit dialog =====================
+
+        private void AddEnvelopeCard_Click(object sender, MouseButtonEventArgs e)
+        {
+            if (e.ChangedButton != MouseButton.Left) return;
+            OpenEnvelopeDialogAdd();
+        }
+
+        private void EditEnvelope_Click(object sender, RoutedEventArgs e)
+        {
+            if ((sender as Button)?.Tag is not DataRowView drv) return;
+
+            var row = drv.Row;
+            var id = Convert.ToInt32(row["Id"]);
+
+            OpenEnvelopeDialogEdit(id, row);
+        }
+
+        private void OpenEnvelopeDialogAdd()
+        {
+            try
+            {
+                var dlg = new EnvelopeEditDialog
+                {
+                    Owner = Window.GetWindow(this)
+                };
+
+                dlg.SetMode(EnvelopeEditDialog.DialogMode.Add);
+                dlg.LoadForAdd();
+
+                if (dlg.ShowDialog() != true)
+                    return;
+
+                SaveEnvelopeFromDialog(dlg.Result);
+            }
+            catch (Exception ex)
+            {
+                ToastService.Error("Nie udało się otworzyć okna koperty: " + ex.Message);
+            }
+        }
+
+        private void OpenEnvelopeDialogEdit(int id, DataRow row)
+        {
+            try
+            {
+                var name = row["Name"]?.ToString() ?? "";
+                var target = SafeDec(row["Target"]);
+                var allocated = SafeDec(row["Allocated"]);
+                var note = row["Note"]?.ToString() ?? "";
+
+                var dlg = new EnvelopeEditDialog
+                {
+                    Owner = Window.GetWindow(this)
+                };
+
+                dlg.SetMode(EnvelopeEditDialog.DialogMode.Edit);
+                dlg.LoadForEdit(id, name, target, allocated, note);
+
+                if (dlg.ShowDialog() != true)
+                    return;
+
+                SaveEnvelopeFromDialog(dlg.Result);
+            }
+            catch (Exception ex)
+            {
+                ToastService.Error("Nie udało się otworzyć edycji koperty: " + ex.Message);
+            }
+        }
+
+        private void SaveEnvelopeFromDialog(EnvelopeEditDialog.EnvelopeEditResult r)
+        {
+            // walidacja środków (zostaje jak było)
+            if (!ValidateAllocationAgainstSavedCash(_userId, r.EditingId, r.Allocated, out var fundsMsg))
+            {
+                ToastService.Info(fundsMsg);
+                return;
+            }
+
+            try
+            {
+                int envelopeId;
+
+                if (r.EditingId is int editId)
+                {
+                    DatabaseService.UpdateEnvelope(editId, _userId, r.Name, r.Target, r.Allocated, r.Note);
+                    envelopeId = editId;
+                    ToastService.Success("Zapisano zmiany koperty.");
+                }
+                else
+                {
+                    envelopeId = DatabaseService.InsertEnvelope(_userId, r.Name, r.Target, r.Allocated, r.Note);
+                    ToastService.Success("Dodano kopertę.");
+                }
+
+                // cel tylko gdy spełnione warunki
+                if (r.ShouldCreateGoal && r.Deadline.HasValue)
+                {
+                    DatabaseService.UpdateEnvelopeGoal(
+                        _userId,
+                        envelopeId,
+                        r.Target,
+                        r.Allocated,
+                        r.Deadline.Value,
+                        r.Note
+                    );
+                }
+
+                LoadAll();
+            }
+            catch (Exception ex)
+            {
+                ToastService.Error("Błąd zapisu koperty: " + ex.Message);
+            }
+        }
+
+        // ===================== UI: Delete inline confirm =====================
+
+        private void DeleteEnvelope_Click(object sender, RoutedEventArgs e)
+        {
+            if ((sender as Button)?.Tag is not DataRowView) return;
+
+            var btn = sender as Button;
+            var cardBorder = FindVisualParent<Border>(btn);
+            if (cardBorder == null) return;
+
+            var confirmPanel = FindDescendantByName<FrameworkElement>(cardBorder, "DeleteConfirmPanel");
+            if (confirmPanel == null) return;
+
+            if (confirmPanel.Visibility == Visibility.Visible)
+            {
+                confirmPanel.Visibility = Visibility.Collapsed;
+            }
+            else
+            {
+                HideAllDeleteConfirmPanels();
+                confirmPanel.Visibility = Visibility.Visible;
+            }
+        }
+
+        private void ConfirmDeleteEnvelope_Click(object sender, RoutedEventArgs e)
+        {
+            if ((sender as Button)?.Tag is not DataRowView drv) return;
+
+            var row = drv.Row;
+            var id = Convert.ToInt32(row["Id"]);
+
+            try
+            {
+                DatabaseService.DeleteEnvelope(id);
+                ToastService.Success("Kopertę usunięto.");
+                LoadAll();
+            }
+            catch (Exception ex)
+            {
+                ToastService.Error("Błąd usuwania koperty: " + ex.Message);
+            }
+            finally
+            {
+                HideAllDeleteConfirmPanels();
+            }
+        }
+
+        private void CancelDeleteEnvelope_Click(object sender, RoutedEventArgs e)
+        {
+            var btn = sender as Button;
+            var cardBorder = FindVisualParent<Border>(btn);
+            if (cardBorder == null) return;
+
+            var confirmPanel = FindDescendantByName<FrameworkElement>(cardBorder, "DeleteConfirmPanel");
+            if (confirmPanel != null) confirmPanel.Visibility = Visibility.Collapsed;
+        }
 
         // ===================== HELPERS =====================
-
-        private static decimal SafeParse(string? s)
-        {
-            if (string.IsNullOrWhiteSpace(s)) return 0m;
-            var raw = s.Replace(" ", "");
-
-            if (decimal.TryParse(raw, NumberStyles.Number, CultureInfo.CurrentCulture, out var d))
-                return d;
-
-            if (decimal.TryParse(raw, NumberStyles.Number, CultureInfo.InvariantCulture, out d))
-                return d;
-
-            return 0m;
-        }
 
         private static decimal SafeDec(object? o)
         {
@@ -196,13 +337,12 @@ namespace Finly.Pages
         {
             if (to <= from) return 0;
             int months = (to.Year - from.Year) * 12 + (to.Month - from.Month);
-            if (to.Day > from.Day)
-                months++;
+            if (to.Day > from.Day) months++;
             return months;
         }
 
         /// <summary>
-        /// Note jest zapisywany jako:
+        /// Note:
         /// "Cel: ....\nOpis: ....\nTermin: RRRR-MM-DD"
         /// </summary>
         private static void SplitNote(string? note, out string goal, out string description, out DateTime? deadline)
@@ -252,293 +392,12 @@ namespace Finly.Pages
             }
         }
 
-        private static string BuildNote(string goal, string description, DateTime? deadline)
-        {
-            goal = (goal ?? "").Trim();
-            description = (description ?? "").Trim();
-
-            var parts = new System.Collections.Generic.List<string>();
-
-            if (!string.IsNullOrEmpty(goal))
-                parts.Add($"Cel: {goal}");
-
-            if (!string.IsNullOrEmpty(description))
-                parts.Add($"Opis: {description}");
-
-            if (deadline.HasValue)
-                parts.Add("Termin: " + deadline.Value.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture));
-
-            return string.Join("\n", parts);
-        }
-
-        private void RecalculateMonthlyRequired()
-        {
-            var target = SafeParse(TargetBox.Text);
-            var allocated = SafeParse(AllocatedBox.Text);
-            var remaining = target - allocated;
-
-            if (remaining <= 0m)
-            {
-                MonthlyRequiredText.Text = "0,00 zł";
-                return;
-            }
-
-            var deadline = DeadlinePicker.SelectedDate;
-            if (deadline == null)
-            {
-                MonthlyRequiredText.Text = "-";
-                return;
-            }
-
-            int monthsLeft = MonthsBetween(DateTime.Today, deadline.Value.Date);
-            if (monthsLeft <= 0)
-                monthsLeft = 1;
-
-            var perMonth = remaining / monthsLeft;
-            MonthlyRequiredText.Text = perMonth.ToString("N2") + " zł";
-        }
-
-        private void SetAddMode()
-        {
-            _editingId = null;
-            FormHeader.Text = "Dodaj kopertę";
-
-            NameBox.Text = string.Empty;
-            TargetBox.Text = "0,00";
-            AllocatedBox.Text = "0,00";
-            GoalBox.Text = string.Empty;
-            DescriptionBox.Text = string.Empty;
-            DeadlinePicker.SelectedDate = null;
-            MonthlyRequiredText.Text = "-";
-
-            FormMessage.Text = string.Empty;
-            SaveEnvelopeBtn.Content = "Dodaj";
-
-            FormBorder.Visibility = Visibility.Visible;
-        }
-
-        private void SetEditMode(int id, DataRow row)
-        {
-            _editingId = id;
-            FormHeader.Text = "Edytuj kopertę";
-
-            NameBox.Text = row["Name"]?.ToString() ?? "";
-            TargetBox.Text = SafeDec(row["Target"]).ToString("N2");
-            AllocatedBox.Text = SafeDec(row["Allocated"]).ToString("N2");
-
-            SplitNote(row["Note"]?.ToString(), out var goal, out var description, out var deadline);
-            GoalBox.Text = goal;
-            DescriptionBox.Text = description;
-            DeadlinePicker.SelectedDate = deadline;
-
-            RecalculateMonthlyRequired();
-
-            FormMessage.Text = string.Empty;
-            SaveEnvelopeBtn.Content = "Zapisz zmiany";
-            FormBorder.Visibility = Visibility.Visible;
-        }
-
-        // ===================== ZDARZENIA UI =====================
-
-        private void AddEnvelopeCard_Click(object sender, MouseButtonEventArgs e)
-        {
-            SetAddMode();
-        }
-
-        private void AmountBox_GotFocus(object sender, RoutedEventArgs e)
-        {
-            if (sender is TextBox tb)
-            {
-                var t = tb.Text.Trim();
-                if (t == "0" || t == "0,00" || t == "0.00")
-                    tb.Text = "";
-            }
-        }
-
-        private void AmountBox_LostFocus(object sender, RoutedEventArgs e)
-        {
-            if (sender is TextBox tb)
-            {
-                var val = SafeParse(tb.Text);
-                tb.Text = val.ToString("N2");
-            }
-
-            RecalculateMonthlyRequired();
-        }
-
-        private void DeadlinePicker_SelectedDateChanged(object sender, SelectionChangedEventArgs e)
-        {
-            RecalculateMonthlyRequired();
-        }
-
-        private void EditEnvelope_Click(object sender, RoutedEventArgs e)
-        {
-            if ((sender as Button)?.Tag is not DataRowView drv) return;
-            var row = drv.Row;
-            var id = Convert.ToInt32(row["Id"]);
-            SetEditMode(id, row);
-        }
-
-        // show / hide inline confirmation (nie MsgBox)
-        private void DeleteEnvelope_Click(object sender, RoutedEventArgs e)
-        {
-            if ((sender as Button)?.Tag is not DataRowView drv) return;
-            var btn = sender as Button;
-
-            // znajdź kontener karty (Border) i panel potwierdzenia wewnątrz niej
-            var cardBorder = FindVisualParent<Border>(btn);
-            if (cardBorder == null) return;
-
-            var confirmPanel = FindDescendantByName<FrameworkElement>(cardBorder, "DeleteConfirmPanel");
-            if (confirmPanel == null) return;
-
-            // przełącz widoczność; przed pokazaniem ukryj inne panele
-            if (confirmPanel.Visibility == Visibility.Visible)
-            {
-                confirmPanel.Visibility = Visibility.Collapsed;
-            }
-            else
-            {
-                HideAllDeleteConfirmPanels();
-                confirmPanel.Visibility = Visibility.Visible;
-            }
-        }
-
-        // potwierdź usunięcie (Tak)
-        private void ConfirmDeleteEnvelope_Click(object sender, RoutedEventArgs e)
-        {
-            if ((sender as Button)?.Tag is not DataRowView drv) return;
-
-            var row = drv.Row;
-            var id = Convert.ToInt32(row["Id"]);
-            // var allocated = SafeDec(row["Allocated"]);
-
-            try
-            {
-                // Usuwamy kopertę. Nie modyfikujemy SavedCash tutaj –
-                // SavedCash w DB reprezentuje całą pulę odłożonej gotówki,
-                // a przydział do kopert jest odzielną kolumną Allocated.
-                DatabaseService.DeleteEnvelope(id);
-
-                LoadAll();
-                FormBorder.Visibility = Visibility.Collapsed;
-                FormMessage.Text = "Kopertę usunięto.";
-            }
-            catch (Exception ex)
-            {
-                FormMessage.Text = "Błąd usuwania: " + ex.Message;
-            }
-        }
-
-
-        // anuluj potwierdzenie (Nie)
-        private void CancelDeleteEnvelope_Click(object sender, RoutedEventArgs e)
-        {
-            var btn = sender as Button;
-            var cardBorder = FindVisualParent<Border>(btn);
-            if (cardBorder == null) return;
-            var confirmPanel = FindDescendantByName<FrameworkElement>(cardBorder, "DeleteConfirmPanel");
-            if (confirmPanel != null) confirmPanel.Visibility = Visibility.Collapsed;
-        }
-
-        private void SaveEnvelope_Click(object sender, RoutedEventArgs e)
-        {
-            var name = (NameBox.Text ?? "").Trim();
-            var target = SafeParse(TargetBox.Text);
-            var allocated = SafeParse(AllocatedBox.Text);
-            var goal = (GoalBox.Text ?? "").Trim();
-            var description = (DescriptionBox.Text ?? "").Trim();
-            var deadline = DeadlinePicker.SelectedDate;
-
-            if (string.IsNullOrWhiteSpace(name))
-            {
-                FormMessage.Text = "Podaj nazwę koperty.";
-                return;
-            }
-
-            if (allocated < 0 || target < 0)
-            {
-                FormMessage.Text = "Kwoty nie mogą być ujemne.";
-                return;
-            }
-
-            // >>>>>> WALIDACJA ŚRODKÓW (zostaje jak było) <<<<<<
-            if (!ValidateAllocationAgainstSavedCash(_userId, _editingId, allocated, out var fundsMsg))
-            {
-                FormMessage.Text = fundsMsg;
-                return;
-            }
-
-            // Cel ma się tworzyć TYLKO gdy:
-            // - jest nazwa celu
-            // - jest termin
-            // - target > 0
-            bool shouldCreateGoal =
-                !string.IsNullOrWhiteSpace(goal) &&
-                deadline.HasValue &&
-                target > 0m;
-
-            // Jeżeli nie tworzymy celu, to nie zapisujemy terminu w NOTE,
-            // żeby koperta nie była traktowana jako "cel" w innych miejscach.
-            var effectiveDeadline = shouldCreateGoal ? deadline : null;
-
-            // NOTE zawsze zapisujemy (opis może być bez celu)
-            var note = BuildNote(goal, description, effectiveDeadline);
-
-            try
-            {
-                int envelopeId;
-
-                if (_editingId is int id)
-                {
-                    DatabaseService.UpdateEnvelope(id, _userId, name, target, allocated, note);
-                    envelopeId = id;
-                    FormMessage.Text = "Zapisano zmiany.";
-                }
-                else
-                {
-                    envelopeId = DatabaseService.InsertEnvelope(_userId, name, target, allocated, note);
-                    FormMessage.Text = "Dodano kopertę.";
-                }
-
-                // Aktualizacja danych celu dla zakładki „Cele” TYLKO gdy spełnione warunki
-                if (shouldCreateGoal)
-                {
-                    DatabaseService.UpdateEnvelopeGoal(
-                        _userId,
-                        envelopeId,
-                        target,
-                        allocated,
-                        deadline!.Value,
-                        note
-                    );
-                }
-
-                _editingId = null;
-                LoadAll();
-                FormBorder.Visibility = Visibility.Collapsed;
-            }
-            catch (Exception ex)
-            {
-                FormMessage.Text = "Błąd zapisu: " + ex.Message;
-            }
-        }
-
-
-
-
-        private void CancelEdit_Click(object sender, RoutedEventArgs e)
-        {
-            _editingId = null;
-            FormBorder.Visibility = Visibility.Collapsed;
-            FormMessage.Text = string.Empty;
-        }
-
         // ===================== VisualTree helpers =====================
 
         private static T? FindVisualParent<T>(DependencyObject? child) where T : DependencyObject
         {
             if (child == null) return null;
+
             DependencyObject? parent = VisualTreeHelper.GetParent(child);
             while (parent != null && parent is not T)
             {
@@ -550,12 +409,15 @@ namespace Finly.Pages
         private static T? FindDescendantByName<T>(DependencyObject? start, string name) where T : FrameworkElement
         {
             if (start == null) return null;
+
             int cnt = VisualTreeHelper.GetChildrenCount(start);
             for (int i = 0; i < cnt; i++)
             {
                 var ch = VisualTreeHelper.GetChild(start, i) as FrameworkElement;
                 if (ch == null) continue;
+
                 if (ch is T fe && fe.Name == name) return fe;
+
                 var deeper = FindDescendantByName<T>(ch, name);
                 if (deeper != null) return deeper;
             }
@@ -564,20 +426,22 @@ namespace Finly.Pages
 
         private void HideAllDeleteConfirmPanels()
         {
-            // przeszukaj visual tree od kontrolki EnvelopesCards i ukryj wszystkie panele DeleteConfirmPanel
             CollapseDeleteConfirm(EnvelopesCards);
         }
 
         private void CollapseDeleteConfirm(DependencyObject? parent)
         {
             if (parent == null) return;
+
             int cnt = VisualTreeHelper.GetChildrenCount(parent);
             for (int i = 0; i < cnt; i++)
             {
                 var ch = VisualTreeHelper.GetChild(parent, i) as FrameworkElement;
                 if (ch == null) continue;
+
                 if (ch.Name == "DeleteConfirmPanel")
                     ch.Visibility = Visibility.Collapsed;
+
                 CollapseDeleteConfirm(ch);
             }
         }
@@ -592,17 +456,15 @@ namespace Finly.Pages
                 return false;
             }
 
-            // 1) Pula odłożonej gotówki
             var savedTotal = DatabaseService.GetSavedCash(userId);
 
-            // 2) Suma przydzielona do wszystkich kopert
             var dt = DatabaseService.GetEnvelopesTable(userId);
             decimal totalAllocated = 0m;
             decimal previousAllocated = 0m;
 
             if (dt != null)
             {
-                foreach (System.Data.DataRow r in dt.Rows)
+                foreach (DataRow r in dt.Rows)
                 {
                     var id = Convert.ToInt32(r["Id"]);
                     var alloc = 0m;
@@ -615,7 +477,6 @@ namespace Finly.Pages
                 }
             }
 
-            // 3) Ile wolno jeszcze przydzielić poza edytowaną kopertą
             var allocatedWithoutThis = totalAllocated - previousAllocated;
             var availableForThis = savedTotal - allocatedWithoutThis;
 
@@ -629,26 +490,19 @@ namespace Finly.Pages
             return true;
         }
 
+        // ===================== cleanup =====================
 
         private void EnvelopesPage_Unloaded(object sender, RoutedEventArgs e)
         {
-            // Odsubskrybuj zdarzenia, aby uniknąć wycieków pamięci
             Unloaded -= EnvelopesPage_Unloaded;
             Loaded -= EnvelopesPage_Loaded;
 
-            try
-            {
-                DatabaseService.DataChanged -= DatabaseService_DataChanged;
-            }
-            catch
-            {
-                // jeśli handler nie istnieje lub już został odsubskrybowany, nic nie rób
-            }
+            try { DatabaseService.DataChanged -= DatabaseService_DataChanged; }
+            catch { }
         }
 
         private void DatabaseService_DataChanged(object? sender, EventArgs e)
         {
-            // Odśwież dane po zmianie w bazie
             LoadAll();
         }
     }

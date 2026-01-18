@@ -1,9 +1,9 @@
-﻿using System;
+﻿using Finly.Services;
+using Finly.ViewModels;
+using System;
 using System.Windows;
 using System.Windows.Controls;
-using Finly.Services;
-using Finly.ViewModels;
-using Finly.Views.Controls;
+using System.Windows.Threading;
 
 namespace Finly.Pages
 {
@@ -12,12 +12,18 @@ namespace Finly.Pages
         // zabezpieczenie przed wielokrotnym podpinaniem eventów (WPF potrafi ponownie wywołać Loaded)
         private bool _eventsHooked;
 
+        private DispatcherTimer? _refreshDebounceTimer;
+        private ReportsViewModel? _vmForRefresh;
+
+        private ReportsViewModel? _hookedVm;
+
         public ReportsPage()
         {
             InitializeComponent();
 
             Loaded += ReportsPage_Loaded;
             Unloaded += ReportsPage_Unloaded;
+            DataContextChanged += ReportsPage_DataContextChanged;
         }
 
         // jeśli gdzieś tworzysz ReportsPage(int userId), zostawiamy, ale nic nie robimy,
@@ -31,9 +37,13 @@ namespace Finly.Pages
 
             try
             {
-                if (DataContext is not ReportsViewModel vm)
-                    return;
+                // KLUCZ: jeśli nawigacja/shell ustawia inny DataContext, KPI binduje w próżnię
+                if (DataContext is not ReportsViewModel)
+                    DataContext = new ReportsViewModel();
 
+                EnsureDebounceTimer();
+
+                // PeriodBar events
                 if (PeriodBar != null)
                 {
                     PeriodBar.SearchClicked += PeriodBar_SearchClicked;
@@ -41,12 +51,17 @@ namespace Finly.Pages
                     PeriodBar.ClearClicked += PeriodBar_ClearClicked;
                 }
 
-                // Pierwsze odświeżenie po załadowaniu strony
-                SafeExecute(vm.RefreshCommand);
+                HookVmPropertyChanged(GetVm());
+
+                // startowy refresh
+                Dispatcher.BeginInvoke(new Action(() =>
+                {
+                    RequestRefresh(GetVm());
+                }), DispatcherPriority.Background);
             }
             catch
             {
-                // celowo bez MessageBox (nie blokujemy UI)
+                // celowo cisza (UI ma się nie wywalać przez eventy)
             }
         }
 
@@ -64,71 +79,179 @@ namespace Finly.Pages
                     PeriodBar.ClearClicked -= PeriodBar_ClearClicked;
                 }
             }
-            catch
+            catch { }
+
+            try
             {
-                // bez wyjątków przy odpinaniu
+                if (_hookedVm != null)
+                {
+                    _hookedVm.PropertyChanged -= Vm_PropertyChanged;
+                    _hookedVm = null;
+                }
             }
+            catch { }
+
+            try
+            {
+                if (_refreshDebounceTimer != null)
+                {
+                    _refreshDebounceTimer.Stop();
+                    _refreshDebounceTimer.Tick -= RefreshDebounceTimer_Tick;
+                    _refreshDebounceTimer = null;
+                }
+            }
+            catch { }
+
+            try
+            {
+                _vmForRefresh = null;
+            }
+            catch { }
         }
 
-        private void PeriodBar_SearchClicked(object? sender, EventArgs e)
+        private void ReportsPage_DataContextChanged(object sender, DependencyPropertyChangedEventArgs e)
         {
             try
             {
-                if (DataContext is ReportsViewModel vm)
-                    SafeExecute(vm.RefreshCommand);
+                if (!_eventsHooked) return;
+
+                HookVmPropertyChanged(GetVm());
+
+                Dispatcher.BeginInvoke(new Action(() =>
+                {
+                    RequestRefresh(GetVm());
+                }), DispatcherPriority.Background);
             }
             catch { }
+        }
+
+        // =========================
+        // VM hooks
+        // =========================
+
+        private void HookVmPropertyChanged(ReportsViewModel? vm)
+        {
+            if (_hookedVm == vm) return;
+
+            if (_hookedVm != null)
+                _hookedVm.PropertyChanged -= Vm_PropertyChanged;
+
+            _hookedVm = vm;
+
+            if (_hookedVm != null)
+                _hookedVm.PropertyChanged += Vm_PropertyChanged;
+        }
+
+        private void Vm_PropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
+        {
+            // Reagujemy na zmiany dat (From/To) – to jest „źródło prawdy”
+            if (e.PropertyName == nameof(ReportsViewModel.FromDate) ||
+                e.PropertyName == nameof(ReportsViewModel.ToDate))
+            {
+                RequestRefresh(_hookedVm);
+            }
+        }
+
+        // =========================
+        // PeriodBar events
+        // =========================
+
+        private void PeriodBar_SearchClicked(object? sender, EventArgs e)
+        {
+            try { RequestRefresh(GetVm()); } catch { }
         }
 
         private void PeriodBar_RangeChanged(object? sender, EventArgs e)
         {
-            try
-            {
-                if (DataContext is ReportsViewModel vm)
-                    SafeExecute(vm.RefreshCommand);
-            }
-            catch { }
+            try { RequestRefresh(GetVm()); } catch { }
         }
 
         private void PeriodBar_ClearClicked(object? sender, EventArgs e)
         {
-            try
-            {
-                if (DataContext is not ReportsViewModel vm)
-                    return;
-
-                SafeExecute(vm.RefreshCommand);
-            }
-            catch { }
+            try { RequestRefresh(GetVm()); } catch { }
         }
+
+        // =========================
+        // Global PDF export
+        // =========================
 
         private void ExportButton_Click(object sender, RoutedEventArgs e)
         {
-            if (DataContext is not ReportsViewModel vm)
-                return;
+            var vm = GetVm();
+            if (vm == null) return;
 
             try
             {
-                // Najbezpieczniej: bez dodatkowych kontrolek renderujących.
                 var path = PdfExportService.ExportReportsPdf(vm, null);
                 ToastService.Success($"Raport PDF zapisano na pulpicie: {path}");
             }
             catch (Exception ex)
             {
-                ToastService.Error($"Błąd eksportu PDF: {ex.Message}");
+                try { ToastService.Error($"Błąd eksportu PDF: {ex.Message}"); } catch { }
             }
         }
 
-        private static void SafeExecute(System.Windows.Input.ICommand? command)
+        // =========================
+        // Refresh debounce
+        // =========================
+
+        private ReportsViewModel? GetVm() => DataContext as ReportsViewModel;
+
+        private void EnsureDebounceTimer()
         {
+            if (_refreshDebounceTimer != null) return;
+
+            _refreshDebounceTimer = new DispatcherTimer(DispatcherPriority.Background)
+            {
+                Interval = TimeSpan.FromMilliseconds(220)
+            };
+
+            _refreshDebounceTimer.Tick += RefreshDebounceTimer_Tick;
+        }
+
+        private async void RefreshDebounceTimer_Tick(object? sender, EventArgs e)
+        {
+            try { _refreshDebounceTimer?.Stop(); } catch { }
+
+            ReportsViewModel? vm;
+
             try
             {
-                if (command != null && command.CanExecute(null))
-                    command.Execute(null);
+                vm = _vmForRefresh;
+                _vmForRefresh = null;
             }
             catch
             {
-                // nie propagujemy wyjątków z komend
+                vm = null;
+            }
+
+            if (vm == null) return;
+
+            try
+            {
+                await vm.RefreshAsync();
+            }
+            catch (Exception ex)
+            {
+                try { ToastService.Error($"Błąd odświeżania raportów: {ex.Message}"); } catch { }
+            }
+        }
+
+        private void RequestRefresh(ReportsViewModel? vm)
+        {
+            if (vm == null) return;
+
+            try
+            {
+                EnsureDebounceTimer();
+                _vmForRefresh = vm;
+
+                _refreshDebounceTimer?.Stop();
+                _refreshDebounceTimer?.Start();
+            }
+            catch
+            {
+                // cisza
             }
         }
     }

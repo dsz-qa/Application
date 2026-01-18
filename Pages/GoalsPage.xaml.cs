@@ -1,6 +1,8 @@
 ﻿using Finly.Services;
 using Finly.Services.Features;
+using Finly.Views.Dialogs;
 using System;
+using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Globalization;
 using System.Linq;
@@ -8,26 +10,20 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
-using System.Collections.Generic;
 
 namespace Finly.Pages
 {
     public class GoalVm
     {
         public int EnvelopeId { get; set; }
-
-        // nazwa koperty (nie zmieniamy jej przy edycji celu)
         public string EnvelopeName { get; set; } = "";
-
-        // tytuł celu (to edytujesz w GoalsPage)
         public string GoalTitle { get; set; } = "";
-
         public decimal TargetAmount { get; set; }
         public decimal CurrentAmount { get; set; }
         public DateTime? DueDate { get; set; }
         public string Description { get; set; } = "";
 
-        // BACKWARD COMPAT: stare miejsca w projekcie oczekują GoalVm.Name
+        // BACKWARD COMPAT
         public string Name
         {
             get => EnvelopeName;
@@ -44,7 +40,6 @@ namespace Finly.Pages
 
                 var today = DateTime.Today;
                 var d = DueDate.Value.Date;
-
                 if (d <= today) return 0;
 
                 int months = (d.Year - today.Year) * 12 + (d.Month - today.Month);
@@ -79,9 +74,6 @@ namespace Finly.Pages
         }
     }
 
-    /// <summary>
-    /// Kafelek „Dodaj cel”.
-    /// </summary>
     public sealed class AddGoalTile { }
 
     public partial class GoalsPage : UserControl
@@ -90,7 +82,6 @@ namespace Finly.Pages
         private readonly ObservableCollection<object> _items = new();
 
         private int _uid => UserService.GetCurrentUserId();
-        private int? _editingEnvelopeId = null;
 
         public GoalsPage()
         {
@@ -98,8 +89,6 @@ namespace Finly.Pages
 
             GoalsRepeater.ItemsSource = _items;
             Loaded += GoalsPage_Loaded;
-
-            FormBorder.Visibility = Visibility.Collapsed;
         }
 
         private void GoalsPage_Loaded(object sender, RoutedEventArgs e)
@@ -114,7 +103,6 @@ namespace Finly.Pages
             var list = DatabaseService.GetEnvelopeGoals(_uid);
             foreach (var g in list)
             {
-                // UWAGA: GoalText powinien być w formacie NOTE: "Cel:\nOpis:\nTermin:"
                 var (goalTitle, description) = SplitGoalText(g.GoalText, g.Name);
 
                 _goals.Add(new GoalVm
@@ -127,8 +115,6 @@ namespace Finly.Pages
                     DueDate = g.Deadline,
                     Description = string.IsNullOrWhiteSpace(description) ? "Brak" : description
                 });
-
-
             }
 
             RebuildItems();
@@ -142,21 +128,7 @@ namespace Finly.Pages
             foreach (var g in _goals)
                 _items.Add(g);
 
-            // kafelek „Dodaj cel”
             _items.Add(new AddGoalTile());
-        }
-
-        private static decimal ParseDecimal(string? text)
-        {
-            if (string.IsNullOrWhiteSpace(text)) return 0m;
-            var raw = text.Replace(" ", "");
-
-            if (decimal.TryParse(raw, NumberStyles.Number, CultureInfo.CurrentCulture, out var d))
-                return d;
-            if (decimal.TryParse(raw, NumberStyles.Number, CultureInfo.InvariantCulture, out d))
-                return d;
-
-            return 0m;
         }
 
         private void RefreshKpis()
@@ -170,11 +142,7 @@ namespace Finly.Pages
             TotalMonthlyNeededText.Text = totalMonthly.ToString("N2") + " zł";
         }
 
-        /// <summary>
-        /// NOTE jest przechowywany jako:
-        /// "Cel: ....\nOpis: ....\nTermin: RRRR-MM-DD"
-        /// Ta funkcja wydobywa tytuł celu i opis (bez Terminu).
-        /// </summary>
+        // NOTE: "Cel: ...\nOpis: ...\nTermin: ..."
         private static (string goalTitle, string description) SplitGoalText(string? raw, string fallbackName)
         {
             if (string.IsNullOrWhiteSpace(raw))
@@ -195,22 +163,16 @@ namespace Finly.Pages
                 }
                 else if (line.StartsWith("Termin:", StringComparison.OrdinalIgnoreCase))
                 {
-                    // termin obsługujemy osobno (z kolumny Deadline)
                     continue;
                 }
                 else
                 {
-                    // opis lub inne linie
-                    // Jeśli linia zaczyna się od "Opis:", to usuwamy prefix,
-                    // bo nagłówek "Opis" i tak jest już w UI.
                     if (line.StartsWith("Opis:", StringComparison.OrdinalIgnoreCase))
                         line = line.Substring(5).Trim();
 
-                    // jeśli po ucięciu nic nie zostało – nie dodawaj
                     if (!string.IsNullOrWhiteSpace(line))
                         descLines.Add(line);
                 }
-
             }
 
             if (string.IsNullOrWhiteSpace(goalTitle))
@@ -221,13 +183,8 @@ namespace Finly.Pages
                 description = "Brak";
 
             return (goalTitle, description);
-
         }
 
-        /// <summary>
-        /// Buduje NOTE w identycznym formacie jak EnvelopesPage.BuildNote,
-        /// żeby Koperty i Cele były zawsze spójne.
-        /// </summary>
         private static string BuildNote(string goalTitle, string description, DateTime? deadline)
         {
             goalTitle = (goalTitle ?? "").Trim();
@@ -240,7 +197,6 @@ namespace Finly.Pages
 
             if (!string.IsNullOrEmpty(description))
             {
-                // jeśli user wpisał bez "Opis:", to dopiszmy prefix, żeby format był stabilny
                 var desc = description.Trim();
                 if (!desc.StartsWith("Opis:", StringComparison.OrdinalIgnoreCase))
                     desc = "Opis: " + desc;
@@ -254,10 +210,8 @@ namespace Finly.Pages
             return string.Join("\n", parts);
         }
 
-        // ========= helper do szukania panelu potwierdzenia w szablonie =========
-
-        private static T? FindTemplateChild<T>(DependencyObject start, string childName)
-            where T : FrameworkElement
+        // ========= helper do panelu potwierdzenia =========
+        private static T? FindTemplateChild<T>(DependencyObject start, string childName) where T : FrameworkElement
         {
             var current = start;
             while (current != null)
@@ -274,47 +228,120 @@ namespace Finly.Pages
             return null;
         }
 
-        // ========= kafel „Dodaj cel” =========
+        // ========= Add/Edit przez dialog =========
 
         private void AddGoalCard_Click(object sender, MouseButtonEventArgs e)
         {
-            _editingEnvelopeId = null;
+            if (e.ChangedButton != MouseButton.Left) return;
 
-            FormHeader.Text = "Dodaj cel";
-            GoalFormMessage.Text = string.Empty;
-            FormBorder.Visibility = Visibility.Visible;
+            var dlg = new GoalEditDialog
+            {
+                Owner = Window.GetWindow(this)
+            };
 
-            ClearGoalForm();
+            dlg.SetMode(GoalEditDialog.DialogMode.Add);
+            dlg.LoadForAdd();
+
+            if (dlg.ShowDialog() != true)
+                return;
+
+            SaveGoalFromDialog(dlg.Result);
         }
-
-        // ========= Edycja / usuwanie istniejących celów =========
 
         private void EditGoal_Click(object sender, RoutedEventArgs e)
         {
             if ((sender as FrameworkElement)?.DataContext is not GoalVm vm)
                 return;
 
-            _editingEnvelopeId = vm.EnvelopeId;
+            var dlg = new GoalEditDialog
+            {
+                Owner = Window.GetWindow(this)
+            };
 
-            FormHeader.Text = "Edytuj cel";
-            GoalFormMessage.Text = string.Empty;
-            FormBorder.Visibility = Visibility.Visible;
+            dlg.SetMode(GoalEditDialog.DialogMode.Edit);
+            dlg.LoadForEdit(vm.EnvelopeId, vm.GoalTitle, vm.TargetAmount, vm.CurrentAmount, vm.DueDate, vm.Description);
 
-            GoalNameBox.Text = vm.GoalTitle; // edytujesz nazwę celu, nie koperty
-            GoalTargetBox.Text = vm.TargetAmount.ToString("N2");
-            GoalCurrentBox.Text = vm.CurrentAmount.ToString("N2");
-            GoalDueDatePicker.SelectedDate = vm.DueDate;
+            if (dlg.ShowDialog() != true)
+                return;
 
-            // usuń "Opis:" jeśli jest, żeby user edytował czysty tekst
-            var d = vm.Description ?? "";
-            if (d.TrimStart().StartsWith("Opis:", StringComparison.OrdinalIgnoreCase))
-                d = d.Trim().Substring(5).Trim();
-            GoalDescriptionBox.Text = d;
+            SaveGoalFromDialog(dlg.Result);
         }
 
-        /// <summary>
-        /// Kliknięcie "Usuń" – tylko pokazuje panel potwierdzenia.
-        /// </summary>
+        private void SaveGoalFromDialog(GoalEditDialog.GoalEditResult r)
+        {
+            // walidacje takie jak miałaś wcześniej
+            if (string.IsNullOrWhiteSpace(r.GoalTitle))
+            {
+                ToastService.Info("Podaj nazwę celu.");
+                return;
+            }
+
+            if (r.TargetAmount <= 0m)
+            {
+                ToastService.Info("Docelowa kwota musi być większa od zera.");
+                return;
+            }
+
+            if (r.CurrentAmount < 0m)
+            {
+                ToastService.Info("Odłożona kwota nie może być ujemna.");
+                return;
+            }
+
+            if (r.CurrentAmount > r.TargetAmount)
+            {
+                ToastService.Info("Odłożona kwota nie może być większa niż cel.");
+                return;
+            }
+
+            if (r.DueDate == null)
+            {
+                ToastService.Info("Wybierz datę zakończenia celu.");
+                return;
+            }
+
+            if (!ValidateGoalCurrentAgainstSavedCash(_uid, r.EditingEnvelopeId, r.CurrentAmount, out var fundsMsg))
+            {
+                ToastService.Info(fundsMsg);
+                return;
+            }
+
+            var note = BuildNote(r.GoalTitle, r.Description, r.DueDate.Value);
+
+            try
+            {
+                int envelopeId;
+
+                if (r.EditingEnvelopeId.HasValue)
+                {
+                    envelopeId = r.EditingEnvelopeId.Value;
+                }
+                else
+                {
+                    var existingId = DatabaseService.GetEnvelopeIdByName(_uid, r.GoalTitle);
+                    if (existingId.HasValue)
+                    {
+                        envelopeId = existingId.Value;
+                    }
+                    else
+                    {
+                        envelopeId = DatabaseService.InsertEnvelope(_uid, r.GoalTitle, r.TargetAmount, r.CurrentAmount, note);
+                    }
+                }
+
+                DatabaseService.UpdateEnvelopeGoal(_uid, envelopeId, r.TargetAmount, r.CurrentAmount, r.DueDate.Value, note);
+
+                ToastService.Success(r.EditingEnvelopeId.HasValue ? "Cel zaktualizowany." : "Cel dodany.");
+                LoadGoals();
+            }
+            catch (Exception ex)
+            {
+                ToastService.Error("Nie udało się zapisać celu: " + ex.Message);
+            }
+        }
+
+        // ========= Delete (bez zmian) =========
+
         private void DeleteGoal_Click(object sender, RoutedEventArgs e)
         {
             if (sender is FrameworkElement fe)
@@ -335,9 +362,6 @@ namespace Finly.Pages
             }
         }
 
-        /// <summary>
-        /// Faktyczne usunięcie celu po kliknięciu "Tak".
-        /// </summary>
         private void DeleteGoalConfirm_Click(object sender, RoutedEventArgs e)
         {
             if ((sender as FrameworkElement)?.DataContext is not GoalVm vm)
@@ -345,7 +369,6 @@ namespace Finly.Pages
 
             try
             {
-                // Czyścimy DANE CELU w kopercie, ale NIE usuwamy samej koperty.
                 DatabaseService.ClearEnvelopeGoal(_uid, vm.EnvelopeId);
 
                 _goals.Remove(vm);
@@ -358,122 +381,13 @@ namespace Finly.Pages
                     if (panel != null)
                         panel.Visibility = Visibility.Collapsed;
                 }
+
+                ToastService.Success("Cel usunięty.");
             }
             catch (Exception ex)
             {
                 ToastService.Error("Nie udało się usunąć celu.\n" + ex.Message);
             }
-        }
-
-        // ========= Formularz zapisujący cel do kopert =========
-
-        private void AddGoal_Click(object sender, RoutedEventArgs e)
-        {
-            var goalTitle = (GoalNameBox.Text ?? "").Trim();
-            var target = ParseDecimal(GoalTargetBox.Text);
-            var current = ParseDecimal(GoalCurrentBox.Text);
-            var dueDate = GoalDueDatePicker.SelectedDate;
-            var desc = (GoalDescriptionBox.Text ?? "").Trim();
-
-            if (string.IsNullOrWhiteSpace(goalTitle))
-            {
-                GoalFormMessage.Text = "Podaj nazwę celu.";
-                return;
-            }
-
-            if (target <= 0)
-            {
-                GoalFormMessage.Text = "Docelowa kwota musi być większa od zera.";
-                return;
-            }
-
-            if (current < 0)
-            {
-                GoalFormMessage.Text = "Odłożona kwota nie może być ujemna.";
-                return;
-            }
-
-            if (current > target)
-            {
-                GoalFormMessage.Text = "Odłożona kwota nie może być większa niż cel.";
-                return;
-            }
-
-            if (dueDate == null)
-            {
-                GoalFormMessage.Text = "Wybierz datę zakończenia celu.";
-                return;
-            }
-
-            // >>>>>> TU JEST KONKRETNE MIEJSCE WALIDACJI ŚRODKÓW <<<<<<
-            if (!ValidateGoalCurrentAgainstSavedCash(_uid, _editingEnvelopeId, current, out var fundsMsg))
-            {
-                GoalFormMessage.Text = fundsMsg;
-                return;
-            }
-
-            // NOTE – jedyne źródło prawdy dla celu/terminu/opisu
-            var note = BuildNote(goalTitle, desc, dueDate.Value);
-
-            try
-            {
-                int envelopeId;
-
-                if (_editingEnvelopeId.HasValue)
-                {
-                    // EDYCJA: pracujemy na tej samej kopercie po ID
-                    envelopeId = _editingEnvelopeId.Value;
-                }
-                else
-                {
-                    // DODAWANIE: tu tworzysz (lub odnajdujesz) kopertę po nazwie CELU
-                    var existingId = DatabaseService.GetEnvelopeIdByName(_uid, goalTitle);
-                    if (existingId.HasValue)
-                    {
-                        envelopeId = existingId.Value;
-                    }
-                    else
-                    {
-                        envelopeId = DatabaseService.InsertEnvelope(_uid, goalTitle, target, current, note);
-                    }
-                }
-
-
-                // UWAGA: przekazujemy NOTE (a nie sam opis)
-                DatabaseService.UpdateEnvelopeGoal(_uid, envelopeId, target, current, dueDate.Value, note);
-
-                LoadGoals();
-
-                GoalFormMessage.Text = _editingEnvelopeId.HasValue
-                    ? "Cel zaktualizowany."
-                    : "Cel dodany.";
-
-                ClearGoalForm();
-                FormBorder.Visibility = Visibility.Collapsed;
-                _editingEnvelopeId = null;
-            }
-            catch (Exception ex)
-            {
-                GoalFormMessage.Text = "Nie udało się zapisać celu: " + ex.Message;
-            }
-        }
-
-
-        private void ClearGoalForm_Click(object sender, RoutedEventArgs e)
-        {
-            ClearGoalForm();
-            GoalFormMessage.Text = string.Empty;
-            FormBorder.Visibility = Visibility.Collapsed;
-            _editingEnvelopeId = null;
-        }
-
-        private void ClearGoalForm()
-        {
-            GoalNameBox.Text = "";
-            GoalTargetBox.Text = "0,00";
-            GoalCurrentBox.Text = "0,00";
-            GoalDueDatePicker.SelectedDate = null;
-            GoalDescriptionBox.Text = "";
         }
 
         private bool ValidateGoalCurrentAgainstSavedCash(int userId, int? editingEnvelopeId, decimal newCurrent, out string message)
@@ -518,27 +432,6 @@ namespace Finly.Pages
             }
 
             return true;
-        }
-
-
-        // ========= 0,00 -> czyszczenie po kliknięciu =========
-
-        private void AmountBox_GotFocus(object sender, RoutedEventArgs e)
-        {
-            if (sender is TextBox tb)
-            {
-                if (tb.Text == "0,00" || tb.Text == "0.00")
-                    tb.Clear();
-            }
-        }
-
-        private void AmountBox_LostFocus(object sender, RoutedEventArgs e)
-        {
-            if (sender is TextBox tb)
-            {
-                var val = ParseDecimal(tb.Text);
-                tb.Text = val.ToString("N2");
-            }
         }
     }
 }

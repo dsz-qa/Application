@@ -4,7 +4,13 @@
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:local="clr-namespace:Finly.Pages"
-             mc:Ignorable="d">
+             mc:Ignorable="d"
+             Background="{DynamicResource App.Background}"
+             Foreground="{DynamicResource App.Foreground}"
+             SnapsToDevicePixels="True"
+             UseLayoutRounding="True"
+             TextOptions.TextFormattingMode="Display"
+             TextOptions.TextRenderingMode="ClearType">
 
     <UserControl.Resources>
 
@@ -40,60 +46,39 @@
 
         <!-- KARTA CELU (z paskiem postępu) -->
         <DataTemplate DataType="{x:Type local:GoalVm}">
-            <Border Style="{StaticResource Card}"
-                    Width="340">
+            <Border Style="{StaticResource Card}" Width="340">
                 <StackPanel>
 
-                    <!-- nagłówek celu bez szarego tła -->
                     <StackPanel Orientation="Horizontal" Margin="0,0,0,6" Background="Transparent">
-                        <!-- Orange goal icon -->
                         <Rectangle Width="24" Height="24" Margin="0,0,8,0" VerticalAlignment="Top" Fill="{DynamicResource Brand.Orange}">
                             <Rectangle.OpacityMask>
                                 <ImageBrush Stretch="Uniform" ImageSource="/Assets/Icons/cele.png"/>
                             </Rectangle.OpacityMask>
                         </Rectangle>
-                        <!-- Zawijanie celu, aby całość mieściła się w kafelku -->
-                        <TextBlock FontSize="16" FontWeight="Bold" Foreground="{DynamicResource App.Foreground}" TextWrapping="Wrap" MaxWidth="280" VerticalAlignment="Center">
+
+                        <TextBlock FontSize="16"
+                                   FontWeight="Bold"
+                                   Foreground="{DynamicResource App.Foreground}"
+                                   TextWrapping="Wrap"
+                                   MaxWidth="280"
+                                   VerticalAlignment="Center">
                             <Run Text="Cel: "/>
                             <Run Text="{Binding GoalTitle, Mode=OneWay}"/>
                         </TextBlock>
                     </StackPanel>
 
-                    <!-- Docelowa kwota: nagłówek + wartość pod spodem -->
-                    <TextBlock Text="Docelowa kwota"
-                               FontWeight="Bold"
-                               Foreground="{DynamicResource App.Foreground}"
-                               Opacity="0.9"/>
-                    <TextBlock Text="{Binding TargetAmount, StringFormat={}{0:N2} zł}"
-                               Margin="0,2,0,6"
-                               Foreground="{DynamicResource App.Foreground}"/>
+                    <TextBlock Text="Docelowa kwota" FontWeight="Bold" Foreground="{DynamicResource App.Foreground}" Opacity="0.9"/>
+                    <TextBlock Text="{Binding TargetAmount, StringFormat={}{0:N2} zł}" Margin="0,2,0,6" Foreground="{DynamicResource App.Foreground}"/>
 
-                    <!-- Już odłożone -->
-                    <TextBlock Text="Już odłożone"
-                               FontWeight="Bold"
-                               Foreground="{DynamicResource App.Foreground}"
-                               Opacity="0.9"/>
-                    <TextBlock Text="{Binding CurrentAmount, StringFormat={}{0:N2} zł}"
-                               Margin="0,2,0,6"
-                               Foreground="{DynamicResource App.Foreground}"/>
+                    <TextBlock Text="Już odłożone" FontWeight="Bold" Foreground="{DynamicResource App.Foreground}" Opacity="0.9"/>
+                    <TextBlock Text="{Binding CurrentAmount, StringFormat={}{0:N2} zł}" Margin="0,2,0,6" Foreground="{DynamicResource App.Foreground}"/>
 
-                    <!-- Do celu pozostało -->
-                    <TextBlock Text="Do celu pozostało"
-                               FontWeight="Bold"
-                               Foreground="{DynamicResource App.Foreground}"
-                               Opacity="0.9"/>
-                    <TextBlock Text="{Binding Remaining, StringFormat={}{0:N2} zł}"
-                               Margin="0,2,0,6"
-                               Foreground="{DynamicResource App.Foreground}"/>
+                    <TextBlock Text="Do celu pozostało" FontWeight="Bold" Foreground="{DynamicResource App.Foreground}" Opacity="0.9"/>
+                    <TextBlock Text="{Binding Remaining, StringFormat={}{0:N2} zł}" Margin="0,2,0,6" Foreground="{DynamicResource App.Foreground}"/>
 
-                    <!-- Pasek postępu -->
-                    <TextBlock Text="Zrealizowano"
-                               FontWeight="Bold"
-                               Foreground="{DynamicResource App.Foreground}"
-                               Opacity="0.9"/>
+                    <TextBlock Text="Zrealizowano" FontWeight="Bold" Foreground="{DynamicResource App.Foreground}" Opacity="0.9"/>
                     <StackPanel Margin="0,2,0,6">
-                        <TextBlock Text="{Binding CompletionPercent, StringFormat={}{0:N0}%}"
-                                   Foreground="{DynamicResource App.Foreground}"/>
+                        <TextBlock Text="{Binding CompletionPercent, StringFormat={}{0:N0}%}" Foreground="{DynamicResource App.Foreground}"/>
                         <ProgressBar Height="6"
                                      Margin="0,4,0,0"
                                      Minimum="0"
@@ -101,43 +86,25 @@
                                      Value="{Binding CompletionPercent, Mode=OneWay}"/>
                     </StackPanel>
 
-                    <!-- Miesięcznie musisz odkładać -->
-                    <TextBlock Text="Miesięcznie musisz odkładać"
-                               FontWeight="Bold"
-                               Foreground="{DynamicResource App.Foreground}"
-                               Opacity="0.9"/>
-                    <TextBlock Text="{Binding MonthlyNeeded, StringFormat={}{0:N2} zł}"
-                               Margin="0,2,0,6"
-                               Foreground="{DynamicResource App.Foreground}"/>
+                    <TextBlock Text="Miesięcznie musisz odkładać" FontWeight="Bold" Foreground="{DynamicResource App.Foreground}" Opacity="0.9"/>
+                    <TextBlock Text="{Binding MonthlyNeeded, StringFormat={}{0:N2} zł}" Margin="0,2,0,6" Foreground="{DynamicResource App.Foreground}"/>
 
-                    <!-- Termin osiągnięcia celu (jak w kopertach) -->
-                    <TextBlock Text="Termin osiągnięcia celu"
-                               FontWeight="Bold"
-                               Foreground="{DynamicResource App.Foreground}"
-                               Opacity="0.9"/>
+                    <TextBlock Text="Termin osiągnięcia celu" FontWeight="Bold" Foreground="{DynamicResource App.Foreground}" Opacity="0.9"/>
                     <TextBlock Margin="0,2,0,6"
                                Foreground="{DynamicResource App.Foreground}"
                                Text="{Binding DueDate, StringFormat={}{0:dd.MM.yyyy}, TargetNullValue=Brak terminu}"/>
 
-                    <!-- Opis -->
-                    <TextBlock Text="Opis"
-                               FontWeight="Bold"
-                               Foreground="{DynamicResource App.Foreground}"
-                               Opacity="0.9"/>
+                    <TextBlock Text="Opis" FontWeight="Bold" Foreground="{DynamicResource App.Foreground}" Opacity="0.9"/>
                     <TextBlock Text="{Binding Description}"
                                Margin="0,2,0,4"
                                TextWrapping="Wrap"
                                Foreground="{DynamicResource App.Foreground}"/>
 
-                    <!-- PRZYCISKI EDYTUJ / USUŃ DLA TEGO CELU -->
-                    <StackPanel Orientation="Horizontal"
-                                HorizontalAlignment="Right"
-                                Margin="0,10,0,0">
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,10,0,0">
                         <Button Click="EditGoal_Click" Style="{StaticResource EditIconButton}" Margin="0,0,8,0"/>
                         <Button Click="DeleteGoal_Click" Style="{StaticResource DeleteIconButton}"/>
-                     </StackPanel>
+                    </StackPanel>
 
-                    <!-- PANEL POTWIERDZENIA USUNIĘCIA CELU -->
                     <StackPanel x:Name="GoalDeleteConfirmPanel"
                                 Orientation="Vertical"
                                 Margin="0,6,0,0"
@@ -146,8 +113,7 @@
                                    FontSize="12"
                                    Foreground="{DynamicResource App.Foreground}"
                                    Margin="0,0,0,4"/>
-                        <StackPanel Orientation="Horizontal"
-                                    HorizontalAlignment="Right">
+                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
                             <Button Content="Tak"
                                     Margin="0,0,8,0"
                                     Padding="8,3"
@@ -201,10 +167,9 @@
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto"/>
                 <RowDefinition Height="*"/>
-                <RowDefinition Height="Auto"/>
             </Grid.RowDefinitions>
 
-            <!-- GÓRA: KPI -->
+            <!-- KPI -->
             <Grid Grid.Row="0">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*"/>
@@ -249,7 +214,7 @@
                 </Border>
             </Grid>
 
-            <!-- LISTA CELÓW + kafel Dodaj -->
+            <!-- LISTA CELÓW -->
             <StackPanel Grid.Row="1" Margin="0,12,0,0">
                 <Separator Height="1"
                            Background="{DynamicResource Surface.Border}"
@@ -270,111 +235,6 @@
                     </ItemsControl.ItemsPanel>
                 </ItemsControl>
             </StackPanel>
-
-            <!-- FORMULARZ DODAWANIA / EDYCJI CELU -->
-            <Border x:Name="FormBorder"
-                    Grid.Row="2"
-                    Margin="0,16,0,24"
-                    Background="Transparent"
-                    BorderBrush="{DynamicResource Surface.Border}"
-                    BorderThickness="1"
-                    CornerRadius="10"
-                    Padding="16"
-                    Visibility="Collapsed">
-                <StackPanel HorizontalAlignment="Center"
-                            MaxWidth="600">
-
-                    <!-- TU NAZWA, KTÓRĄ WIDZI C# (FormHeader) -->
-                    <TextBlock x:Name="FormHeader"
-                               Text="Dodaj cel"
-                               FontSize="18"
-                               FontWeight="SemiBold"
-                               HorizontalAlignment="Center"
-                               Foreground="{DynamicResource App.Foreground}"/>
-
-                    <Grid Margin="0,12,0,0">
-                        <Grid.RowDefinitions>
-                            <RowDefinition Height="Auto"/>
-                            <RowDefinition Height="Auto"/>
-                            <RowDefinition Height="Auto"/>
-                            <RowDefinition Height="Auto"/>
-                            <RowDefinition Height="Auto"/>
-                        </Grid.RowDefinitions>
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="Auto"/>
-                            <ColumnDefinition Width="220"/>
-                        </Grid.ColumnDefinitions>
-
-                        <TextBlock Grid.Row="0" Grid.Column="0"
-                                   Text="Nazwa:"
-                                   Margin="0,4,8,4"
-                                   VerticalAlignment="Center"
-                                   Foreground="{DynamicResource App.Foreground}"/>
-                        <TextBox x:Name="GoalNameBox"
-                                 Grid.Row="0" Grid.Column="1"/>
-
-                        <TextBlock Grid.Row="1" Grid.Column="0"
-                                   Text="Docelowa kwota:"
-                                   Margin="0,4,8,4"
-                                   VerticalAlignment="Center"
-                                   Foreground="{DynamicResource App.Foreground}"/>
-                        <TextBox x:Name="GoalTargetBox"
-                                 Grid.Row="1" Grid.Column="1"
-                                 HorizontalContentAlignment="Right"
-                                 Text="0,00"
-                                 GotFocus="AmountBox_GotFocus"
-                                 LostFocus="AmountBox_LostFocus"/>
-
-                        <TextBlock Grid.Row="2" Grid.Column="0"
-                                   Text="Już odłożone:"
-                                   Margin="0,4,8,4"
-                                   VerticalAlignment="Center"
-                                   Foreground="{DynamicResource App.Foreground}"/>
-                        <TextBox x:Name="GoalCurrentBox"
-                                 Grid.Row="2" Grid.Column="1"
-                                 HorizontalContentAlignment="Right"
-                                 Text="0,00"
-                                 GotFocus="AmountBox_GotFocus"
-                                 LostFocus="AmountBox_LostFocus"/>
-
-                        <TextBlock Grid.Row="3" Grid.Column="0"
-                                   Text="Termin (data):"
-                                   Margin="0,4,8,4"
-                                   VerticalAlignment="Center"
-                                   Foreground="{DynamicResource App.Foreground}"/>
-                        <DatePicker x:Name="GoalDueDatePicker"
-                                    Grid.Row="3" Grid.Column="1"/>
-
-                        <TextBlock Grid.Row="4" Grid.Column="0"
-                                   Text="Opis:"
-                                   Margin="0,4,8,4"
-                                   VerticalAlignment="Top"
-                                   Foreground="{DynamicResource App.Foreground}"/>
-                        <TextBox x:Name="GoalDescriptionBox"
-                                 Grid.Row="4" Grid.Column="1"
-                                 Height="60"
-                                 TextWrapping="Wrap"
-                                 AcceptsReturn="True"/>
-                    </Grid>
-
-                    <StackPanel Orientation="Horizontal"
-                                HorizontalAlignment="Center"
-                                Margin="0,12,0,0">
-                        <Button Content="Dodaj cel"
-                                Width="110"
-                                Margin="0,0,8,0"
-                                Click="AddGoal_Click"/>
-                        <Button Content="Wyczyść"
-                                Width="110"
-                                Click="ClearGoalForm_Click"/>
-                    </StackPanel>
-
-                    <TextBlock x:Name="GoalFormMessage"
-                               Margin="0,8,0,0"
-                               HorizontalAlignment="Center"
-                               Foreground="OrangeRed"/>
-                </StackPanel>
-            </Border>
 
         </Grid>
     </ScrollViewer>
