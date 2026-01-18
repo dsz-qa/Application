@@ -59,6 +59,13 @@
             <Setter Property="Margin" Value="0,4,0,10"/>
         </Style>
 
+        <!-- Wartości KPI bez bolda (dla "Brak danych do porównania") -->
+        <Style x:Key="KpiInlineValueNormal" TargetType="TextBlock" BasedOn="{StaticResource KpiValueStyle}">
+            <Setter Property="FontWeight" Value="Normal"/>
+            <Setter Property="Opacity" Value="0.85"/>
+        </Style>
+
+
         <!-- ===================== MINI TABLE ===================== -->
 
         <Style x:Key="MiniTableCard" TargetType="Border">
@@ -201,6 +208,7 @@
         </Grid.RowDefinitions>
 
         <!-- ROW 0: KPI -->
+        <!-- ROW 0: KPI -->
         <Grid Grid.Row="0" Margin="0,0,0,12">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="*"/>
@@ -210,31 +218,41 @@
 
             <!-- Obecny okres -->
             <Border Grid.Column="0" Style="{StaticResource AccentCard}" Margin="0,0,10,0">
+                <Border.Resources>
+                    <!-- Lokalny styl TYLKO dla tego kafelka -->
+                    <Style x:Key="KpiInlineValueBig"
+               TargetType="TextBlock"
+               BasedOn="{StaticResource KpiInlineValueNormal}">
+                        <Setter Property="FontSize" Value="18"/>
+                        <Setter Property="FontWeight" Value="Bold"/>
+                    </Style>
+                </Border.Resources>
+
                 <StackPanel>
                     <TextBlock Text="Obecny okres"
-                               Style="{StaticResource CardHeader}"
-                               FontSize="18"
-                               FontWeight="Bold"/>
+                       Style="{StaticResource CardHeader}"
+                       FontSize="18"
+                       FontWeight="Bold"/>
 
-                    <TextBlock Text="{Binding PeriodLabel}"
-                               Style="{StaticResource KpiSubHeader}"/>
+                    <TextBlock Text="{Binding PeriodLabel, FallbackValue=Brak danych, TargetNullValue=Brak danych}"
+                       Style="{StaticResource KpiSubHeader}"/>
 
                     <StackPanel Orientation="Horizontal">
                         <TextBlock Text="Wydatki:" Style="{StaticResource KpiInlineLabel}"/>
-                        <TextBlock Text="{Binding TotalExpensesStr, TargetNullValue=Brak danych do porównania, FallbackValue=Brak danych do porównania}"
-                                   Style="{StaticResource KpiInlineValue}"/>
+                        <TextBlock Text="{Binding TotalExpensesStr, FallbackValue=Brak danych do porównania, TargetNullValue=Brak danych do porównania}"
+                           Style="{StaticResource KpiInlineValueNormal}"/>
                     </StackPanel>
 
                     <StackPanel Orientation="Horizontal">
                         <TextBlock Text="Przychody:" Style="{StaticResource KpiInlineLabel}"/>
-                        <TextBlock Text="{Binding TotalIncomesStr, TargetNullValue=Brak danych do porównania, FallbackValue=Brak danych do porównania}"
-                                   Style="{StaticResource KpiInlineValue}"/>
+                        <TextBlock Text="{Binding TotalIncomesStr, FallbackValue=Brak danych do porównania, TargetNullValue=Brak danych do porównania}"
+                           Style="{StaticResource KpiInlineValueNormal}"/>
                     </StackPanel>
 
                     <StackPanel Orientation="Horizontal">
                         <TextBlock Text="Bilans:" Style="{StaticResource KpiInlineLabel}" Margin="0,0,6,0"/>
-                        <TextBlock Text="{Binding BalanceStr, TargetNullValue=Brak danych do porównania, FallbackValue=Brak danych do porównania}"
-                                   Style="{StaticResource KpiInlineValue}" Margin="0,0,0,0"/>
+                        <TextBlock Text="{Binding BalanceStr, FallbackValue=Brak danych do porównania, TargetNullValue=Brak danych do porównania}"
+                           Style="{StaticResource KpiInlineValueNormal}" Margin="0,0,0,0"/>
                     </StackPanel>
                 </StackPanel>
             </Border>
@@ -243,30 +261,30 @@
             <Border Grid.Column="1" Style="{StaticResource AccentCard}" Margin="0,0,10,0">
                 <StackPanel>
                     <TextBlock Text="Poprzedni okres"
-                               Style="{StaticResource CardHeader}"
-                               FontSize="18"
-                               FontWeight="Bold"/>
+                       Style="{StaticResource CardHeader}"
+                       FontSize="18"
+                       FontWeight="Bold"/>
 
-                    <!-- pod napisem data poprzedniego okresu -->
-                    <TextBlock Text="{Binding PreviousPeriodLabel, TargetNullValue=Brak danych}"
-                               Style="{StaticResource KpiSubHeader}"/>
+                    <!-- data poprzedniego okresu -->
+                    <TextBlock Text="{Binding PreviousPeriodLabel, FallbackValue=Brak danych, TargetNullValue=Brak danych}"
+                       Style="{StaticResource KpiSubHeader}"/>
 
                     <StackPanel Orientation="Horizontal">
                         <TextBlock Text="Wydatki:" Style="{StaticResource KpiInlineLabel}"/>
-                        <TextBlock Text="{Binding PreviousTotalExpensesStr, TargetNullValue=Brak danych do porównania, FallbackValue=Brak danych do porównania}"
-                                   Style="{StaticResource KpiInlineValue}"/>
+                        <TextBlock Text="{Binding PreviousTotalExpensesStr, FallbackValue=Brak danych do porównania, TargetNullValue=Brak danych do porównania}"
+                           Style="{StaticResource KpiInlineValueNormal}"/>
                     </StackPanel>
 
                     <StackPanel Orientation="Horizontal">
                         <TextBlock Text="Przychody:" Style="{StaticResource KpiInlineLabel}"/>
-                        <TextBlock Text="{Binding PreviousTotalIncomesStr, TargetNullValue=Brak danych do porównania, FallbackValue=Brak danych do porównania}"
-                                   Style="{StaticResource KpiInlineValue}"/>
+                        <TextBlock Text="{Binding PreviousTotalIncomesStr, FallbackValue=Brak danych do porównania, TargetNullValue=Brak danych do porównania}"
+                           Style="{StaticResource KpiInlineValueNormal}"/>
                     </StackPanel>
 
                     <StackPanel Orientation="Horizontal">
                         <TextBlock Text="Bilans:" Style="{StaticResource KpiInlineLabel}" Margin="0,0,6,0"/>
-                        <TextBlock Text="{Binding PreviousBalanceStr, TargetNullValue=Brak danych do porównania, FallbackValue=Brak danych do porównania}"
-                                   Style="{StaticResource KpiInlineValue}" Margin="0,0,0,0"/>
+                        <TextBlock Text="{Binding PreviousBalanceStr, FallbackValue=Brak danych do porównania, TargetNullValue=Brak danych do porównania}"
+                           Style="{StaticResource KpiInlineValueNormal}" Margin="0,0,0,0"/>
                     </StackPanel>
                 </StackPanel>
             </Border>
@@ -275,33 +293,50 @@
             <Border Grid.Column="2" Style="{StaticResource AccentCard}">
                 <StackPanel>
                     <TextBlock Text="Porównanie okresów"
-                               Style="{StaticResource CardHeader}"
-                               FontSize="18"
-                               FontWeight="Bold"/>
+                       Style="{StaticResource CardHeader}"
+                       FontSize="18"
+                       FontWeight="Bold"/>
 
-                    <TextBlock Text="{Binding ComparisonLabel, TargetNullValue=Brak danych}"
-                               Style="{StaticResource KpiSubHeader}"/>
+                    <!-- dwie daty porównywanych okresów -->
+                    <Grid Margin="0,4,0,10">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+
+                        <StackPanel Grid.Column="0" Orientation="Horizontal">
+                            <TextBlock Text="Poprzedni okres: " Style="{StaticResource CardHeader}" Opacity="0.75"/>
+                            <TextBlock Text="{Binding PreviousPeriodLabel}" Style="{StaticResource CardHeader}" Opacity="0.75"/>
+                        </StackPanel>
+
+                        <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Right">
+                            <TextBlock Text="Obecny okres: " Style="{StaticResource CardHeader}" Opacity="0.75"/>
+                            <TextBlock Text="{Binding PeriodLabel}" Style="{StaticResource CardHeader}" Opacity="0.75"/>
+                        </StackPanel>
+                    </Grid>
+
 
                     <StackPanel Orientation="Horizontal">
                         <TextBlock Text="Wydatki:" Style="{StaticResource KpiInlineLabel}"/>
-                        <TextBlock Text="{Binding DeltaExpensesStr, TargetNullValue=Brak danych do porównania, FallbackValue=Brak danych do porównania}"
-                                   Style="{StaticResource KpiInlineValue}"/>
+                        <TextBlock Text="{Binding DeltaExpensesStr, FallbackValue=Brak danych do porównania, TargetNullValue=Brak danych do porównania}"
+                           Style="{StaticResource KpiInlineValueNormal}"/>
                     </StackPanel>
 
                     <StackPanel Orientation="Horizontal">
                         <TextBlock Text="Przychody:" Style="{StaticResource KpiInlineLabel}"/>
-                        <TextBlock Text="{Binding DeltaIncomesStr, TargetNullValue=Brak danych do porównania, FallbackValue=Brak danych do porównania}"
-                                   Style="{StaticResource KpiInlineValue}"/>
+                        <TextBlock Text="{Binding DeltaIncomesStr, FallbackValue=Brak danych do porównania, TargetNullValue=Brak danych do porównania}"
+                           Style="{StaticResource KpiInlineValueNormal}"/>
                     </StackPanel>
 
                     <StackPanel Orientation="Horizontal">
                         <TextBlock Text="Bilans:" Style="{StaticResource KpiInlineLabel}" Margin="0,0,6,0"/>
-                        <TextBlock Text="{Binding DeltaBalanceStr, TargetNullValue=Brak danych do porównania, FallbackValue=Brak danych do porównania}"
-                                   Style="{StaticResource KpiInlineValue}" Margin="0,0,0,0"/>
+                        <TextBlock Text="{Binding DeltaBalanceStr, FallbackValue=Brak danych do porównania, TargetNullValue=Brak danych do porównania}"
+                           Style="{StaticResource KpiInlineValueNormal}" Margin="0,0,0,0"/>
                     </StackPanel>
                 </StackPanel>
             </Border>
         </Grid>
+
 
         <!-- ROW 1: PeriodBar -->
         <Border Grid.Row="1" Background="Transparent" Margin="0,0,0,8">
@@ -319,66 +354,6 @@
                     Padding="22,10"
                     Click="ExportButton_Click"/>
         </Border>
-
-        <!-- ROW 3: Filtry -->
-        <Grid Grid.Row="3" Margin="0,0,0,12">
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="*"/>
-                <ColumnDefinition Width="*"/>
-                <ColumnDefinition Width="*"/>
-            </Grid.ColumnDefinitions>
-
-            <GroupBox Grid.Column="0" Style="{StaticResource FilterPanelStyle}">
-                <GroupBox.Header>
-                    <TextBlock Text="Typ transakcji" Style="{StaticResource FilterHeaderTextStyle}"/>
-                </GroupBox.Header>
-
-                <StackPanel>
-                    <ComboBox Height="32"
-                              ItemsSource="{Binding TransactionTypes}"
-                              SelectedItem="{Binding SelectedTransactionType, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                              HorizontalContentAlignment="Left"/>
-                    <TextBlock Text="Filtr wpływa na wszystkie zakładki."
-                               Margin="0,8,0,0"
-                               Opacity="0.75"
-                               Foreground="{DynamicResource App.Foreground}"/>
-                </StackPanel>
-            </GroupBox>
-
-            <GroupBox Grid.Column="1" Style="{StaticResource FilterPanelStyle}">
-                <GroupBox.Header>
-                    <TextBlock Text="Kategorie" Style="{StaticResource FilterHeaderTextStyle}"/>
-                </GroupBox.Header>
-
-                <StackPanel>
-                    <ComboBox Height="32"
-                              ItemsSource="{Binding Categories}"
-                              SelectedItem="{Binding SelectedCategory, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                              HorizontalContentAlignment="Left"/>
-                    <TextBlock Text="Filtr wpływa na wszystkie zakładki."
-                               Margin="0,8,0,0"
-                               Opacity="0.75"
-                               Foreground="{DynamicResource App.Foreground}"/>
-                </StackPanel>
-            </GroupBox>
-
-            <GroupBox Grid.Column="2" Style="{StaticResource FilterPanelStyle}" Margin="0">
-                <GroupBox.Header>
-                    <TextBlock Text="Konta" Style="{StaticResource FilterHeaderTextStyle}"/>
-                </GroupBox.Header>
-
-                <StackPanel>
-                    <ComboBox Height="32"
-                              ItemsSource="{Binding MoneyPlaces}"
-                              SelectedItem="{Binding SelectedMoneyPlace, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                              HorizontalContentAlignment="Left"/>
-                    <TextBlock Text="Filtr wpływa na wszystkie zakładki."
-                               Margin="0,8,0,0"
-                               Opacity="0.75"
-                               Foreground="{DynamicResource App.Foreground}"/>
-                </StackPanel>
-            </GroupBox>
-        </Grid>
 
         <!-- ROW 4: Tabs -->
         <Border Grid.Row="4" Background="Transparent">

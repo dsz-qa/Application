@@ -97,7 +97,6 @@ namespace Finly.Pages
                 if (DataContext is not ReportsViewModel vm)
                     return;
 
-                vm.ResetFilters();
                 SafeExecute(vm.RefreshCommand);
             }
             catch { }

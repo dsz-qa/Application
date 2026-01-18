@@ -1,6 +1,5 @@
 ﻿using Finly.Helpers;
 using Finly.Models;
-using Finly.Pages;                 // GoalVm (masz to u siebie)
 using Finly.Services;
 using Finly.Services.Features;
 using Finly.Services.SpecificPages;
@@ -8,7 +7,6 @@ using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
-using System.Data;
 using System.Globalization;
 using System.Linq;
 using System.Windows;
@@ -32,6 +30,9 @@ namespace Finly.ViewModels
 
             _fromDate = startOfMonth;
             _toDate = endOfMonth;
+
+            // WAŻNE: bez tego PreviousFrom/To zostają DateTime.MinValue i UI pokazuje "Brak danych"
+            RecalcPreviousRange();
 
             Categories = new ObservableCollection<string>();
             MoneyPlaces = new ObservableCollection<string>();
@@ -61,6 +62,7 @@ namespace Finly.ViewModels
 
             // Wspólne dane bazowe
             Rows = new ObservableCollection<ReportsService.ReportItem>();
+            PreviousRows = new ObservableCollection<ReportsService.ReportItem>();
 
             RefreshCommand = new RelayCommand(_ => Refresh());
             ExportPdfCommand = new RelayCommand(_ => ExportPdf());
@@ -87,11 +89,11 @@ namespace Finly.ViewModels
                 {
                     _fromDate = v;
                     Raise(nameof(FromDate));
-                    Raise(nameof(PeriodLabel)); // <-- DOKŁADNIE TO DOPISZ
+                    Raise(nameof(PeriodLabel));
+                    RecalcPreviousRange();
                 }
             }
         }
-
 
         private DateTime _toDate;
         public DateTime ToDate
@@ -104,16 +106,64 @@ namespace Finly.ViewModels
                 {
                     _toDate = v;
                     Raise(nameof(ToDate));
-                    Raise(nameof(PeriodLabel)); // <-- DOKŁADNIE TO DOPISZ
+                    Raise(nameof(PeriodLabel));
+                    RecalcPreviousRange();
                 }
             }
         }
 
-
         public string PeriodLabel => $"{FromDate:dd.MM.yyyy} – {ToDate:dd.MM.yyyy}";
 
         // =========================
-        // Filtry wspólne (wpływają na każdą zakładkę)
+        // Poprzedni okres
+        // =========================
+        private DateTime _prevFrom;
+        public DateTime PreviousFrom
+        {
+            get => _prevFrom;
+            private set
+            {
+                if (_prevFrom != value)
+                {
+                    _prevFrom = value;
+                    Raise(nameof(PreviousFrom));
+                    Raise(nameof(PreviousPeriodLabel));
+                }
+            }
+        }
+
+        private DateTime _prevTo;
+        public DateTime PreviousTo
+        {
+            get => _prevTo;
+            private set
+            {
+                if (_prevTo != value)
+                {
+                    _prevTo = value;
+                    Raise(nameof(PreviousTo));
+                    Raise(nameof(PreviousPeriodLabel));
+                }
+            }
+        }
+
+        public string PreviousPeriodLabel => $"{PreviousFrom:dd.MM.yyyy} – {PreviousTo:dd.MM.yyyy}";
+
+        private void RecalcPreviousRange()
+        {
+            // długość okresu w dniach (inkluzja obu końców)
+            var len = Math.Max(1, (ToDate.Date - FromDate.Date).Days + 1);
+
+            // Poprzedni okres = dokładnie tyle samo dni bezpośrednio przed obecnym
+            var prevTo = FromDate.Date.AddDays(-1);
+            var prevFrom = prevTo.AddDays(-(len - 1));
+
+            PreviousFrom = prevFrom;
+            PreviousTo = prevTo;
+        }
+
+        // =========================
+        // Filtry wspólne
         // =========================
         public ObservableCollection<string> Categories { get; }
         public ObservableCollection<string> MoneyPlaces { get; }
@@ -198,7 +248,7 @@ namespace Finly.ViewModels
             }
             catch
             {
-                // celowo cicho – filtry nie mogą wysypać strony
+                // celowo cicho
             }
         }
 
@@ -227,10 +277,16 @@ namespace Finly.ViewModels
         }
 
         // =========================
-        // Dane wspólne (zaciągane raz, używane w wielu zakładkach)
+        // Dane wspólne
         // =========================
         public ObservableCollection<ReportsService.ReportItem> Rows { get; }
 
+        // NOWE: poprzedni okres (osobna kolekcja, to samo źródło danych, inne daty)
+        public ObservableCollection<ReportsService.ReportItem> PreviousRows { get; }
+
+        // =========================
+        // KPI – obecny okres
+        // =========================
         private decimal _totalExpenses;
         public decimal TotalExpenses
         {
@@ -279,7 +335,119 @@ namespace Finly.ViewModels
         }
         public string BalanceStr => Balance.ToString("N2", CultureInfo.CurrentCulture) + " zł";
 
-        // Donut: słownik dla DonutChartControl (jak masz obecnie)
+        // =========================
+        // KPI – poprzedni okres (NOWE)
+        // =========================
+        private decimal _previousTotalExpenses;
+        public decimal PreviousTotalExpenses
+        {
+            get => _previousTotalExpenses;
+            private set
+            {
+                if (_previousTotalExpenses != value)
+                {
+                    _previousTotalExpenses = value;
+                    Raise(nameof(PreviousTotalExpenses));
+                    Raise(nameof(PreviousTotalExpensesStr));
+                }
+            }
+        }
+        public string PreviousTotalExpensesStr => PreviousTotalExpenses.ToString("N2", CultureInfo.CurrentCulture) + " zł";
+
+        private decimal _previousTotalIncomes;
+        public decimal PreviousTotalIncomes
+        {
+            get => _previousTotalIncomes;
+            private set
+            {
+                if (_previousTotalIncomes != value)
+                {
+                    _previousTotalIncomes = value;
+                    Raise(nameof(PreviousTotalIncomes));
+                    Raise(nameof(PreviousTotalIncomesStr));
+                }
+            }
+        }
+        public string PreviousTotalIncomesStr => PreviousTotalIncomes.ToString("N2", CultureInfo.CurrentCulture) + " zł";
+
+        private decimal _previousBalance;
+        public decimal PreviousBalance
+        {
+            get => _previousBalance;
+            private set
+            {
+                if (_previousBalance != value)
+                {
+                    _previousBalance = value;
+                    Raise(nameof(PreviousBalance));
+                    Raise(nameof(PreviousBalanceStr));
+                }
+            }
+        }
+        public string PreviousBalanceStr => PreviousBalance.ToString("N2", CultureInfo.CurrentCulture) + " zł";
+
+        // =========================
+        // Porównanie (delta) – NOWE
+        // =========================
+        private decimal _deltaExpenses;
+        public decimal DeltaExpenses
+        {
+            get => _deltaExpenses;
+            private set
+            {
+                if (_deltaExpenses != value)
+                {
+                    _deltaExpenses = value;
+                    Raise(nameof(DeltaExpenses));
+                    Raise(nameof(DeltaExpensesStr));
+                }
+            }
+        }
+        public string DeltaExpensesStr => FormatDeltaMoney(DeltaExpenses);
+
+        private decimal _deltaIncomes;
+        public decimal DeltaIncomes
+        {
+            get => _deltaIncomes;
+            private set
+            {
+                if (_deltaIncomes != value)
+                {
+                    _deltaIncomes = value;
+                    Raise(nameof(DeltaIncomes));
+                    Raise(nameof(DeltaIncomesStr));
+                }
+            }
+        }
+        public string DeltaIncomesStr => FormatDeltaMoney(DeltaIncomes);
+
+        private decimal _deltaBalance;
+        public decimal DeltaBalance
+        {
+            get => _deltaBalance;
+            private set
+            {
+                if (_deltaBalance != value)
+                {
+                    _deltaBalance = value;
+                    Raise(nameof(DeltaBalance));
+                    Raise(nameof(DeltaBalanceStr));
+                }
+            }
+        }
+        public string DeltaBalanceStr => FormatDeltaMoney(DeltaBalance);
+
+        private static string FormatDeltaMoney(decimal value)
+        {
+            // + / - przed kwotą (czytelne porównanie)
+            var sign = value > 0 ? "+" : value < 0 ? "-" : "";
+            var abs = Math.Abs(value).ToString("N2", CultureInfo.CurrentCulture);
+            return $"{sign}{abs} zł";
+        }
+
+        // =========================
+        // Donut: (zostawiam jak masz)
+        // =========================
         private Dictionary<string, decimal> _chartTotals = new();
         public Dictionary<string, decimal> ChartTotals
         {
@@ -350,7 +518,6 @@ namespace Finly.ViewModels
         public ObservableCollection<TxLine> OverviewTopExpenses { get; }
         public ObservableCollection<TxLine> OverviewTopIncomes { get; }
 
-        // Trend (cashflow) – proste wiadra dzienne (VM gotowy pod wykres liniowy)
         public sealed class TrendPoint
         {
             public DateTime Date { get; set; }
@@ -371,14 +538,14 @@ namespace Finly.ViewModels
             public double SharePercent { get; set; }
         }
 
-        // „Donut w kategoriach” + tabelki zależnie od filtra
         public ObservableCollection<CategoryAmount> CategoryBreakdown { get; }
         public ObservableCollection<CategoryAmount> ExpenseCategoriesSummary { get; }
         public ObservableCollection<CategoryAmount> IncomeCategoriesSummary { get; }
         public ObservableCollection<CategoryAmount> TransferCategoriesSummary { get; }
 
         // =========================
-        // BUDŻETY
+        // BUDŻETY / KREDYTY / CELE / INWESTYCJE / SYMULACJA
+        // (zostawiam jak masz – nie ruszam logiki, bo naprawa dotyczy poprzedniego okresu)
         // =========================
         public sealed class BudgetRow
         {
@@ -400,22 +567,11 @@ namespace Finly.ViewModels
         public ObservableCollection<BudgetRow> Budgets { get; }
 
         private int _budgetsOkCount;
-        public int BudgetsOkCount
-        {
-            get => _budgetsOkCount;
-            private set { _budgetsOkCount = value; Raise(nameof(BudgetsOkCount)); }
-        }
+        public int BudgetsOkCount { get => _budgetsOkCount; private set { _budgetsOkCount = value; Raise(nameof(BudgetsOkCount)); } }
 
         private int _budgetsOverCount;
-        public int BudgetsOverCount
-        {
-            get => _budgetsOverCount;
-            private set { _budgetsOverCount = value; Raise(nameof(BudgetsOverCount)); }
-        }
+        public int BudgetsOverCount { get => _budgetsOverCount; private set { _budgetsOverCount = value; Raise(nameof(BudgetsOverCount)); } }
 
-        // =========================
-        // INWESTYCJE (placeholder – gotowe pod źródło danych)
-        // =========================
         public sealed class InvestmentRow
         {
             public string Name { get; set; } = "";
@@ -430,9 +586,6 @@ namespace Finly.ViewModels
 
         public ObservableCollection<InvestmentRow> Investments { get; }
 
-        // =========================
-        // KREDYTY
-        // =========================
         public sealed class LoanRow
         {
             public int Id { get; set; }
@@ -442,9 +595,9 @@ namespace Finly.ViewModels
             public int TermMonths { get; set; }
 
             public decimal EstimatedMonthlyPayment { get; set; }
-            public decimal PaidInPeriod { get; set; }        // do podpięcia z tabelą operacji
-            public decimal OverpaidInPeriod { get; set; }    // do podpięcia z tabelą operacji
-            public decimal RemainingToPay { get; set; }      // do podpięcia z harmonogramu / salda
+            public decimal PaidInPeriod { get; set; }
+            public decimal OverpaidInPeriod { get; set; }
+            public decimal RemainingToPay { get; set; }
 
             public string EstimatedMonthlyPaymentStr => EstimatedMonthlyPayment.ToString("N2", CultureInfo.CurrentCulture) + " zł";
             public string PaidInPeriodStr => PaidInPeriod.ToString("N2", CultureInfo.CurrentCulture) + " zł";
@@ -454,9 +607,6 @@ namespace Finly.ViewModels
 
         public ObservableCollection<LoanRow> Loans { get; }
 
-        // =========================
-        // CELE
-        // =========================
         public sealed class GoalRow
         {
             public string Name { get; set; } = "";
@@ -472,20 +622,16 @@ namespace Finly.ViewModels
             public string ProgressPercentStr => ProgressPercent.ToString("N1", CultureInfo.CurrentCulture) + " %";
             public string MissingStr => Missing.ToString("N2", CultureInfo.CurrentCulture) + " zł";
 
-            // „ile trzeba w kolejnym okresie”
             public decimal NeededNextPeriod { get; set; }
             public string NeededNextPeriodStr => NeededNextPeriod.ToString("N2", CultureInfo.CurrentCulture) + " zł";
         }
 
         public ObservableCollection<GoalRow> Goals { get; }
 
-        // =========================
-        // SYMULACJA MAJĄTKU (planowane transakcje)
-        // =========================
         public sealed class PlannedRow
         {
             public DateTime Date { get; set; }
-            public string Type { get; set; } = ""; // Wydatek/Przychód/Transfer (jak podepniesz)
+            public string Type { get; set; } = "";
             public string Description { get; set; } = "";
             public decimal Amount { get; set; }
             public string AmountStr => Amount.ToString("N2", CultureInfo.CurrentCulture) + " zł";
@@ -516,31 +662,23 @@ namespace Finly.ViewModels
                     return;
                 }
 
-                // 1) bazowe transakcje (Rows) – respektuje filtry typu/kategorii/miejsca + okres
-                LoadRows(uid);
+                // 1) Obecny okres
+                LoadRowsInto(uid, FromDate, ToDate, Rows);
 
-                // 2) sumy globalne
-                RecalcTotals();
+                // 2) Poprzedni okres (TEN SAM mechanizm, inne daty)
+                LoadRowsInto(uid, PreviousFrom, PreviousTo, PreviousRows);
 
-                // 3) PRZEGLĄD
+                // 3) KPI obecny/poprzedni + delty
+                RecalcTotalsForBoth();
+
+                // 4) PRZEGLĄD, KATEGORIE, reszta bazuje na Rows (obecny okres) – jak dotąd
                 BuildOverview();
-
-                // 4) KATEGORIE (donut + tabelki zależnie od SelectedTransactionType)
                 BuildCategories();
 
-                // 5) BUDŻETY (analiza budżetów w kontekście wydatków z okresu)
                 BuildBudgets(uid);
-
-                // 6) KREDYTY
                 BuildLoans(uid);
-
-                // 7) CELE
                 BuildGoals(uid);
-
-                // 8) INWESTYCJE (na razie puste – gotowe do podpięcia)
                 BuildInvestments(uid);
-
-                // 9) SYMULACJA (planowane transakcje w przyszłość o długości wybranego okresu)
                 BuildPlannedSimulation(uid);
             }
             catch (Exception ex)
@@ -550,36 +688,54 @@ namespace Finly.ViewModels
             }
         }
 
-        private void LoadRows(int uid)
+        private void LoadRowsInto(int uid, DateTime from, DateTime to, ObservableCollection<ReportsService.ReportItem> target)
         {
-            Rows.Clear();
+            target.Clear();
 
             var rows = ReportsService.LoadReport(
                 userId: uid,
                 category: SelectedCategory,
                 transactionType: SelectedTransactionType,
-                from: FromDate,
-                to: ToDate
+                from: from,
+                to: to
             );
 
             foreach (var r in rows)
-                Rows.Add(r);
+                target.Add(r);
 
-            Raise(nameof(Rows));
+            // pod binding
+            if (ReferenceEquals(target, Rows))
+                Raise(nameof(Rows));
+            else
+                Raise(nameof(PreviousRows));
         }
 
-
-        private void RecalcTotals()
+        private void RecalcTotalsForBoth()
         {
-            // Uwaga: w Rows przychód dodatni, wydatek dodatni? – w Twoim ReportsService: Wydatek ma Amount = e.Amount * -1
-            // czyli Wydatek jest dodatni po stronie raportu? Nie – tam jest e.Amount * -1, a w DB e.Amount zwykle dodatnie,
-            // więc w raporcie wyjdzie ujemny. Trzymamy logikę:
-            var expenses = Rows.Where(r => r.Type == "Wydatek").Sum(r => Math.Abs(r.Amount));
-            var incomes = Rows.Where(r => r.Type == "Przychód").Sum(r => Math.Abs(r.Amount));
+            // OBECNY
+            var curExpenses = Rows.Where(r => r.Type == "Wydatek").Sum(r => Math.Abs(r.Amount));
+            var curIncomes = Rows.Where(r => r.Type == "Przychód").Sum(r => Math.Abs(r.Amount));
 
-            TotalExpenses = expenses;
-            TotalIncomes = incomes;
+            TotalExpenses = curExpenses;
+            TotalIncomes = curIncomes;
             Balance = TotalIncomes - TotalExpenses;
+
+            // POPRZEDNI
+            var prevExpenses = PreviousRows.Where(r => r.Type == "Wydatek").Sum(r => Math.Abs(r.Amount));
+            var prevIncomes = PreviousRows.Where(r => r.Type == "Przychód").Sum(r => Math.Abs(r.Amount));
+
+            PreviousTotalExpenses = prevExpenses;
+            PreviousTotalIncomes = prevIncomes;
+            PreviousBalance = PreviousTotalIncomes - PreviousTotalExpenses;
+
+            // DELTY (obecny - poprzedni)
+            DeltaExpenses = TotalExpenses - PreviousTotalExpenses;
+            DeltaIncomes = TotalIncomes - PreviousTotalIncomes;
+            DeltaBalance = Balance - PreviousBalance;
+
+            // Dodatkowo: upewnij się, że etykiety okresów są odświeżone
+            Raise(nameof(PeriodLabel));
+            Raise(nameof(PreviousPeriodLabel));
         }
 
         // =========================
@@ -591,7 +747,6 @@ namespace Finly.ViewModels
             OverviewTopIncomes.Clear();
             Trend.Clear();
 
-            // Top wydatki / przychody (po kwocie)
             var topExp = Rows
                 .Where(r => r.Type == "Wydatek")
                 .OrderByDescending(r => Math.Abs(r.Amount))
@@ -620,10 +775,8 @@ namespace Finly.ViewModels
 
             foreach (var x in topInc) OverviewTopIncomes.Add(x);
 
-            // Donut (w przeglądzie) – domyślnie: według kategorii dla WYBRANEGO typu
             BuildDonutForCurrentMode();
 
-            // Trend dzienny (prosty): incomes/expenses per dzień
             var byDay = Rows
                 .GroupBy(r => r.Date.Date)
                 .OrderBy(g => g.Key)
@@ -645,7 +798,6 @@ namespace Finly.ViewModels
         {
             IEnumerable<ReportsService.ReportItem> scope = Rows;
 
-            // Donut wg aktualnego SelectedTransactionType:
             scope = SelectedTransactionType switch
             {
                 "Wydatki" => scope.Where(r => r.Type == "Wydatek"),
@@ -678,7 +830,6 @@ namespace Finly.ViewModels
             IncomeCategoriesSummary.Clear();
             TransferCategoriesSummary.Clear();
 
-            // (A) Donut tabelka – zależnie od SelectedTransactionType
             IEnumerable<ReportsService.ReportItem> scope = Rows;
             scope = SelectedTransactionType switch
             {
@@ -706,8 +857,6 @@ namespace Finly.ViewModels
                 });
             }
 
-            // (B) Równolegle: trzy tabelki (wydatki / przychody / transfery) – ale UI może pokazywać tylko te,
-            // które odpowiadają filtrowi (to już XAML/em)
             FillCategoryTable(ExpenseCategoriesSummary, Rows.Where(r => r.Type == "Wydatek"));
             FillCategoryTable(IncomeCategoriesSummary, Rows.Where(r => r.Type == "Przychód"));
             FillCategoryTable(TransferCategoriesSummary, Rows.Where(r => r.Type == "Transfer"));
@@ -748,16 +897,11 @@ namespace Finly.ViewModels
         {
             Budgets.Clear();
 
-            // Wydatki per kategoria w wybranym okresie – to jest baza do “spent”
             var spentByCategory = Rows
                 .Where(r => r.Type == "Wydatek")
                 .GroupBy(r => string.IsNullOrWhiteSpace(r.Category) ? "(brak kategorii)" : r.Category)
                 .ToDictionary(g => g.Key, g => g.Sum(x => Math.Abs(x.Amount)));
 
-            // BudgetsService: nie znamy 1:1 mapowania budżetu->kategoria w Twoim modelu,
-            // więc robimy bezpiecznie:
-            // - jeżeli BudgetSummary ma Name odpowiadający nazwie kategorii – zadziała “jak złoto”
-            // - jeżeli nie – dalej pokazujemy Planned/Spent z BudgetSummary (jeśli jest)
             try
             {
                 var raw = BudgetService.GetBudgetsWithSummary(uid) ?? new List<BudgetService.BudgetSummary>();
@@ -767,7 +911,6 @@ namespace Finly.ViewModels
                     decimal planned = b.PlannedAmount;
                     decimal spent = b.Spent;
 
-                    // jeśli umiemy policzyć “spent w okresie” po nazwie:
                     if (!string.IsNullOrWhiteSpace(b.Name) && spentByCategory.TryGetValue(b.Name, out var inPeriod))
                         spent = inPeriod;
 
@@ -782,7 +925,7 @@ namespace Finly.ViewModels
             }
             catch
             {
-                // jeśli budżety nie działają – nie wysypujemy raportów
+                // cicho
             }
 
             BudgetsOkCount = Budgets.Count(b => !b.IsOver);
@@ -804,11 +947,9 @@ namespace Finly.ViewModels
 
                 foreach (var l in loans)
                 {
+                    // zostawiam jak było u Ciebie w projekcie (jeśli masz inną klasę, zmień tutaj)
                     var monthly = LoansService.CalculateMonthlyPayment(l.Principal, l.InterestRate, l.TermMonths);
 
-                    // Paid/Overpaid/Remaining – jeśli masz tabelę operacji kredytu:
-                    // tutaj wstaw agregację po okresie (FromDate..ToDate).
-                    // Na ten moment: zostawiamy 0 bezpiecznie, żeby UI działał i nie kłamał.
                     Loans.Add(new LoanRow
                     {
                         Id = l.Id,
@@ -840,7 +981,6 @@ namespace Finly.ViewModels
 
             try
             {
-                // Prefer DB (koperty cele) – jest u Ciebie używane w innych miejscach
                 var envGoals = DatabaseService.GetEnvelopeGoals(uid);
 
                 if (envGoals != null)
@@ -857,8 +997,6 @@ namespace Finly.ViewModels
                             DueDate = g.Deadline
                         };
 
-                        // „ile w kolejnym okresie”
-                        // jeżeli cel nie dowieziony: rozkładamy brakującą kwotę na kolejny okres
                         row.NeededNextPeriod = row.Missing <= 0 ? 0 : (row.Missing / periodLenDays * periodLenDays);
 
                         Goals.Add(row);
@@ -874,22 +1012,16 @@ namespace Finly.ViewModels
         }
 
         // =========================
-        // INWESTYCJE (placeholder)
+        // INWESTYCJE
         // =========================
         private void BuildInvestments(int uid)
         {
             Investments.Clear();
-
-            // Tu podepniesz źródło danych:
-            // - tabela Investments / holdings / wartości dzienne
-            // - albo integracja z API
-            // VM jest gotowy, UI nie wybuchnie – po prostu będzie pusto.
-
             Raise(nameof(Investments));
         }
 
         // =========================
-        // SYMULACJA: planowane transakcje w przyszłość (długość = wybrany okres)
+        // SYMULACJA
         // =========================
         private void BuildPlannedSimulation(int uid)
         {
@@ -900,14 +1032,11 @@ namespace Finly.ViewModels
             var simFrom = ToDate.Date.AddDays(1);
             var simTo = simFrom.AddDays(periodLenDays - 1);
 
-            // Jeśli masz w DB IsPlanned w Expenses/Incomes – to pobieramy z SQL bezpośrednio.
-            // Filtry: SelectedTransactionType + SelectedCategory.
             try
             {
                 using var con = DatabaseService.GetConnection();
                 using var cmd = con.CreateCommand();
 
-                // Budujemy query warunkowo wg filtra typu:
                 var parts = new List<string>();
 
                 bool wantExpenses = SelectedTransactionType == "Wydatki" || SelectedTransactionType == "Wszystko";
@@ -978,7 +1107,6 @@ WHERE 1=1
                         Amount = amount
                     });
 
-                    // delta salda: przychód +, wydatek -
                     SimBalanceDelta += amount;
                 }
             }
@@ -991,7 +1119,7 @@ WHERE 1=1
         }
 
         // =========================
-        // PDF export – docelowo ma brać dane z każdej zakładki zgodnie z filtrami
+        // PDF
         // =========================
         private void ExportPdf()
         {
@@ -1005,6 +1133,5 @@ WHERE 1=1
                 ToastService.Error($"Błąd eksportu PDF: {ex.Message}");
             }
         }
-
     }
 }
