@@ -555,11 +555,9 @@ namespace Finly.ViewModels
             Rows.Clear();
 
             var rows = ReportsService.LoadReport(
-                uid,
-                source: "Wszystko", // na razie spójnie z Twoimi filtrami (MoneyPlaces obsługujemy po stronie DB poniżej)
+                userId: uid,
                 category: SelectedCategory,
                 transactionType: SelectedTransactionType,
-                moneyPlace: SelectedMoneyPlace,
                 from: FromDate,
                 to: ToDate
             );
@@ -569,6 +567,7 @@ namespace Finly.ViewModels
 
             Raise(nameof(Rows));
         }
+
 
         private void RecalcTotals()
         {

@@ -17,10 +17,8 @@ namespace Finly.Services.SpecificPages
 
         public static List<ReportItem> LoadReport(
             int userId,
-            string source,
             string category,
             string transactionType,
-            string moneyPlace,
             DateTime from,
             DateTime to)
         {
@@ -82,8 +80,6 @@ WHERE 1=1
                 cmd.Parameters.AddWithValue("@cat", category);
             }
 
-            // source / moneyPlace do rozbudowy później (jak będziesz realnie wyliczać AccountName)
-
             sql += " ORDER BY t.TxDate;";
 
             cmd.CommandText = sql;
@@ -95,15 +91,14 @@ WHERE 1=1
             using var r = cmd.ExecuteReader();
             while (r.Read())
             {
-                var item = new ReportItem
+                result.Add(new ReportItem
                 {
                     Date = DateTime.Parse(r["TxDate"].ToString() ?? DateTime.MinValue.ToString("yyyy-MM-dd")),
                     Category = r["CategoryName"]?.ToString() ?? "(brak kategorii)",
                     Amount = Convert.ToDecimal(r["Amount"]),
                     Account = r["AccountName"]?.ToString() ?? "",
                     Type = r["TxType"]?.ToString() ?? ""
-                };
-                result.Add(item);
+                });
             }
 
             return result;
