@@ -11,10 +11,11 @@ using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Globalization;
 using System.Linq;
-using System.Windows;
-using System.Windows.Input;
 using System.Threading;
 using System.Threading.Tasks;
+using System.Windows.Input;
+using System.Windows.Data;
+
 
 namespace Finly.ViewModels
 {
@@ -53,18 +54,48 @@ namespace Finly.ViewModels
             PlannedSim = new ObservableCollection<PlannedRow>();
 
             // Komendy
+            // (RelayCommand może nie wspierać async -> i tak nie blokujemy UI, bo refresh jest w tle)
             RefreshCommand = new RelayCommand(_ => _ = RefreshAsync());
-
-
-            // Tab eksport (na razie wspólna metoda eksportu; później łatwo rozdzielimy per zakładka)
             ExportPdfCommand = new RelayCommand(param => ExportPdf(param?.ToString()));
 
-            // Startowe serie/osi, żeby XAML miał co bindować od razu
+            // Startowe serie/osi (XAML ma od razu co bindować)
             InitAllCharts();
-
         }
 
+        // =========================
+        // Debounce / re-entrancy
+        // =========================
         private int _refreshing;
+
+        public async Task RefreshAsync()
+        {
+            if (Interlocked.Exchange(ref _refreshing, 1) == 1)
+                return;
+
+            try
+            {
+                var uid = UserService.GetCurrentUserId();
+                if (uid <= 0)
+                    throw new InvalidOperationException("Brak zalogowanego użytkownika.");
+
+                // snapshot dat
+                var from = FromDate;
+                var to = ToDate;
+                var pFrom = PreviousFrom;
+                var pTo = PreviousTo;
+
+                var snap = await Task.Run(() => BuildSnapshot(uid, from, to, pFrom, pTo));
+
+                // ApplySnapshot musi być na UI thread — a MyRelay/ReportsPage wywołuje VM z UI,
+                // więc po await wracamy na UI context i to jest OK.
+                ApplySnapshot(snap);
+            }
+            finally
+            {
+                Interlocked.Exchange(ref _refreshing, 0);
+            }
+        }
+
         // =========================
         // Daty (PeriodBarControl)
         // =========================
@@ -84,361 +115,6 @@ namespace Finly.ViewModels
                 }
             }
         }
-
-        public async System.Threading.Tasks.Task RefreshAsync()
-        {
-            // blokada re-entrancy
-            if (Interlocked.Exchange(ref _refreshing, 1) == 1)
-                return;
-
-            try
-            {
-                var uid = UserService.GetCurrentUserId();
-                if (uid <= 0)
-                    throw new InvalidOperationException("Brak zalogowanego użytkownika.");
-
-                // snapshot dat (żeby w trakcie Task.Run nie zmieniły się)
-                var from = FromDate;
-                var to = ToDate;
-                var pFrom = PreviousFrom;
-                var pTo = PreviousTo;
-
-                // 1) ciężkie rzeczy liczymy w tle
-                var snap = await Task.Run(() => BuildSnapshot(uid, from, to, pFrom, pTo));
-
-                // 2) aplikujemy na UI (tu już jesteśmy z powrotem na wątku UI)
-                ApplySnapshot(snap);
-            }
-            finally
-            {
-                Interlocked.Exchange(ref _refreshing, 0);
-            }
-        }
-
-        private sealed class ReportsSnapshot
-        {
-            public List<ReportsService.ReportItem> CurRows { get; init; } = new();
-            public List<ReportsService.ReportItem> PrevRows { get; init; } = new();
-
-            public decimal CurExp { get; init; }
-            public decimal CurInc { get; init; }
-            public decimal PrevExp { get; init; }
-            public decimal PrevInc { get; init; }
-
-            public List<TxLine> TopExp { get; init; } = new();
-            public List<TxLine> TopInc { get; init; } = new();
-
-            public int CntExp { get; init; }
-            public int CntInc { get; init; }
-            public int CntTrf { get; init; }
-
-            public double SumExp { get; init; }
-            public double SumInc { get; init; }
-            public double SumTrf { get; init; }
-
-            public List<BudgetRow> Budgets { get; init; } = new();
-            public string[] BudgetLabels { get; init; } = Array.Empty<string>();
-            public double[] BudgetSpent { get; init; } = Array.Empty<double>();
-            public double[] BudgetLimit { get; init; } = Array.Empty<double>();
-
-            public List<LoanRow> Loans { get; init; } = new();
-            public List<GoalRow> Goals { get; init; } = new();
-
-            public List<PlannedRow> Planned { get; init; } = new();
-            public decimal SimDelta { get; init; }
-            public string[] SimLabels { get; init; } = Array.Empty<string>();
-            public double[] SimValues { get; init; } = Array.Empty<double>();
-        }
-
-        private static ReportsSnapshot BuildSnapshot(int uid, DateTime from, DateTime to, DateTime pFrom, DateTime pTo)
-        {
-            // Normalizacja dat (na wszelki wypadek)
-            from = from.Date;
-            to = to.Date;
-            pFrom = pFrom.Date;
-            pTo = pTo.Date;
-
-            // 1) rows (best-effort, ale bez wywalania całego snapshotu)
-            List<ReportsService.ReportItem> cur;
-            List<ReportsService.ReportItem> prev;
-
-            try
-            {
-                cur = ReportsService.LoadReport(uid, "Wszystkie kategorie", "Wszystko", from, to) ?? new List<ReportsService.ReportItem>();
-            }
-            catch
-            {
-                cur = new List<ReportsService.ReportItem>();
-            }
-
-            try
-            {
-                prev = ReportsService.LoadReport(uid, "Wszystkie kategorie", "Wszystko", pFrom, pTo) ?? new List<ReportsService.ReportItem>();
-            }
-            catch
-            {
-                prev = new List<ReportsService.ReportItem>();
-            }
-
-            // 2) KPI (liczymy na listach)
-            var curExp = cur.Where(r => r.Type == "Wydatek").Sum(r => Math.Abs(r.Amount));
-            var curInc = cur.Where(r => r.Type == "Przychód").Sum(r => Math.Abs(r.Amount));
-
-            var prevExp = prev.Where(r => r.Type == "Wydatek").Sum(r => Math.Abs(r.Amount));
-            var prevInc = prev.Where(r => r.Type == "Przychód").Sum(r => Math.Abs(r.Amount));
-
-            // 3) podium
-            var topExp = cur.Where(x => x.Type == "Wydatek")
-                .OrderByDescending(x => Math.Abs(x.Amount))
-                .Take(3)
-                .Select(r => new TxLine
-                {
-                    Date = r.Date,
-                    Category = r.Category,
-                    Amount = Math.Abs(r.Amount)
-                })
-                .ToList();
-
-            var topInc = cur.Where(x => x.Type == "Przychód")
-                .OrderByDescending(x => Math.Abs(x.Amount))
-                .Take(3)
-                .Select(r => new TxLine
-                {
-                    Date = r.Date,
-                    Category = r.Category,
-                    Amount = Math.Abs(r.Amount)
-                })
-                .ToList();
-
-            // 4) overview chart numbers
-            var cntExp = cur.Count(x => x.Type == "Wydatek");
-            var cntInc = cur.Count(x => x.Type == "Przychód");
-            var cntTrf = cur.Count(x => x.Type == "Transfer");
-
-            var sumExp = cur.Where(x => x.Type == "Wydatek").Sum(x => (double)Math.Abs(x.Amount));
-            var sumInc = cur.Where(x => x.Type == "Przychód").Sum(x => (double)Math.Abs(x.Amount));
-            var sumTrf = cur.Where(x => x.Type == "Transfer").Sum(x => (double)Math.Abs(x.Amount));
-
-            // 5) budżety
-            var budgetsRows = new List<BudgetRow>();
-            try
-            {
-                var spentByCategory = cur.Where(r => r.Type == "Wydatek")
-                    .GroupBy(r => string.IsNullOrWhiteSpace(r.Category) ? "(brak kategorii)" : r.Category)
-                    .ToDictionary(g => g.Key, g => g.Sum(x => Math.Abs(x.Amount)));
-
-                var rawBudgets = BudgetService.GetBudgetsWithSummary(uid) ?? new List<BudgetService.BudgetSummary>();
-                foreach (var b in rawBudgets)
-                {
-                    var plannedAmount = b.PlannedAmount;
-                    var spentAmount = b.Spent;
-
-                    // Jeżeli da się, podmieniamy spent na realnie wydane w okresie po kategorii (nazwa budżetu = kategoria)
-                    if (!string.IsNullOrWhiteSpace(b.Name) && spentByCategory.TryGetValue(b.Name, out var inPeriod))
-                        spentAmount = inPeriod;
-
-                    budgetsRows.Add(new BudgetRow
-                    {
-                        Id = b.Id,
-                        Name = b.Name ?? "(budżet)",
-                        Planned = plannedAmount,
-                        Spent = spentAmount
-                    });
-                }
-            }
-            catch
-            {
-                // celowo cisza (raport ma się wygenerować nawet jak budżety się wysypią)
-            }
-
-            var topBudgets = budgetsRows
-                .OrderByDescending(b => b.Planned)
-                .Take(8)
-                .ToList();
-
-            var budgetLabels = topBudgets.Select(x => x.Name).ToArray();
-            var budgetSpent = topBudgets.Select(x => (double)x.Spent).ToArray();
-            var budgetLimit = topBudgets.Select(x => (double)x.Planned).ToArray();
-
-            if (budgetLabels.Length == 0) budgetLabels = new[] { "" };
-            if (budgetSpent.Length == 0) budgetSpent = new[] { 0d };
-            if (budgetLimit.Length == 0) budgetLimit = new[] { 0d };
-
-            // 6) loans
-            var loans = new List<LoanRow>();
-            try
-            {
-                var rawLoans = DatabaseService.GetLoans(uid) ?? new List<LoanModel>();
-                foreach (var l in rawLoans)
-                {
-                    loans.Add(new LoanRow
-                    {
-                        Id = l.Id,
-                        Name = l.Name ?? "Kredyt",
-                        RemainingToPay = 0m,
-                        PaidInPeriod = 0m,
-                        OverpaidInPeriod = 0m
-                    });
-                }
-            }
-            catch { }
-
-            // 6b) goals
-            var goals = new List<GoalRow>();
-            try
-            {
-                var envGoals = DatabaseService.GetEnvelopeGoals(uid);
-                if (envGoals != null)
-                {
-                    var periodLenDays = Math.Max(1, (to - from).Days + 1);
-
-                    foreach (var g in envGoals)
-                    {
-                        var row = new GoalRow
-                        {
-                            Name = g.Name ?? "Cel",
-                            Target = g.Target,
-                            Current = g.Allocated,
-                            DueDate = g.Deadline
-                        };
-
-                        row.NeededNextPeriod = CalculateNeededForNextPeriod(row, periodLenDays);
-                        goals.Add(row);
-                    }
-                }
-            }
-            catch { }
-
-            // 7) planned sim – placeholder (żeby kompilacja i UI działały)
-            var plannedTx = new List<PlannedRow>();
-            decimal simDelta = 0m;
-
-            // placeholdery wykresu symulacji – zawsze niepuste
-            string[] simLabels = new[] { "" };
-            double[] simValues = new[] { 0d };
-
-            try
-            {
-                // Jeśli później podepniesz realne query:
-                // - uzupełnij plannedTx
-                // - simDelta = plannedTx.Sum(x => x.Amount)
-                // - simLabels/simValues wylicz jak w BuildSimulationChart (ale bez UI)
-
-                simDelta = plannedTx.Sum(x => x.Amount);
-            }
-            catch
-            {
-                simDelta = 0m;
-            }
-
-            return new ReportsSnapshot
-            {
-                CurRows = cur,
-                PrevRows = prev,
-
-                CurExp = curExp,
-                CurInc = curInc,
-                PrevExp = prevExp,
-                PrevInc = prevInc,
-
-                TopExp = topExp,
-                TopInc = topInc,
-
-                CntExp = cntExp,
-                CntInc = cntInc,
-                CntTrf = cntTrf,
-
-                SumExp = sumExp,
-                SumInc = sumInc,
-                SumTrf = sumTrf,
-
-                Budgets = budgetsRows,
-                BudgetLabels = budgetLabels,
-                BudgetSpent = budgetSpent,
-                BudgetLimit = budgetLimit,
-
-                Loans = loans,
-                Goals = goals,
-
-                Planned = plannedTx,
-                SimDelta = simDelta,
-                SimLabels = simLabels,
-                SimValues = simValues
-            };
-        }
-
-
-        private void ApplySnapshot(ReportsSnapshot s)
-        {
-            // Rows
-            Rows = new ObservableCollection<ReportsService.ReportItem>(s.CurRows);
-            PreviousRows = new ObservableCollection<ReportsService.ReportItem>(s.PrevRows);
-
-            // KPI
-            TotalExpenses = s.CurExp;
-            TotalIncomes = s.CurInc;
-            Balance = TotalIncomes - TotalExpenses;
-
-            PreviousTotalExpenses = s.PrevExp;
-            PreviousTotalIncomes = s.PrevInc;
-            PreviousBalance = PreviousTotalIncomes - PreviousTotalExpenses;
-
-            DeltaExpenses = TotalExpenses - PreviousTotalExpenses;
-            DeltaIncomes = TotalIncomes - PreviousTotalIncomes;
-            DeltaBalance = Balance - PreviousBalance;
-
-            // Podium
-            OverviewTopExpenses.Clear();
-            foreach (var x in s.TopExp) OverviewTopExpenses.Add(x);
-
-            OverviewTopIncomes.Clear();
-            foreach (var x in s.TopInc) OverviewTopIncomes.Add(x);
-
-            // Overview charts
-            OverviewCountSeries = new ISeries[]
-            {
-        new ColumnSeries<double> { Name="Ilość", Values = new double[] { s.CntExp, s.CntInc, s.CntTrf } }
-            };
-
-            OverviewAmountSeries = new ISeries[]
-            {
-        new ColumnSeries<double> { Name="Wartość (zł)", Values = new double[] { s.SumExp, s.SumInc, s.SumTrf } }
-            };
-
-            // Budgets
-            Budgets.Clear();
-            foreach (var b in s.Budgets) Budgets.Add(b);
-
-            BudgetsAxesX = new[] { new Axis { Labels = s.BudgetLabels } };
-            BudgetsAxesY = new[] { new Axis { MinLimit = 0 } };
-            BudgetsSeries = new ISeries[]
-            {
-        new ColumnSeries<double> { Name="Wydano", Values = s.BudgetSpent },
-        new ColumnSeries<double> { Name="Limit",  Values = s.BudgetLimit }
-            };
-
-            // Loans/Goals
-            Loans.Clear();
-            foreach (var l in s.Loans) Loans.Add(l);
-
-            Goals.Clear();
-            foreach (var g in s.Goals) Goals.Add(g);
-
-            // Planned
-            PlannedSim.Clear();
-            foreach (var p in s.Planned.OrderBy(x => x.Date)) PlannedSim.Add(p);
-
-            SimBalanceDelta = s.SimDelta;
-
-            // Sym chart (jeśli dopniesz dane)
-            SimulationAxesX = new[] { new Axis { Labels = s.SimLabels } };
-            SimulationSeries = new ISeries[] { new LineSeries<double> { Name = "Saldo (symulacja)", Values = s.SimValues } };
-
-            // Donuty budujesz po ApplySnapshot (możesz też tu):
-            BuildCategoryDonuts();
-        }
-
-
 
         private DateTime _toDate;
         public DateTime ToDate
@@ -525,6 +201,106 @@ namespace Finly.ViewModels
         }
 
         // =========================
+        // Przegląd: filtr listy transakcji (Toggle)
+        // =========================
+        public enum TxFilter
+        {
+            All,
+            Expenses,
+            Incomes,
+            Transfers
+        }
+
+        private TxFilter _selectedTxFilter = TxFilter.All;
+        public TxFilter SelectedTxFilter
+        {
+            get => _selectedTxFilter;
+            private set
+            {
+                if (_selectedTxFilter != value)
+                {
+                    _selectedTxFilter = value;
+                    Raise(nameof(SelectedTxFilter));
+                    Raise(nameof(FilterAll));
+                    Raise(nameof(FilterExpenses));
+                    Raise(nameof(FilterIncomes));
+                    Raise(nameof(FilterTransfers));
+                    ApplyTransactionsFilter();
+                }
+            }
+        }
+
+        // Te bool-e są pod ToggleButton.IsChecked (bez converterów, bez wyjątków)
+        public bool FilterAll
+        {
+            get => SelectedTxFilter == TxFilter.All;
+            set { if (value) SelectedTxFilter = TxFilter.All; }
+        }
+        public bool FilterExpenses
+        {
+            get => SelectedTxFilter == TxFilter.Expenses;
+            set { if (value) SelectedTxFilter = TxFilter.Expenses; }
+        }
+        public bool FilterIncomes
+        {
+            get => SelectedTxFilter == TxFilter.Incomes;
+            set { if (value) SelectedTxFilter = TxFilter.Incomes; }
+        }
+        public bool FilterTransfers
+        {
+            get => SelectedTxFilter == TxFilter.Transfers;
+            set { if (value) SelectedTxFilter = TxFilter.Transfers; }
+        }
+
+        // ICollectionView dla listy transakcji (prawa kolumna w przeglądzie)
+        private ICollectionView? _transactionsView;
+        public ICollectionView? TransactionsView
+        {
+            get => _transactionsView;
+            private set { _transactionsView = value; Raise(nameof(TransactionsView)); }
+        }
+
+        private void RebuildTransactionsView()
+        {
+            try
+            {
+                var view = CollectionViewSource.GetDefaultView(Rows);
+                view.Filter = TxViewFilter;
+                view.SortDescriptions.Clear();
+                view.SortDescriptions.Add(new SortDescription(nameof(ReportsService.ReportItem.Date), ListSortDirection.Descending));
+                TransactionsView = view;
+
+                // po rebuildzie też od razu odśwież filtr
+                view.Refresh();
+            }
+            catch
+            {
+                TransactionsView = null;
+            }
+        }
+
+        private bool TxViewFilter(object obj)
+        {
+            if (obj is not ReportsService.ReportItem r) return false;
+
+            return SelectedTxFilter switch
+            {
+                TxFilter.All => true,
+                TxFilter.Expenses => r.Type == "Wydatek",
+                TxFilter.Incomes => r.Type == "Przychód",
+                TxFilter.Transfers => r.Type == "Transfer",
+                _ => true
+            };
+        }
+
+        private void ApplyTransactionsFilter()
+        {
+            try { TransactionsView?.Refresh(); }
+            catch { }
+        }
+
+
+        // =========================
         // Dane wspólne
         // =========================
         private ObservableCollection<ReportsService.ReportItem> _rows = new();
@@ -541,15 +317,22 @@ namespace Finly.ViewModels
             private set { _previousRows = value; Raise(nameof(PreviousRows)); }
         }
 
-
         // =========================
-        // KPI – obecny / poprzedni / delta
+        // KPI
         // =========================
         private decimal _totalExpenses;
         public decimal TotalExpenses
         {
             get => _totalExpenses;
-            private set { if (_totalExpenses != value) { _totalExpenses = value; Raise(nameof(TotalExpenses)); Raise(nameof(TotalExpensesStr)); } }
+            private set
+            {
+                if (_totalExpenses != value)
+                {
+                    _totalExpenses = value;
+                    Raise(nameof(TotalExpenses));
+                    Raise(nameof(TotalExpensesStr));
+                }
+            }
         }
         public string TotalExpensesStr => Money(TotalExpenses);
 
@@ -557,7 +340,15 @@ namespace Finly.ViewModels
         public decimal TotalIncomes
         {
             get => _totalIncomes;
-            private set { if (_totalIncomes != value) { _totalIncomes = value; Raise(nameof(TotalIncomes)); Raise(nameof(TotalIncomesStr)); } }
+            private set
+            {
+                if (_totalIncomes != value)
+                {
+                    _totalIncomes = value;
+                    Raise(nameof(TotalIncomes));
+                    Raise(nameof(TotalIncomesStr));
+                }
+            }
         }
         public string TotalIncomesStr => Money(TotalIncomes);
 
@@ -565,7 +356,15 @@ namespace Finly.ViewModels
         public decimal Balance
         {
             get => _balance;
-            private set { if (_balance != value) { _balance = value; Raise(nameof(Balance)); Raise(nameof(BalanceStr)); } }
+            private set
+            {
+                if (_balance != value)
+                {
+                    _balance = value;
+                    Raise(nameof(Balance));
+                    Raise(nameof(BalanceStr));
+                }
+            }
         }
         public string BalanceStr => Money(Balance);
 
@@ -573,7 +372,15 @@ namespace Finly.ViewModels
         public decimal PreviousTotalExpenses
         {
             get => _previousTotalExpenses;
-            private set { if (_previousTotalExpenses != value) { _previousTotalExpenses = value; Raise(nameof(PreviousTotalExpenses)); Raise(nameof(PreviousTotalExpensesStr)); } }
+            private set
+            {
+                if (_previousTotalExpenses != value)
+                {
+                    _previousTotalExpenses = value;
+                    Raise(nameof(PreviousTotalExpenses));
+                    Raise(nameof(PreviousTotalExpensesStr));
+                }
+            }
         }
         public string PreviousTotalExpensesStr => Money(PreviousTotalExpenses);
 
@@ -581,7 +388,15 @@ namespace Finly.ViewModels
         public decimal PreviousTotalIncomes
         {
             get => _previousTotalIncomes;
-            private set { if (_previousTotalIncomes != value) { _previousTotalIncomes = value; Raise(nameof(PreviousTotalIncomes)); Raise(nameof(PreviousTotalIncomesStr)); } }
+            private set
+            {
+                if (_previousTotalIncomes != value)
+                {
+                    _previousTotalIncomes = value;
+                    Raise(nameof(PreviousTotalIncomes));
+                    Raise(nameof(PreviousTotalIncomesStr));
+                }
+            }
         }
         public string PreviousTotalIncomesStr => Money(PreviousTotalIncomes);
 
@@ -589,7 +404,15 @@ namespace Finly.ViewModels
         public decimal PreviousBalance
         {
             get => _previousBalance;
-            private set { if (_previousBalance != value) { _previousBalance = value; Raise(nameof(PreviousBalance)); Raise(nameof(PreviousBalanceStr)); } }
+            private set
+            {
+                if (_previousBalance != value)
+                {
+                    _previousBalance = value;
+                    Raise(nameof(PreviousBalance));
+                    Raise(nameof(PreviousBalanceStr));
+                }
+            }
         }
         public string PreviousBalanceStr => Money(PreviousBalance);
 
@@ -597,7 +420,15 @@ namespace Finly.ViewModels
         public decimal DeltaExpenses
         {
             get => _deltaExpenses;
-            private set { if (_deltaExpenses != value) { _deltaExpenses = value; Raise(nameof(DeltaExpenses)); Raise(nameof(DeltaExpensesStr)); } }
+            private set
+            {
+                if (_deltaExpenses != value)
+                {
+                    _deltaExpenses = value;
+                    Raise(nameof(DeltaExpenses));
+                    Raise(nameof(DeltaExpensesStr));
+                }
+            }
         }
         public string DeltaExpensesStr => DeltaMoney(DeltaExpenses);
 
@@ -605,7 +436,15 @@ namespace Finly.ViewModels
         public decimal DeltaIncomes
         {
             get => _deltaIncomes;
-            private set { if (_deltaIncomes != value) { _deltaIncomes = value; Raise(nameof(DeltaIncomes)); Raise(nameof(DeltaIncomesStr)); } }
+            private set
+            {
+                if (_deltaIncomes != value)
+                {
+                    _deltaIncomes = value;
+                    Raise(nameof(DeltaIncomes));
+                    Raise(nameof(DeltaIncomesStr));
+                }
+            }
         }
         public string DeltaIncomesStr => DeltaMoney(DeltaIncomes);
 
@@ -613,7 +452,15 @@ namespace Finly.ViewModels
         public decimal DeltaBalance
         {
             get => _deltaBalance;
-            private set { if (_deltaBalance != value) { _deltaBalance = value; Raise(nameof(DeltaBalance)); Raise(nameof(DeltaBalanceStr)); } }
+            private set
+            {
+                if (_deltaBalance != value)
+                {
+                    _deltaBalance = value;
+                    Raise(nameof(DeltaBalance));
+                    Raise(nameof(DeltaBalanceStr));
+                }
+            }
         }
         public string DeltaBalanceStr => DeltaMoney(DeltaBalance);
 
@@ -625,7 +472,7 @@ namespace Finly.ViewModels
         }
 
         // =========================
-        // PRZEGLĄD: podium TOP3
+        // Modele tabel
         // =========================
         public sealed class TxLine
         {
@@ -635,12 +482,34 @@ namespace Finly.ViewModels
             public string AmountStr => Amount.ToString("N2", CultureInfo.CurrentCulture) + " zł";
         }
 
+        // =========================
+        // Podium: łatwe bindy (2–1–3)
+        // =========================
+        private TxLine? _topExp1;
+        public TxLine? TopExp1 { get => _topExp1; private set { _topExp1 = value; Raise(nameof(TopExp1)); } }
+
+        private TxLine? _topExp2;
+        public TxLine? TopExp2 { get => _topExp2; private set { _topExp2 = value; Raise(nameof(TopExp2)); } }
+
+        private TxLine? _topExp3;
+        public TxLine? TopExp3 { get => _topExp3; private set { _topExp3 = value; Raise(nameof(TopExp3)); } }
+
+        private TxLine? _topInc1;
+        public TxLine? TopInc1 { get => _topInc1; private set { _topInc1 = value; Raise(nameof(TopInc1)); } }
+
+        private TxLine? _topInc2;
+        public TxLine? TopInc2 { get => _topInc2; private set { _topInc2 = value; Raise(nameof(TopInc2)); } }
+
+        private TxLine? _topInc3;
+        public TxLine? TopInc3 { get => _topInc3; private set { _topInc3 = value; Raise(nameof(TopInc3)); } }
+
+        private static TxLine? GetAt(List<TxLine> list, int index)
+            => (index >= 0 && index < list.Count) ? list[index] : null;
+
+
         public ObservableCollection<TxLine> OverviewTopExpenses { get; }
         public ObservableCollection<TxLine> OverviewTopIncomes { get; }
 
-        // =========================
-        // BUDŻETY / KREDYTY / CELE / INWESTYCJE / SYMULACJA – modele tabel
-        // =========================
         public sealed class BudgetRow
         {
             public int Id { get; set; }
@@ -649,8 +518,8 @@ namespace Finly.ViewModels
             public decimal Spent { get; set; }
 
             public bool IsOver => Spent > Planned;
-            public decimal Delta => Spent - Planned;              // >0 przekroczono, <0 zapas
-            public decimal Remaining => Planned - Spent;          // >0 zapas, <0 przekroczono
+            public decimal Delta => Spent - Planned;
+            public decimal Remaining => Planned - Spent;
             public decimal UsedPercent => Planned <= 0 ? 0 : (Spent / Planned * 100m);
 
             public string PlannedStr => Money(Planned);
@@ -705,7 +574,7 @@ namespace Finly.ViewModels
             public decimal ProgressPercent => Target <= 0 ? 0 : (Current / Target * 100m);
             public decimal Missing => Math.Max(0, Target - Current);
 
-            public decimal NeededNextPeriod { get; set; } // rekomendacja na kolejny okres
+            public decimal NeededNextPeriod { get; set; }
 
             public string TargetStr => Money(Target);
             public string CurrentStr => Money(Current);
@@ -731,15 +600,21 @@ namespace Finly.ViewModels
         public decimal SimBalanceDelta
         {
             get => _simBalanceDelta;
-            private set { if (_simBalanceDelta != value) { _simBalanceDelta = value; Raise(nameof(SimBalanceDelta)); Raise(nameof(SimBalanceDeltaStr)); } }
+            private set
+            {
+                if (_simBalanceDelta != value)
+                {
+                    _simBalanceDelta = value;
+                    Raise(nameof(SimBalanceDelta));
+                    Raise(nameof(SimBalanceDeltaStr));
+                }
+            }
         }
         public string SimBalanceDeltaStr => Money(SimBalanceDelta);
 
         // =========================
-        // LIVECHARTS – BINDINGI POD XAML
+        // LIVECHARTS – bindowanie pod XAML
         // =========================
-
-        // ---- 1) Przegląd: wykres ilości transakcji
         private ISeries[] _overviewCountSeries = Array.Empty<ISeries>();
         public ISeries[] OverviewCountSeries { get => _overviewCountSeries; private set { _overviewCountSeries = value; Raise(nameof(OverviewCountSeries)); } }
 
@@ -749,7 +624,6 @@ namespace Finly.ViewModels
         private Axis[] _overviewCountAxesY = Array.Empty<Axis>();
         public Axis[] OverviewCountAxesY { get => _overviewCountAxesY; private set { _overviewCountAxesY = value; Raise(nameof(OverviewCountAxesY)); } }
 
-        // ---- 1) Przegląd: wykres wartości (zł)
         private ISeries[] _overviewAmountSeries = Array.Empty<ISeries>();
         public ISeries[] OverviewAmountSeries { get => _overviewAmountSeries; private set { _overviewAmountSeries = value; Raise(nameof(OverviewAmountSeries)); } }
 
@@ -759,7 +633,6 @@ namespace Finly.ViewModels
         private Axis[] _overviewAmountAxesY = Array.Empty<Axis>();
         public Axis[] OverviewAmountAxesY { get => _overviewAmountAxesY; private set { _overviewAmountAxesY = value; Raise(nameof(OverviewAmountAxesY)); } }
 
-        // ---- 2) Budżety
         private ISeries[] _budgetsSeries = Array.Empty<ISeries>();
         public ISeries[] BudgetsSeries { get => _budgetsSeries; private set { _budgetsSeries = value; Raise(nameof(BudgetsSeries)); } }
 
@@ -769,7 +642,6 @@ namespace Finly.ViewModels
         private Axis[] _budgetsAxesY = Array.Empty<Axis>();
         public Axis[] BudgetsAxesY { get => _budgetsAxesY; private set { _budgetsAxesY = value; Raise(nameof(BudgetsAxesY)); } }
 
-        // ---- 3) Inwestycje
         private ISeries[] _investmentsSeries = Array.Empty<ISeries>();
         public ISeries[] InvestmentsSeries { get => _investmentsSeries; private set { _investmentsSeries = value; Raise(nameof(InvestmentsSeries)); } }
 
@@ -779,7 +651,6 @@ namespace Finly.ViewModels
         private Axis[] _investmentsAxesY = Array.Empty<Axis>();
         public Axis[] InvestmentsAxesY { get => _investmentsAxesY; private set { _investmentsAxesY = value; Raise(nameof(InvestmentsAxesY)); } }
 
-        // ---- 4) Kategorie (donuty)
         private ISeries[] _expenseDonutSeries = Array.Empty<ISeries>();
         public ISeries[] ExpenseDonutSeries { get => _expenseDonutSeries; private set { _expenseDonutSeries = value; Raise(nameof(ExpenseDonutSeries)); } }
 
@@ -789,7 +660,6 @@ namespace Finly.ViewModels
         private ISeries[] _transferDonutSeries = Array.Empty<ISeries>();
         public ISeries[] TransferDonutSeries { get => _transferDonutSeries; private set { _transferDonutSeries = value; Raise(nameof(TransferDonutSeries)); } }
 
-        // ---- 5) Kredyty
         private ISeries[] _loansSeries = Array.Empty<ISeries>();
         public ISeries[] LoansSeries { get => _loansSeries; private set { _loansSeries = value; Raise(nameof(LoansSeries)); } }
 
@@ -799,7 +669,6 @@ namespace Finly.ViewModels
         private Axis[] _loansAxesY = Array.Empty<Axis>();
         public Axis[] LoansAxesY { get => _loansAxesY; private set { _loansAxesY = value; Raise(nameof(LoansAxesY)); } }
 
-        // ---- 6) Cele
         private ISeries[] _goalsSeries = Array.Empty<ISeries>();
         public ISeries[] GoalsSeries { get => _goalsSeries; private set { _goalsSeries = value; Raise(nameof(GoalsSeries)); } }
 
@@ -809,7 +678,6 @@ namespace Finly.ViewModels
         private Axis[] _goalsAxesY = Array.Empty<Axis>();
         public Axis[] GoalsAxesY { get => _goalsAxesY; private set { _goalsAxesY = value; Raise(nameof(GoalsAxesY)); } }
 
-        // ---- 7) Symulacja
         private ISeries[] _simulationSeries = Array.Empty<ISeries>();
         public ISeries[] SimulationSeries { get => _simulationSeries; private set { _simulationSeries = value; Raise(nameof(SimulationSeries)); } }
 
@@ -821,372 +689,195 @@ namespace Finly.ViewModels
 
         private void InitAllCharts()
         {
-            // Wspólne etykiety
             var txLabels = new[] { "Wydatki", "Przychody", "Transfery" };
 
-            // =========================
-            // 1) Overview: COUNT
-            // =========================
             OverviewCountAxesX = new[] { new Axis { Labels = txLabels } };
             OverviewCountAxesY = new[] { new Axis { MinLimit = 0 } };
             OverviewCountSeries = new ISeries[]
             {
-        new ColumnSeries<double>
-        {
-            Name = "Ilość",
-            Values = new double[] { 0, 0, 0 }
-        }
+                new ColumnSeries<double> { Name = "Ilość", Values = new double[] { 0, 0, 0 } }
             };
 
-            // =========================
-            // 1) Overview: AMOUNT
-            // =========================
             OverviewAmountAxesX = new[] { new Axis { Labels = txLabels } };
             OverviewAmountAxesY = new[] { new Axis { MinLimit = 0 } };
             OverviewAmountSeries = new ISeries[]
             {
-        new ColumnSeries<double>
-        {
-            Name = "Wartość (zł)",
-            Values = new double[] { 0, 0, 0 }
-        }
+                new ColumnSeries<double> { Name = "Wartość (zł)", Values = new double[] { 0, 0, 0 } }
             };
 
-            // =========================
-            // 2) Budżety (placeholder)
-            // =========================
             BudgetsAxesX = new[] { new Axis { Labels = SafeLabels(null) } };
             BudgetsAxesY = new[] { new Axis { MinLimit = 0 } };
             BudgetsSeries = new ISeries[]
             {
-        new ColumnSeries<double> { Name = "Wydano", Values = SafeValues(null) },
-        new ColumnSeries<double> { Name = "Limit",  Values = SafeValues(null) }
+                new ColumnSeries<double> { Name = "Wydano", Values = SafeValues(null) },
+                new ColumnSeries<double> { Name = "Limit",  Values = SafeValues(null) }
             };
 
-            // =========================
-            // 3) Inwestycje (placeholder)  <-- KLUCZ: bez pustych Labels/Values
-            // =========================
             InvestmentsAxesX = new[] { new Axis { Labels = SafeLabels(null) } };
             InvestmentsAxesY = new[] { new Axis { MinLimit = 0 } };
             InvestmentsSeries = new ISeries[]
             {
-        new ColumnSeries<double> { Name = "Zysk/Strata", Values = SafeValues(null) }
+                new ColumnSeries<double> { Name = "Zysk/Strata", Values = SafeValues(null) }
             };
 
-            // =========================
-            // 4) Kategorie (donuty) – placeholder
-            // (tu może być pusto, bo to nie jest CartesianChart – ale zostawiamy stabilnie)
-            // =========================
             ExpenseDonutSeries = Array.Empty<ISeries>();
             IncomeDonutSeries = Array.Empty<ISeries>();
             TransferDonutSeries = Array.Empty<ISeries>();
 
-            // =========================
-            // 5) Kredyty (placeholder)  <-- KLUCZ: bez pustych Labels/Values
-            // =========================
             LoansAxesX = new[] { new Axis { Labels = SafeLabels(null) } };
             LoansAxesY = new[] { new Axis { MinLimit = 0 } };
             LoansSeries = new ISeries[]
             {
-        new ColumnSeries<double> { Name = "Spłacono",  Values = SafeValues(null) },
-        new ColumnSeries<double> { Name = "Nadpłaty",  Values = SafeValues(null) },
-        new ColumnSeries<double> { Name = "Pozostało", Values = SafeValues(null) }
+                new ColumnSeries<double> { Name = "Spłacono",  Values = SafeValues(null) },
+                new ColumnSeries<double> { Name = "Nadpłaty",  Values = SafeValues(null) },
+                new ColumnSeries<double> { Name = "Pozostało", Values = SafeValues(null) }
             };
 
-            // =========================
-            // 6) Cele (placeholder)  <-- KLUCZ: bez pustych Labels/Values
-            // =========================
             GoalsAxesX = new[] { new Axis { Labels = SafeLabels(null) } };
             GoalsAxesY = new[] { new Axis { MinLimit = 0, MaxLimit = 100 } };
             GoalsSeries = new ISeries[]
             {
-        new ColumnSeries<double> { Name = "Postęp (%)", Values = SafeValues(null) }
+                new ColumnSeries<double> { Name = "Postęp (%)", Values = SafeValues(null) }
             };
 
-            // =========================
-            // 7) Symulacja (placeholder)  <-- KLUCZ: bez pustych Labels/Values
-            // =========================
             SimulationAxesX = new[] { new Axis { Labels = SafeLabels(null) } };
             SimulationAxesY = new[] { new Axis() };
             SimulationSeries = new ISeries[]
             {
-        new LineSeries<double> { Name = "Saldo (symulacja)", Values = SafeValues(null) }
+                new LineSeries<double> { Name = "Saldo (symulacja)", Values = SafeValues(null) }
             };
         }
 
-
         // =========================
-        // Odświeżenie główne
+        // Snapshot (heavy work) – tło
         // =========================
-        private void Refresh()
+        private sealed class ReportsSnapshot
         {
-            try
-            {
-                var uid = UserService.GetCurrentUserId();
-                if (uid <= 0)
-                {
-                    MessageBox.Show("Brak zalogowanego użytkownika.", "Błąd",
-                        MessageBoxButton.OK, MessageBoxImage.Warning);
-                    return;
-                }
+            public List<ReportsService.ReportItem> CurRows { get; init; } = new();
+            public List<ReportsService.ReportItem> PrevRows { get; init; } = new();
 
-                // 1) Obecny okres
-                var cur = LoadRows(uid, FromDate, ToDate);
-                Rows = new ObservableCollection<ReportsService.ReportItem>(cur);
+            public decimal CurExp { get; init; }
+            public decimal CurInc { get; init; }
+            public decimal PrevExp { get; init; }
+            public decimal PrevInc { get; init; }
 
-                // 2) Poprzedni okres
-                var prev = LoadRows(uid, PreviousFrom, PreviousTo);
-                PreviousRows = new ObservableCollection<ReportsService.ReportItem>(prev);
+            public List<TxLine> TopExp { get; init; } = new();
+            public List<TxLine> TopInc { get; init; } = new();
 
+            public int CntExp { get; init; }
+            public int CntInc { get; init; }
+            public int CntTrf { get; init; }
 
-                // 3) KPI
-                RecalcTotalsForBoth();
+            public double SumExp { get; init; }
+            public double SumInc { get; init; }
+            public double SumTrf { get; init; }
 
-                // 4) Przegląd: podium + wykresy
-                BuildOverview();
+            public List<BudgetRow> Budgets { get; init; } = new();
+            public string[] BudgetLabels { get; init; } = Array.Empty<string>();
+            public double[] BudgetSpent { get; init; } = Array.Empty<double>();
+            public double[] BudgetLimit { get; init; } = Array.Empty<double>();
 
-                // 5) Budżety / Kredyty / Cele / Inwestycje / Symulacja
-                BuildBudgets(uid);
-                BuildInvestments(uid);
-                BuildLoans(uid);
-                BuildGoals(uid);
-                BuildPlannedSimulation(uid);
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show("Błąd odświeżania raportów: " + ex.Message,
-                    "Błąd", MessageBoxButton.OK, MessageBoxImage.Error);
-            }
+            public List<LoanRow> Loans { get; init; } = new();
+            public List<GoalRow> Goals { get; init; } = new();
+
+            public List<PlannedRow> Planned { get; init; } = new();
+            public decimal SimDelta { get; init; }
+            public string[] SimLabels { get; init; } = Array.Empty<string>();
+            public double[] SimValues { get; init; } = Array.Empty<double>();
         }
 
-        private static List<ReportsService.ReportItem> LoadRows(int uid, DateTime from, DateTime to)
+        private static ReportsSnapshot BuildSnapshot(int uid, DateTime from, DateTime to, DateTime pFrom, DateTime pTo)
         {
-            return ReportsService.LoadReport(
-                userId: uid,
-                category: "Wszystkie kategorie",
-                transactionType: "Wszystko",
-                from: from,
-                to: to
-            );
-        }
+            from = from.Date;
+            to = to.Date;
+            pFrom = pFrom.Date;
+            pTo = pTo.Date;
 
+            List<ReportsService.ReportItem> cur;
+            List<ReportsService.ReportItem> prev;
 
-        private void RecalcTotalsForBoth()
-        {
-            // OBECNY
-            var curExp = Rows.Where(r => r.Type == "Wydatek").Sum(r => Math.Abs(r.Amount));
-            var curInc = Rows.Where(r => r.Type == "Przychód").Sum(r => Math.Abs(r.Amount));
+            try { cur = ReportsService.LoadReport(uid, "Wszystkie kategorie", "Wszystko", from, to) ?? new(); }
+            catch { cur = new(); }
 
-            TotalExpenses = curExp;
-            TotalIncomes = curInc;
-            Balance = TotalIncomes - TotalExpenses;
+            try { prev = ReportsService.LoadReport(uid, "Wszystkie kategorie", "Wszystko", pFrom, pTo) ?? new(); }
+            catch { prev = new(); }
 
-            // POPRZEDNI
-            var prevExp = PreviousRows.Where(r => r.Type == "Wydatek").Sum(r => Math.Abs(r.Amount));
-            var prevInc = PreviousRows.Where(r => r.Type == "Przychód").Sum(r => Math.Abs(r.Amount));
+            var curExp = cur.Where(r => r.Type == "Wydatek").Sum(r => Math.Abs(r.Amount));
+            var curInc = cur.Where(r => r.Type == "Przychód").Sum(r => Math.Abs(r.Amount));
 
-            PreviousTotalExpenses = prevExp;
-            PreviousTotalIncomes = prevInc;
-            PreviousBalance = PreviousTotalIncomes - PreviousTotalExpenses;
+            var prevExp = prev.Where(r => r.Type == "Wydatek").Sum(r => Math.Abs(r.Amount));
+            var prevInc = prev.Where(r => r.Type == "Przychód").Sum(r => Math.Abs(r.Amount));
 
-            // DELTY
-            DeltaExpenses = TotalExpenses - PreviousTotalExpenses;
-            DeltaIncomes = TotalIncomes - PreviousTotalIncomes;
-            DeltaBalance = Balance - PreviousBalance;
-
-            Raise(nameof(PeriodLabel));
-            Raise(nameof(PreviousPeriodLabel));
-        }
-
-        // =========================
-        // 1) PRZEGLĄD OGÓLNY
-        // =========================
-        private void BuildOverview()
-        {
-            // TOP 3 wydatki
-            OverviewTopExpenses.Clear();
-            foreach (var r in Rows
-                         .Where(x => x.Type == "Wydatek")
-                         .OrderByDescending(x => Math.Abs(x.Amount))
-                         .Take(3))
-            {
-                OverviewTopExpenses.Add(new TxLine
-                {
-                    Date = r.Date,
-                    Category = r.Category,
-                    Amount = Math.Abs(r.Amount)
-                });
-            }
-
-            // TOP 3 przychody
-            OverviewTopIncomes.Clear();
-            foreach (var r in Rows
-                         .Where(x => x.Type == "Przychód")
-                         .OrderByDescending(x => Math.Abs(x.Amount))
-                         .Take(3))
-            {
-                OverviewTopIncomes.Add(new TxLine
-                {
-                    Date = r.Date,
-                    Category = r.Category,
-                    Amount = Math.Abs(r.Amount)
-                });
-            }
-
-            // Wykres ilości (wydatki/przychody/transfery)
-            var cntExp = Rows.Count(x => x.Type == "Wydatek");
-            var cntInc = Rows.Count(x => x.Type == "Przychód");
-            var cntTrf = Rows.Count(x => x.Type == "Transfer"); // na razie 0, dopóki ReportsService nie ładuje transferów
-
-            OverviewCountSeries = new ISeries[]
-            {
-                new ColumnSeries<double>
-                {
-                    Name = "Ilość",
-                    Values = new double[] { cntExp, cntInc, cntTrf }
-                }
-            };
-
-            // Wykres wartości (wydatki/przychody/transfery)
-            var sumExp = Rows.Where(x => x.Type == "Wydatek").Sum(x => (double)Math.Abs(x.Amount));
-            var sumInc = Rows.Where(x => x.Type == "Przychód").Sum(x => (double)Math.Abs(x.Amount));
-            var sumTrf = Rows.Where(x => x.Type == "Transfer").Sum(x => (double)Math.Abs(x.Amount)); // jw.
-
-            OverviewAmountSeries = new ISeries[]
-            {
-                new ColumnSeries<double>
-                {
-                    Name = "Wartość (zł)",
-                    Values = new double[] { sumExp, sumInc, sumTrf }
-                }
-            };
-
-            // Kategorie donuty też podpinamy już tutaj, żeby zakładka Kategorie miała dane
-            BuildCategoryDonuts();
-        }
-
-        // =========================
-        // 4) KATEGORIE – Donuty (3 osobne)
-        // =========================
-        private void BuildCategoryDonuts()
-        {
-            ExpenseDonutSeries = BuildDonutSeriesFor(Rows.Where(x => x.Type == "Wydatek"));
-            IncomeDonutSeries = BuildDonutSeriesFor(Rows.Where(x => x.Type == "Przychód"));
-            TransferDonutSeries = BuildDonutSeriesFor(Rows.Where(x => x.Type == "Transfer"));
-        }
-
-        private static ISeries[] BuildDonutSeriesFor(IEnumerable<ReportsService.ReportItem> rows)
-        {
-            var groups = rows
-                .GroupBy(r => string.IsNullOrWhiteSpace(r.Category) ? "(brak kategorii)" : r.Category)
-                .Select(g => new { Name = g.Key, Total = g.Sum(x => Math.Abs(x.Amount)) })
-                .OrderByDescending(x => x.Total)
-                .Take(12) // ograniczamy wizualnie, reszta do tabeli później
+            var topExp = cur.Where(x => x.Type == "Wydatek")
+                .OrderByDescending(x => Math.Abs(x.Amount))
+                .Take(3)
+                .Select(r => new TxLine { Date = r.Date, Category = r.Category, Amount = Math.Abs(r.Amount) })
                 .ToList();
 
-            if (groups.Count == 0)
-                return Array.Empty<ISeries>();
+            var topInc = cur.Where(x => x.Type == "Przychód")
+                .OrderByDescending(x => Math.Abs(x.Amount))
+                .Take(3)
+                .Select(r => new TxLine { Date = r.Date, Category = r.Category, Amount = Math.Abs(r.Amount) })
+                .ToList();
 
-            var series = new List<ISeries>();
-            foreach (var g in groups)
-            {
-                series.Add(new PieSeries<double>
-                {
-                    Name = g.Name,
-                    Values = new double[] { (double)g.Total }
-                });
-            }
+            var cntExp = cur.Count(x => x.Type == "Wydatek");
+            var cntInc = cur.Count(x => x.Type == "Przychód");
+            var cntTrf = cur.Count(x => x.Type == "Transfer");
 
-            return series.ToArray();
-        }
+            var sumExp = cur.Where(x => x.Type == "Wydatek").Sum(x => (double)Math.Abs(x.Amount));
+            var sumInc = cur.Where(x => x.Type == "Przychód").Sum(x => (double)Math.Abs(x.Amount));
+            var sumTrf = cur.Where(x => x.Type == "Transfer").Sum(x => (double)Math.Abs(x.Amount));
 
-        // =========================
-        // 2) BUDŻETY – analiza + wykres
-        // =========================
-        private void BuildBudgets(int uid)
-        {
-            Budgets.Clear();
+            // Budżety
+            var budgetsRows = new List<BudgetRow>();
+            string[] budgetLabels = new[] { "" };
+            double[] budgetSpent = new[] { 0d };
+            double[] budgetLimit = new[] { 0d };
 
             try
             {
-                // Minimalnie: bierzemy budżety i liczymy "Spent" w okresie z Rows po kategorii = nazwa budżetu (jak miałaś wcześniej)
-                var spentByCategory = Rows
-                    .Where(r => r.Type == "Wydatek")
+                var spentByCategory = cur.Where(r => r.Type == "Wydatek")
                     .GroupBy(r => string.IsNullOrWhiteSpace(r.Category) ? "(brak kategorii)" : r.Category)
                     .ToDictionary(g => g.Key, g => g.Sum(x => Math.Abs(x.Amount)));
 
-                var raw = BudgetService.GetBudgetsWithSummary(uid) ?? new List<BudgetService.BudgetSummary>();
-                foreach (var b in raw)
+                var rawBudgets = BudgetService.GetBudgetsWithSummary(uid) ?? new List<BudgetService.BudgetSummary>();
+
+                foreach (var b in rawBudgets)
                 {
-                    var planned = b.PlannedAmount;
-                    var spent = b.Spent;
+                    var plannedAmount = b.PlannedAmount;
+                    var spentAmount = b.Spent;
 
                     if (!string.IsNullOrWhiteSpace(b.Name) && spentByCategory.TryGetValue(b.Name, out var inPeriod))
-                        spent = inPeriod;
+                        spentAmount = inPeriod;
 
-                    Budgets.Add(new BudgetRow
+                    budgetsRows.Add(new BudgetRow
                     {
                         Id = b.Id,
                         Name = b.Name ?? "(budżet)",
-                        Planned = planned,
-                        Spent = spent
+                        Planned = plannedAmount,
+                        Spent = spentAmount
                     });
                 }
+
+                var topBudgets = budgetsRows.OrderByDescending(b => b.Planned).Take(8).ToList();
+                budgetLabels = topBudgets.Select(x => x.Name).ToArray();
+                budgetSpent = topBudgets.Select(x => (double)x.Spent).ToArray();
+                budgetLimit = topBudgets.Select(x => (double)x.Planned).ToArray();
+
+                if (budgetLabels.Length == 0) budgetLabels = new[] { "" };
+                if (budgetSpent.Length == 0) budgetSpent = new[] { 0d };
+                if (budgetLimit.Length == 0) budgetLimit = new[] { 0d };
             }
-            catch
-            {
-                // celowo cicho (UI ma działać nawet jak coś w bazie się nie spina)
-            }
+            catch { }
 
-            // Wykres: Limit vs Wydano dla top N budżetów
-            var top = Budgets
-                .OrderByDescending(b => b.Planned)
-                .Take(8)
-                .ToList();
-
-            BudgetsAxesX = new[] { new Axis { Labels = top.Select(x => x.Name).ToArray() } };
-            BudgetsAxesY = new[] { new Axis { MinLimit = 0 } };
-
-            BudgetsSeries = new ISeries[]
-            {
-                new ColumnSeries<double> { Name = "Wydano", Values = top.Select(x => (double)x.Spent).ToArray() },
-                new ColumnSeries<double> { Name = "Limit",  Values = top.Select(x => (double)x.Planned).ToArray() }
-            };
-        }
-
-        // =========================
-        // 3) INWESTYCJE – placeholder + wykres
-        // =========================
-        private void BuildInvestments(int uid)
-        {
-            Investments.Clear();
-
-            // Na teraz brak danych -> NIE zostawiamy pustych serii
-            InvestmentsAxesX = new[] { new Axis { Labels = SafeLabels(null) } };
-            InvestmentsAxesY = new[] { new Axis { MinLimit = 0 } };
-
-            InvestmentsSeries = new ISeries[]
-            {
-        new ColumnSeries<double> { Name = "Zysk/Strata", Values = SafeValues(null) }
-            };
-        }
-
-
-        // =========================
-        // 5) KREDYTY – minimal + wykres
-        // =========================
-        private void BuildLoans(int uid)
-        {
-            Loans.Clear();
-
-            // Tu docelowo podepniemy realne dane z Twojego modułu kredytów.
-            // Teraz: nie ryzykujemy zależności od niepewnych metod – szkielet + wykres.
+            // Kredyty – minimal (bez ryzykownych zależności)
+            var loans = new List<LoanRow>();
             try
             {
-                var loans = DatabaseService.GetLoans(uid) ?? new List<LoanModel>();
-                foreach (var l in loans)
+                var rawLoans = DatabaseService.GetLoans(uid) ?? new List<LoanModel>();
+                foreach (var l in rawLoans)
                 {
-                    Loans.Add(new LoanRow
+                    loans.Add(new LoanRow
                     {
                         Id = l.Id,
                         Name = l.Name ?? "Kredyt",
@@ -1196,37 +887,16 @@ namespace Finly.ViewModels
                     });
                 }
             }
-            catch
-            {
-                // cicho
-            }
+            catch { }
 
-            var labels = Loans.Select(x => x.Name).ToArray();
-            LoansAxesX = new[] { new Axis { Labels = labels } };
-            LoansAxesY = new[] { new Axis { MinLimit = 0 } };
-
-            LoansSeries = new ISeries[]
-            {
-                new ColumnSeries<double> { Name = "Spłacono", Values = Loans.Select(x => (double)x.PaidInPeriod).ToArray() },
-                new ColumnSeries<double> { Name = "Nadpłaty", Values = Loans.Select(x => (double)x.OverpaidInPeriod).ToArray() },
-                new ColumnSeries<double> { Name = "Pozostało", Values = Loans.Select(x => (double)x.RemainingToPay).ToArray() }
-            };
-        }
-
-        // =========================
-        // 6) CELE – minimal + wykres
-        // =========================
-        private void BuildGoals(int uid)
-        {
-            Goals.Clear();
-
+            // Cele
+            var goals = new List<GoalRow>();
             try
             {
                 var envGoals = DatabaseService.GetEnvelopeGoals(uid);
                 if (envGoals != null)
                 {
-                    var periodLenDays = Math.Max(1, (ToDate.Date - FromDate.Date).Days + 1);
-
+                    var periodLenDays = Math.Max(1, (to - from).Days + 1);
                     foreach (var g in envGoals)
                     {
                         var row = new GoalRow
@@ -1236,231 +906,193 @@ namespace Finly.ViewModels
                             Current = g.Allocated,
                             DueDate = g.Deadline
                         };
-
-                        // Rekomendacja na kolejny okres:
-                        // - jeśli cel ma deadline, liczymy "ile trzeba dołożyć na 1 kolejny okres", aby domknąć przed deadline
-                        // - jeśli brak deadline, najprościej: brakujące = NeededNextPeriod (użytkownik widzi “ile brakuje”)
                         row.NeededNextPeriod = CalculateNeededForNextPeriod(row, periodLenDays);
-
-                        Goals.Add(row);
+                        goals.Add(row);
                     }
                 }
             }
-            catch
+            catch { }
+
+            // Symulacja – na razie placeholder (żeby UI działało)
+            var plannedTx = new List<PlannedRow>();
+            decimal simDelta = 0m;
+            string[] simLabels = new[] { "" };
+            double[] simValues = new[] { 0d };
+
+            try
             {
-                // celowo cicho
+                simDelta = plannedTx.Sum(x => x.Amount);
             }
+            catch { simDelta = 0m; }
 
-            // Wykres: postęp (%) dla top N celów
-            var top = Goals
-                .OrderByDescending(g => g.Target)
-                .Take(10)
-                .ToList();
-
-            GoalsAxesX = new[] { new Axis { Labels = top.Select(x => x.Name).ToArray() } };
-            GoalsAxesY = new[] { new Axis { MinLimit = 0, MaxLimit = 100 } };
-
-            GoalsSeries = new ISeries[]
+            return new ReportsSnapshot
             {
-                new ColumnSeries<double>
-                {
-                    Name = "Postęp (%)",
-                    Values = top.Select(x => (double)Math.Max(0, Math.Min(100, x.ProgressPercent))).ToArray()
-                }
+                CurRows = cur,
+                PrevRows = prev,
+
+                CurExp = curExp,
+                CurInc = curInc,
+                PrevExp = prevExp,
+                PrevInc = prevInc,
+
+                TopExp = topExp,
+                TopInc = topInc,
+
+                CntExp = cntExp,
+                CntInc = cntInc,
+                CntTrf = cntTrf,
+
+                SumExp = sumExp,
+                SumInc = sumInc,
+                SumTrf = sumTrf,
+
+                Budgets = budgetsRows,
+                BudgetLabels = budgetLabels,
+                BudgetSpent = budgetSpent,
+                BudgetLimit = budgetLimit,
+
+                Loans = loans,
+                Goals = goals,
+
+                Planned = plannedTx,
+                SimDelta = simDelta,
+                SimLabels = simLabels,
+                SimValues = simValues
             };
         }
+
+        // =========================
+        // Apply snapshot – UI thread
+        // =========================
+        private void ApplySnapshot(ReportsSnapshot s)
+        {
+            // 1) Rows + PreviousRows
+            Rows = new ObservableCollection<ReportsService.ReportItem>(s.CurRows ?? new List<ReportsService.ReportItem>());
+            PreviousRows = new ObservableCollection<ReportsService.ReportItem>(s.PrevRows ?? new List<ReportsService.ReportItem>());
+
+            // IMPORTANT: po podmianie Rows musimy odbudować CollectionView
+            // (prawa lista transakcji + toggles filtrujące)
+            RebuildTransactionsView();
+
+            // 2) KPI – bieżący okres
+            TotalExpenses = s.CurExp;
+            TotalIncomes = s.CurInc;
+            Balance = TotalIncomes - TotalExpenses;
+
+            // 3) KPI – poprzedni okres
+            PreviousTotalExpenses = s.PrevExp;
+            PreviousTotalIncomes = s.PrevInc;
+            PreviousBalance = PreviousTotalIncomes - PreviousTotalExpenses;
+
+            // 4) Delta
+            DeltaExpenses = TotalExpenses - PreviousTotalExpenses;
+            DeltaIncomes = TotalIncomes - PreviousTotalIncomes;
+            DeltaBalance = Balance - PreviousBalance;
+
+            // 5) Podium (kolekcje zostają, ale dodajemy też TopExp1/2/3 i TopInc1/2/3)
+            OverviewTopExpenses.Clear();
+            foreach (var x in s.TopExp ?? new List<TxLine>()) OverviewTopExpenses.Add(x);
+
+            OverviewTopIncomes.Clear();
+            foreach (var x in s.TopInc ?? new List<TxLine>()) OverviewTopIncomes.Add(x);
+
+            // Top 1/2/3 do layoutu 2–1–3
+            var expList = s.TopExp ?? new List<TxLine>();
+            var incList = s.TopInc ?? new List<TxLine>();
+
+            TopExp1 = GetAt(expList, 0);
+            TopExp2 = GetAt(expList, 1);
+            TopExp3 = GetAt(expList, 2);
+
+            TopInc1 = GetAt(incList, 0);
+            TopInc2 = GetAt(incList, 1);
+            TopInc3 = GetAt(incList, 2);
+
+            // 6) Wykresy przeglądu – bezpiecznie (LiveCharts nie lubi null / pustych)
+            OverviewCountSeries = new ISeries[]
+            {
+        new ColumnSeries<double>
+        {
+            Name = "Ilość",
+            Values = new double[] { s.CntExp, s.CntInc, s.CntTrf }
+        }
+            };
+
+            OverviewAmountSeries = new ISeries[]
+            {
+        new ColumnSeries<double>
+        {
+            Name = "Wartość (zł)",
+            Values = new double[] { s.SumExp, s.SumInc, s.SumTrf }
+        }
+            };
+
+            // 7) Budżety
+            Budgets.Clear();
+            foreach (var b in s.Budgets ?? new List<BudgetRow>()) Budgets.Add(b);
+
+            var bx = (s.BudgetLabels != null && s.BudgetLabels.Length > 0) ? s.BudgetLabels : new[] { "" };
+            var bs = (s.BudgetSpent != null && s.BudgetSpent.Length > 0) ? s.BudgetSpent : new[] { 0d };
+            var bl = (s.BudgetLimit != null && s.BudgetLimit.Length > 0) ? s.BudgetLimit : new[] { 0d };
+
+            BudgetsAxesX = new[] { new Axis { Labels = bx } };
+            BudgetsAxesY = new[] { new Axis { MinLimit = 0 } };
+            BudgetsSeries = new ISeries[]
+            {
+        new ColumnSeries<double> { Name = "Wydano", Values = bs },
+        new ColumnSeries<double> { Name = "Limit",  Values = bl }
+            };
+
+            // 8) Kredyty
+            Loans.Clear();
+            foreach (var l in s.Loans ?? new List<LoanRow>()) Loans.Add(l);
+
+            // 9) Cele
+            Goals.Clear();
+            foreach (var g in s.Goals ?? new List<GoalRow>()) Goals.Add(g);
+
+            // 10) Symulacja
+            PlannedSim.Clear();
+            foreach (var p in (s.Planned ?? new List<PlannedRow>()).OrderBy(x => x.Date))
+                PlannedSim.Add(p);
+
+            SimBalanceDelta = s.SimDelta;
+
+            var simX = (s.SimLabels != null && s.SimLabels.Length > 0) ? s.SimLabels : new[] { "" };
+            var simY = (s.SimValues != null && s.SimValues.Length > 0) ? s.SimValues : new[] { 0d };
+
+            SimulationAxesX = new[] { new Axis { Labels = simX } };
+            SimulationAxesY = new[] { new Axis() };
+            SimulationSeries = new ISeries[]
+            {
+        new LineSeries<double>
+        {
+            Name = "Saldo (symulacja)",
+            Values = simY
+        }
+            };
+
+            // 11) Donuty – na razie puste (dopniemy w zakładce Kategorie)
+            ExpenseDonutSeries = Array.Empty<ISeries>();
+            IncomeDonutSeries = Array.Empty<ISeries>();
+            TransferDonutSeries = Array.Empty<ISeries>();
+        }
+
 
         private static decimal CalculateNeededForNextPeriod(GoalRow row, int periodLenDays)
         {
             if (row.Missing <= 0) return 0m;
-
-            // jeśli nie ma deadline: prosta i czytelna rekomendacja
-            if (row.DueDate == null)
-                return row.Missing;
+            if (row.DueDate == null) return row.Missing;
 
             var today = DateTime.Today;
             var due = row.DueDate.Value.Date;
+            if (due <= today) return row.Missing;
 
-            // jeśli termin już minął lub jest dziś: jedyna sensowna rekomendacja to “brakuje” (czyli wszystko)
-            if (due <= today)
-                return row.Missing;
-
-            // ile dni zostało do deadline
             var daysLeft = (due - today).Days;
-
-            // ile "okresów" tej długości jeszcze się mieści do deadline (zaokrąglamy w górę, żeby nie zaniżać)
             var periodsLeft = (int)Math.Ceiling(daysLeft / (double)Math.Max(1, periodLenDays));
             periodsLeft = Math.Max(1, periodsLeft);
 
-            // rozkładamy brakującą kwotę na pozostałe okresy
-            var perPeriod = row.Missing / periodsLeft;
-
-            return Math.Max(0m, perPeriod);
-        }
-
-        // =========================
-        // 7) SYMULACJA – planned tx w przyszłym okresie tej samej długości
-        // =========================
-        private void BuildPlannedSimulation(int uid)
-        {
-            PlannedSim.Clear();
-            SimBalanceDelta = 0m;
-
-            // Symulujemy przyszły zakres o tej samej długości jak wybrany okres:
-            // [ToDate+1 .. ToDate+len]
-            var len = Math.Max(1, (ToDate.Date - FromDate.Date).Days + 1);
-            var simFrom = ToDate.Date.AddDays(1);
-            var simTo = simFrom.AddDays(len - 1);
-
-            var planned = new List<PlannedRow>();
-
-            try
-            {
-                using var con = DatabaseService.GetConnection();
-
-                // Planned Expenses (ujemny wpływ na saldo)
-                using (var cmd = con.CreateCommand())
-                {
-                    cmd.CommandText = @"
-SELECT e.Date AS TxDate,
-       COALESCE(e.Description,'') AS TxDesc,
-       e.Amount AS Amount
-FROM Expenses e
-WHERE e.UserId = @uid
-  AND IFNULL(e.IsPlanned,0) = 1
-  AND e.Date >= @from AND e.Date <= @to
-ORDER BY e.Date;
-";
-                    cmd.Parameters.AddWithValue("@uid", uid);
-                    cmd.Parameters.AddWithValue("@from", simFrom.ToString("yyyy-MM-dd"));
-                    cmd.Parameters.AddWithValue("@to", simTo.ToString("yyyy-MM-dd"));
-
-                    using var r = cmd.ExecuteReader();
-                    while (r.Read())
-                    {
-                        var d = DateTime.Parse(r["TxDate"].ToString() ?? simFrom.ToString("yyyy-MM-dd"));
-                        var desc = r["TxDesc"]?.ToString() ?? "";
-                        var amount = Convert.ToDecimal(r["Amount"]);
-
-                        planned.Add(new PlannedRow
-                        {
-                            Date = d,
-                            Type = "Wydatek (plan)",
-                            Description = desc,
-                            Amount = -Math.Abs(amount)
-                        });
-                    }
-                }
-
-                // Planned Incomes (dodatni wpływ na saldo)
-                using (var cmd = con.CreateCommand())
-                {
-                    cmd.CommandText = @"
-SELECT i.Date AS TxDate,
-       COALESCE(i.Description,'') AS TxDesc,
-       i.Amount AS Amount
-FROM Incomes i
-WHERE i.UserId = @uid
-  AND IFNULL(i.IsPlanned,0) = 1
-  AND i.Date >= @from AND i.Date <= @to
-ORDER BY i.Date;
-";
-                    cmd.Parameters.AddWithValue("@uid", uid);
-                    cmd.Parameters.AddWithValue("@from", simFrom.ToString("yyyy-MM-dd"));
-                    cmd.Parameters.AddWithValue("@to", simTo.ToString("yyyy-MM-dd"));
-
-                    using var r = cmd.ExecuteReader();
-                    while (r.Read())
-                    {
-                        var d = DateTime.Parse(r["TxDate"].ToString() ?? simFrom.ToString("yyyy-MM-dd"));
-                        var desc = r["TxDesc"]?.ToString() ?? "";
-                        var amount = Convert.ToDecimal(r["Amount"]);
-
-                        planned.Add(new PlannedRow
-                        {
-                            Date = d,
-                            Type = "Przychód (plan)",
-                            Description = desc,
-                            Amount = Math.Abs(amount)
-                        });
-                    }
-                }
-            }
-            catch
-            {
-                // cicho – symulacja ma nie psuć raportów, jeśli tabela/kolumna różni się u Ciebie
-            }
-
-            // Sort + wypełnij ObservableCollection
-            foreach (var p in planned.OrderBy(x => x.Date))
-                PlannedSim.Add(p);
-
-            // Suma wpływu planowanych transakcji (delta salda)
-            SimBalanceDelta = planned.Sum(x => x.Amount);
-
-            // Wykres: saldo narastająco per dzień
-            BuildSimulationChart(simFrom, simTo, planned);
-        }
-
-        private void BuildSimulationChart(DateTime simFrom, DateTime simTo, List<PlannedRow> planned)
-        {
-            // Grupujemy per dzień (netto)
-            var daily = planned
-                .GroupBy(p => p.Date.Date)
-                .ToDictionary(g => g.Key, g => g.Sum(x => x.Amount));
-
-            var labels = new List<string>();
-            var values = new List<double>();
-
-            decimal running = 0m;
-
-            // Żeby nie robić 365 etykiet w UI, ograniczamy do sensownego maksimum
-            // (dla rocznych zakresów i tak w przyszłości zrobimy agregację miesięczną)
-            var maxPoints = 62;
-
-            var totalDays = (simTo.Date - simFrom.Date).Days + 1;
-            if (totalDays <= maxPoints)
-            {
-                for (var d = simFrom.Date; d <= simTo.Date; d = d.AddDays(1))
-                {
-                    running += daily.TryGetValue(d, out var net) ? net : 0m;
-                    labels.Add(d.ToString("dd.MM"));
-                    values.Add((double)running);
-                }
-            }
-            else
-            {
-                // agregacja tygodniowa (prosta, żeby wykres był czytelny)
-                var cur = simFrom.Date;
-                while (cur <= simTo.Date)
-                {
-                    var weekEnd = cur.AddDays(6);
-                    if (weekEnd > simTo.Date) weekEnd = simTo.Date;
-
-                    decimal weekNet = 0m;
-                    for (var d = cur; d <= weekEnd; d = d.AddDays(1))
-                        weekNet += daily.TryGetValue(d, out var net) ? net : 0m;
-
-                    running += weekNet;
-
-                    labels.Add($"{cur:dd.MM}-{weekEnd:dd.MM}");
-                    values.Add((double)running);
-
-                    cur = weekEnd.AddDays(1);
-                }
-            }
-
-            SimulationAxesX = new[] { new Axis { Labels = labels.ToArray() } };
-            SimulationAxesY = new[] { new Axis() };
-
-            SimulationSeries = new ISeries[]
-            {
-                new LineSeries<double>
-                {
-                    Name = "Saldo (symulacja)",
-                    Values = values.ToArray()
-                }
-            };
+            return Math.Max(0m, row.Missing / periodsLeft);
         }
 
         private static string[] SafeLabels(IEnumerable<string>? labels)
@@ -1475,21 +1107,15 @@ ORDER BY i.Date;
             return arr.Length == 0 ? new[] { 0d } : arr;
         }
 
-
         // =========================
-        // Eksport PDF – per zakładka (szkielet)
+        // Export PDF
         // =========================
         private void ExportPdf(string? tabKey)
         {
             try
             {
-                // Na dziś: PdfExportService masz już spięty pod całość.
-                // Ten parametr tabKey zostawiamy jako “hak” – łatwo rozbudujesz usługę
-                // aby generowała tylko 1 sekcję raportu na podstawie tabKey.
-                //
-                // Aktualnie: eksportuje całość (bezpiecznie, żeby działało od razu).
+                // Na teraz: eksport całości (tabKey jest “hakiem” na przyszłość)
                 var path = PdfExportService.ExportReportsPdf(this, null);
-
                 ToastService.Success($"Raport PDF zapisano na pulpicie: {path}");
             }
             catch (Exception ex)
