@@ -15,6 +15,8 @@ using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Input;
 using System.Windows.Data;
+using LiveChartsCore.SkiaSharpView.Painting;
+using SkiaSharp;
 
 
 namespace Finly.ViewModels
@@ -966,37 +968,40 @@ namespace Finly.ViewModels
         // =========================
         private void ApplySnapshot(ReportsSnapshot s)
         {
-            // 1) Rows + PreviousRows
+            // ====== 0) Null-safe snapshot ======
+            s ??= new ReportsSnapshot();
+
+            // ====== 1) Rows + PreviousRows ======
             Rows = new ObservableCollection<ReportsService.ReportItem>(s.CurRows ?? new List<ReportsService.ReportItem>());
             PreviousRows = new ObservableCollection<ReportsService.ReportItem>(s.PrevRows ?? new List<ReportsService.ReportItem>());
 
             // IMPORTANT: po podmianie Rows musimy odbudować CollectionView
-            // (prawa lista transakcji + toggles filtrujące)
             RebuildTransactionsView();
 
-            // 2) KPI – bieżący okres
+            // ====== 2) KPI – bieżący okres ======
             TotalExpenses = s.CurExp;
             TotalIncomes = s.CurInc;
             Balance = TotalIncomes - TotalExpenses;
 
-            // 3) KPI – poprzedni okres
+            // ====== 3) KPI – poprzedni okres ======
             PreviousTotalExpenses = s.PrevExp;
             PreviousTotalIncomes = s.PrevInc;
             PreviousBalance = PreviousTotalIncomes - PreviousTotalExpenses;
 
-            // 4) Delta
+            // ====== 4) Delta ======
             DeltaExpenses = TotalExpenses - PreviousTotalExpenses;
             DeltaIncomes = TotalIncomes - PreviousTotalIncomes;
             DeltaBalance = Balance - PreviousBalance;
 
-            // 5) Podium (kolekcje zostają, ale dodajemy też TopExp1/2/3 i TopInc1/2/3)
+            // ====== 5) Podium ======
             OverviewTopExpenses.Clear();
-            foreach (var x in s.TopExp ?? new List<TxLine>()) OverviewTopExpenses.Add(x);
+            foreach (var x in s.TopExp ?? new List<TxLine>())
+                OverviewTopExpenses.Add(x);
 
             OverviewTopIncomes.Clear();
-            foreach (var x in s.TopInc ?? new List<TxLine>()) OverviewTopIncomes.Add(x);
+            foreach (var x in s.TopInc ?? new List<TxLine>())
+                OverviewTopIncomes.Add(x);
 
-            // Top 1/2/3 do layoutu 2–1–3
             var expList = s.TopExp ?? new List<TxLine>();
             var incList = s.TopInc ?? new List<TxLine>();
 
@@ -1008,13 +1013,51 @@ namespace Finly.ViewModels
             TopInc2 = GetAt(incList, 1);
             TopInc3 = GetAt(incList, 2);
 
-            // 6) Wykresy przeglądu – bezpiecznie (LiveCharts nie lubi null / pustych)
+            // ====== 6) Wykresy przeglądu (kolory + 3 słupki na osi X) ======
+            var xLabels = new[] { "Wydatki", "Przychody", "Transfery" };
+
+            // półprzezroczyste wypełnienia + mocniejszy stroke (jak na statystykach)
+            var redFill = new SolidColorPaint(new SKColor(255, 60, 60, 150));
+            var redStroke = new SolidColorPaint(new SKColor(255, 60, 60, 230)) { StrokeThickness = 2 };
+
+            var greenFill = new SolidColorPaint(new SKColor(70, 220, 120, 150));
+            var greenStroke = new SolidColorPaint(new SKColor(70, 220, 120, 230)) { StrokeThickness = 2 };
+
+            var purpleFill = new SolidColorPaint(new SKColor(170, 90, 255, 150));
+            var purpleStroke = new SolidColorPaint(new SKColor(170, 90, 255, 230)) { StrokeThickness = 2 };
+
+            // Osie (ustawiamy tu, żeby nie zostały stare wartości)
+            OverviewCountAxesX = new[] { new Axis { Labels = xLabels } };
+            OverviewCountAxesY = new[] { new Axis { MinLimit = 0 } };
+
+            OverviewAmountAxesX = new[] { new Axis { Labels = xLabels } };
+            OverviewAmountAxesY = new[] { new Axis { MinLimit = 0 } };
+
+            // Seria per typ: 3 wartości (tylko jeden słupek > 0), dzięki temu:
+            // - oś X ma 3 etykiety
+            // - każdy słupek ma swój kolor
             OverviewCountSeries = new ISeries[]
             {
         new ColumnSeries<double>
         {
-            Name = "Ilość",
-            Values = new double[] { s.CntExp, s.CntInc, s.CntTrf }
+            Name = "Wydatki",
+            Values = new double[] { s.CntExp, 0, 0 },
+            Fill = redFill,
+            Stroke = redStroke
+        },
+        new ColumnSeries<double>
+        {
+            Name = "Przychody",
+            Values = new double[] { 0, s.CntInc, 0 },
+            Fill = greenFill,
+            Stroke = greenStroke
+        },
+        new ColumnSeries<double>
+        {
+            Name = "Transfery",
+            Values = new double[] { 0, 0, s.CntTrf },
+            Fill = purpleFill,
+            Stroke = purpleStroke
         }
             };
 
@@ -1022,14 +1065,31 @@ namespace Finly.ViewModels
             {
         new ColumnSeries<double>
         {
-            Name = "Wartość (zł)",
-            Values = new double[] { s.SumExp, s.SumInc, s.SumTrf }
+            Name = "Wydatki",
+            Values = new double[] { s.SumExp, 0, 0 },
+            Fill = redFill,
+            Stroke = redStroke
+        },
+        new ColumnSeries<double>
+        {
+            Name = "Przychody",
+            Values = new double[] { 0, s.SumInc, 0 },
+            Fill = greenFill,
+            Stroke = greenStroke
+        },
+        new ColumnSeries<double>
+        {
+            Name = "Transfery",
+            Values = new double[] { 0, 0, s.SumTrf },
+            Fill = purpleFill,
+            Stroke = purpleStroke
         }
             };
 
-            // 7) Budżety
+            // ====== 7) Budżety ======
             Budgets.Clear();
-            foreach (var b in s.Budgets ?? new List<BudgetRow>()) Budgets.Add(b);
+            foreach (var b in s.Budgets ?? new List<BudgetRow>())
+                Budgets.Add(b);
 
             var bx = (s.BudgetLabels != null && s.BudgetLabels.Length > 0) ? s.BudgetLabels : new[] { "" };
             var bs = (s.BudgetSpent != null && s.BudgetSpent.Length > 0) ? s.BudgetSpent : new[] { 0d };
@@ -1043,15 +1103,17 @@ namespace Finly.ViewModels
         new ColumnSeries<double> { Name = "Limit",  Values = bl }
             };
 
-            // 8) Kredyty
+            // ====== 8) Kredyty ======
             Loans.Clear();
-            foreach (var l in s.Loans ?? new List<LoanRow>()) Loans.Add(l);
+            foreach (var l in s.Loans ?? new List<LoanRow>())
+                Loans.Add(l);
 
-            // 9) Cele
+            // ====== 9) Cele ======
             Goals.Clear();
-            foreach (var g in s.Goals ?? new List<GoalRow>()) Goals.Add(g);
+            foreach (var g in s.Goals ?? new List<GoalRow>())
+                Goals.Add(g);
 
-            // 10) Symulacja
+            // ====== 10) Symulacja ======
             PlannedSim.Clear();
             foreach (var p in (s.Planned ?? new List<PlannedRow>()).OrderBy(x => x.Date))
                 PlannedSim.Add(p);
@@ -1072,11 +1134,12 @@ namespace Finly.ViewModels
         }
             };
 
-            // 11) Donuty – na razie puste (dopniemy w zakładce Kategorie)
+            // ====== 11) Donuty – na razie puste ======
             ExpenseDonutSeries = Array.Empty<ISeries>();
             IncomeDonutSeries = Array.Empty<ISeries>();
             TransferDonutSeries = Array.Empty<ISeries>();
         }
+
 
 
         private static decimal CalculateNeededForNextPeriod(GoalRow row, int periodLenDays)
