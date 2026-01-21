@@ -11,9 +11,12 @@
 
             <!-- ========= STYLE + MOTYW ========= -->
             <ResourceDictionary.MergedDictionaries>
-                <ResourceDictionary Source="/Styles/_Index.xaml"/>
-                <ResourceDictionary Source="/Themes/Dark.xaml"/>
+				<ResourceDictionary Source="/Styles/_Index.xaml"/>
+				<ResourceDictionary Source="/Themes/Dark.xaml"/>
 				<ResourceDictionary Source="/Finly;component/Styles/ReportsSharedStyles.xaml"/>
+
+				<!-- MiniTable STYLES (ResourceDictionary) -->
+				<ResourceDictionary Source="/Finly;component/Styles/MiniTable.xaml"/>
             </ResourceDictionary.MergedDictionaries>
 
             <!-- ========= KONWERTERY ========= -->

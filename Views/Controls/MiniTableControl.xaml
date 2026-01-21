@@ -15,8 +15,9 @@
                         Content="{x:Static sys:String.Empty}"
                         ContentTemplate="{Binding HeaderTemplate, ElementName=Root}"/>
 
-		<!-- Rows (UWAGA: włączona wirtualizacja, żeby duże listy nie zamrażały UI) -->
+		<!-- Rows -->
 		<ListBox Grid.Row="1"
+                 Style="{DynamicResource MiniTableListBox}"
                  ItemsSource="{Binding ItemsSource, ElementName=Root}"
                  ItemTemplate="{Binding RowTemplate, ElementName=Root}"
                  SelectionMode="{Binding SelectionMode, ElementName=Root}"
@@ -24,9 +25,6 @@
                  SelectedIndex="{Binding SelectedIndex, ElementName=Root, Mode=TwoWay}"
                  ScrollViewer.HorizontalScrollBarVisibility="{Binding HorizontalScrollBarVisibility, ElementName=Root}"
                  ScrollViewer.VerticalScrollBarVisibility="{Binding VerticalScrollBarVisibility, ElementName=Root}"
-                 ScrollViewer.CanContentScroll="True"
-                 VirtualizingPanel.IsVirtualizing="True"
-                 VirtualizingPanel.VirtualizationMode="Recycling"
                  Background="Transparent"
                  BorderThickness="0"
                  Padding="0"
@@ -38,38 +36,9 @@
 				</ItemsPanelTemplate>
 			</ListBox.ItemsPanel>
 
+			<!-- Spójny styl wiersza -->
 			<ListBox.ItemContainerStyle>
-				<Style TargetType="ListBoxItem">
-					<Setter Property="HorizontalContentAlignment" Value="Stretch"/>
-					<Setter Property="Padding" Value="2"/>
-					<Setter Property="Margin" Value="0"/>
-					<Setter Property="Background" Value="Transparent"/>
-					<Setter Property="BorderThickness" Value="1"/>
-					<Setter Property="BorderBrush" Value="Transparent"/>
-					<Setter Property="FocusVisualStyle" Value="{x:Null}"/>
-					<Setter Property="Template">
-						<Setter.Value>
-							<ControlTemplate TargetType="ListBoxItem">
-								<Border x:Name="Bd"
-                                        Background="{TemplateBinding Background}"
-                                        BorderBrush="{TemplateBinding BorderBrush}"
-                                        BorderThickness="{TemplateBinding BorderThickness}"
-                                        CornerRadius="6">
-									<ContentPresenter/>
-								</Border>
-								<ControlTemplate.Triggers>
-									<Trigger Property="IsSelected" Value="True">
-										<Setter TargetName="Bd" Property="Background" Value="{DynamicResource Surface.Background}"/>
-										<Setter TargetName="Bd" Property="BorderBrush" Value="{DynamicResource Brand.Blue}"/>
-									</Trigger>
-									<Trigger Property="IsMouseOver" Value="True">
-										<Setter TargetName="Bd" Property="BorderBrush" Value="{DynamicResource Surface.Border}"/>
-									</Trigger>
-								</ControlTemplate.Triggers>
-							</ControlTemplate>
-						</Setter.Value>
-					</Setter>
-				</Style>
+				<StaticResource ResourceKey="MiniTableListBoxItem"/>
 			</ListBox.ItemContainerStyle>
 
 		</ListBox>

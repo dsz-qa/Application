@@ -6,7 +6,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Threading;
 
-// kontrolki zakładek (Twoje nowe pliki w Views/Controls/ReportsPageControls)
+// kontrolki zakładek
 using Finly.Views.Controls.ReportsPageControls;
 
 namespace Finly.Pages
@@ -20,6 +20,7 @@ namespace Finly.Pages
         private ReportsViewModel? _hookedVm;
 
         private bool _tabsInitialized;
+        private TabControl? _tabsHost;
 
         public ReportsPage()
         {
@@ -38,35 +39,32 @@ namespace Finly.Pages
             if (_eventsHooked) return;
             _eventsHooked = true;
 
-            try
+            // Nie nadpisuj DataContext, jeśli ktoś już go podał (Shell/Nawigacja)
+            if (DataContext is not ReportsViewModel)
+                DataContext = new ReportsViewModel();
+
+            EnsureDebounceTimer();
+
+            // PeriodBar events (jeśli istnieje w XAML)
+            if (PeriodBar != null)
             {
-                // Nie nadpisuj DataContext, jeśli ktoś już go podał (Shell/Nawigacja)
-                if (DataContext is not ReportsViewModel)
-                    DataContext = new ReportsViewModel();
-
-                EnsureDebounceTimer();
-
-                // PeriodBar events (jeśli istnieje w XAML)
-                if (PeriodBar != null)
-                {
-                    PeriodBar.SearchClicked += PeriodBar_SearchClicked;
-                    PeriodBar.RangeChanged += PeriodBar_RangeChanged;
-                    PeriodBar.ClearClicked += PeriodBar_ClearClicked;
-                }
-
-                HookVmPropertyChanged(GetVm());
-
-                // Lazy init tabów (ważne: buduje kontrolki dopiero po wejściu na stronę)
-                Dispatcher.BeginInvoke(new Action(() =>
-                {
-                    EnsureTabsCreated();
-                    RequestRefresh(GetVm());
-                }), DispatcherPriority.Background);
+                PeriodBar.SearchClicked += PeriodBar_SearchClicked;
+                PeriodBar.RangeChanged += PeriodBar_RangeChanged;
+                PeriodBar.ClearClicked += PeriodBar_ClearClicked;
             }
-            catch
+
+            HookVmPropertyChanged(GetVm());
+
+            // Tab host + lazy init
+            _tabsHost = FindTabsHost();
+            if (_tabsHost != null)
+                _tabsHost.SelectionChanged += TabsHost_SelectionChanged;
+
+            Dispatcher.BeginInvoke(new Action(() =>
             {
-                // UI nie ma się wywalać przez pojedynczy błąd w eventach
-            }
+                EnsureTabsCreated();
+                RequestRefresh(GetVm());
+            }), DispatcherPriority.Background);
         }
 
         private void ReportsPage_Unloaded(object sender, RoutedEventArgs e)
@@ -83,7 +81,14 @@ namespace Finly.Pages
                     PeriodBar.ClearClicked -= PeriodBar_ClearClicked;
                 }
             }
-            catch { }
+            catch { /* celowo cisza */ }
+
+            try
+            {
+                if (_tabsHost != null)
+                    _tabsHost.SelectionChanged -= TabsHost_SelectionChanged;
+            }
+            catch { /* celowo cisza */ }
 
             try
             {
@@ -93,7 +98,7 @@ namespace Finly.Pages
                     _hookedVm = null;
                 }
             }
-            catch { }
+            catch { /* celowo cisza */ }
 
             try
             {
@@ -104,8 +109,9 @@ namespace Finly.Pages
                     _refreshDebounceTimer = null;
                 }
             }
-            catch { }
+            catch { /* celowo cisza */ }
 
+            _tabsHost = null;
             _vmForRefresh = null;
             _tabsInitialized = false;
         }
@@ -114,49 +120,33 @@ namespace Finly.Pages
         {
             if (!_eventsHooked) return;
 
-            try
-            {
-                HookVmPropertyChanged(GetVm());
+            HookVmPropertyChanged(GetVm());
 
-                Dispatcher.BeginInvoke(new Action(() =>
-                {
-                    EnsureTabsCreated();
-                    RequestRefresh(GetVm());
-                }), DispatcherPriority.Background);
-            }
-            catch { }
+            Dispatcher.BeginInvoke(new Action(() =>
+            {
+                EnsureTabsCreated();
+                RequestRefresh(GetVm());
+            }), DispatcherPriority.Background);
         }
 
         // =========================
-        // Lazy init zakładek
+        // Tabs: lazy init
         // =========================
 
-        /// <summary>
-        /// Tworzy kontrolki tabów dopiero po załadowaniu strony, a nie w czasie parsowania XAML.
-        /// Dzięki temu możemy wstrzyknąć zasoby (Card/AccentCard itp.) zanim taby się zainicjalizują.
-        /// </summary>
         private void EnsureTabsCreated()
         {
             if (_tabsInitialized) return;
 
-            // Znajdź TabControl. (Najlepiej nadaj mu x:Name w XAML: ReportsTabs)
-            // Jeśli nie masz nazwy, to próbujemy znaleźć pierwszy TabControl w drzewie.
-            var tabs = FindTabsHost();
+            var tabs = _tabsHost ?? FindTabsHost();
             if (tabs == null) return;
 
-            // Jeśli TabControl ma już Content ustawiony (np. ktoś nadal trzyma <rp:OverviewTab/> w XAML),
-            // to nie ruszamy – ale wtedy wyjątek i tak poleci przy parsowaniu XAML.
-            // Ten mechanizm działa poprawnie dopiero, gdy w XAML TabItem ma pustą zawartość.
             try
             {
                 foreach (var obj in tabs.Items)
                 {
                     if (obj is not TabItem ti) continue;
+                    if (ti.Content != null) continue; // już wstawione
 
-                    // Jeżeli content jest już ustawiony – nic nie rób
-                    if (ti.Content != null) continue;
-
-                    // Tworzymy kontrolkę na podstawie nagłówka (bezpieczne i proste)
                     var header = (ti.Header?.ToString() ?? "").Trim();
 
                     UserControl? content = header switch
@@ -172,11 +162,8 @@ namespace Finly.Pages
 
                     if (content == null) continue;
 
-                    // Najważniejsze: wstrzyknięcie zasobów strony do zakładki
-                    InjectLocalResources(content);
-
-                    // Opcjonalnie: spójny DataContext (taby dziedziczą DataContext z rodzica i tak)
-                    // content.DataContext = DataContext;
+                    // NIE wstrzykujemy Resources (to powoduje wyjątki rodzica ResourceDictionary)
+                    // Warunek: style typu Card/AccentCard/MiniTable* muszą być globalnie w App.xaml (MergedDictionaries).
 
                     ti.Content = content;
                 }
@@ -185,23 +172,15 @@ namespace Finly.Pages
             }
             catch
             {
-                // cisza – UI ma działać dalej
+                // Jeśli coś poleci, to i tak lepiej, żeby strona nie wysadzała całej aplikacji.
+                // Ale przy poprawnych globalnych zasobach, tu nie powinno być wyjątków.
             }
         }
 
-        private void InjectLocalResources(FrameworkElement element)
+        private void TabsHost_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
-            try
-            {
-                // Skopiuj zasoby ReportsPage (Card/AccentCard/itd.) do tabów,
-                // aby {StaticResource Card} w OverviewTab działało.
-                // Robimy to jako MergedDictionary, aby nie duplikować stylów.
-                element.Resources.MergedDictionaries.Add(Resources);
-            }
-            catch
-            {
-                // jeżeli coś pójdzie nie tak – tab nadal może działać na globalnych zasobach
-            }
+            // Hook na przyszłość (np. odświeżaj tylko aktywną zakładkę).
+            // Teraz: nic nie robimy, bo VM i tak odświeża komplet danych.
         }
 
         private TabControl? FindTabsHost()
@@ -210,7 +189,6 @@ namespace Finly.Pages
             if (FindName("ReportsTabs") is TabControl named)
                 return named;
 
-            // Fallback: szukamy pierwszego TabControl w drzewie wizualnym
             return FindFirstChildTabControl(this);
         }
 
@@ -228,7 +206,7 @@ namespace Finly.Pages
                     if (nested != null) return nested;
                 }
             }
-            catch { }
+            catch { /* celowo cisza */ }
 
             return null;
         }
