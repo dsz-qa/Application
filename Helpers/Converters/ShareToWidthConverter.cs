@@ -4,7 +4,6 @@ using System.Windows.Data;
 
 namespace Finly.Helpers.Converters
 {
-    // Converts a share percent (0..100) to a pixel width based on ConverterParameter (max width).
     public sealed class ShareToWidthConverter : IValueConverter
     {
         public object? Convert(object value, Type targetType, object parameter, CultureInfo culture)
@@ -15,7 +14,6 @@ namespace Finly.Helpers.Converters
                 var p = parameter.ToString();
                 if (!string.IsNullOrWhiteSpace(p))
                 {
-                    // try invariant then culture parse
                     if (!double.TryParse(p, NumberStyles.Any, CultureInfo.InvariantCulture, out maxWidth))
                         double.TryParse(p, NumberStyles.Any, culture, out maxWidth);
                 }
@@ -31,7 +29,6 @@ namespace Finly.Helpers.Converters
                 double.TryParse(value.ToString(), NumberStyles.Any, culture, out share);
             }
 
-            // clamp share to 0..100
             if (double.IsNaN(share) || double.IsInfinity(share)) share = 0.0;
             share = Math.Max(0.0, Math.Min(100.0, share));
 

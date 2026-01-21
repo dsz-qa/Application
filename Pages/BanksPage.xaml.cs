@@ -21,8 +21,6 @@ namespace Finly.Pages
         private readonly ObservableCollection<BankAccountVm> _accounts = new();
         private readonly ObservableCollection<object> _cards = new();
         private readonly AddAccountTile _addTile = new();
-
-        // ====== koperty do dialogu operacji ======
         private sealed class EnvelopeItem
         {
             public int Id { get; set; }
@@ -81,8 +79,6 @@ namespace Finly.Pages
             }
             return null;
         }
-
-        // ===== helpers do drzewka wizualnego =====
 
         private static T? FindInTree<T>(FrameworkElement root, string name)
             where T : FrameworkElement
@@ -154,7 +150,7 @@ namespace Finly.Pages
             return list;
         }
 
-        // ===== DIALOG: DODAJ / EDYTUJ =====
+        // ===== DODAJ / EDYTUJ =====
 
         private void AddAccountCard_Click(object sender, MouseButtonEventArgs e)
         {
@@ -249,7 +245,7 @@ namespace Finly.Pages
             LastSync = m.LastSync
         };
 
-        // ===== DIALOG: WYPŁATA / WPŁATA =====
+        // ===== WYPŁATA / WPŁATA =====
 
         private void WithdrawFromAccount_Click(object sender, RoutedEventArgs e)
         {
@@ -302,7 +298,6 @@ namespace Finly.Pages
 
                 dlg.Configure(kind, vm.AccountName);
 
-                // koperty tylko jeśli użytkownik wybierze "Koperta", ale ItemsSource ustawiamy od razu
                 var envelopes = LoadEnvelopes();
                 dlg.SetEnvelopes(envelopes);
 
@@ -347,7 +342,7 @@ namespace Finly.Pages
                         return;
                 }
             }
-            else // Deposit
+            else
             {
                 switch (source)
                 {
@@ -374,7 +369,7 @@ namespace Finly.Pages
             throw new InvalidOperationException("Nieznany typ operacji.");
         }
 
-        // ===== USUWANIE (inline panel w kafelku) =====
+        // ===== USUWANIE =====
 
         private void DeleteAccount_Click(object sender, RoutedEventArgs e)
         {
@@ -454,7 +449,7 @@ namespace Finly.Pages
         }
     }
 
-    // ===== VM KAFELKA KONTA =====
+    // ===== VIEWMODEL KAFELKA KONTA =====
     public sealed class BankAccountVm
     {
         public int Id { get; }
@@ -506,7 +501,5 @@ namespace Finly.Pages
             return "pack://application:,,,/Assets/Banks/innybank.png";
         }
     }
-
-    // marker dla kafla "Dodaj konto"
     public sealed class AddAccountTile { }
 }

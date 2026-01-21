@@ -62,7 +62,7 @@
             <Setter Property="Visibility" Value="Collapsed"/>
         </Style>
 
-        <!-- ====== TABY: większe, niebieskie, mniej zaokrąglone, aktywny z pomarańczową obwódką ====== -->
+        <!-- ====== TABY ====== -->
         <Style x:Key="BigBlueTabItemStyle" TargetType="TabItem">
             <Setter Property="Foreground" Value="White"/>
             <Setter Property="FontSize" Value="20"/>
@@ -131,7 +131,7 @@
             <RowDefinition Height="*"/>
         </Grid.RowDefinitions>
 
-        <!-- ================= KPI (góra) ================= -->
+        <!-- ================= KPI ================= -->
         <Grid Grid.Row="0" Margin="0,0,0,12">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="*"/>
@@ -185,7 +185,7 @@
             </Border>
         </Grid>
 
-        <!-- Pytanie + zakładki -->
+		<!-- ================= KPI ================= -->
         <StackPanel Grid.Row="2"
                     Orientation="Vertical"
                     HorizontalAlignment="Center"
@@ -215,7 +215,6 @@
             </TabControl>
         </StackPanel>
 
-        <!-- ===================== TREŚĆ (WYŚRODKOWANA, NIE NA CAŁĄ SZEROKOŚĆ) ===================== -->
         <Grid Grid.Row="4" HorizontalAlignment="Center">
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto"/>

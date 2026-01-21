@@ -1,7 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
-using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Windows;
@@ -11,9 +10,8 @@ using System.Windows.Media;
 using Finly.Models;
 using Finly.Services;
 using Finly.Services.Features;
-using Finly.Services.SpecificPages;
 using Finly.ViewModels;
-using Finly.Views;
+using Finly.Views.Dialogs;
 
 namespace Finly.Pages
 {
@@ -21,23 +19,13 @@ namespace Finly.Pages
     {
         private readonly ObservableCollection<object> _loans = new();
         private readonly int _userId;
-        private LoanCardVm? _selectedVm;
 
+        // Pamięć runtime
         private readonly Dictionary<int, string> _loanScheduleFiles = new();
         private readonly Dictionary<int, List<LoanInstallmentRow>> _parsedSchedules = new();
-        private string? _lastChosenSchedulePath;
-
-        private List<BankAccountModel> _accounts = new();
         private readonly Dictionary<int, int> _loanAccounts = new();
 
-        private enum LoanPanel
-        {
-            None,
-            AddEdit,
-            Schedule,
-            Overpay,
-            Sim
-        }
+        private List<BankAccountModel> _accounts = new();
 
         public LoansPage()
             : this(UserService.GetCurrentUserId())
@@ -56,39 +44,21 @@ namespace Finly.Pages
 
         private void LoansPage_Loaded(object sender, RoutedEventArgs e)
         {
+            LoadAccounts();
             LoadLoans();
-            LoadAccountsForLoanForm();
             RefreshKpisAndLists();
         }
 
-        private static string FormatMonths(int months)
-        {
-            if (months <= 0) return "0 mies.";
-
-            int years = months / 12;
-            int monthsLeft = months % 12;
-
-            if (years > 0 && monthsLeft > 0) return $"{years} lat {monthsLeft} mies.";
-            if (years > 0) return $"{years} lat";
-            return $"{monthsLeft} mies.";
-        }
-
-        private void LoadAccountsForLoanForm()
+        private void LoadAccounts()
         {
             try
             {
                 _accounts = DatabaseService.GetAccounts(_userId) ?? new List<BankAccountModel>();
-
-                if (LoanAccountBox != null)
-                {
-                    LoanAccountBox.ItemsSource = _accounts;
-                    LoanAccountBox.DisplayMemberPath = "AccountName";
-                    LoanAccountBox.SelectedValuePath = "Id";
-                }
             }
             catch (Exception ex)
             {
                 ToastService.Error("Nie udało się załadować listy kont: " + ex.Message);
+                _accounts = new List<BankAccountModel>();
             }
         }
 
@@ -116,7 +86,20 @@ namespace Finly.Pages
             UpdateKpiTiles();
         }
 
-        private (decimal totalDebt, decimal monthlySum, decimal yearlySum, int maxRemainingMonths) CalculatePortfolioStats(List<LoanCardVm> loans)
+        private static string FormatMonths(int months)
+        {
+            if (months <= 0) return "0 mies.";
+
+            int years = months / 12;
+            int monthsLeft = months % 12;
+
+            if (years > 0 && monthsLeft > 0) return $"{years} lat {monthsLeft} mies.";
+            if (years > 0) return $"{years} lat";
+            return $"{monthsLeft} mies.";
+        }
+
+        private (decimal totalDebt, decimal monthlySum, decimal yearlySum, int maxRemainingMonths)
+            CalculatePortfolioStats(List<LoanCardVm> loans)
         {
             decimal totalDebt = loans.Sum(x => x.Principal);
             decimal monthlySum = 0m;
@@ -129,11 +112,7 @@ namespace Finly.Pages
                 decimal loanYearly;
                 int remainingMonths;
 
-                if (TryGetScheduleStats(vm,
-                        out var nextAmount,
-                        out _,
-                        out remainingMonths,
-                        out var yearSumFromSchedule))
+                if (TryGetScheduleStats(vm, out var nextAmount, out _, out remainingMonths, out var yearSumFromSchedule))
                 {
                     loanMonthly = nextAmount;
                     loanYearly = yearSumFromSchedule;
@@ -190,7 +169,6 @@ namespace Finly.Pages
 
             List<LoanInstallmentRow> schedule;
 
-            // Prefer cache
             if (_parsedSchedules.TryGetValue(vm.Id, out var cached) && cached != null && cached.Count > 0)
             {
                 schedule = cached;
@@ -203,9 +181,8 @@ namespace Finly.Pages
                     schedule = parser.Parse(path).ToList();
                     _parsedSchedules[vm.Id] = schedule;
                 }
-                catch (Exception ex)
+                catch
                 {
-                    System.Diagnostics.Debug.WriteLine($"TryGetScheduleStats parse error: {ex}");
                     return false;
                 }
             }
@@ -265,25 +242,25 @@ namespace Finly.Pages
 
                 insights.Add(new LoanInsightVm
                 {
-                    Label = "Średnie oprocentowanie portfela (ważone saldem):",
+                    Label = "Średnie oprocentowanie portfela (ważone saldem)",
                     Value = $"{weightedRate:N2} %"
                 });
 
                 insights.Add(new LoanInsightVm
                 {
-                    Label = "Szacowane odsetki w kolejne 30 dni (dla obecnych sald):",
+                    Label = "Szacowane odsetki w kolejne 30 dni",
                     Value = $"{interest30:N2} zł"
                 });
 
                 insights.Add(new LoanInsightVm
                 {
-                    Label = "Prognozowana łączna kwota rat w ciągu roku:",
+                    Label = "Prognozowana łączna kwota rat w ciągu roku",
                     Value = $"{yearlySum:N2} zł"
                 });
 
                 insights.Add(new LoanInsightVm
                 {
-                    Label = "Całkowity czas spłaty kredytów:",
+                    Label = "Całkowity czas spłaty kredytów",
                     Value = FormatMonths(maxRemainingMonths)
                 });
             }
@@ -303,183 +280,242 @@ namespace Finly.Pages
                 tbMonthly.Text = monthlySum.ToString("N2") + " zł";
         }
 
-        private void ShowPanel(LoanPanel panel)
-        {
-            if (FormBorder == null) return;
+        // ===================== DIALOGS =====================
 
-            FormBorder.Visibility = panel == LoanPanel.None
-                ? Visibility.Collapsed
-                : Visibility.Visible;
-
-            if (AddEditPanel != null)
-                AddEditPanel.Visibility = panel == LoanPanel.AddEdit ? Visibility.Visible : Visibility.Collapsed;
-            if (SchedulePanel != null)
-                SchedulePanel.Visibility = panel == LoanPanel.Schedule ? Visibility.Visible : Visibility.Collapsed;
-            if (OverpayPanel != null)
-                OverpayPanel.Visibility = panel == LoanPanel.Overpay ? Visibility.Visible : Visibility.Collapsed;
-            if (SimPanel != null)
-                SimPanel.Visibility = panel == LoanPanel.Sim ? Visibility.Visible : Visibility.Collapsed;
-        }
-
-        private void ShowAddForm()
-        {
-            _selectedVm = null;
-
-            try { if (AddEditHeaderText != null) AddEditHeaderText.Text = "Dodaj kredyt"; } catch { }
-            try { LoanFormMessage.Text = string.Empty; } catch { }
-            try { LoanNameBox.Text = ""; } catch { }
-            try { LoanPrincipalBox.Text = ""; } catch { }
-            try { LoanInterestBox.Text = ""; } catch { }
-            try { LoanTermBox.Text = ""; } catch { }
-            try { LoanStartDatePicker.SelectedDate = DateTime.Today; } catch { }
-
-            try
-            {
-                if (LoanPaymentDayBox != null) LoanPaymentDayBox.SelectedIndex = 0;
-                if (LoanAccountBox != null) LoanAccountBox.SelectedIndex = -1;
-            }
-            catch { }
-
-            ComputeAndShowMonthlyBreakdown();
-            ShowPanel(LoanPanel.AddEdit);
-        }
+        private Window? GetOwnerWindow() => Window.GetWindow(this);
 
         private void AddLoanCard_Click(object sender, MouseButtonEventArgs e)
         {
             if (e.ChangedButton != MouseButton.Left) return;
-            ShowAddForm();
+
+            var dlg = new EditLoanDialog(_accounts)
+            {
+                Owner = GetOwnerWindow()
+            };
+            dlg.SetMode(EditLoanDialog.Mode.Add);
+
+            if (dlg.ShowDialog() == true)
+            {
+                try
+                {
+                    var loan = dlg.ResultLoan;
+                    if (loan == null)
+                    {
+                        ToastService.Error("Błąd: dialog nie zwrócił danych kredytu.");
+                        return;
+                    }
+
+                    loan.UserId = _userId;
+
+                    var id = DatabaseService.InsertLoan(loan);
+                    loan.Id = id;
+
+                    if (dlg.SelectedAccountId.HasValue)
+                        _loanAccounts[loan.Id] = dlg.SelectedAccountId.Value;
+
+                    if (!string.IsNullOrWhiteSpace(dlg.AttachedSchedulePath))
+                        _loanScheduleFiles[loan.Id] = dlg.AttachedSchedulePath!;
+
+                    ToastService.Success("Kredyt dodany.");
+                    LoadLoans();
+                    RefreshKpisAndLists();
+                }
+                catch (Exception ex)
+                {
+                    ToastService.Error("Błąd dodawania kredytu: " + ex.Message);
+                }
+            }
         }
 
-        private void SaveLoan_Click(object sender, RoutedEventArgs e)
+        private void EditLoan_Click(object sender, RoutedEventArgs e)
         {
-            var name = (LoanNameBox.Text ?? "").Trim();
-            if (string.IsNullOrEmpty(name))
+            if ((sender as FrameworkElement)?.Tag is not LoanCardVm vm)
+                return;
+
+            var dlg = new EditLoanDialog(_accounts)
             {
-                LoanFormMessage.Text = "Podaj nazwę kredytu.";
+                Owner = GetOwnerWindow()
+            };
+
+            _loanAccounts.TryGetValue(vm.Id, out var accId);
+            _loanScheduleFiles.TryGetValue(vm.Id, out var schedPath);
+
+            var loanToEdit = new LoanModel
+            {
+                Id = vm.Id,
+                UserId = vm.UserId,
+                Name = vm.Name,
+                Principal = vm.Principal,
+                InterestRate = vm.InterestRate,
+                StartDate = vm.StartDate,
+                TermMonths = vm.TermMonths,
+                PaymentDay = vm.PaymentDay
+            };
+
+            dlg.LoadLoan(loanToEdit, _loanAccounts.ContainsKey(vm.Id) ? accId : (int?)null, schedPath);
+
+            if (dlg.ShowDialog() == true)
+            {
+                try
+                {
+                    var loan = dlg.ResultLoan;
+                    if (loan == null)
+                    {
+                        ToastService.Error("Błąd: dialog nie zwrócił danych kredytu.");
+                        return;
+                    }
+
+                    loan.Id = vm.Id;
+                    loan.UserId = _userId;
+
+                    DatabaseService.UpdateLoan(loan);
+
+                    if (dlg.SelectedAccountId.HasValue)
+                        _loanAccounts[vm.Id] = dlg.SelectedAccountId.Value;
+                    else
+                        _loanAccounts.Remove(vm.Id);
+
+                    if (!string.IsNullOrWhiteSpace(dlg.AttachedSchedulePath))
+                        _loanScheduleFiles[vm.Id] = dlg.AttachedSchedulePath!;
+                    else
+                        _loanScheduleFiles.Remove(vm.Id);
+
+                    ToastService.Success("Kredyt zaktualizowany.");
+                    LoadLoans();
+                    RefreshKpisAndLists();
+                }
+                catch (Exception ex)
+                {
+                    ToastService.Error("Błąd edycji kredytu: " + ex.Message);
+                }
+            }
+        }
+
+        private void CardOverpay_Click(object sender, RoutedEventArgs e)
+        {
+            if ((sender as FrameworkElement)?.Tag is not LoanCardVm vm)
+                return;
+
+            var dlg = new OverpayLoanDialog(vm.Name)
+            {
+                Owner = GetOwnerWindow()
+            };
+
+            if (dlg.ShowDialog() != true)
+                return;
+
+            var amt = dlg.Amount;
+            if (amt <= 0m)
+            {
+                ToastService.Error("Podaj poprawną kwotę nadpłaty.");
                 return;
             }
 
-            if (!decimal.TryParse((LoanPrincipalBox.Text ?? "").Trim(), out var principal))
-                principal = 0m;
-            if (!decimal.TryParse((LoanInterestBox.Text ?? "").Trim(), out var interest))
-                interest = 0m;
-            if (!int.TryParse((LoanTermBox.Text ?? "").Trim(), out var term))
-                term = 0;
-
-            var start = LoanStartDatePicker.SelectedDate ?? DateTime.Today;
-
-            int paymentDay = 0;
             try
             {
-                if (LoanPaymentDayBox?.SelectedItem is ComboBoxItem ci && ci.Tag != null)
-                {
-                    if (!int.TryParse(ci.Tag.ToString(), out paymentDay))
-                        paymentDay = 0;
-                }
-            }
-            catch { paymentDay = 0; }
+                int paymentDay = vm.PaymentDay;
+                var today = DateTime.Today;
 
-            int? selectedAccountId = null;
-            if (LoanAccountBox?.SelectedItem is BankAccountModel acc)
-                selectedAccountId = acc.Id;
+                var lastDue = LoansService.GetPreviousDueDate(today, paymentDay, vm.StartDate);
 
-            try
-            {
-                var loan = new LoanModel
+                var interest = LoanMathService.CalculateInterest(
+                    vm.Principal,
+                    vm.InterestRate,
+                    lastDue,
+                    today);
+
+                if (interest < 0) interest = 0;
+
+                var principalPart = amt - interest;
+                if (principalPart < 0) principalPart = 0;
+
+                var newPrincipal = vm.Principal - principalPart;
+                if (newPrincipal < 0) newPrincipal = 0;
+
+                var loanToUpdate = new LoanModel
                 {
+                    Id = vm.Id,
                     UserId = _userId,
-                    Name = name,
-                    Principal = principal,
-                    InterestRate = interest,
-                    StartDate = start,
-                    TermMonths = term,
-                    PaymentDay = paymentDay
+                    Name = vm.Name,
+                    Principal = newPrincipal,
+                    InterestRate = vm.InterestRate,
+                    StartDate = vm.StartDate,
+                    TermMonths = vm.TermMonths,
+                    PaymentDay = vm.PaymentDay
                 };
 
-                if (_selectedVm != null)
-                {
-                    loan.Id = _selectedVm.Id;
-                    DatabaseService.UpdateLoan(loan);
-                    ToastService.Success("Kredyt zaktualizowany.");
-                }
-                else
-                {
-                    var id = DatabaseService.InsertLoan(loan);
-                    loan.Id = id;
-                    ToastService.Success("Kredyt dodany.");
-                }
+                DatabaseService.UpdateLoan(loanToUpdate);
 
-                if (selectedAccountId.HasValue) _loanAccounts[loan.Id] = selectedAccountId.Value;
-                else _loanAccounts.Remove(loan.Id);
+                var newMonthly = LoansService.CalculateMonthlyPayment(
+                    newPrincipal,
+                    vm.InterestRate,
+                    vm.TermMonths);
 
-                if (!string.IsNullOrWhiteSpace(_lastChosenSchedulePath))
-                {
-                    _loanScheduleFiles[loan.Id] = _lastChosenSchedulePath;
-                    _lastChosenSchedulePath = null;
-                }
+                ToastService.Success(
+                    $"Nadpłata {amt:N2} zł. Nowy kapitał: {newPrincipal:N2} zł. Szac. nowa rata: {newMonthly:N2} zł.");
 
                 LoadLoans();
                 RefreshKpisAndLists();
             }
             catch (Exception ex)
             {
-                ToastService.Error("Błąd dodawania kredytu: " + ex.Message);
-            }
-            finally
-            {
-                ShowPanel(LoanPanel.None);
-                _selectedVm = null;
+                ToastService.Error("Błąd podczas nadpłaty: " + ex.Message);
             }
         }
 
-        private void CancelLoan_Click(object sender, RoutedEventArgs e)
+        private void ShowSimDialog_Click(object sender, RoutedEventArgs e)
         {
-            ShowPanel(LoanPanel.None);
+            if ((sender as FrameworkElement)?.Tag is not LoanCardVm)
+                return;
+
+            ToastService.Error("Symulacja nadpłaty nie jest jeszcze zaimplementowana.");
         }
 
-        private void LoanFormField_Changed(object sender, TextChangedEventArgs e)
+        private void CardSchedule_Click(object sender, RoutedEventArgs e)
         {
-            ComputeAndShowMonthlyBreakdown();
-        }
+            if ((sender as FrameworkElement)?.Tag is not LoanCardVm vm)
+                return;
 
-        private void ComputeAndShowMonthlyBreakdown()
-        {
-            if (!decimal.TryParse((LoanPrincipalBox.Text ?? "").Replace(" ", ""), out var principal))
-                principal = 0m;
-            if (!decimal.TryParse((LoanInterestBox.Text ?? "").Replace(" ", ""), out var annualRate))
-                annualRate = 0m;
-            if (!int.TryParse((LoanTermBox.Text ?? "").Replace(" ", ""), out var months))
-                months = 0;
-
-            if (principal <= 0 || months <= 0)
+            if (!_loanScheduleFiles.TryGetValue(vm.Id, out var path) || string.IsNullOrWhiteSpace(path))
             {
-                MonthlyPaymentText.Text = "0,00 zł";
-                FirstPrincipalText.Text = "0,00 zł";
-                FirstInterestText.Text = "0,00 zł";
+                ToastService.Error("Nie załączyłaś jeszcze harmonogramu spłaty rat dla tego kredytu.");
                 return;
             }
 
-            var payment = LoansService.CalculateMonthlyPayment(principal, annualRate, months);
-            var (interestFirst, capitalFirst) =
-                LoansService.CalculateFirstInstallmentBreakdown(principal, annualRate, months);
-
-            MonthlyPaymentText.Text = payment.ToString("N2") + " zł";
-            FirstPrincipalText.Text = capitalFirst.ToString("N2") + " zł";
-            FirstInterestText.Text = interestFirst.ToString("N2") + " zł";
-        }
-
-        private void ChooseSchedule_Click(object sender, RoutedEventArgs e)
-        {
-            var dlg = new Microsoft.Win32.OpenFileDialog
+            if (!File.Exists(path))
             {
-                Filter = "Pliki CSV|*.csv|Wszystkie pliki|*.*"
-            };
+                ToastService.Error("Nie znaleziono pliku harmonogramu. Załącz go ponownie.");
+                _loanScheduleFiles.Remove(vm.Id);
+                _parsedSchedules.Remove(vm.Id);
+                return;
+            }
 
-            var ok = dlg.ShowDialog();
-            if (ok == true)
+            try
             {
-                _lastChosenSchedulePath = dlg.FileName;
-                ScheduleFileNameText.Text = Path.GetFileName(dlg.FileName);
+                if (!string.Equals(Path.GetExtension(path), ".csv", StringComparison.OrdinalIgnoreCase))
+                {
+                    ToastService.Error("Aktualnie harmonogram analizujemy tylko z CSV (PDF dodamy później).");
+                    return;
+                }
+
+                if (!_parsedSchedules.TryGetValue(vm.Id, out var rows) || rows == null || rows.Count == 0)
+                {
+                    var parser = new LoanScheduleCsvParser();
+                    rows = parser.Parse(path).ToList();
+                    _parsedSchedules[vm.Id] = rows;
+                }
+
+                var dlg = new LoanScheduleDialog(vm.Name, rows)
+                {
+                    Owner = GetOwnerWindow()
+                };
+
+                dlg.ShowDialog();
+            }
+            catch (Exception ex)
+            {
+                ToastService.Error("Nie udało się odczytać harmonogramu. Sprawdź format pliku CSV.");
+                System.Diagnostics.Debug.WriteLine("LoanSchedule open error: " + ex);
             }
         }
 
@@ -498,155 +534,37 @@ namespace Finly.Pages
 
             var path = dlg.FileName;
 
+            _loanScheduleFiles[vm.Id] = path;
+            _parsedSchedules.Remove(vm.Id);
+
             if (string.Equals(Path.GetExtension(path), ".csv", StringComparison.OrdinalIgnoreCase))
             {
                 try
                 {
                     var parser = new LoanScheduleCsvParser();
-                    var rows = parser.Parse(path);
+                    var rows = parser.Parse(path).ToList();
+                    _parsedSchedules[vm.Id] = rows;
 
-                    _loanScheduleFiles[vm.Id] = path;
-                    _parsedSchedules[vm.Id] = rows.ToList();
-
-                    ScheduleList.ItemsSource = rows.Select(r => r.ToString()).ToList();
-                    _selectedVm = vm;
-                    ShowPanel(LoanPanel.Schedule);
-
-                    ToastService.Success("Harmonogram spłat został załączony i odczytany dla kredytu: " + vm.Name);
+                    ToastService.Success("Harmonogram spłat został załączony i odczytany.");
 
                     LoadLoans();
                     RefreshKpisAndLists();
+                    return;
                 }
                 catch (Exception ex)
                 {
                     ToastService.Error("Nie udało się odczytać harmonogramu. Sprawdź format pliku CSV.");
                     System.Diagnostics.Debug.WriteLine("LoanScheduleCsvParser error: " + ex);
+                    return;
                 }
-
-                return;
             }
 
-            _loanScheduleFiles[vm.Id] = path;
-            ToastService.Success("Harmonogram spłat został załączony do kredytu: " + vm.Name);
-
+            ToastService.Success("Harmonogram spłat został załączony.");
             LoadLoans();
             RefreshKpisAndLists();
         }
 
-        private void CardDetails_Click(object sender, RoutedEventArgs e)
-        {
-            if ((sender as FrameworkElement)?.Tag is not LoanCardVm vm)
-                return;
-
-            _selectedVm = vm;
-
-            try { if (AddEditHeaderText != null) AddEditHeaderText.Text = $"Edycja kredytu \"{vm.Name}\""; } catch { }
-
-            LoanNameBox.Text = vm.Name;
-            LoanPrincipalBox.Text = vm.Principal.ToString(CultureInfo.InvariantCulture);
-            LoanInterestBox.Text = vm.InterestRate.ToString(CultureInfo.InvariantCulture);
-            LoanTermBox.Text = vm.TermMonths.ToString(CultureInfo.InvariantCulture);
-            LoanStartDatePicker.SelectedDate = vm.StartDate;
-
-            try
-            {
-                if (LoanPaymentDayBox != null)
-                {
-                    int pd = vm.PaymentDay;
-                    for (int i = 0; i < LoanPaymentDayBox.Items.Count; i++)
-                    {
-                        if (LoanPaymentDayBox.Items[i] is ComboBoxItem ci &&
-                            ci.Tag != null &&
-                            int.TryParse(ci.Tag.ToString(), out var tagVal) &&
-                            tagVal == pd)
-                        {
-                            LoanPaymentDayBox.SelectedIndex = i;
-                            break;
-                        }
-                    }
-                }
-            }
-            catch { }
-
-            try
-            {
-                if (LoanAccountBox != null)
-                {
-                    if (_loanAccounts.TryGetValue(vm.Id, out var accId))
-                        LoanAccountBox.SelectedItem = _accounts.FirstOrDefault(a => a.Id == accId);
-                    else
-                        LoanAccountBox.SelectedIndex = -1;
-                }
-            }
-            catch { }
-
-            ComputeAndShowMonthlyBreakdown();
-            ShowPanel(LoanPanel.AddEdit);
-        }
-
-        private void EditLoan_Click(object sender, RoutedEventArgs e) => CardDetails_Click(sender, e);
-
-        private void CardAddPayment_Click(object sender, RoutedEventArgs e)
-        {
-            if ((sender as FrameworkElement)?.Tag is not LoanCardVm vm)
-                return;
-
-            _selectedVm = vm;
-            OverpayAmountBox.Text = "";
-            OverpayResult.Text = string.Empty;
-            ShowPanel(LoanPanel.Overpay);
-        }
-
-        private void CardSchedule_Click(object sender, RoutedEventArgs e)
-        {
-            if ((sender as FrameworkElement)?.Tag is not LoanCardVm vm)
-                return;
-
-            _selectedVm = vm;
-
-            if (!_loanScheduleFiles.TryGetValue(vm.Id, out var path) || string.IsNullOrWhiteSpace(path))
-            {
-                ToastService.Error("Nie załączyłaś jeszcze harmonogramu spłaty rat Twojego kredytu.");
-                return;
-            }
-
-            if (!File.Exists(path))
-            {
-                ToastService.Error("Nie znaleziono pliku harmonogramu. Załącz go ponownie.");
-                _loanScheduleFiles.Remove(vm.Id);
-                _parsedSchedules.Remove(vm.Id);
-                return;
-            }
-
-            try
-            {
-                var ext = Path.GetExtension(path);
-                if (!string.Equals(ext, ".csv", StringComparison.OrdinalIgnoreCase))
-                {
-                    ToastService.Error("Aktualnie aplikacja analizuje harmonogram tylko z pliku CSV. PDF dodamy w kolejnym kroku.");
-                    return;
-                }
-
-                if (_parsedSchedules.TryGetValue(vm.Id, out var cached) && cached != null && cached.Count > 0)
-                {
-                    ScheduleList.ItemsSource = cached.Select(r => r.ToString()).ToList();
-                    ShowPanel(LoanPanel.Schedule);
-                    return;
-                }
-
-                var parser = new LoanScheduleCsvParser();
-                var rows = parser.Parse(path).ToList();
-                _parsedSchedules[vm.Id] = rows;
-
-                ScheduleList.ItemsSource = rows.Select(r => r.ToString()).ToList();
-                ShowPanel(LoanPanel.Schedule);
-            }
-            catch (Exception ex)
-            {
-                ToastService.Error("Nie udało się odczytać harmonogramu. Sprawdź format pliku CSV.");
-                System.Diagnostics.Debug.WriteLine("LoanScheduleCsvParser error: " + ex);
-            }
-        }
+        // ===================== DELETE =====================
 
         private void DeleteLoan_Click(object sender, RoutedEventArgs e)
         {
@@ -691,7 +609,6 @@ namespace Finly.Pages
             }
 
             HideAllDeletePanels();
-            ShowPanel(LoanPanel.None);
         }
 
         private void DeleteCancel_Click(object sender, RoutedEventArgs e)
@@ -750,155 +667,6 @@ namespace Finly.Pages
             }
 
             return null;
-        }
-
-        private void OverpaySave_Click(object sender, RoutedEventArgs e)
-        {
-            if (_selectedVm == null)
-            {
-                OverpayResult.Text = "Wybierz najpierw kredyt (kliknij kartę).";
-                OverpayResult.Foreground = Brushes.IndianRed;
-                return;
-            }
-
-            if (!decimal.TryParse((OverpayAmountBox.Text ?? "").Replace(" ", ""), out var amt) || amt <= 0)
-            {
-                OverpayResult.Text = "Podaj poprawną kwotę nadpłaty.";
-                OverpayResult.Foreground = Brushes.IndianRed;
-                return;
-            }
-
-            int? accountId = null;
-            string? accountName = null;
-            if (_loanAccounts.TryGetValue(_selectedVm.Id, out var accId))
-            {
-                accountId = accId;
-                accountName = _accounts.FirstOrDefault(a => a.Id == accId)?.AccountName;
-            }
-
-            try
-            {
-                var today = DateTime.Today;
-
-                var lastDue = GetPreviousDueDate(today, _selectedVm.PaymentDay, _selectedVm.StartDate);
-
-                var interest = LoanMathService.CalculateInterest(
-                    _selectedVm.Principal,
-                    _selectedVm.InterestRate,
-                    lastDue,
-                    today);
-
-                if (interest < 0) interest = 0;
-
-                var principalPart = amt - interest;
-                if (principalPart < 0) principalPart = 0;
-
-                var newPrincipal = _selectedVm.Principal - principalPart;
-                if (newPrincipal < 0) newPrincipal = 0;
-
-                var loanToUpdate = new LoanModel
-                {
-                    Id = _selectedVm.Id,
-                    UserId = _selectedVm.UserId,
-                    Name = _selectedVm.Name,
-                    Principal = newPrincipal,
-                    InterestRate = _selectedVm.InterestRate,
-                    StartDate = _selectedVm.StartDate,
-                    TermMonths = _selectedVm.TermMonths,
-                    PaymentDay = _selectedVm.PaymentDay
-                };
-
-                DatabaseService.UpdateLoan(loanToUpdate);
-
-                var newMonthly = LoansService.CalculateMonthlyPayment(
-                    newPrincipal,
-                    _selectedVm.InterestRate,
-                    _selectedVm.TermMonths);
-
-                var accInfo = accountName != null ? $" z konta \"{accountName}\"" : "";
-                OverpayResult.Text =
-                    $"Nadpłata: {amt:N2} zł{accInfo}.\n" +
-                    $"Odsetki narosłe od poprzedniego terminu raty ({lastDue:dd.MM.yyyy}) do dziś: {interest:N2} zł.\n" +
-                    $"Część kapitałowa nadpłaty: {principalPart:N2} zł.\n" +
-                    $"Nowy stan kapitału: {newPrincipal:N2} zł.\n" +
-                    $"Szacowana nowa rata (przy tej samej liczbie rat): {newMonthly:N2} zł.";
-                OverpayResult.Foreground = Brushes.Green;
-
-                LoadLoans();
-                RefreshKpisAndLists();
-            }
-            catch (Exception ex)
-            {
-                OverpayResult.Text = "Błąd podczas zapisu nadpłaty: " + ex.Message;
-                OverpayResult.Foreground = Brushes.IndianRed;
-            }
-        }
-
-        private void ShowSimPanel_Click(object sender, RoutedEventArgs e)
-        {
-            if ((sender as FrameworkElement)?.Tag is not LoanCardVm vm)
-                return;
-
-            _selectedVm = vm;
-            SimExtraBox.Text = "";
-            SimResult.Text = "";
-            ShowPanel(LoanPanel.Sim);
-        }
-
-        private void SimulateInline_Click(object sender, RoutedEventArgs e)
-        {
-            if (_selectedVm == null)
-            {
-                SimResult.Text = "Najpierw wybierz kredyt (kliknij kartę).";
-                return;
-            }
-
-            if (!decimal.TryParse((SimExtraBox.Text ?? "").Replace(" ", ""), out var extra) || extra <= 0)
-            {
-                SimResult.Text = "Podaj poprawną kwotę jednorazowej nadpłaty.";
-                return;
-            }
-
-            var vm = _selectedVm;
-
-            var before = LoansService.CalculateMonthlyPayment(vm.Principal, vm.InterestRate, vm.TermMonths);
-            var newPrincipal = Math.Max(0m, vm.Principal - extra);
-            var after = LoansService.CalculateMonthlyPayment(newPrincipal, vm.InterestRate, vm.TermMonths);
-
-            var diff = before - after;
-
-            SimResult.Text =
-                $"Przy jednorazowej nadpłacie {extra:N2} zł:\n" +
-                $"- obecna rata: {before:N2} zł\n" +
-                $"- nowa rata (ta sama liczba rat): {after:N2} zł\n" +
-                $"- różnica: {diff:N2} zł miesięcznie.";
-        }
-
-        private static DateTime GetPreviousDueDate(DateTime today, int paymentDay, DateTime startDate)
-        {
-            if (paymentDay <= 0)
-                return today.Date.AddMonths(-1);
-
-            int daysInThisMonth = DateTime.DaysInMonth(today.Year, today.Month);
-            int day = Math.Min(paymentDay, daysInThisMonth);
-            var thisDue = new DateTime(today.Year, today.Month, day);
-
-            if (today.Date >= thisDue.Date)
-            {
-                if (thisDue.Date < startDate.Date)
-                    return startDate.Date;
-                return thisDue.Date;
-            }
-
-            var prevMonthFirst = new DateTime(today.Year, today.Month, 1).AddMonths(-1);
-            int daysInPrevMonth = DateTime.DaysInMonth(prevMonthFirst.Year, prevMonthFirst.Month);
-            day = Math.Min(paymentDay, daysInPrevMonth);
-            var prevDue = new DateTime(prevMonthFirst.Year, prevMonthFirst.Month, day);
-
-            if (prevDue.Date < startDate.Date)
-                return startDate.Date;
-
-            return prevDue.Date;
         }
     }
 }

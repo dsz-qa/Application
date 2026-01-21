@@ -1,21 +1,25 @@
 ﻿using Finly.Services;
 using Finly.ViewModels;
 using System;
+using System.ComponentModel;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Threading;
+
+// kontrolki zakładek (Twoje nowe pliki w Views/Controls/ReportsPageControls)
+using Finly.Views.Controls.ReportsPageControls;
 
 namespace Finly.Pages
 {
     public partial class ReportsPage : UserControl
     {
-        // zabezpieczenie przed wielokrotnym podpinaniem eventów (WPF potrafi ponownie wywołać Loaded)
         private bool _eventsHooked;
 
         private DispatcherTimer? _refreshDebounceTimer;
         private ReportsViewModel? _vmForRefresh;
-
         private ReportsViewModel? _hookedVm;
+
+        private bool _tabsInitialized;
 
         public ReportsPage()
         {
@@ -26,8 +30,7 @@ namespace Finly.Pages
             DataContextChanged += ReportsPage_DataContextChanged;
         }
 
-        // jeśli gdzieś tworzysz ReportsPage(int userId), zostawiamy, ale nic nie robimy,
-        // bo VM i tak bierze userId z UserService
+        // kompatybilność, jeśli gdzieś istnieje taki konstruktor
         public ReportsPage(int userId) : this() { }
 
         private void ReportsPage_Loaded(object sender, RoutedEventArgs e)
@@ -37,13 +40,13 @@ namespace Finly.Pages
 
             try
             {
-                // KLUCZ: jeśli nawigacja/shell ustawia inny DataContext, KPI binduje w próżnię
+                // Nie nadpisuj DataContext, jeśli ktoś już go podał (Shell/Nawigacja)
                 if (DataContext is not ReportsViewModel)
                     DataContext = new ReportsViewModel();
 
                 EnsureDebounceTimer();
 
-                // PeriodBar events
+                // PeriodBar events (jeśli istnieje w XAML)
                 if (PeriodBar != null)
                 {
                     PeriodBar.SearchClicked += PeriodBar_SearchClicked;
@@ -53,15 +56,16 @@ namespace Finly.Pages
 
                 HookVmPropertyChanged(GetVm());
 
-                // startowy refresh
+                // Lazy init tabów (ważne: buduje kontrolki dopiero po wejściu na stronę)
                 Dispatcher.BeginInvoke(new Action(() =>
                 {
+                    EnsureTabsCreated();
                     RequestRefresh(GetVm());
                 }), DispatcherPriority.Background);
             }
             catch
             {
-                // celowo cisza (UI ma się nie wywalać przez eventy)
+                // UI nie ma się wywalać przez pojedynczy błąd w eventach
             }
         }
 
@@ -102,27 +106,131 @@ namespace Finly.Pages
             }
             catch { }
 
-            try
-            {
-                _vmForRefresh = null;
-            }
-            catch { }
+            _vmForRefresh = null;
+            _tabsInitialized = false;
         }
 
         private void ReportsPage_DataContextChanged(object sender, DependencyPropertyChangedEventArgs e)
         {
+            if (!_eventsHooked) return;
+
             try
             {
-                if (!_eventsHooked) return;
-
                 HookVmPropertyChanged(GetVm());
 
                 Dispatcher.BeginInvoke(new Action(() =>
                 {
+                    EnsureTabsCreated();
                     RequestRefresh(GetVm());
                 }), DispatcherPriority.Background);
             }
             catch { }
+        }
+
+        // =========================
+        // Lazy init zakładek
+        // =========================
+
+        /// <summary>
+        /// Tworzy kontrolki tabów dopiero po załadowaniu strony, a nie w czasie parsowania XAML.
+        /// Dzięki temu możemy wstrzyknąć zasoby (Card/AccentCard itp.) zanim taby się zainicjalizują.
+        /// </summary>
+        private void EnsureTabsCreated()
+        {
+            if (_tabsInitialized) return;
+
+            // Znajdź TabControl. (Najlepiej nadaj mu x:Name w XAML: ReportsTabs)
+            // Jeśli nie masz nazwy, to próbujemy znaleźć pierwszy TabControl w drzewie.
+            var tabs = FindTabsHost();
+            if (tabs == null) return;
+
+            // Jeśli TabControl ma już Content ustawiony (np. ktoś nadal trzyma <rp:OverviewTab/> w XAML),
+            // to nie ruszamy – ale wtedy wyjątek i tak poleci przy parsowaniu XAML.
+            // Ten mechanizm działa poprawnie dopiero, gdy w XAML TabItem ma pustą zawartość.
+            try
+            {
+                foreach (var obj in tabs.Items)
+                {
+                    if (obj is not TabItem ti) continue;
+
+                    // Jeżeli content jest już ustawiony – nic nie rób
+                    if (ti.Content != null) continue;
+
+                    // Tworzymy kontrolkę na podstawie nagłówka (bezpieczne i proste)
+                    var header = (ti.Header?.ToString() ?? "").Trim();
+
+                    UserControl? content = header switch
+                    {
+                        "Przegląd ogólny" => new OverviewTab(),
+                        "Budżety" => new BudgetsTab(),
+                        "Kredyty" => new LoansTab(),
+                        "Cele" => new GoalsTab(),
+                        "Inwestycje" => new InvestmentsTab(),
+                        "Symulacja" => new SimulationTab(),
+                        _ => null
+                    };
+
+                    if (content == null) continue;
+
+                    // Najważniejsze: wstrzyknięcie zasobów strony do zakładki
+                    InjectLocalResources(content);
+
+                    // Opcjonalnie: spójny DataContext (taby dziedziczą DataContext z rodzica i tak)
+                    // content.DataContext = DataContext;
+
+                    ti.Content = content;
+                }
+
+                _tabsInitialized = true;
+            }
+            catch
+            {
+                // cisza – UI ma działać dalej
+            }
+        }
+
+        private void InjectLocalResources(FrameworkElement element)
+        {
+            try
+            {
+                // Skopiuj zasoby ReportsPage (Card/AccentCard/itd.) do tabów,
+                // aby {StaticResource Card} w OverviewTab działało.
+                // Robimy to jako MergedDictionary, aby nie duplikować stylów.
+                element.Resources.MergedDictionaries.Add(Resources);
+            }
+            catch
+            {
+                // jeżeli coś pójdzie nie tak – tab nadal może działać na globalnych zasobach
+            }
+        }
+
+        private TabControl? FindTabsHost()
+        {
+            // Preferowany wariant: nazwij TabControl w XAML jako x:Name="ReportsTabs"
+            if (FindName("ReportsTabs") is TabControl named)
+                return named;
+
+            // Fallback: szukamy pierwszego TabControl w drzewie wizualnym
+            return FindFirstChildTabControl(this);
+        }
+
+        private static TabControl? FindFirstChildTabControl(DependencyObject root)
+        {
+            try
+            {
+                var count = System.Windows.Media.VisualTreeHelper.GetChildrenCount(root);
+                for (int i = 0; i < count; i++)
+                {
+                    var child = System.Windows.Media.VisualTreeHelper.GetChild(root, i);
+                    if (child is TabControl tc) return tc;
+
+                    var nested = FindFirstChildTabControl(child);
+                    if (nested != null) return nested;
+                }
+            }
+            catch { }
+
+            return null;
         }
 
         // =========================
@@ -142,9 +250,8 @@ namespace Finly.Pages
                 _hookedVm.PropertyChanged += Vm_PropertyChanged;
         }
 
-        private void Vm_PropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
+        private void Vm_PropertyChanged(object? sender, PropertyChangedEventArgs e)
         {
-            // Reagujemy na zmiany dat (From/To) – to jest „źródło prawdy”
             if (e.PropertyName == nameof(ReportsViewModel.FromDate) ||
                 e.PropertyName == nameof(ReportsViewModel.ToDate))
             {
@@ -182,7 +289,7 @@ namespace Finly.Pages
 
             try
             {
-                var path = PdfExportService.ExportReportsPdf(vm, null);
+                var path = PdfExportService.ExportReportsPdf(vm);
                 ToastService.Success($"Raport PDF zapisano na pulpicie: {path}");
             }
             catch (Exception ex)
@@ -205,7 +312,6 @@ namespace Finly.Pages
             {
                 Interval = TimeSpan.FromMilliseconds(220)
             };
-
             _refreshDebounceTimer.Tick += RefreshDebounceTimer_Tick;
         }
 
@@ -214,7 +320,6 @@ namespace Finly.Pages
             try { _refreshDebounceTimer?.Stop(); } catch { }
 
             ReportsViewModel? vm;
-
             try
             {
                 vm = _vmForRefresh;
@@ -251,7 +356,7 @@ namespace Finly.Pages
             }
             catch
             {
-                // cisza
+                // celowo cisza
             }
         }
     }

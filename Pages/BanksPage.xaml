@@ -10,7 +10,7 @@
              TextOptions.TextRenderingMode="ClearType">
 
     <UserControl.Resources>
-        <!-- Karta ogólna -->
+        <!-- =====  Kafelek banku =====  -->
         <Style x:Key="Card" TargetType="Border">
             <Setter Property="Background" Value="Transparent"/>
             <Setter Property="BorderBrush" Value="{DynamicResource Surface.Border}"/>
@@ -20,13 +20,13 @@
             <Setter Property="Margin" Value="0,12,0,0"/>
         </Style>
 
-        <!-- Karta z niebieskim obramowaniem (KPI) -->
+        <!-- =====  KPI =====  -->
         <Style x:Key="AccentCard" TargetType="Border" BasedOn="{StaticResource Card}">
             <Setter Property="BorderBrush" Value="{DynamicResource Brand.Blue}"/>
             <Setter Property="BorderThickness" Value="1.5"/>
         </Style>
 
-        <!-- Nagłówek -->
+        <!-- =====  Nagłówek =====  -->
         <Style x:Key="CardHeader" TargetType="TextBlock">
             <Setter Property="FontSize" Value="13"/>
             <Setter Property="FontWeight" Value="SemiBold"/>
@@ -34,7 +34,7 @@
             <Setter Property="Opacity" Value="0.9"/>
         </Style>
 
-        <!-- Wartość KPI -->
+        <!-- =====  Wartość KPI =====  -->
         <Style x:Key="KpiValueStyle" TargetType="TextBlock">
             <Setter Property="FontSize" Value="20"/>
             <Setter Property="FontWeight" Value="Bold"/>
@@ -42,7 +42,7 @@
             <Setter Property="Foreground" Value="{DynamicResource App.Foreground}"/>
         </Style>
 
-        <!-- ===== KAFEL KONTA BANKOWEGO ===== -->
+        <!-- ===== Kafel konta bankowego ===== -->
         <DataTemplate DataType="{x:Type local:BankAccountVm}">
             <Border Style="{StaticResource Card}"
                     Margin="0,0,16,16"
@@ -55,7 +55,7 @@
                         <RowDefinition Height="Auto"/>
                     </Grid.RowDefinitions>
 
-                    <!-- LOGO + NAZWA BANKU -->
+                    <!-- ===== NAZWA BANKU ===== -->
                     <StackPanel Grid.Row="0"
                                 Orientation="Horizontal"
                                 Margin="0,0,0,6">
@@ -71,7 +71,7 @@
                                    VerticalAlignment="Center"/>
                     </StackPanel>
 
-                    <!-- SZCZEGÓŁY RACHUNKU -->
+                    <!-- ===== SZCZEGÓŁY RACHUNKU ===== -->
                     <StackPanel Grid.Row="1"
                                 Margin="0,2,0,0">
 
@@ -116,11 +116,10 @@
                         </StackPanel>
                     </StackPanel>
 
-                    <!-- AKCJE -->
                     <StackPanel Grid.Row="2"
                                 Margin="0,12,0,0">
 
-                        <!-- Wypłata / Wpłata -->
+                        <!-- =====  Wypłata / Wpłata =====  -->
                         <Grid HorizontalAlignment="Left">
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="Auto"/>
@@ -145,7 +144,7 @@
                                     Tag="{Binding}"/>
                         </Grid>
 
-                        <!-- Edytuj / Usuń -->
+                        <!-- ===== Edytuj / Usuń ===== -->
                         <Grid Margin="0,10,0,0">
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="Auto"/>
@@ -165,7 +164,7 @@
                         </Grid>
                     </StackPanel>
 
-                    <!-- PANEL POTWIERDZENIA USUNIĘCIA -->
+                    <!-- =====  PANEL POTWIERDZENIA USUNIĘCIA ===== -->
                     <Border x:Name="DeleteConfirmPanel"
                             Grid.Row="3"
                             Background="{DynamicResource Surface.Background}"
@@ -235,8 +234,6 @@
     <ScrollViewer VerticalScrollBarVisibility="Auto">
         <Grid Margin="24">
             <StackPanel>
-
-                <!-- KPI: suma kont -->
                 <Border Style="{StaticResource AccentCard}"
                         BorderThickness="2"
                         Margin="0,16,0,8"
@@ -273,7 +270,7 @@
                            Foreground="{DynamicResource App.Foreground}"
                            Margin="0,4,0,12"/>
 
-                <!-- Lista kafelków -->
+                <!-- ===== Lista kafelków ===== -->
                 <ItemsControl x:Name="AccountsRepeater"
                               Margin="0,8,0,0">
                     <ItemsControl.ItemsPanel>

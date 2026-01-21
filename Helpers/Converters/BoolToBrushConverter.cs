@@ -5,7 +5,6 @@ using System.Windows.Media;
 
 namespace Finly.Helpers.Converters
 {
-    /// Użycie: Foreground="{Binding SomeBool, Converter={StaticResource BoolToBrush}}"
     public sealed class BoolToBrushConverter : IValueConverter
     {
         public Brush TrueBrush { get; set; } = Brushes.LimeGreen;

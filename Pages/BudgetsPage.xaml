@@ -12,12 +12,12 @@
 
     <UserControl.Resources>
 
-        <!-- Konwertery -->
+        <!-- ===================== KONWERTERY ===================== -->
         <BooleanToVisibilityConverter x:Key="BoolToVisibilityConverter"/>
         <local:StringNullOrEmptyToVisibilityConverter x:Key="StringToVisibility"/>
         <local:ProgressToWidthConverter x:Key="ProgressToWidthConv"/>
 
-        <!-- ===================== KARTY / TYPOGRAFIA ===================== -->
+        <!-- ===================== KARTY ===================== -->
         <Style x:Key="Card" TargetType="Border">
             <Setter Property="Background" Value="{DynamicResource Surface.Background}"/>
             <Setter Property="BorderBrush" Value="{DynamicResource Surface.Border}"/>
@@ -67,7 +67,7 @@
             <Setter Property="FontSize" Value="14"/>
         </Style>
 
-        <!-- ===================== PROGRESS BAR ===================== -->
+        <!-- ===================== PASEK POSTĘPU ===================== -->
         <Style x:Key="BudgetProgressBarStyle" TargetType="ProgressBar">
             <Setter Property="Height" Value="10"/>
             <Setter Property="Minimum" Value="0"/>
@@ -186,7 +186,7 @@
             </Setter>
         </Style>
 
-        <!-- ===================== INSIGHT ===================== -->
+        <!-- ===================== ANALIZA ===================== -->
         <Style x:Key="InsightItemBorder" TargetType="Border">
             <Setter Property="Background" Value="{DynamicResource Surface.Background}"/>
             <Setter Property="BorderBrush" Value="{DynamicResource Surface.Border}"/>
@@ -203,7 +203,7 @@
             <Setter Property="TextWrapping" Value="Wrap"/>
         </Style>
 
-        <!-- ===================== TRANSAKCJE (prawa lista) ===================== -->
+        <!-- ===================== TRANSAKCJE ===================== -->
         <Style x:Key="TxCard" TargetType="Border">
             <Setter Property="Background" Value="{DynamicResource Surface.Background}"/>
             <Setter Property="BorderBrush" Value="{DynamicResource Surface.Border}"/>
@@ -310,7 +310,7 @@
                 <RowDefinition Height="*"/>
             </Grid.RowDefinitions>
 
-            <!-- KPI -->
+            <!-- ===================== KPI ===================== -->
             <Grid Grid.Row="0" Margin="0,0,0,12" Background="Transparent">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*"/>
@@ -353,7 +353,6 @@
                     <RowDefinition Height="*"/>
                 </Grid.RowDefinitions>
 
-                <!-- RZĄD 1 -->
                 <Grid Grid.Row="0" Margin="0,0,0,12" Background="Transparent">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="1.05*"/>
@@ -361,7 +360,7 @@
                         <ColumnDefinition Width="1.25*"/>
                     </Grid.ColumnDefinitions>
 
-                    <!-- Szczegóły budżetu -->
+                    <!-- ===================== SZCZEGÓŁY BUDŻETU ===================== -->
                     <Border Grid.Column="0"
                             Style="{StaticResource OrangeCard}"
                             Margin="0,0,10,0"
@@ -430,7 +429,7 @@
                                 <TextBlock x:Name="BudgetMetaText" Visibility="Collapsed"/>
                             </Grid>
 
-                            <!-- pasek wykorzystania budżetu -->
+                            <!-- ===================== PASEK POSTĘPU BUDŻETU ===================== -->
                             <Grid Grid.Row="1" Margin="0,10,0,0" Background="Transparent">
                                 <Grid.RowDefinitions>
                                     <RowDefinition Height="Auto"/>
@@ -462,7 +461,7 @@
                         </Grid>
                     </Border>
 
-                    <!-- Historia -->
+                    <!-- ===================== WYKRES ===================== -->
                     <Border Grid.Column="1"
                             Style="{StaticResource OrangeCard}"
                             Margin="0,0,10,0"
@@ -511,7 +510,7 @@
                         </Grid>
                     </Border>
 
-                    <!-- Analiza -->
+                    <!-- ===================== ANALIZA ===================== -->
                     <Border Grid.Column="2"
                             Style="{StaticResource OrangeCard}"
                             Height="260"
@@ -547,7 +546,6 @@
                     </Border>
                 </Grid>
 
-                <!-- RZĄD 2 -->
                 <Grid Grid.Row="1" Background="Transparent">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="1.05*"/>
@@ -555,7 +553,7 @@
                         <ColumnDefinition Width="0.95*"/>
                     </Grid.ColumnDefinitions>
 
-                    <!-- LEWA: lista budżetów -->
+                    <!-- ===================== LISTA BUDŻETÓW ===================== -->
                     <Border Grid.Column="0" Style="{StaticResource Card}">
                         <StackPanel Background="Transparent">
 
@@ -576,8 +574,7 @@
                                           SelectedIndex="0"
                                           SelectedValuePath="Tag"
                                           SelectionChanged="TypeFilterCombo_SelectionChanged"/>
-
-                                <!-- Używa globalnego SearchBoxStyle (tak jak w CategoriesPage) -->
+								
                                 <TextBox x:Name="SearchBox"
                                          Grid.Column="2"
                                          Style="{StaticResource SearchBoxStyle}"
@@ -655,7 +652,6 @@
                                                            Text="{Binding Period}"
                                                            Style="{StaticResource MiniTableCellText}"/>
 
-                                                <!-- PRZYCISKI 1:1 jak w CategoriesPage -->
                                                 <StackPanel Grid.Column="5"
                                                             Orientation="Horizontal"
                                                             HorizontalAlignment="Right"
@@ -673,7 +669,6 @@
                                                 </StackPanel>
                                             </Grid>
 
-                                            <!-- Inline confirm: układ 1:1 jak w CategoriesPage -->
                                             <Border Margin="0,6,0,0"
                                                     HorizontalAlignment="Right"
                                                     Background="{DynamicResource Surface.Background}"
@@ -737,7 +732,7 @@
 
                     <Border Grid.Column="1" Background="Transparent" BorderThickness="0"/>
 
-                    <!-- PRAWA: transakcje budżetu -->
+                    <!-- ===================== TRANSAKCJE BUDŻETU ===================== -->
                     <Border Grid.Column="2" Style="{StaticResource Card}">
                         <Grid Background="Transparent">
                             <Grid.RowDefinitions>

@@ -13,6 +13,7 @@
             <ResourceDictionary.MergedDictionaries>
                 <ResourceDictionary Source="/Styles/_Index.xaml"/>
                 <ResourceDictionary Source="/Themes/Dark.xaml"/>
+				<ResourceDictionary Source="/Finly;component/Styles/ReportsSharedStyles.xaml"/>
             </ResourceDictionary.MergedDictionaries>
 
             <!-- ========= KONWERTERY ========= -->

@@ -24,7 +24,7 @@
         public decimal TargetAmount { get; set; }
         public decimal CurrentAmount { get; set; }
 
-        public string? TargetDate { get; set; } // stored as YYYY-MM-DD
+        public string? TargetDate { get; set; }
         public string? Description { get; set; }
     }
 }

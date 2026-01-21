@@ -4,7 +4,6 @@ using System.Windows.Data;
 
 namespace Finly.Helpers.Converters
 {
-    // Splits strings of the form "from?to" and returns requested part
     public sealed class SplitArrowConverter : IValueConverter
     {
         public object? Convert(object value, Type targetType, object parameter, CultureInfo culture)

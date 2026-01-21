@@ -1,30 +1,27 @@
 ﻿<UserControl x:Class="Finly.Pages.AccountPage"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-             xmlns:conv="clr-namespace:Finly.Helpers.Converters">
+             xmlns:conv="clr-namespace:Finly.Helpers.Converters"
+             Background="{DynamicResource App.Background}"
+             Foreground="{DynamicResource App.Foreground}">
 
-    <UserControl.Resources>
-        <!-- prosty konwerter bool -> Visibility -->
-        <conv:BoolToVisibilityConverter x:Key="BoolToVisibility" />
-    </UserControl.Resources>
+	<UserControl.Resources>
+		<conv:BoolToVisibilityConverter x:Key="BoolToVisibility" />
+	</UserControl.Resources>
 
-    <ScrollViewer VerticalScrollBarVisibility="Auto">
-        <!-- Cała zawartość wyrównana do lewej, blisko sidebara -->
-        <Grid Margin="24,24,0,24"
+	<ScrollViewer VerticalScrollBarVisibility="Auto">
+		<Grid Margin="24,24,0,24"
               HorizontalAlignment="Left">
-            <Grid.RowDefinitions>
-                <!-- Dane osobowe / Dane firmy -->
-                <RowDefinition Height="Auto"/>
-                <RowDefinition Height="16"/>
-                <!-- Zmiana hasła -->
-                <RowDefinition Height="Auto"/>
-                <RowDefinition Height="16"/>
-                <!-- Usuwanie konta -->
-                <RowDefinition Height="Auto"/>
-            </Grid.RowDefinitions>
+			<Grid.RowDefinitions>
+				<RowDefinition Height="Auto"/>
+				<RowDefinition Height="16"/>
+				<RowDefinition Height="Auto"/>
+				<RowDefinition Height="16"/>
+				<RowDefinition Height="Auto"/>
+			</Grid.RowDefinitions>
 
-            <!-- ============== DANE OSOBOWE (KONTO OSOBISTE) ============== -->
-            <Border x:Name="PersonalBorder"
+			<!-- ============== DANE OSOBOWE (KONTO OSOBISTE) ============== -->
+			<Border x:Name="PersonalBorder"
                     Grid.Row="0"
                     Width="700"
                     HorizontalAlignment="Left"
@@ -34,168 +31,122 @@
                     Padding="12"
                     Background="{DynamicResource Surface.Background}"
                     Visibility="{Binding IsPersonal, Converter={StaticResource BoolToVisibility}}">
-                <StackPanel>
-                    <TextBlock Text="Dane osobowe"
+				<StackPanel>
+					<TextBlock Text="Dane osobowe"
                                FontSize="18"
                                FontWeight="Bold"
                                Foreground="White"
                                Margin="0,0,0,10"/>
 
-                    <Grid>
-                        <Grid.RowDefinitions>
-                            <RowDefinition Height="Auto"/>
-                            <!-- Email -->
-                            <RowDefinition Height="Auto"/>
-                            <!-- Imię -->
-                            <RowDefinition Height="Auto"/>
-                            <!-- Nazwisko -->
-                            <RowDefinition Height="Auto"/>
-                            <!-- Data ur. -->
-                            <RowDefinition Height="Auto"/>
-                            <!-- Telefon -->
-                            <RowDefinition Height="Auto"/>
-                            <!-- Miasto -->
-                            <RowDefinition Height="Auto"/>
-                            <!-- Kod pocztowy -->
-                            <RowDefinition Height="Auto"/>
-                            <!-- Ulica -->
-                            <RowDefinition Height="Auto"/>
-                            <!-- Nr domu/mieszkania -->
-                            <RowDefinition Height="Auto"/>
-                            <!-- Przyciski -->
-                        </Grid.RowDefinitions>
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="160"/>
-                            <ColumnDefinition Width="*"/>
-                        </Grid.ColumnDefinitions>
+					<Grid>
+						<Grid.RowDefinitions>
+							<RowDefinition Height="Auto"/>
+							<!-- 0 Email -->
+							<RowDefinition Height="Auto"/>
+							<!-- 1 Imię -->
+							<RowDefinition Height="Auto"/>
+							<!-- 2 Nazwisko -->
+							<RowDefinition Height="Auto"/>
+							<!-- 3 Data ur. -->
+							<RowDefinition Height="Auto"/>
+							<!-- 4 Telefon -->
+							<RowDefinition Height="Auto"/>
+							<!-- 5 Miasto -->
+							<RowDefinition Height="Auto"/>
+							<!-- 6 Kod pocztowy -->
+							<RowDefinition Height="Auto"/>
+							<!-- 7 Ulica -->
+							<RowDefinition Height="Auto"/>
+							<!-- 8 Nr domu -->
+							<RowDefinition Height="Auto"/>
+							<!-- 9 Przyciski -->
+						</Grid.RowDefinitions>
+						<Grid.ColumnDefinitions>
+							<ColumnDefinition Width="160"/>
+							<ColumnDefinition Width="*"/>
+						</Grid.ColumnDefinitions>
 
-                        <!-- Email -->
-                        <TextBlock Grid.Row="0" Grid.Column="0"
-                                   Text="Email:" VerticalAlignment="Center"/>
-                        <StackPanel Grid.Row="0" Grid.Column="1">
-                            <TextBlock x:Name="LblEmail" Text="nie podano"/>
-                            <TextBox x:Name="TxtEmail"
-                                     Visibility="Collapsed"
-                                     Height="24"/>
-                        </StackPanel>
+						<TextBlock Grid.Row="0" Grid.Column="0" Text="Email:" VerticalAlignment="Center"/>
+						<StackPanel Grid.Row="0" Grid.Column="1">
+							<TextBlock x:Name="LblEmail" Text="nie podano"/>
+							<TextBox x:Name="TxtEmail" Visibility="Collapsed" Height="24"/>
+						</StackPanel>
 
-                        <!-- Imię -->
-                        <TextBlock Grid.Row="1" Grid.Column="0"
-                                   Text="Imię:" VerticalAlignment="Center"
-                                   Margin="0,4,0,0"/>
-                        <StackPanel Grid.Row="1" Grid.Column="1" Margin="0,4,0,0">
-                            <TextBlock x:Name="LblFirstName" Text="nie podano"/>
-                            <TextBox x:Name="TxtFirstName"
-                                     Visibility="Collapsed"
-                                     Height="24"/>
-                        </StackPanel>
+						<TextBlock Grid.Row="1" Grid.Column="0" Text="Imię:" VerticalAlignment="Center" Margin="0,4,0,0"/>
+						<StackPanel Grid.Row="1" Grid.Column="1" Margin="0,4,0,0">
+							<TextBlock x:Name="LblFirstName" Text="nie podano"/>
+							<TextBox x:Name="TxtFirstName" Visibility="Collapsed" Height="24"/>
+						</StackPanel>
 
-                        <!-- Nazwisko -->
-                        <TextBlock Grid.Row="2" Grid.Column="0"
-                                   Text="Nazwisko:" VerticalAlignment="Center"
-                                   Margin="0,4,0,0"/>
-                        <StackPanel Grid.Row="2" Grid.Column="1" Margin="0,4,0,0">
-                            <TextBlock x:Name="LblLastName" Text="nie podano"/>
-                            <TextBox x:Name="TxtLastName"
-                                     Visibility="Collapsed"
-                                     Height="24"/>
-                        </StackPanel>
+						<TextBlock Grid.Row="2" Grid.Column="0" Text="Nazwisko:" VerticalAlignment="Center" Margin="0,4,0,0"/>
+						<StackPanel Grid.Row="2" Grid.Column="1" Margin="0,4,0,0">
+							<TextBlock x:Name="LblLastName" Text="nie podano"/>
+							<TextBox x:Name="TxtLastName" Visibility="Collapsed" Height="24"/>
+						</StackPanel>
 
-                        <!-- Data urodzenia -->
-                        <TextBlock Grid.Row="3" Grid.Column="0"
-                                   Text="Data urodzenia (DD-MM-RRRR):"
-                                   VerticalAlignment="Center"
-                                   Margin="0,4,0,0"/>
-                        <StackPanel Grid.Row="3" Grid.Column="1" Margin="0,4,0,0">
-                            <TextBlock x:Name="LblBirthDate" Text="nie podano"/>
-                            <TextBox x:Name="TxtBirthDate"
-                                     Visibility="Collapsed"
-                                     Height="24"/>
-                        </StackPanel>
+						<TextBlock Grid.Row="3" Grid.Column="0" Text="Data urodzenia (DD-MM-RRRR):" VerticalAlignment="Center" Margin="0,4,0,0"/>
+						<StackPanel Grid.Row="3" Grid.Column="1" Margin="0,4,0,0">
+							<TextBlock x:Name="LblBirthDate" Text="nie podano"/>
+							<TextBox x:Name="TxtBirthDate" Visibility="Collapsed" Height="24"/>
+						</StackPanel>
 
-                        <!-- Telefon -->
-                        <TextBlock Grid.Row="4" Grid.Column="0"
-                                   Text="Nr telefonu:" VerticalAlignment="Center"
-                                   Margin="0,4,0,0"/>
-                        <StackPanel Grid.Row="4" Grid.Column="1" Margin="0,4,0,0">
-                            <TextBlock x:Name="LblPhone" Text="nie podano"/>
-                            <TextBox x:Name="TxtPhone"
-                                     Visibility="Collapsed"
-                                     Height="24"/>
-                        </StackPanel>
+						<TextBlock Grid.Row="4" Grid.Column="0" Text="Nr telefonu:" VerticalAlignment="Center" Margin="0,4,0,0"/>
+						<StackPanel Grid.Row="4" Grid.Column="1" Margin="0,4,0,0">
+							<TextBlock x:Name="LblPhone" Text="nie podano"/>
+							<TextBox x:Name="TxtPhone" Visibility="Collapsed" Height="24"/>
+						</StackPanel>
 
-                        <!-- Miasto -->
-                        <TextBlock Grid.Row="5" Grid.Column="0"
-                                   Text="Miasto:" VerticalAlignment="Center"
-                                   Margin="0,4,0,0"/>
-                        <StackPanel Grid.Row="5" Grid.Column="1" Margin="0,4,0,0">
-                            <TextBlock x:Name="LblCity" Text="nie podano"/>
-                            <TextBox x:Name="TxtCity"
-                                     Visibility="Collapsed"
-                                     Height="24"/>
-                        </StackPanel>
+						<TextBlock Grid.Row="5" Grid.Column="0" Text="Miasto:" VerticalAlignment="Center" Margin="0,4,0,0"/>
+						<StackPanel Grid.Row="5" Grid.Column="1" Margin="0,4,0,0">
+							<TextBlock x:Name="LblCity" Text="nie podano"/>
+							<TextBox x:Name="TxtCity" Visibility="Collapsed" Height="24"/>
+						</StackPanel>
 
-                        <!-- Kod pocztowy -->
-                        <TextBlock Grid.Row="6" Grid.Column="0"
-                                   Text="Kod pocztowy:" VerticalAlignment="Center"
-                                   Margin="0,4,0,0"/>
-                        <StackPanel Grid.Row="6" Grid.Column="1" Margin="0,4,0,0">
-                            <TextBlock x:Name="LblPostalCode" Text="nie podano"/>
-                            <TextBox x:Name="TxtPostalCode"
-                                     Visibility="Collapsed"
-                                     Height="24"/>
-                        </StackPanel>
+						<TextBlock Grid.Row="6" Grid.Column="0" Text="Kod pocztowy:" VerticalAlignment="Center" Margin="0,4,0,0"/>
+						<StackPanel Grid.Row="6" Grid.Column="1" Margin="0,4,0,0">
+							<TextBlock x:Name="LblPostalCode" Text="nie podano"/>
+							<TextBox x:Name="TxtPostalCode" Visibility="Collapsed" Height="24"/>
+						</StackPanel>
 
-                        <!-- Ulica -->
-                        <TextBlock Grid.Row="7" Grid.Column="0"
-                                   Text="Ulica:" VerticalAlignment="Center"
-                                   Margin="0,4,0,0"/>
-                        <StackPanel Grid.Row="7" Grid.Column="1" Margin="0,4,0,0">
-                            <TextBlock x:Name="LblStreet" Text="nie podano"/>
-                            <TextBox x:Name="TxtStreet"
-                                     Visibility="Collapsed"
-                                     Height="24"/>
-                        </StackPanel>
+						<TextBlock Grid.Row="7" Grid.Column="0" Text="Ulica:" VerticalAlignment="Center" Margin="0,4,0,0"/>
+						<StackPanel Grid.Row="7" Grid.Column="1" Margin="0,4,0,0">
+							<TextBlock x:Name="LblStreet" Text="nie podano"/>
+							<TextBox x:Name="TxtStreet" Visibility="Collapsed" Height="24"/>
+						</StackPanel>
 
-                        <!-- Nr domu / mieszkania -->
-                        <TextBlock Grid.Row="8" Grid.Column="0"
-                                   Text="Nr domu / mieszkania:" VerticalAlignment="Center"
-                                   Margin="0,4,0,0"/>
-                        <StackPanel Grid.Row="8" Grid.Column="1" Margin="0,4,0,0">
-                            <TextBlock x:Name="LblHouseNo" Text="nie podano"/>
-                            <TextBox x:Name="TxtHouseNo"
-                                     Visibility="Collapsed"
-                                     Height="24"/>
-                        </StackPanel>
+						<TextBlock Grid.Row="8" Grid.Column="0" Text="Nr domu / mieszkania:" VerticalAlignment="Center" Margin="0,4,0,0"/>
+						<StackPanel Grid.Row="8" Grid.Column="1" Margin="0,4,0,0">
+							<TextBlock x:Name="LblHouseNo" Text="nie podano"/>
+							<TextBox x:Name="TxtHouseNo" Visibility="Collapsed" Height="24"/>
+						</StackPanel>
 
-                        <!-- Przyciski -->
-                        <StackPanel Grid.Row="9" Grid.ColumnSpan="2"
+						<StackPanel Grid.Row="9" Grid.ColumnSpan="2"
                                     Orientation="Horizontal"
                                     HorizontalAlignment="Right"
                                     Margin="0,12,0,0">
-                            <Button x:Name="BtnCancelPersonal"
+							<Button x:Name="BtnCancelPersonal"
                                     Content="Anuluj"
                                     Width="90"
                                     Margin="0,0,8,0"
                                     Visibility="Collapsed"
                                     Click="BtnCancelPersonal_Click"/>
-                            <Button x:Name="BtnSavePersonal"
+							<Button x:Name="BtnSavePersonal"
                                     Content="Zapisz"
                                     Width="90"
                                     Margin="0,0,8,0"
                                     Visibility="Collapsed"
                                     Click="BtnSavePersonal_Click"/>
-                            <Button x:Name="BtnEditPersonal"
+							<Button x:Name="BtnEditPersonal"
                                     Content="Uzupełnij / Edytuj dane"
                                     Width="170"
                                     Click="BtnEditPersonal_Click"/>
-                        </StackPanel>
-                    </Grid>
-                </StackPanel>
-            </Border>
+						</StackPanel>
+					</Grid>
+				</StackPanel>
+			</Border>
 
-            <!-- ============== DANE FIRMY (KONTO BUSINESS) ============== -->
-            <Border x:Name="CompanyBorder"
+			<!-- ============== DANE FIRMY (KONTO FIRMOWE) ============== -->
+			<Border x:Name="CompanyBorder"
                     Grid.Row="0"
                     Width="700"
                     HorizontalAlignment="Left"
@@ -205,154 +156,114 @@
                     Padding="12"
                     Background="{DynamicResource Surface.Background}"
                     Visibility="{Binding IsBusiness, Converter={StaticResource BoolToVisibility}}">
-                <StackPanel>
-                    <TextBlock Text="Dane firmy"
+				<StackPanel>
+					<TextBlock Text="Dane firmy"
                                FontSize="18"
                                FontWeight="Bold"
                                Foreground="White"
                                Margin="0,0,0,10"/>
 
-                    <Grid>
-                        <Grid.RowDefinitions>
-                            <RowDefinition Height="Auto"/>
-                            <!-- Nazwa -->
-                            <RowDefinition Height="Auto"/>
-                            <!-- NIP -->
-                            <RowDefinition Height="Auto"/>
-                            <!-- REGON -->
-                            <RowDefinition Height="Auto"/>
-                            <!-- KRS -->
-                            <RowDefinition Height="Auto"/>
-                            <!-- Miasto siedziby -->
-                            <RowDefinition Height="Auto"/>
-                            <!-- Kod pocztowy -->
-                            <RowDefinition Height="Auto"/>
-                            <!-- Ulica -->
-                            <RowDefinition Height="Auto"/>
-                            <!-- Nr lokalu -->
-                            <RowDefinition Height="Auto"/>
-                            <!-- Przyciski -->
-                        </Grid.RowDefinitions>
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="160"/>
-                            <ColumnDefinition Width="*"/>
-                        </Grid.ColumnDefinitions>
+					<Grid>
+						<Grid.RowDefinitions>
+							<RowDefinition Height="Auto"/>
+							<!-- 0 Nazwa -->
+							<RowDefinition Height="Auto"/>
+							<!-- 1 NIP -->
+							<RowDefinition Height="Auto"/>
+							<!-- 2 REGON -->
+							<RowDefinition Height="Auto"/>
+							<!-- 3 KRS -->
+							<RowDefinition Height="Auto"/>
+							<!-- 4 Miasto -->
+							<RowDefinition Height="Auto"/>
+							<!-- 5 Kod -->
+							<RowDefinition Height="Auto"/>
+							<!-- 6 Ulica -->
+							<RowDefinition Height="Auto"/>
+							<!-- 7 Nr -->
+							<RowDefinition Height="Auto"/>
+							<!-- 8 Przyciski -->
+						</Grid.RowDefinitions>
+						<Grid.ColumnDefinitions>
+							<ColumnDefinition Width="160"/>
+							<ColumnDefinition Width="*"/>
+						</Grid.ColumnDefinitions>
 
-                        <!-- Nazwa firmy -->
-                        <TextBlock Grid.Row="0" Grid.Column="0"
-                                   Text="Nazwa firmy:" VerticalAlignment="Center"/>
-                        <StackPanel Grid.Row="0" Grid.Column="1">
-                            <TextBlock x:Name="LblCompanyName" Text="nie podano"/>
-                            <TextBox x:Name="TxtCompanyName"
-                                     Visibility="Collapsed"
-                                     Height="24"/>
-                        </StackPanel>
+						<TextBlock Grid.Row="0" Grid.Column="0" Text="Nazwa firmy:" VerticalAlignment="Center"/>
+						<StackPanel Grid.Row="0" Grid.Column="1">
+							<TextBlock x:Name="LblCompanyName" Text="nie podano"/>
+							<TextBox x:Name="TxtCompanyName" Visibility="Collapsed" Height="24"/>
+						</StackPanel>
 
-                        <!-- NIP -->
-                        <TextBlock Grid.Row="1" Grid.Column="0"
-                                   Text="NIP:" VerticalAlignment="Center"
-                                   Margin="0,4,0,0"/>
-                        <StackPanel Grid.Row="1" Grid.Column="1" Margin="0,4,0,0">
-                            <TextBlock x:Name="LblCompanyNip" Text="nie podano"/>
-                            <TextBox x:Name="TxtCompanyNip"
-                                     Visibility="Collapsed"
-                                     Height="24"/>
-                        </StackPanel>
+						<TextBlock Grid.Row="1" Grid.Column="0" Text="NIP:" VerticalAlignment="Center" Margin="0,4,0,0"/>
+						<StackPanel Grid.Row="1" Grid.Column="1" Margin="0,4,0,0">
+							<TextBlock x:Name="LblCompanyNip" Text="nie podano"/>
+							<TextBox x:Name="TxtCompanyNip" Visibility="Collapsed" Height="24"/>
+						</StackPanel>
 
-                        <!-- REGON -->
-                        <TextBlock Grid.Row="2" Grid.Column="0"
-                                   Text="REGON:" VerticalAlignment="Center"
-                                   Margin="0,4,0,0"/>
-                        <StackPanel Grid.Row="2" Grid.Column="1" Margin="0,4,0,0">
-                            <TextBlock x:Name="LblCompanyRegon" Text="nie podano"/>
-                            <TextBox x:Name="TxtCompanyRegon"
-                                     Visibility="Collapsed"
-                                     Height="24"/>
-                        </StackPanel>
+						<TextBlock Grid.Row="2" Grid.Column="0" Text="REGON:" VerticalAlignment="Center" Margin="0,4,0,0"/>
+						<StackPanel Grid.Row="2" Grid.Column="1" Margin="0,4,0,0">
+							<TextBlock x:Name="LblCompanyRegon" Text="nie podano"/>
+							<TextBox x:Name="TxtCompanyRegon" Visibility="Collapsed" Height="24"/>
+						</StackPanel>
 
-                        <!-- KRS -->
-                        <TextBlock Grid.Row="3" Grid.Column="0"
-                                   Text="KRS:" VerticalAlignment="Center"
-                                   Margin="0,4,0,0"/>
-                        <StackPanel Grid.Row="3" Grid.Column="1" Margin="0,4,0,0">
-                            <TextBlock x:Name="LblCompanyKrs" Text="nie podano"/>
-                            <TextBox x:Name="TxtCompanyKrs"
-                                     Visibility="Collapsed"
-                                     Height="24"/>
-                        </StackPanel>
+						<TextBlock Grid.Row="3" Grid.Column="0" Text="KRS:" VerticalAlignment="Center" Margin="0,4,0,0"/>
+						<StackPanel Grid.Row="3" Grid.Column="1" Margin="0,4,0,0">
+							<TextBlock x:Name="LblCompanyKrs" Text="nie podano"/>
+							<TextBox x:Name="TxtCompanyKrs" Visibility="Collapsed" Height="24"/>
+						</StackPanel>
 
-                        <!-- Miasto siedziby -->
-                        <TextBlock Grid.Row="4" Grid.Column="0"
-                                   Text="Miasto siedziby:" VerticalAlignment="Center"
-                                   Margin="0,4,0,0"/>
-                        <StackPanel Grid.Row="4" Grid.Column="1" Margin="0,4,0,0">
-                            <TextBlock x:Name="LblCompanyCity" Text="nie podano"/>
-                            <TextBox x:Name="TxtCompanyCity"
-                                     Visibility="Collapsed"
-                                     Height="24"/>
-                        </StackPanel>
+						<TextBlock Grid.Row="4" Grid.Column="0" Text="Miasto siedziby:" VerticalAlignment="Center" Margin="0,4,0,0"/>
+						<StackPanel Grid.Row="4" Grid.Column="1" Margin="0,4,0,0">
+							<TextBlock x:Name="LblCompanyCity" Text="nie podano"/>
+							<TextBox x:Name="TxtCompanyCity" Visibility="Collapsed" Height="24"/>
+						</StackPanel>
 
-                        <!-- Kod pocztowy -->
-                        <TextBlock Grid.Row="5" Grid.Column="0"
-                                   Text="Kod pocztowy:" VerticalAlignment="Center"
-                                   Margin="0,4,0,0"/>
-                        <StackPanel Grid.Row="5" Grid.Column="1" Margin="0,4,0,0">
-                            <TextBlock x:Name="LblCompanyPostalCode" Text="nie podano"/>
-                            <TextBox x:Name="TxtCompanyPostalCode"
-                                     Visibility="Collapsed"
-                                     Height="24"/>
-                        </StackPanel>
+						<TextBlock Grid.Row="5" Grid.Column="0" Text="Kod pocztowy:" VerticalAlignment="Center" Margin="0,4,0,0"/>
+						<StackPanel Grid.Row="5" Grid.Column="1" Margin="0,4,0,0">
+							<TextBlock x:Name="LblCompanyPostalCode" Text="nie podano"/>
+							<TextBox x:Name="TxtCompanyPostalCode" Visibility="Collapsed" Height="24"/>
+						</StackPanel>
 
-                        <!-- Ulica -->
-                        <TextBlock Grid.Row="6" Grid.Column="0"
-                                   Text="Ulica:" VerticalAlignment="Center"
-                                   Margin="0,4,0,0"/>
-                        <StackPanel Grid.Row="6" Grid.Column="1" Margin="0,4,0,0">
-                            <TextBlock x:Name="LblCompanyStreet" Text="nie podano"/>
-                            <TextBox x:Name="TxtCompanyStreet"
-                                     Visibility="Collapsed"
-                                     Height="24"/>
-                        </StackPanel>
+						<TextBlock Grid.Row="6" Grid.Column="0" Text="Ulica:" VerticalAlignment="Center" Margin="0,4,0,0"/>
+						<StackPanel Grid.Row="6" Grid.Column="1" Margin="0,4,0,0">
+							<TextBlock x:Name="LblCompanyStreet" Text="nie podano"/>
+							<TextBox x:Name="TxtCompanyStreet" Visibility="Collapsed" Height="24"/>
+						</StackPanel>
 
-                        <!-- Nr lokalu -->
-                        <TextBlock Grid.Row="7" Grid.Column="0"
-                                   Text="Nr lokalu:" VerticalAlignment="Center"
-                                   Margin="0,4,0,0"/>
-                        <StackPanel Grid.Row="7" Grid.Column="1" Margin="0,4,0,0">
-                            <TextBlock x:Name="LblCompanyHouseNo" Text="nie podano"/>
-                            <TextBox x:Name="TxtCompanyHouseNo"
-                                     Visibility="Collapsed"
-                                     Height="24"/>
-                        </StackPanel>
+						<TextBlock Grid.Row="7" Grid.Column="0" Text="Nr lokalu:" VerticalAlignment="Center" Margin="0,4,0,0"/>
+						<StackPanel Grid.Row="7" Grid.Column="1" Margin="0,4,0,0">
+							<TextBlock x:Name="LblCompanyHouseNo" Text="nie podano"/>
+							<TextBox x:Name="TxtCompanyHouseNo" Visibility="Collapsed" Height="24"/>
+						</StackPanel>
 
-                        <!-- Przyciski -->
-                        <StackPanel Grid.Row="8" Grid.ColumnSpan="2"
+						<StackPanel Grid.Row="8" Grid.ColumnSpan="2"
                                     Orientation="Horizontal"
                                     HorizontalAlignment="Right"
                                     Margin="0,12,0,0">
-                            <Button x:Name="BtnCancelCompany"
+							<Button x:Name="BtnCancelCompany"
                                     Content="Anuluj"
                                     Width="90"
                                     Margin="0,0,8,0"
                                     Visibility="Collapsed"
                                     Click="BtnCancelCompany_Click"/>
-                            <Button x:Name="BtnSaveCompany"
+							<Button x:Name="BtnSaveCompany"
                                     Content="Zapisz"
                                     Width="90"
                                     Margin="0,0,8,0"
                                     Visibility="Collapsed"
                                     Click="BtnSaveCompany_Click"/>
-                            <Button x:Name="BtnEditCompany"
+							<Button x:Name="BtnEditCompany"
                                     Content="Uzupełnij / Edytuj dane"
                                     Width="170"
                                     Click="BtnEditCompany_Click"/>
-                        </StackPanel>
-                    </Grid>
-                </StackPanel>
-            </Border>
+						</StackPanel>
+					</Grid>
+				</StackPanel>
+			</Border>
 
-            <!-- ============== ZMIANA HASŁA ============== -->
-            <Border Grid.Row="2"
+			<!-- ============== ZMIANA HASŁA ============== -->
+			<Border Grid.Row="2"
                     Width="700"
                     HorizontalAlignment="Left"
                     BorderBrush="{DynamicResource Brand.Blue}"
@@ -360,55 +271,46 @@
                     CornerRadius="6"
                     Padding="12"
                     Background="{DynamicResource Surface.Background}">
-                <StackPanel>
-                    <TextBlock Text="Zmiana hasła"
+				<StackPanel>
+					<TextBlock Text="Zmiana hasła"
                                FontSize="18"
                                FontWeight="Bold"
                                Foreground="White"
                                Margin="0,0,0,10"/>
 
-                    <Grid>
-                        <Grid.RowDefinitions>
-                            <RowDefinition Height="Auto"/>
-                            <RowDefinition Height="Auto"/>
-                            <RowDefinition Height="Auto"/>
-                            <RowDefinition Height="Auto"/>
-                        </Grid.RowDefinitions>
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="200"/>
-                            <ColumnDefinition Width="*"/>
-                        </Grid.ColumnDefinitions>
+					<Grid>
+						<Grid.RowDefinitions>
+							<RowDefinition Height="Auto"/>
+							<RowDefinition Height="Auto"/>
+							<RowDefinition Height="Auto"/>
+							<RowDefinition Height="Auto"/>
+						</Grid.RowDefinitions>
+						<Grid.ColumnDefinitions>
+							<ColumnDefinition Width="200"/>
+							<ColumnDefinition Width="*"/>
+						</Grid.ColumnDefinitions>
 
-                        <TextBlock Grid.Row="0" Grid.Column="0"
-                                   Text="Stare hasło:" VerticalAlignment="Center"/>
-                        <PasswordBox x:Name="PwdOld"
-                                     Grid.Row="0" Grid.Column="1"
-                                     Margin="0,2,0,2"/>
+						<TextBlock Grid.Row="0" Grid.Column="0" Text="Stare hasło:" VerticalAlignment="Center"/>
+						<PasswordBox x:Name="PwdOld" Grid.Row="0" Grid.Column="1" Margin="0,2,0,2"/>
 
-                        <TextBlock Grid.Row="1" Grid.Column="0"
-                                   Text="Nowe hasło:" VerticalAlignment="Center"/>
-                        <PasswordBox x:Name="PwdNew"
-                                     Grid.Row="1" Grid.Column="1"
-                                     Margin="0,2,0,2"/>
+						<TextBlock Grid.Row="1" Grid.Column="0" Text="Nowe hasło:" VerticalAlignment="Center"/>
+						<PasswordBox x:Name="PwdNew" Grid.Row="1" Grid.Column="1" Margin="0,2,0,2"/>
 
-                        <TextBlock Grid.Row="2" Grid.Column="0"
-                                   Text="Powtórz nowe hasło:" VerticalAlignment="Center"/>
-                        <PasswordBox x:Name="PwdNew2"
-                                     Grid.Row="2" Grid.Column="1"
-                                     Margin="0,2,0,2"/>
+						<TextBlock Grid.Row="2" Grid.Column="0" Text="Powtórz nowe hasło:" VerticalAlignment="Center"/>
+						<PasswordBox x:Name="PwdNew2" Grid.Row="2" Grid.Column="1" Margin="0,2,0,2"/>
 
-                        <Button Grid.Row="3" Grid.ColumnSpan="2"
+						<Button Grid.Row="3" Grid.ColumnSpan="2"
                                 Content="Zmień hasło"
                                 Width="120"
                                 HorizontalAlignment="Right"
                                 Margin="0,8,0,0"
                                 Click="ChangePassword_Click"/>
-                    </Grid>
-                </StackPanel>
-            </Border>
+					</Grid>
+				</StackPanel>
+			</Border>
 
-            <!-- ============== USUWANIE KONTA ============== -->
-            <Border Grid.Row="4"
+			<!-- ============== USUWANIE KONTA ============== -->
+			<Border Grid.Row="4"
                     Width="700"
                     HorizontalAlignment="Left"
                     BorderBrush="{DynamicResource Brand.Blue}"
@@ -416,54 +318,55 @@
                     CornerRadius="6"
                     Padding="12"
                     Background="{DynamicResource Surface.Background}">
-                <StackPanel>
-                    <TextBlock Text="Usuwanie konta"
+				<StackPanel>
+					<TextBlock Text="Usuwanie konta"
                                FontSize="18"
                                FontWeight="Bold"
                                Foreground="White"
                                Margin="0,0,0,10"/>
 
-                    <TextBlock Text="Usuń swoje konto i wszystkie dane z aplikacji."
+					<TextBlock Text="Usuń swoje konto i wszystkie dane z aplikacji."
                                TextWrapping="Wrap"
                                Margin="0,0,0,8"/>
 
-                    <Button x:Name="BtnShowDeleteConfirm"
+					<Button x:Name="BtnShowDeleteConfirm"
                             Width="140"
                             Click="ShowDeleteConfirm_Click"
                             Background="{DynamicResource Brand.Red}"
                             BorderBrush="{DynamicResource Brand.Red}">
-                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
-                            <Image Source="/Assets/Icons/delete.png"
-                                   Width="16" Height="16"
+						<StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+							<Image Source="/Assets/Icons/delete.png"
+                                   Width="16"
+                                   Height="16"
                                    Margin="0,0,4,0"/>
-                            <TextBlock Text="Usuń konto"
-                                       Foreground="White"/>
-                        </StackPanel>
-                    </Button>
+							<TextBlock Text="Usuń konto" Foreground="White"/>
+						</StackPanel>
+					</Button>
 
-                    <StackPanel x:Name="DeleteConfirmPanel"
+					<StackPanel x:Name="DeleteConfirmPanel"
                                 Margin="0,10,0,0"
                                 Visibility="Collapsed">
-                        <TextBlock Text="Czy na pewno chcesz usunąć konto użytkownika?"
+						<TextBlock Text="Czy na pewno chcesz usunąć konto użytkownika?"
                                    TextWrapping="Wrap"
                                    Margin="0,0,0,4"/>
-                        <TextBlock Text="Tej operacji nie można cofnąć. Zostaną usunięte wszystkie Twoje dane: rachunki, transakcje, budżety, kategorie itp."
+						<TextBlock Text="Tej operacji nie można cofnąć. Zostaną usunięte wszystkie Twoje dane: rachunki, transakcje, budżety, kategorie itp."
                                    TextWrapping="Wrap"
                                    Margin="0,0,0,8"/>
 
-                        <StackPanel Orientation="Horizontal">
-                            <Button Content="Nie, nie usuwaj!"
+						<StackPanel Orientation="Horizontal">
+							<Button Content="Nie, nie usuwaj!"
                                     Margin="0,0,8,0"
                                     Click="CancelDelete_Click"/>
-                            <Button Content="Tak, usuń konto"
+							<Button Content="Tak, usuń konto"
                                     Click="DeleteUser_Click"
                                     Background="{DynamicResource Brand.Red}"
                                     BorderBrush="{DynamicResource Brand.Red}"
                                     Foreground="White"/>
-                        </StackPanel>
-                    </StackPanel>
-                </StackPanel>
-            </Border>
-        </Grid>
-    </ScrollViewer>
+						</StackPanel>
+					</StackPanel>
+				</StackPanel>
+			</Border>
+
+		</Grid>
+	</ScrollViewer>
 </UserControl>

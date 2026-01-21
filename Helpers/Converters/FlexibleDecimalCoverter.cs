@@ -5,12 +5,6 @@ using System.Windows.Data;
 
 namespace Finly.Helpers.Converters
 {
-    /// <summary>
-    /// WPF IValueConverter + bezpieczne parsowanie kwot:
-    /// - akceptuje 200,50 i 200.50
-    /// - toleruje spacje / NBSP / NNBSP / apostrof jako separatory tysięcy
-    /// - gdy występują ',' i '.', ostatni z nich traktuje jako separator dziesiętny
-    /// </summary>
     public sealed class FlexibleDecimalConverter : IValueConverter
     {
         public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
@@ -32,7 +26,6 @@ namespace Finly.Helpers.Converters
             if (value is long l)
                 return ((decimal)l).ToString("0.00", culture);
 
-            // fallback
             if (decimal.TryParse(value.ToString(), NumberStyles.Number, culture, out var v))
                 return v.ToString("0.00", culture);
 
@@ -56,17 +49,14 @@ namespace Finly.Helpers.Converters
 
             var s = input.Trim();
 
-            // usuń typowe separatory tysięcy
             s = s.Replace(" ", "")
-                 .Replace("\u00A0", "")  // NBSP
-                 .Replace("\u202F", "")  // NNBSP
+                 .Replace("\u00A0", "")
+                 .Replace("\u202F", "")
                  .Replace("'", "");
 
-            // zostaw tylko cyfry, +/-, kropkę i przecinek
             s = new string(s.Where(ch => char.IsDigit(ch) || ch == '.' || ch == ',' || ch == '-' || ch == '+').ToArray());
             if (string.IsNullOrWhiteSpace(s)) return false;
 
-            // znak na początku
             int sign = 1;
             if (s[0] == '-')
             {
@@ -87,12 +77,10 @@ namespace Finly.Helpers.Converters
 
             if (lastDot >= 0 && lastComma >= 0)
             {
-                // oba występują -> ostatni to separator dziesiętny
                 decimalSep = lastDot > lastComma ? '.' : ',';
             }
             else if (lastDot >= 0)
             {
-                // pojedyncza kropka => dziesiętny (żeby 200.00 nie robiło 20000)
                 decimalSep = '.';
             }
             else if (lastComma >= 0)
@@ -104,13 +92,13 @@ namespace Finly.Helpers.Converters
 
             if (decimalSep == null)
             {
-                normalized = s; // same cyfry
+                normalized = s;
             }
             else
             {
                 var other = decimalSep == '.' ? ',' : '.';
-                var tmp = s.Replace(other.ToString(), "");   // usuń drugi separator jako tysięczny
-                normalized = tmp.Replace(decimalSep.Value, '.'); // ujednolić na '.'
+                var tmp = s.Replace(other.ToString(), "");
+                normalized = tmp.Replace(decimalSep.Value, '.');
             }
 
             if (!decimal.TryParse(normalized, NumberStyles.Number, CultureInfo.InvariantCulture, out var parsed))

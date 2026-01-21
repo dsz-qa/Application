@@ -2,7 +2,7 @@
 using Finly.Services;
 using Finly.Services.Features;
 using Finly.ViewModels;
-using Finly.Views;              // AuthWindow
+using Finly.Views;
 using System;
 using System.Globalization;
 using System.Text;
@@ -18,14 +18,15 @@ namespace Finly.Pages
         private readonly AccountViewModel _vm;
 
         private PersonalDetails _personalDetails = new();
-        private bool _isEditingPersonal = false;
+        private bool _isEditingPersonal;
 
         private UserProfile _companyProfile = new();
-        private bool _isEditingCompany = false;
+        private bool _isEditingCompany;
 
         public AccountPage(int userId)
         {
             InitializeComponent();
+
             _userId = userId;
             _vm = new AccountViewModel(userId);
             DataContext = _vm;
@@ -33,12 +34,32 @@ namespace Finly.Pages
             Loaded += AccountPage_Loaded;
         }
 
+        private int ResolveUserId()
+            => _userId > 0 ? _userId : UserService.GetCurrentUserId();
+
         private void AccountPage_Loaded(object? sender, RoutedEventArgs e)
         {
-            if (_vm.IsBusiness)
-                LoadCompanyDetails();
-            else
-                LoadPersonalDetails();
+            try
+            {
+                var uid = ResolveUserId();
+                if (uid <= 0)
+                {
+                    ToastService.Error("Brak zalogowanego użytkownika.");
+                    return;
+                }
+
+                if (_vm.IsBusiness)
+                    LoadCompanyDetails();
+                else
+                    LoadPersonalDetails();
+
+                TogglePersonalEditMode(false);
+                ToggleCompanyEditMode(false);
+            }
+            catch (Exception ex)
+            {
+                ToastService.Error("Błąd podczas ładowania strony Konto: " + ex.Message);
+            }
         }
 
         // ===== Pomocnicze dla adresu firmy =====
@@ -51,7 +72,6 @@ namespace Finly.Pages
 
             string? city = null, postal = null, street = null, house = null;
 
-            // Szukamy kodu pocztowego 00-000
             var m = Regex.Match(address, @"\b\d{2}-\d{3}\b");
             if (m.Success)
             {
@@ -78,10 +98,9 @@ namespace Finly.Pages
             }
             else
             {
-                // fallback: "Miasto, Ulica 10"
                 var parts = address.Split(',', StringSplitOptions.RemoveEmptyEntries);
-                if (parts.Length > 0)
-                    city = parts[0].Trim();
+                if (parts.Length > 0) city = parts[0].Trim();
+
                 if (parts.Length > 1)
                 {
                     var rest = parts[1].Trim();
@@ -101,8 +120,7 @@ namespace Finly.Pages
             return (city, postal, street, house);
         }
 
-        private static string? BuildCompanyAddress(
-            string? city, string? postal, string? street, string? houseNo)
+        private static string? BuildCompanyAddress(string? city, string? postal, string? street, string? houseNo)
         {
             if (string.IsNullOrWhiteSpace(city) &&
                 string.IsNullOrWhiteSpace(postal) &&
@@ -130,7 +148,7 @@ namespace Finly.Pages
                 {
                     sb.Append(' ');
                     sb.Append(houseNo.Trim());
-                    houseNo = null; // żeby niżej nie dodać drugi raz
+                    houseNo = null;
                 }
             }
 
@@ -143,16 +161,28 @@ namespace Finly.Pages
             return sb.ToString();
         }
 
-        // ====== DANE OSOBOWE ======
+        // ===== Helpers null-safe =====
 
-        private static void SetLabel(TextBlock label, string? value)
+        private static void SetLabel(TextBlock? label, string? value)
         {
+            if (label == null) return;
             label.Text = string.IsNullOrWhiteSpace(value) ? "nie podano" : value;
         }
 
+        private static void SetText(TextBox? tb, string? value)
+        {
+            if (tb == null) return;
+            tb.Text = value ?? "";
+        }
+
+        private static string? NullIfEmpty(string? s)
+            => string.IsNullOrWhiteSpace(s) ? null : s.Trim();
+
+        // ====== DANE OSOBOWE ======
+
         private void LoadPersonalDetails()
         {
-            var uid = UserService.GetCurrentUserId();
+            var uid = ResolveUserId();
             if (uid <= 0) return;
 
             _personalDetails = UserService.GetPersonalDetails(uid) ?? new PersonalDetails();
@@ -166,56 +196,57 @@ namespace Finly.Pages
             SetLabel(LblStreet, _personalDetails.Street);
             SetLabel(LblHouseNo, _personalDetails.HouseNo);
 
-            LblBirthDate.Text = _personalDetails.BirthDate.HasValue
-                ? _personalDetails.BirthDate.Value.ToString("dd-MM-yyyy", CultureInfo.GetCultureInfo("pl-PL"))
-                : "nie podano";
+            if (LblBirthDate != null)
+            {
+                LblBirthDate.Text = _personalDetails.BirthDate.HasValue
+                    ? _personalDetails.BirthDate.Value.ToString("dd-MM-yyyy", CultureInfo.GetCultureInfo("pl-PL"))
+                    : "nie podano";
+            }
 
-            TxtEmail.Text = _personalDetails.Email ?? "";
-            TxtFirstName.Text = _personalDetails.FirstName ?? "";
-            TxtLastName.Text = _personalDetails.LastName ?? "";
-            TxtPhone.Text = _personalDetails.Phone ?? "";
-            TxtCity.Text = _personalDetails.City ?? "";
-            TxtPostalCode.Text = _personalDetails.PostalCode ?? "";
-            TxtStreet.Text = _personalDetails.Street ?? "";
-            TxtHouseNo.Text = _personalDetails.HouseNo ?? "";
-            TxtBirthDate.Text = _personalDetails.BirthDate.HasValue
+            SetText(TxtEmail, _personalDetails.Email);
+            SetText(TxtFirstName, _personalDetails.FirstName);
+            SetText(TxtLastName, _personalDetails.LastName);
+            SetText(TxtPhone, _personalDetails.Phone);
+            SetText(TxtCity, _personalDetails.City);
+            SetText(TxtPostalCode, _personalDetails.PostalCode);
+            SetText(TxtStreet, _personalDetails.Street);
+            SetText(TxtHouseNo, _personalDetails.HouseNo);
+
+            SetText(TxtBirthDate, _personalDetails.BirthDate.HasValue
                 ? _personalDetails.BirthDate.Value.ToString("dd-MM-yyyy", CultureInfo.GetCultureInfo("pl-PL"))
-                : "";
+                : "");
         }
 
         private void TogglePersonalEditMode(bool editing)
         {
             _isEditingPersonal = editing;
 
-            LblEmail.Visibility = editing ? Visibility.Collapsed : Visibility.Visible;
-            LblFirstName.Visibility = editing ? Visibility.Collapsed : Visibility.Visible;
-            LblLastName.Visibility = editing ? Visibility.Collapsed : Visibility.Visible;
-            LblBirthDate.Visibility = editing ? Visibility.Collapsed : Visibility.Visible;
-            LblPhone.Visibility = editing ? Visibility.Collapsed : Visibility.Visible;
-            LblCity.Visibility = editing ? Visibility.Collapsed : Visibility.Visible;
-            LblPostalCode.Visibility = editing ? Visibility.Collapsed : Visibility.Visible;
-            LblStreet.Visibility = editing ? Visibility.Collapsed : Visibility.Visible;
-            LblHouseNo.Visibility = editing ? Visibility.Collapsed : Visibility.Visible;
+            if (LblEmail != null) LblEmail.Visibility = editing ? Visibility.Collapsed : Visibility.Visible;
+            if (LblFirstName != null) LblFirstName.Visibility = editing ? Visibility.Collapsed : Visibility.Visible;
+            if (LblLastName != null) LblLastName.Visibility = editing ? Visibility.Collapsed : Visibility.Visible;
+            if (LblBirthDate != null) LblBirthDate.Visibility = editing ? Visibility.Collapsed : Visibility.Visible;
+            if (LblPhone != null) LblPhone.Visibility = editing ? Visibility.Collapsed : Visibility.Visible;
+            if (LblCity != null) LblCity.Visibility = editing ? Visibility.Collapsed : Visibility.Visible;
+            if (LblPostalCode != null) LblPostalCode.Visibility = editing ? Visibility.Collapsed : Visibility.Visible;
+            if (LblStreet != null) LblStreet.Visibility = editing ? Visibility.Collapsed : Visibility.Visible;
+            if (LblHouseNo != null) LblHouseNo.Visibility = editing ? Visibility.Collapsed : Visibility.Visible;
 
-            TxtEmail.Visibility = editing ? Visibility.Visible : Visibility.Collapsed;
-            TxtFirstName.Visibility = editing ? Visibility.Visible : Visibility.Collapsed;
-            TxtLastName.Visibility = editing ? Visibility.Visible : Visibility.Collapsed;
-            TxtBirthDate.Visibility = editing ? Visibility.Visible : Visibility.Collapsed;
-            TxtPhone.Visibility = editing ? Visibility.Visible : Visibility.Collapsed;
-            TxtCity.Visibility = editing ? Visibility.Visible : Visibility.Collapsed;
-            TxtPostalCode.Visibility = editing ? Visibility.Visible : Visibility.Collapsed;
-            TxtStreet.Visibility = editing ? Visibility.Visible : Visibility.Collapsed;
-            TxtHouseNo.Visibility = editing ? Visibility.Visible : Visibility.Collapsed;
+            if (TxtEmail != null) TxtEmail.Visibility = editing ? Visibility.Visible : Visibility.Collapsed;
+            if (TxtFirstName != null) TxtFirstName.Visibility = editing ? Visibility.Visible : Visibility.Collapsed;
+            if (TxtLastName != null) TxtLastName.Visibility = editing ? Visibility.Visible : Visibility.Collapsed;
+            if (TxtBirthDate != null) TxtBirthDate.Visibility = editing ? Visibility.Visible : Visibility.Collapsed;
+            if (TxtPhone != null) TxtPhone.Visibility = editing ? Visibility.Visible : Visibility.Collapsed;
+            if (TxtCity != null) TxtCity.Visibility = editing ? Visibility.Visible : Visibility.Collapsed;
+            if (TxtPostalCode != null) TxtPostalCode.Visibility = editing ? Visibility.Visible : Visibility.Collapsed;
+            if (TxtStreet != null) TxtStreet.Visibility = editing ? Visibility.Visible : Visibility.Collapsed;
+            if (TxtHouseNo != null) TxtHouseNo.Visibility = editing ? Visibility.Visible : Visibility.Collapsed;
 
-            BtnEditPersonal.Visibility = editing ? Visibility.Collapsed : Visibility.Visible;
-            BtnSavePersonal.Visibility = editing ? Visibility.Visible : Visibility.Collapsed;
-            BtnCancelPersonal.Visibility = editing ? Visibility.Visible : Visibility.Collapsed;
+            if (BtnEditPersonal != null) BtnEditPersonal.Visibility = editing ? Visibility.Collapsed : Visibility.Visible;
+            if (BtnSavePersonal != null) BtnSavePersonal.Visibility = editing ? Visibility.Visible : Visibility.Collapsed;
+            if (BtnCancelPersonal != null) BtnCancelPersonal.Visibility = editing ? Visibility.Visible : Visibility.Collapsed;
         }
 
-        private void BtnEditPersonal_Click(object sender, RoutedEventArgs e)
-        {
-            TogglePersonalEditMode(true);
-        }
+        private void BtnEditPersonal_Click(object sender, RoutedEventArgs e) => TogglePersonalEditMode(true);
 
         private void BtnCancelPersonal_Click(object sender, RoutedEventArgs e)
         {
@@ -223,12 +254,9 @@ namespace Finly.Pages
             TogglePersonalEditMode(false);
         }
 
-        private static string? NullIfEmpty(string? s)
-            => string.IsNullOrWhiteSpace(s) ? null : s.Trim();
-
         private void BtnSavePersonal_Click(object sender, RoutedEventArgs e)
         {
-            var uid = UserService.GetCurrentUserId();
+            var uid = ResolveUserId();
             if (uid <= 0)
             {
                 ToastService.Error("Brak zalogowanego użytkownika.");
@@ -237,14 +265,14 @@ namespace Finly.Pages
 
             var d = new PersonalDetails
             {
-                Email = NullIfEmpty(TxtEmail.Text),
-                FirstName = NullIfEmpty(TxtFirstName.Text),
-                LastName = NullIfEmpty(TxtLastName.Text),
-                Phone = NullIfEmpty(TxtPhone.Text),
-                City = NullIfEmpty(TxtCity.Text),
-                PostalCode = NullIfEmpty(TxtPostalCode.Text),
-                Street = NullIfEmpty(TxtStreet.Text),
-                HouseNo = NullIfEmpty(TxtHouseNo.Text)
+                Email = NullIfEmpty(TxtEmail?.Text),
+                FirstName = NullIfEmpty(TxtFirstName?.Text),
+                LastName = NullIfEmpty(TxtLastName?.Text),
+                Phone = NullIfEmpty(TxtPhone?.Text),
+                City = NullIfEmpty(TxtCity?.Text),
+                PostalCode = NullIfEmpty(TxtPostalCode?.Text),
+                Street = NullIfEmpty(TxtStreet?.Text),
+                HouseNo = NullIfEmpty(TxtHouseNo?.Text)
             };
 
             if (!string.IsNullOrWhiteSpace(d.Email) && !d.Email!.Contains("@"))
@@ -253,7 +281,7 @@ namespace Finly.Pages
                 return;
             }
 
-            var birthRaw = (TxtBirthDate.Text ?? "").Trim();
+            var birthRaw = (TxtBirthDate?.Text ?? "").Trim();
             if (!string.IsNullOrEmpty(birthRaw))
             {
                 if (!DateTime.TryParseExact(
@@ -280,6 +308,8 @@ namespace Finly.Pages
 
                 LoadPersonalDetails();
                 TogglePersonalEditMode(false);
+
+                _vm.Refresh(); // spójność VM
             }
             catch (Exception ex)
             {
@@ -291,7 +321,7 @@ namespace Finly.Pages
 
         private void LoadCompanyDetails()
         {
-            var uid = UserService.GetCurrentUserId();
+            var uid = ResolveUserId();
             if (uid <= 0) return;
 
             _companyProfile = UserService.GetProfile(uid) ?? new UserProfile();
@@ -301,56 +331,52 @@ namespace Finly.Pages
             SetLabel(LblCompanyRegon, _companyProfile.CompanyRegon);
             SetLabel(LblCompanyKrs, _companyProfile.CompanyKrs);
 
-            var (city, postal, street, house) =
-                SplitCompanyAddress(_companyProfile.CompanyAddress);
+            var (city, postal, street, house) = SplitCompanyAddress(_companyProfile.CompanyAddress);
 
             SetLabel(LblCompanyCity, city);
             SetLabel(LblCompanyPostalCode, postal);
             SetLabel(LblCompanyStreet, street);
             SetLabel(LblCompanyHouseNo, house);
 
-            TxtCompanyName.Text = _companyProfile.CompanyName ?? "";
-            TxtCompanyNip.Text = _companyProfile.CompanyNip ?? "";
-            TxtCompanyRegon.Text = _companyProfile.CompanyRegon ?? "";
-            TxtCompanyKrs.Text = _companyProfile.CompanyKrs ?? "";
+            SetText(TxtCompanyName, _companyProfile.CompanyName);
+            SetText(TxtCompanyNip, _companyProfile.CompanyNip);
+            SetText(TxtCompanyRegon, _companyProfile.CompanyRegon);
+            SetText(TxtCompanyKrs, _companyProfile.CompanyKrs);
 
-            TxtCompanyCity.Text = city ?? "";
-            TxtCompanyPostalCode.Text = postal ?? "";
-            TxtCompanyStreet.Text = street ?? "";
-            TxtCompanyHouseNo.Text = house ?? "";
+            SetText(TxtCompanyCity, city);
+            SetText(TxtCompanyPostalCode, postal);
+            SetText(TxtCompanyStreet, street);
+            SetText(TxtCompanyHouseNo, house);
         }
 
         private void ToggleCompanyEditMode(bool editing)
         {
             _isEditingCompany = editing;
 
-            LblCompanyName.Visibility = editing ? Visibility.Collapsed : Visibility.Visible;
-            LblCompanyNip.Visibility = editing ? Visibility.Collapsed : Visibility.Visible;
-            LblCompanyRegon.Visibility = editing ? Visibility.Collapsed : Visibility.Visible;
-            LblCompanyKrs.Visibility = editing ? Visibility.Collapsed : Visibility.Visible;
-            LblCompanyCity.Visibility = editing ? Visibility.Collapsed : Visibility.Visible;
-            LblCompanyPostalCode.Visibility = editing ? Visibility.Collapsed : Visibility.Visible;
-            LblCompanyStreet.Visibility = editing ? Visibility.Collapsed : Visibility.Visible;
-            LblCompanyHouseNo.Visibility = editing ? Visibility.Collapsed : Visibility.Visible;
+            if (LblCompanyName != null) LblCompanyName.Visibility = editing ? Visibility.Collapsed : Visibility.Visible;
+            if (LblCompanyNip != null) LblCompanyNip.Visibility = editing ? Visibility.Collapsed : Visibility.Visible;
+            if (LblCompanyRegon != null) LblCompanyRegon.Visibility = editing ? Visibility.Collapsed : Visibility.Visible;
+            if (LblCompanyKrs != null) LblCompanyKrs.Visibility = editing ? Visibility.Collapsed : Visibility.Visible;
+            if (LblCompanyCity != null) LblCompanyCity.Visibility = editing ? Visibility.Collapsed : Visibility.Visible;
+            if (LblCompanyPostalCode != null) LblCompanyPostalCode.Visibility = editing ? Visibility.Collapsed : Visibility.Visible;
+            if (LblCompanyStreet != null) LblCompanyStreet.Visibility = editing ? Visibility.Collapsed : Visibility.Visible;
+            if (LblCompanyHouseNo != null) LblCompanyHouseNo.Visibility = editing ? Visibility.Collapsed : Visibility.Visible;
 
-            TxtCompanyName.Visibility = editing ? Visibility.Visible : Visibility.Collapsed;
-            TxtCompanyNip.Visibility = editing ? Visibility.Visible : Visibility.Collapsed;
-            TxtCompanyRegon.Visibility = editing ? Visibility.Visible : Visibility.Collapsed;
-            TxtCompanyKrs.Visibility = editing ? Visibility.Visible : Visibility.Collapsed;
-            TxtCompanyCity.Visibility = editing ? Visibility.Visible : Visibility.Collapsed;
-            TxtCompanyPostalCode.Visibility = editing ? Visibility.Visible : Visibility.Collapsed;
-            TxtCompanyStreet.Visibility = editing ? Visibility.Visible : Visibility.Collapsed;
-            TxtCompanyHouseNo.Visibility = editing ? Visibility.Visible : Visibility.Collapsed;
+            if (TxtCompanyName != null) TxtCompanyName.Visibility = editing ? Visibility.Visible : Visibility.Collapsed;
+            if (TxtCompanyNip != null) TxtCompanyNip.Visibility = editing ? Visibility.Visible : Visibility.Collapsed;
+            if (TxtCompanyRegon != null) TxtCompanyRegon.Visibility = editing ? Visibility.Visible : Visibility.Collapsed;
+            if (TxtCompanyKrs != null) TxtCompanyKrs.Visibility = editing ? Visibility.Visible : Visibility.Collapsed;
+            if (TxtCompanyCity != null) TxtCompanyCity.Visibility = editing ? Visibility.Visible : Visibility.Collapsed;
+            if (TxtCompanyPostalCode != null) TxtCompanyPostalCode.Visibility = editing ? Visibility.Visible : Visibility.Collapsed;
+            if (TxtCompanyStreet != null) TxtCompanyStreet.Visibility = editing ? Visibility.Visible : Visibility.Collapsed;
+            if (TxtCompanyHouseNo != null) TxtCompanyHouseNo.Visibility = editing ? Visibility.Visible : Visibility.Collapsed;
 
-            BtnEditCompany.Visibility = editing ? Visibility.Collapsed : Visibility.Visible;
-            BtnSaveCompany.Visibility = editing ? Visibility.Visible : Visibility.Collapsed;
-            BtnCancelCompany.Visibility = editing ? Visibility.Visible : Visibility.Collapsed;
+            if (BtnEditCompany != null) BtnEditCompany.Visibility = editing ? Visibility.Collapsed : Visibility.Visible;
+            if (BtnSaveCompany != null) BtnSaveCompany.Visibility = editing ? Visibility.Visible : Visibility.Collapsed;
+            if (BtnCancelCompany != null) BtnCancelCompany.Visibility = editing ? Visibility.Visible : Visibility.Collapsed;
         }
 
-        private void BtnEditCompany_Click(object sender, RoutedEventArgs e)
-        {
-            ToggleCompanyEditMode(true);
-        }
+        private void BtnEditCompany_Click(object sender, RoutedEventArgs e) => ToggleCompanyEditMode(true);
 
         private void BtnCancelCompany_Click(object sender, RoutedEventArgs e)
         {
@@ -360,7 +386,7 @@ namespace Finly.Pages
 
         private void BtnSaveCompany_Click(object sender, RoutedEventArgs e)
         {
-            var uid = UserService.GetCurrentUserId();
+            var uid = ResolveUserId();
             if (uid <= 0)
             {
                 ToastService.Error("Brak zalogowanego użytkownika.");
@@ -368,15 +394,16 @@ namespace Finly.Pages
             }
 
             var p = UserService.GetProfile(uid) ?? new UserProfile();
-            p.CompanyName = NullIfEmpty(TxtCompanyName.Text);
-            p.CompanyNip = NullIfEmpty(TxtCompanyNip.Text);
-            p.CompanyRegon = NullIfEmpty(TxtCompanyRegon.Text);
-            p.CompanyKrs = NullIfEmpty(TxtCompanyKrs.Text);
 
-            var city = NullIfEmpty(TxtCompanyCity.Text);
-            var postal = NullIfEmpty(TxtCompanyPostalCode.Text);
-            var street = NullIfEmpty(TxtCompanyStreet.Text);
-            var house = NullIfEmpty(TxtCompanyHouseNo.Text);
+            p.CompanyName = NullIfEmpty(TxtCompanyName?.Text);
+            p.CompanyNip = NullIfEmpty(TxtCompanyNip?.Text);
+            p.CompanyRegon = NullIfEmpty(TxtCompanyRegon?.Text);
+            p.CompanyKrs = NullIfEmpty(TxtCompanyKrs?.Text);
+
+            var city = NullIfEmpty(TxtCompanyCity?.Text);
+            var postal = NullIfEmpty(TxtCompanyPostalCode?.Text);
+            var street = NullIfEmpty(TxtCompanyStreet?.Text);
+            var house = NullIfEmpty(TxtCompanyHouseNo?.Text);
 
             p.CompanyAddress = BuildCompanyAddress(city, postal, street, house);
 
@@ -385,6 +412,7 @@ namespace Finly.Pages
                 ToastService.Info("Podaj nazwę firmy.");
                 return;
             }
+
             if (string.IsNullOrWhiteSpace(p.CompanyNip))
             {
                 ToastService.Info("Podaj NIP firmy.");
@@ -398,6 +426,8 @@ namespace Finly.Pages
 
                 LoadCompanyDetails();
                 ToggleCompanyEditMode(false);
+
+                _vm.Refresh(); // spójność VM
             }
             catch (Exception ex)
             {
@@ -411,9 +441,9 @@ namespace Finly.Pages
         {
             if (DataContext is not AccountViewModel vm) return;
 
-            var oldPwd = PwdOld.Password;
-            var newPwd = PwdNew.Password;
-            var newPwd2 = PwdNew2.Password;
+            var oldPwd = PwdOld?.Password ?? "";
+            var newPwd = PwdNew?.Password ?? "";
+            var newPwd2 = PwdNew2?.Password ?? "";
 
             vm.ChangePassword(oldPwd, newPwd, newPwd2);
         }
@@ -422,17 +452,19 @@ namespace Finly.Pages
 
         private void ShowDeleteConfirm_Click(object sender, RoutedEventArgs e)
         {
-            DeleteConfirmPanel.Visibility = Visibility.Visible;
+            if (DeleteConfirmPanel != null)
+                DeleteConfirmPanel.Visibility = Visibility.Visible;
         }
 
         private void CancelDelete_Click(object sender, RoutedEventArgs e)
         {
-            DeleteConfirmPanel.Visibility = Visibility.Collapsed;
+            if (DeleteConfirmPanel != null)
+                DeleteConfirmPanel.Visibility = Visibility.Collapsed;
         }
 
         private void DeleteUser_Click(object sender, RoutedEventArgs e)
         {
-            var uid = UserService.GetCurrentUserId();
+            var uid = ResolveUserId();
             if (uid <= 0)
             {
                 ToastService.Error("Brak zalogowanego użytkownika.");

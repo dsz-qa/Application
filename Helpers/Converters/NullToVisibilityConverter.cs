@@ -9,7 +9,6 @@ namespace Finly.Helpers.Converters
     {
         public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
         {
-            // Gdy null albo pusty string → ukryj
             if (value == null) return Visibility.Collapsed;
             if (value is string s && string.IsNullOrWhiteSpace(s))
                 return Visibility.Collapsed;

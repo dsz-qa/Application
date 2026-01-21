@@ -693,62 +693,98 @@ namespace Finly.ViewModels
         {
             var txLabels = new[] { "Wydatki", "Przychody", "Transfery" };
 
-            OverviewCountAxesX = new[] { new Axis { Labels = txLabels } };
-            OverviewCountAxesY = new[] { new Axis { MinLimit = 0 } };
+            // ===== Overview: COUNT =====
+            OverviewCountAxesX = new[] { CreateAxisX(txLabels) };
+            OverviewCountAxesY = new[] { CreateAxisY(min: 0) };
+
             OverviewCountSeries = new ISeries[]
             {
-                new ColumnSeries<double> { Name = "Ilość", Values = new double[] { 0, 0, 0 } }
+        // startowo bez śmieciowych słupków
+        new ColumnSeries<double?>
+        {
+            Name = "Wydatki",
+            Values = new double?[] { null, null, null }
+        }
             };
 
-            OverviewAmountAxesX = new[] { new Axis { Labels = txLabels } };
-            OverviewAmountAxesY = new[] { new Axis { MinLimit = 0 } };
+            // ===== Overview: AMOUNT =====
+            OverviewAmountAxesX = new[] { CreateAxisX(txLabels) };
+            OverviewAmountAxesY = new[] { CreateAxisY(min: 0) };
+
             OverviewAmountSeries = new ISeries[]
             {
-                new ColumnSeries<double> { Name = "Wartość (zł)", Values = new double[] { 0, 0, 0 } }
+        new ColumnSeries<double?>
+        {
+            Name = "Wartość (zł)",
+            Values = new double?[] { null, null, null }
+        }
             };
 
-            BudgetsAxesX = new[] { new Axis { Labels = SafeLabels(null) } };
-            BudgetsAxesY = new[] { new Axis { MinLimit = 0 } };
+            // ===== Budżety =====
+            BudgetsAxesX = new[] { CreateAxisX(SafeLabels(null)) };
+            BudgetsAxesY = new[] { CreateAxisY(min: 0) };
+
             BudgetsSeries = new ISeries[]
             {
-                new ColumnSeries<double> { Name = "Wydano", Values = SafeValues(null) },
-                new ColumnSeries<double> { Name = "Limit",  Values = SafeValues(null) }
+        new ColumnSeries<double> { Name = "Wydano", Values = SafeValues(null) },
+        new ColumnSeries<double> { Name = "Limit",  Values = SafeValues(null) }
             };
 
-            InvestmentsAxesX = new[] { new Axis { Labels = SafeLabels(null) } };
-            InvestmentsAxesY = new[] { new Axis { MinLimit = 0 } };
+            // ===== Inwestycje =====
+            InvestmentsAxesX = new[] { CreateAxisX(SafeLabels(null)) };
+            InvestmentsAxesY = new[] { CreateAxisY(min: 0) };
+
             InvestmentsSeries = new ISeries[]
             {
-                new ColumnSeries<double> { Name = "Zysk/Strata", Values = SafeValues(null) }
+        new ColumnSeries<double> { Name = "Zysk/Strata", Values = SafeValues(null) }
             };
 
+            // ===== Donuty =====
             ExpenseDonutSeries = Array.Empty<ISeries>();
             IncomeDonutSeries = Array.Empty<ISeries>();
             TransferDonutSeries = Array.Empty<ISeries>();
 
-            LoansAxesX = new[] { new Axis { Labels = SafeLabels(null) } };
-            LoansAxesY = new[] { new Axis { MinLimit = 0 } };
+            // ===== Kredyty =====
+            LoansAxesX = new[] { CreateAxisX(SafeLabels(null)) };
+            LoansAxesY = new[] { CreateAxisY(min: 0) };
+
             LoansSeries = new ISeries[]
             {
-                new ColumnSeries<double> { Name = "Spłacono",  Values = SafeValues(null) },
-                new ColumnSeries<double> { Name = "Nadpłaty",  Values = SafeValues(null) },
-                new ColumnSeries<double> { Name = "Pozostało", Values = SafeValues(null) }
+        new ColumnSeries<double> { Name = "Spłacono",  Values = SafeValues(null) },
+        new ColumnSeries<double> { Name = "Nadpłaty",  Values = SafeValues(null) },
+        new ColumnSeries<double> { Name = "Pozostało", Values = SafeValues(null) }
             };
 
-            GoalsAxesX = new[] { new Axis { Labels = SafeLabels(null) } };
-            GoalsAxesY = new[] { new Axis { MinLimit = 0, MaxLimit = 100 } };
+            // ===== Cele =====
+            GoalsAxesX = new[] { CreateAxisX(SafeLabels(null)) };
+            GoalsAxesY = new[] { CreateAxisY(min: 0, max: 100) };
+
             GoalsSeries = new ISeries[]
             {
-                new ColumnSeries<double> { Name = "Postęp (%)", Values = SafeValues(null) }
+        new ColumnSeries<double> { Name = "Postęp (%)", Values = SafeValues(null) }
             };
 
-            SimulationAxesX = new[] { new Axis { Labels = SafeLabels(null) } };
-            SimulationAxesY = new[] { new Axis() };
+            // ===== Symulacja =====
+            SimulationAxesX = new[] { CreateAxisX(SafeLabels(null)) };
+
+            // saldo symulacji może zejść poniżej 0 -> min: null
+            SimulationAxesY = new[] { CreateAxisY(min: null) };
+
             SimulationSeries = new ISeries[]
             {
-                new LineSeries<double> { Name = "Saldo (symulacja)", Values = SafeValues(null) }
+        new LineSeries<double>
+        {
+            Name = "Saldo (symulacja)",
+            Values = SafeValues(null),
+            GeometrySize = 0
+        }
             };
         }
+
+        private static Axis CreateAxisX(string[] labels) => AxisX(labels);
+        private static Axis CreateAxisY(double? min = 0, double? max = null) => AxisY(min, max);
+
+
 
         // =========================
         // Snapshot (heavy work) – tło
@@ -968,32 +1004,51 @@ namespace Finly.ViewModels
         // =========================
         private void ApplySnapshot(ReportsSnapshot s)
         {
-            // ====== 0) Null-safe snapshot ======
             s ??= new ReportsSnapshot();
 
-            // ====== 1) Rows + PreviousRows ======
+            // ===== 1) Rows + PreviousRows =====
             Rows = new ObservableCollection<ReportsService.ReportItem>(s.CurRows ?? new List<ReportsService.ReportItem>());
             PreviousRows = new ObservableCollection<ReportsService.ReportItem>(s.PrevRows ?? new List<ReportsService.ReportItem>());
 
-            // IMPORTANT: po podmianie Rows musimy odbudować CollectionView
             RebuildTransactionsView();
 
-            // ====== 2) KPI – bieżący okres ======
+            // ===== 2) KPI – bieżący okres =====
             TotalExpenses = s.CurExp;
             TotalIncomes = s.CurInc;
             Balance = TotalIncomes - TotalExpenses;
 
-            // ====== 3) KPI – poprzedni okres ======
+            // ===== 3) KPI – poprzedni okres =====
             PreviousTotalExpenses = s.PrevExp;
             PreviousTotalIncomes = s.PrevInc;
             PreviousBalance = PreviousTotalIncomes - PreviousTotalExpenses;
 
-            // ====== 4) Delta ======
+            // ===== 4) Delta =====
             DeltaExpenses = TotalExpenses - PreviousTotalExpenses;
             DeltaIncomes = TotalIncomes - PreviousTotalIncomes;
             DeltaBalance = Balance - PreviousBalance;
 
-            // ====== 5) Podium ======
+            // ===== 4b) Teksty „ludzkie” do kafelka porównania =====
+            // UWAGA: jeśli chcesz pogrubiać same etykiety w XAML (Wydatki/Przychody/Bilans),
+            // to tu zwracamy zdania BEZ "Wydatki:" na początku (patrz sekcja 2).
+            CompareExpensesText = (DeltaExpenses == 0m)
+                ? "bez zmian względem poprzedniego okresu."
+                : (DeltaExpenses > 0m
+                    ? $"wydajesz o {Money(DeltaExpenses)} więcej niż w poprzednim okresie."
+                    : $"wydajesz o {Money(Math.Abs(DeltaExpenses))} mniej niż w poprzednim okresie.");
+
+            CompareIncomesText = (DeltaIncomes == 0m)
+                ? "bez zmian względem poprzedniego okresu."
+                : (DeltaIncomes > 0m
+                    ? $"Twoje wpływy były większe o {Money(DeltaIncomes)} niż w poprzednim okresie."
+                    : $"Twoje wpływy były mniejsze o {Money(Math.Abs(DeltaIncomes))} niż w poprzednim okresie.");
+
+            CompareBalanceText = (DeltaBalance == 0m)
+                ? "bez zmian względem poprzedniego okresu."
+                : (DeltaBalance > 0m
+                    ? $"jesteś na plusie o {Money(DeltaBalance)} względem poprzedniego okresu."
+                    : $"jesteś na minusie o {Money(Math.Abs(DeltaBalance))} względem poprzedniego okresu.");
+
+            // ===== 5) Podium =====
             OverviewTopExpenses.Clear();
             foreach (var x in s.TopExp ?? new List<TxLine>())
                 OverviewTopExpenses.Add(x);
@@ -1013,80 +1068,62 @@ namespace Finly.ViewModels
             TopInc2 = GetAt(incList, 1);
             TopInc3 = GetAt(incList, 2);
 
-            // ====== 6) Wykresy przeglądu (kolory + 3 słupki na osi X) ======
+            // ===== 6) Wykresy przeglądu – KLUCZ: 1 seria z 3 wartościami =====
             var xLabels = new[] { "Wydatki", "Przychody", "Transfery" };
 
-            // półprzezroczyste wypełnienia + mocniejszy stroke (jak na statystykach)
-            var redFill = new SolidColorPaint(new SKColor(255, 60, 60, 150));
-            var redStroke = new SolidColorPaint(new SKColor(255, 60, 60, 230)) { StrokeThickness = 2 };
+            OverviewCountAxesX = new[] { CreateAxisX(xLabels) };
+            OverviewCountAxesY = new[] { CreateAxisY(min: 0) };
 
-            var greenFill = new SolidColorPaint(new SKColor(70, 220, 120, 150));
-            var greenStroke = new SolidColorPaint(new SKColor(70, 220, 120, 230)) { StrokeThickness = 2 };
+            OverviewAmountAxesX = new[] { CreateAxisX(xLabels) };
+            OverviewAmountAxesY = new[] { CreateAxisY(min: 0) };
 
-            var purpleFill = new SolidColorPaint(new SKColor(170, 90, 255, 150));
-            var purpleStroke = new SolidColorPaint(new SKColor(170, 90, 255, 230)) { StrokeThickness = 2 };
-
-            // Osie (ustawiamy tu, żeby nie zostały stare wartości)
-            OverviewCountAxesX = new[] { new Axis { Labels = xLabels } };
-            OverviewCountAxesY = new[] { new Axis { MinLimit = 0 } };
-
-            OverviewAmountAxesX = new[] { new Axis { Labels = xLabels } };
-            OverviewAmountAxesY = new[] { new Axis { MinLimit = 0 } };
-
-            // Seria per typ: 3 wartości (tylko jeden słupek > 0), dzięki temu:
-            // - oś X ma 3 etykiety
-            // - każdy słupek ma swój kolor
+            // Jedna seria -> słupki zawsze centralnie pod labelami
             OverviewCountSeries = new ISeries[]
             {
-        new ColumnSeries<double>
-        {
-            Name = "Wydatki",
-            Values = new double[] { s.CntExp, 0, 0 },
-            Fill = redFill,
-            Stroke = redStroke
-        },
-        new ColumnSeries<double>
-        {
-            Name = "Przychody",
-            Values = new double[] { 0, s.CntInc, 0 },
-            Fill = greenFill,
-            Stroke = greenStroke
-        },
-        new ColumnSeries<double>
-        {
-            Name = "Transfery",
-            Values = new double[] { 0, 0, s.CntTrf },
-            Fill = purpleFill,
-            Stroke = purpleStroke
-        }
+    new StackedColumnSeries<double?>
+    {
+        Name = "Wydatki",
+        Values = new double?[] { s.CntExp, null, null },
+        Fill = new SolidColorPaint(new SKColor(220, 60, 60))   // czerwony
+    },
+    new StackedColumnSeries<double?>
+    {
+        Name = "Przychody",
+        Values = new double?[] { null, s.CntInc, null },
+        Fill = new SolidColorPaint(new SKColor(60, 200, 120))  // zielony
+    },
+    new StackedColumnSeries<double?>
+    {
+        Name = "Transfery",
+        Values = new double?[] { null, null, s.CntTrf },
+        Fill = new SolidColorPaint(new SKColor(160, 90, 255))  // fiolet
+    }
             };
 
             OverviewAmountSeries = new ISeries[]
             {
-        new ColumnSeries<double>
-        {
-            Name = "Wydatki",
-            Values = new double[] { s.SumExp, 0, 0 },
-            Fill = redFill,
-            Stroke = redStroke
-        },
-        new ColumnSeries<double>
-        {
-            Name = "Przychody",
-            Values = new double[] { 0, s.SumInc, 0 },
-            Fill = greenFill,
-            Stroke = greenStroke
-        },
-        new ColumnSeries<double>
-        {
-            Name = "Transfery",
-            Values = new double[] { 0, 0, s.SumTrf },
-            Fill = purpleFill,
-            Stroke = purpleStroke
-        }
+    new StackedColumnSeries<double?>
+    {
+        Name = "Wydatki",
+        Values = new double?[] { s.SumExp, null, null },
+        Fill = new SolidColorPaint(new SKColor(220, 60, 60))
+    },
+    new StackedColumnSeries<double?>
+    {
+        Name = "Przychody",
+        Values = new double?[] { null, s.SumInc, null },
+        Fill = new SolidColorPaint(new SKColor(60, 200, 120))
+    },
+    new StackedColumnSeries<double?>
+    {
+        Name = "Transfery",
+        Values = new double?[] { null, null, s.SumTrf },
+        Fill = new SolidColorPaint(new SKColor(160, 90, 255))
+    }
             };
 
-            // ====== 7) Budżety ======
+
+            // ===== 7) Budżety =====
             Budgets.Clear();
             foreach (var b in s.Budgets ?? new List<BudgetRow>())
                 Budgets.Add(b);
@@ -1095,25 +1132,26 @@ namespace Finly.ViewModels
             var bs = (s.BudgetSpent != null && s.BudgetSpent.Length > 0) ? s.BudgetSpent : new[] { 0d };
             var bl = (s.BudgetLimit != null && s.BudgetLimit.Length > 0) ? s.BudgetLimit : new[] { 0d };
 
-            BudgetsAxesX = new[] { new Axis { Labels = bx } };
-            BudgetsAxesY = new[] { new Axis { MinLimit = 0 } };
+            BudgetsAxesX = new[] { CreateAxisX(bx) };
+            BudgetsAxesY = new[] { CreateAxisY(min: 0) };
+
             BudgetsSeries = new ISeries[]
             {
         new ColumnSeries<double> { Name = "Wydano", Values = bs },
         new ColumnSeries<double> { Name = "Limit",  Values = bl }
             };
 
-            // ====== 8) Kredyty ======
+            // ===== 8) Kredyty =====
             Loans.Clear();
             foreach (var l in s.Loans ?? new List<LoanRow>())
                 Loans.Add(l);
 
-            // ====== 9) Cele ======
+            // ===== 9) Cele =====
             Goals.Clear();
             foreach (var g in s.Goals ?? new List<GoalRow>())
                 Goals.Add(g);
 
-            // ====== 10) Symulacja ======
+            // ===== 10) Symulacja =====
             PlannedSim.Clear();
             foreach (var p in (s.Planned ?? new List<PlannedRow>()).OrderBy(x => x.Date))
                 PlannedSim.Add(p);
@@ -1123,22 +1161,26 @@ namespace Finly.ViewModels
             var simX = (s.SimLabels != null && s.SimLabels.Length > 0) ? s.SimLabels : new[] { "" };
             var simY = (s.SimValues != null && s.SimValues.Length > 0) ? s.SimValues : new[] { 0d };
 
-            SimulationAxesX = new[] { new Axis { Labels = simX } };
-            SimulationAxesY = new[] { new Axis() };
+            SimulationAxesX = new[] { CreateAxisX(simX) };
+            SimulationAxesY = new[] { CreateAxisY(min: null) };
+
             SimulationSeries = new ISeries[]
             {
         new LineSeries<double>
         {
             Name = "Saldo (symulacja)",
-            Values = simY
+            Values = simY,
+            GeometrySize = 0
         }
             };
 
-            // ====== 11) Donuty – na razie puste ======
+            // ===== 11) Donuty =====
             ExpenseDonutSeries = Array.Empty<ISeries>();
             IncomeDonutSeries = Array.Empty<ISeries>();
             TransferDonutSeries = Array.Empty<ISeries>();
         }
+
+
 
 
 
@@ -1162,6 +1204,78 @@ namespace Finly.ViewModels
         {
             var arr = labels?.ToArray() ?? Array.Empty<string>();
             return arr.Length == 0 ? new[] { "" } : arr;
+        }
+
+        private static Axis AxisX(string[] labels)
+        {
+            return new Axis
+            {
+                Labels = labels,
+                SeparatorsAtCenter = true,
+
+                LabelsPaint = new SolidColorPaint(SKColors.White),
+                NamePaint = new SolidColorPaint(SKColors.White),
+                SeparatorsPaint = new SolidColorPaint(new SKColor(255, 255, 255, 35)),
+                TicksPaint = new SolidColorPaint(new SKColor(255, 255, 255, 60)),
+                TextSize = 12
+            };
+        }
+
+
+        private static Axis AxisY(double? min = 0, double? max = null)
+        {
+            return new Axis
+            {
+                MinLimit = min,
+                MaxLimit = max,
+                LabelsPaint = new SolidColorPaint(SKColors.White),
+                NamePaint = new SolidColorPaint(SKColors.White),
+                SeparatorsPaint = new SolidColorPaint(new SKColor(255, 255, 255, 35)),
+                TicksPaint = new SolidColorPaint(new SKColor(255, 255, 255, 60)),
+                TextSize = 12
+            };
+        }
+
+        private string _compareExpensesText = "";
+        public string CompareExpensesText
+        {
+            get => _compareExpensesText;
+            set
+            {
+                if (_compareExpensesText != value)
+                {
+                    _compareExpensesText = value;
+                    Raise(nameof(CompareExpensesText));
+                }
+            }
+        }
+
+        private string _compareIncomesText = "";
+        public string CompareIncomesText
+        {
+            get => _compareIncomesText;
+            set
+            {
+                if (_compareIncomesText != value)
+                {
+                    _compareIncomesText = value;
+                    Raise(nameof(CompareIncomesText));
+                }
+            }
+        }
+
+        private string _compareBalanceText = "";
+        public string CompareBalanceText
+        {
+            get => _compareBalanceText;
+            set
+            {
+                if (_compareBalanceText != value)
+                {
+                    _compareBalanceText = value;
+                    Raise(nameof(CompareBalanceText));
+                }
+            }
         }
 
         private static double[] SafeValues(IEnumerable<double>? values)

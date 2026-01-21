@@ -2,9 +2,6 @@ using System;
 
 namespace Finly.Models
 {
-    /// <summary>
-    /// Prosty model pojedynczej raty kredytu (do listy i/lub zapisu w DB).
-    /// </summary>
     public sealed class LoanInstallmentRow
     {
         public DateTime Date { get; init; }

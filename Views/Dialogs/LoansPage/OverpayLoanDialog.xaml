@@ -1,0 +1,134 @@
+﻿<Window x:Class="Finly.Views.Dialogs.OverpayLoanDialog"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:shell="clr-namespace:System.Windows.Shell;assembly=PresentationFramework"
+        Title="Nadpłata"
+        WindowStartupLocation="CenterOwner"
+        SizeToContent="WidthAndHeight"
+        ResizeMode="NoResize"
+        WindowStyle="None"
+        Background="{DynamicResource App.Background}"
+        Foreground="{DynamicResource App.Foreground}"
+        Icon="/Assets/Icons/logoFinly.ico">
+
+    <shell:WindowChrome.WindowChrome>
+        <shell:WindowChrome CaptionHeight="40"
+                            ResizeBorderThickness="0"
+                            CornerRadius="0"
+                            UseAeroCaptionButtons="False"/>
+    </shell:WindowChrome.WindowChrome>
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="40"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <Grid Grid.Row="0"
+              Background="{DynamicResource TitleBar.Background}"
+              MouseLeftButtonDown="TitleBar_MouseLeftButtonDown">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition/>
+                <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
+
+            <TextBlock x:Name="TitleText"
+                       Text="Nadpłata kredytu"
+                       VerticalAlignment="Center"
+                       Margin="12,0,0,0"
+                       Foreground="{DynamicResource App.Foreground}"
+                       FontSize="13"
+                       shell:WindowChrome.IsHitTestVisibleInChrome="True"/>
+
+            <StackPanel Grid.Column="1" Orientation="Horizontal">
+                <Button Width="46" Height="32" Padding="0"
+                        Background="Transparent"
+                        BorderBrush="{x:Null}"
+                        Foreground="{DynamicResource App.Foreground}"
+                        Cursor="Hand"
+                        FocusVisualStyle="{x:Null}"
+                        shell:WindowChrome.IsHitTestVisibleInChrome="True"
+                        Click="Close_Click">
+                    <TextBlock Text="✕" FontSize="12"
+                               HorizontalAlignment="Center"
+                               VerticalAlignment="Center"/>
+                </Button>
+            </StackPanel>
+        </Grid>
+
+        <Border Grid.Row="1"
+                Margin="14"
+                Padding="16"
+                Background="{DynamicResource App.Background}"
+                BorderBrush="{DynamicResource Surface.Border}"
+                BorderThickness="1"
+                CornerRadius="12"
+                MinWidth="520">
+
+            <Border Padding="16"
+                    Background="{DynamicResource Surface.Background}"
+                    BorderBrush="{DynamicResource Surface.Border}"
+                    BorderThickness="1"
+                    CornerRadius="10">
+
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="12"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="18"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+
+                    <TextBlock x:Name="HeaderText"
+                               Text="Wprowadź kwotę nadpłaty"
+                               FontSize="18"
+                               FontWeight="Bold"
+                               Foreground="{DynamicResource App.Foreground}"/>
+
+                    <StackPanel Grid.Row="2">
+                        <TextBlock Text="Kwota nadpłaty:"
+                                   Opacity="0.85"
+                                   Foreground="{DynamicResource App.Foreground}"/>
+                        <TextBox x:Name="AmountTextBox"
+                                 MinWidth="260"
+                                 VerticalContentAlignment="Center"
+                                 TextChanged="AmountTextBox_TextChanged"/>
+
+                        <TextBlock x:Name="InlineErrorText"
+                                   Text=""
+                                   Foreground="Tomato"
+                                   FontSize="12"
+                                   Margin="2,4,0,0"
+                                   Visibility="Collapsed"/>
+                    </StackPanel>
+
+                    <TextBlock Grid.Row="3"
+                               x:Name="HintText"
+                               Text="Zatwierdzenie spowoduje zapis nadpłaty w kredycie (logika pozostaje po stronie LoansPage)."
+                               Opacity="0.7"
+                               TextWrapping="Wrap"
+                               Foreground="{DynamicResource App.Foreground}"
+                               Margin="0,10,0,0"/>
+
+                    <StackPanel Grid.Row="5"
+                                Orientation="Horizontal"
+                                HorizontalAlignment="Right">
+                        <Button Content="Anuluj"
+                                Style="{StaticResource SecondaryButton}"
+                                IsCancel="True"
+                                Click="Cancel_Click"/>
+
+                        <Button Content="Zatwierdź"
+                                Style="{StaticResource PrimaryButton}"
+                                Margin="8,0,0,0"
+                                IsDefault="True"
+                                Click="Ok_Click"/>
+                    </StackPanel>
+                </Grid>
+            </Border>
+        </Border>
+    </Grid>
+</Window>
+

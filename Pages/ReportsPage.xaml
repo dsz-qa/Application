@@ -3,7 +3,7 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:controls="clr-namespace:Finly.Views.Controls"
              xmlns:lvc="clr-namespace:LiveChartsCore.SkiaSharpView.WPF;assembly=LiveChartsCore.SkiaSharpView.WPF"
-             xmlns:vm="clr-namespace:Finly.ViewModels"
+             xmlns:rp="clr-namespace:Finly.Views.Controls.ReportsPageControls"
              x:Name="Root"
              Background="{DynamicResource App.Background}"
              SnapsToDevicePixels="True"
@@ -12,803 +12,357 @@
              TextOptions.TextRenderingMode="ClearType"
              Foreground="{DynamicResource App.Foreground}">
 
-    <UserControl.Resources>
+	<UserControl.Resources>
 
-        <!-- ===================== MINI TABLE STYLES (jak Dashboard) ===================== -->
+		<!-- ===================== MINI TABLE STYLES ===================== -->
+		<Style x:Key="MiniTableCellText" TargetType="TextBlock">
+			<Setter Property="Foreground" Value="{DynamicResource App.Foreground}"/>
+			<Setter Property="VerticalAlignment" Value="Center"/>
+			<Setter Property="Margin" Value="6,2,6,2"/>
+			<Setter Property="TextTrimming" Value="CharacterEllipsis"/>
+			<Setter Property="TextWrapping" Value="NoWrap"/>
+		</Style>
 
-        <Style x:Key="MiniTableCellText" TargetType="TextBlock">
-            <Setter Property="Foreground" Value="{DynamicResource App.Foreground}"/>
-            <Setter Property="VerticalAlignment" Value="Center"/>
-            <Setter Property="Margin" Value="6,2,6,2"/>
-            <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
-            <Setter Property="TextWrapping" Value="NoWrap"/>
-        </Style>
+		<Style x:Key="MiniTableHeaderBorder" TargetType="Border">
+			<Setter Property="Background" Value="{DynamicResource Surface.Background}"/>
+			<Setter Property="Padding" Value="6,4"/>
+			<Setter Property="Margin" Value="0,0,0,6"/>
+			<Setter Property="CornerRadius" Value="6"/>
+		</Style>
 
-        <Style x:Key="MiniTableCellSingleLine" TargetType="TextBlock" BasedOn="{StaticResource MiniTableCellText}">
-            <Setter Property="TextWrapping" Value="NoWrap"/>
-            <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
-        </Style>
+		<Style x:Key="MiniTableHeaderText" TargetType="TextBlock">
+			<Setter Property="FontSize" Value="11"/>
+			<Setter Property="FontWeight" Value="SemiBold"/>
+			<Setter Property="Foreground" Value="{DynamicResource App.Foreground}"/>
+			<Setter Property="Opacity" Value="0.85"/>
+			<Setter Property="Margin" Value="6,0,6,0"/>
+		</Style>
 
-        <Style x:Key="MiniTableCellWrap" TargetType="TextBlock" BasedOn="{StaticResource MiniTableCellText}">
-            <Setter Property="TextWrapping" Value="Wrap"/>
-            <Setter Property="TextTrimming" Value="None"/>
-        </Style>
+		<!-- ===================== CARDS ===================== -->
+		<Style x:Key="Card" TargetType="Border">
+			<Setter Property="Background" Value="Transparent"/>
+			<Setter Property="BorderBrush" Value="{DynamicResource Surface.Border}"/>
+			<Setter Property="BorderThickness" Value="1"/>
+			<Setter Property="CornerRadius" Value="10"/>
+			<Setter Property="Padding" Value="12"/>
+		</Style>
 
-        <Style x:Key="MiniTableHeaderBorder" TargetType="Border">
-            <Setter Property="Background" Value="{DynamicResource Surface.Background}"/>
-            <Setter Property="Padding" Value="6,4"/>
-            <Setter Property="Margin" Value="0,0,0,6"/>
-            <Setter Property="CornerRadius" Value="6"/>
-        </Style>
+		<Style x:Key="AccentCard" TargetType="Border" BasedOn="{StaticResource Card}">
+			<Setter Property="BorderBrush" Value="{DynamicResource Brand.Blue}"/>
+			<Setter Property="BorderThickness" Value="2"/>
+		</Style>
 
-        <Style x:Key="MiniTableHeaderText" TargetType="TextBlock">
-            <Setter Property="FontSize" Value="11"/>
-            <Setter Property="FontWeight" Value="SemiBold"/>
-            <Setter Property="Foreground" Value="{DynamicResource App.Foreground}"/>
-            <Setter Property="Opacity" Value="0.8"/>
-            <Setter Property="Margin" Value="6,0,6,0"/>
-        </Style>
+		<Style x:Key="CardHeader" TargetType="TextBlock">
+			<Setter Property="FontSize" Value="13"/>
+			<Setter Property="FontWeight" Value="SemiBold"/>
+			<Setter Property="Foreground" Value="{DynamicResource App.Foreground}"/>
+			<Setter Property="Opacity" Value="0.9"/>
+			<Setter Property="TextWrapping" Value="Wrap"/>
+		</Style>
 
-        <!-- ===================== CARDS / KPI (spójnie, lżej jak Dashboard) ===================== -->
+		<!-- ===================== LIVECHARTS ===================== -->
+		<Style x:Key="BaseCartesianChart" TargetType="{x:Type lvc:CartesianChart}">
+			<Setter Property="Background" Value="Transparent"/>
+			<Setter Property="Foreground" Value="{DynamicResource App.Foreground}"/>
+			<Setter Property="LegendPosition" Value="Hidden"/>
+			<Setter Property="DrawMargin" Value="42,10,10,40"/>
+			<Setter Property="AnimationsSpeed" Value="0:0:0.35"/>
+			<Setter Property="ZoomMode" Value="None"/>
+			<Setter Property="HorizontalAlignment" Value="Stretch"/>
+			<Setter Property="VerticalAlignment" Value="Stretch"/>
+		</Style>
 
-        <Style x:Key="Card" TargetType="Border">
-            <Setter Property="Background" Value="Transparent"/>
-            <Setter Property="BorderBrush" Value="{DynamicResource Surface.Border}"/>
-            <Setter Property="BorderThickness" Value="1"/>
-            <Setter Property="CornerRadius" Value="10"/>
-            <Setter Property="Padding" Value="12"/>
-        </Style>
-
-        <Style x:Key="AccentCard" TargetType="Border" BasedOn="{StaticResource Card}">
-            <Setter Property="BorderBrush" Value="{DynamicResource Brand.Blue}"/>
-            <Setter Property="BorderThickness" Value="2"/>
-        </Style>
-
-        <Style x:Key="CardHeader" TargetType="TextBlock">
-            <Setter Property="FontSize" Value="13"/>
-            <Setter Property="FontWeight" Value="SemiBold"/>
-            <Setter Property="Foreground" Value="{DynamicResource App.Foreground}"/>
-            <Setter Property="Opacity" Value="0.9"/>
-            <Setter Property="TextWrapping" Value="Wrap"/>
-        </Style>
-
-        <Style x:Key="KpiValueStyle" TargetType="TextBlock">
-            <Setter Property="FontSize" Value="18"/>
-            <Setter Property="FontWeight" Value="Bold"/>
-            <Setter Property="Foreground" Value="{DynamicResource App.Foreground}"/>
-            <Setter Property="TextWrapping" Value="Wrap"/>
-        </Style>
-
-        <Style x:Key="KpiInlineLabel" TargetType="TextBlock" BasedOn="{StaticResource KpiValueStyle}">
-            <Setter Property="Margin" Value="0,0,6,6"/>
-        </Style>
-
-        <Style x:Key="KpiInlineValueNormal" TargetType="TextBlock" BasedOn="{StaticResource KpiValueStyle}">
-            <Setter Property="FontWeight" Value="Normal"/>
-            <Setter Property="Opacity" Value="0.85"/>
-            <Setter Property="Margin" Value="0,0,0,6"/>
-        </Style>
-
-        <Style x:Key="KpiSubHeader" TargetType="TextBlock" BasedOn="{StaticResource CardHeader}">
-            <Setter Property="Opacity" Value="0.75"/>
-            <Setter Property="Margin" Value="0,4,0,10"/>
-        </Style>
-
-        <!-- ===================== LIVECHARTS ===================== -->
-        <Style x:Key="BaseCartesianChart" TargetType="{x:Type lvc:CartesianChart}">
-            <Setter Property="Background" Value="Transparent"/>
-            <Setter Property="Foreground" Value="{DynamicResource App.Foreground}"/>
-            <Setter Property="LegendPosition" Value="Hidden"/>
-            <Setter Property="DrawMargin" Value="46,16,16,34"/>
-            <Setter Property="AnimationsSpeed" Value="0:0:0.35"/>
-        </Style>
-
-        <!-- ===================== TABCONTROL ===================== -->
-        <Style x:Key="ReportsTabControlStyle" TargetType="TabControl">
-            <Setter Property="Background" Value="Transparent"/>
-            <Setter Property="BorderThickness" Value="0"/>
-            <Setter Property="Padding" Value="0"/>
-            <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
-            <Setter Property="VerticalContentAlignment" Value="Stretch"/>
-            <Setter Property="Template">
-                <Setter.Value>
-                    <ControlTemplate TargetType="TabControl">
-                        <Grid SnapsToDevicePixels="True">
-                            <Grid.RowDefinitions>
-                                <RowDefinition Height="64"/>
-                                <RowDefinition Height="*"/>
-                            </Grid.RowDefinitions>
-
-                            <Border Grid.Row="0"
-                                    Background="{DynamicResource Surface.Background}"
-                                    BorderBrush="{DynamicResource Surface.Border}"
-                                    BorderThickness="1"
-                                    CornerRadius="10"
-                                    Padding="6"
-                                    SnapsToDevicePixels="True">
-                                <UniformGrid Rows="1"
-                                             IsItemsHost="True"
-                                             VerticalAlignment="Stretch"
-                                             HorizontalAlignment="Stretch"/>
-                            </Border>
-
-                            <Border Grid.Row="1" Background="Transparent" Padding="0">
-                                <ContentPresenter x:Name="PART_SelectedContentHost"
-                                                  ContentSource="SelectedContent"
-                                                  HorizontalAlignment="Stretch"
-                                                  VerticalAlignment="Stretch"/>
-                            </Border>
-                        </Grid>
-                    </ControlTemplate>
-                </Setter.Value>
-            </Setter>
-        </Style>
-
-        <Style x:Key="ReportsTabItemStyle" TargetType="TabItem">
-            <Setter Property="FontSize" Value="15"/>
-            <Setter Property="FontWeight" Value="Bold"/>
-            <Setter Property="Foreground" Value="White"/>
-            <Setter Property="Background" Value="{DynamicResource Brand.Blue}"/>
-            <Setter Property="BorderBrush" Value="Transparent"/>
-            <Setter Property="BorderThickness" Value="3"/>
-            <Setter Property="Padding" Value="10,0"/>
-            <Setter Property="Margin" Value="4,0,4,0"/>
-            <Setter Property="Cursor" Value="Hand"/>
-            <Setter Property="HorizontalContentAlignment" Value="Center"/>
-            <Setter Property="VerticalContentAlignment" Value="Center"/>
-            <Setter Property="VerticalAlignment" Value="Stretch"/>
-            <Setter Property="HorizontalAlignment" Value="Stretch"/>
-            <Setter Property="Template">
-                <Setter.Value>
-                    <ControlTemplate TargetType="TabItem">
-                        <Border x:Name="Bd"
-                                Background="{TemplateBinding Background}"
-                                BorderBrush="{TemplateBinding BorderBrush}"
-                                BorderThickness="{TemplateBinding BorderThickness}"
-                                SnapsToDevicePixels="True">
-                            <ContentPresenter ContentSource="Header"
-                                              HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
-                                              VerticalAlignment="{TemplateBinding VerticalContentAlignment}"
-                                              RecognizesAccessKey="True"/>
-                        </Border>
-                        <ControlTemplate.Triggers>
-                            <Trigger Property="IsEnabled" Value="False">
-                                <Setter TargetName="Bd" Property="Opacity" Value="0.55"/>
-                            </Trigger>
-                            <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="Bd" Property="Opacity" Value="0.92"/>
-                            </Trigger>
-                            <Trigger Property="IsSelected" Value="True">
-                                <Setter TargetName="Bd" Property="BorderBrush" Value="{DynamicResource Separator.Orange}"/>
-                            </Trigger>
-                        </ControlTemplate.Triggers>
-                    </ControlTemplate>
-                </Setter.Value>
-            </Setter>
-        </Style>
-
-        <!-- ===================== FILTRY (toggle) ===================== -->
-        <Style x:Key="ModeFilterButton" TargetType="ToggleButton">
-            <Setter Property="MinWidth" Value="140"/>
-            <Setter Property="Height" Value="46"/>
-            <Setter Property="Background" Value="{DynamicResource Brand.Blue}"/>
-            <Setter Property="Foreground" Value="White"/>
-            <Setter Property="BorderBrush" Value="{DynamicResource Brand.Blue}"/>
-            <Setter Property="BorderThickness" Value="2"/>
-            <Setter Property="Cursor" Value="Hand"/>
-            <Setter Property="FontWeight" Value="SemiBold"/>
-            <Setter Property="Margin" Value="6,0,6,0"/>
-            <Setter Property="Template">
-                <Setter.Value>
-                    <ControlTemplate TargetType="ToggleButton">
-                        <Border x:Name="Bd"
+		<!-- ===================== FILTRY (toggle) ===================== -->
+		<Style x:Key="ModeFilterButton" TargetType="ToggleButton">
+			<Setter Property="MinWidth" Value="150"/>
+			<Setter Property="Height" Value="46"/>
+			<Setter Property="Background" Value="{DynamicResource Brand.Blue}"/>
+			<Setter Property="Foreground" Value="White"/>
+			<Setter Property="BorderBrush" Value="{DynamicResource Brand.Blue}"/>
+			<Setter Property="BorderThickness" Value="2"/>
+			<Setter Property="Cursor" Value="Hand"/>
+			<Setter Property="FontWeight" Value="SemiBold"/>
+			<Setter Property="Margin" Value="6,0,6,0"/>
+			<Setter Property="Template">
+				<Setter.Value>
+					<ControlTemplate TargetType="ToggleButton">
+						<Border x:Name="Bd"
                                 Background="{TemplateBinding Background}"
                                 BorderBrush="{TemplateBinding BorderBrush}"
                                 BorderThickness="{TemplateBinding BorderThickness}"
                                 CornerRadius="8"
                                 Padding="10,6">
-                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                        </Border>
-                        <ControlTemplate.Triggers>
-                            <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="Bd" Property="Opacity" Value="0.95"/>
-                            </Trigger>
-                            <Trigger Property="IsChecked" Value="True">
-                                <Setter TargetName="Bd" Property="BorderBrush" Value="{DynamicResource Separator.Orange}"/>
-                            </Trigger>
-                            <Trigger Property="IsEnabled" Value="False">
-                                <Setter TargetName="Bd" Property="Opacity" Value="0.55"/>
-                            </Trigger>
-                        </ControlTemplate.Triggers>
-                    </ControlTemplate>
-                </Setter.Value>
-            </Setter>
-        </Style>
+							<ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+						</Border>
+						<ControlTemplate.Triggers>
+							<Trigger Property="IsMouseOver" Value="True">
+								<Setter TargetName="Bd" Property="Opacity" Value="0.95"/>
+							</Trigger>
+							<Trigger Property="IsChecked" Value="True">
+								<Setter TargetName="Bd" Property="BorderBrush" Value="{DynamicResource Separator.Orange}"/>
+							</Trigger>
+							<Trigger Property="IsEnabled" Value="False">
+								<Setter TargetName="Bd" Property="Opacity" Value="0.55"/>
+							</Trigger>
+						</ControlTemplate.Triggers>
+					</ControlTemplate>
+				</Setter.Value>
+			</Setter>
+		</Style>
 
-        <!-- ===================== Tabela transakcji (jak Dashboard: SharedSizeGroup) ===================== -->
+		<!-- ===================== Podium ===================== -->
+		<Style x:Key="PodiumRank" TargetType="TextBlock">
+			<Setter Property="FontSize" Value="18"/>
+			<Setter Property="FontWeight" Value="Bold"/>
+			<Setter Property="Opacity" Value="0.85"/>
+			<Setter Property="Margin" Value="0,0,0,6"/>
+			<Setter Property="HorizontalAlignment" Value="Center"/>
+			<Setter Property="TextAlignment" Value="Center"/>
+		</Style>
 
-        <DataTemplate x:Key="TxTableHeaderTemplate">
-            <Border Style="{StaticResource MiniTableHeaderBorder}">
-                <Grid>
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition SharedSizeGroup="cDateR" Width="120"/>
-                        <ColumnDefinition SharedSizeGroup="cTypeR" Width="110"/>
-                        <ColumnDefinition SharedSizeGroup="cCategoryR" Width="180"/>
-                        <ColumnDefinition SharedSizeGroup="cAccountR" Width="200"/>
-                        <ColumnDefinition SharedSizeGroup="cAmountR" Width="110"/>
-                    </Grid.ColumnDefinitions>
+		<Style x:Key="PodiumCategory" TargetType="TextBlock">
+			<Setter Property="FontSize" Value="12"/>
+			<Setter Property="FontWeight" Value="SemiBold"/>
+			<Setter Property="TextWrapping" Value="Wrap"/>
+			<Setter Property="TextTrimming" Value="CharacterEllipsis"/>
+			<Setter Property="Opacity" Value="0.95"/>
+			<Setter Property="HorizontalAlignment" Value="Center"/>
+			<Setter Property="TextAlignment" Value="Center"/>
+		</Style>
 
-                    <TextBlock Grid.Column="0" Text="Data" Style="{StaticResource MiniTableHeaderText}"/>
-                    <TextBlock Grid.Column="1" Text="Typ" Style="{StaticResource MiniTableHeaderText}"/>
-                    <TextBlock Grid.Column="2" Text="Kategoria" Style="{StaticResource MiniTableHeaderText}"/>
+		<Style x:Key="PodiumAmount" TargetType="TextBlock">
+			<Setter Property="FontSize" Value="15"/>
+			<Setter Property="FontWeight" Value="Bold"/>
+			<Setter Property="Margin" Value="0,8,0,0"/>
+			<Setter Property="HorizontalAlignment" Value="Center"/>
+			<Setter Property="TextAlignment" Value="Center"/>
+		</Style>
 
-                    <!-- UWAGA: bez Style="..." na zewnątrz -> koniec XLS0501 -->
-                    <TextBlock Grid.Column="3">
-                        <TextBlock.Style>
-                            <Style TargetType="TextBlock" BasedOn="{StaticResource MiniTableHeaderText}">
-                                <Setter Property="Text" Value="Konto"/>
-                                <Style.Triggers>
-                                    <DataTrigger Binding="{Binding SelectedTxFilter}" Value="{x:Static vm:ReportsViewModel+TxFilter.Expenses}">
-                                        <Setter Property="Text" Value="Z konta"/>
-                                    </DataTrigger>
-                                    <DataTrigger Binding="{Binding SelectedTxFilter}" Value="{x:Static vm:ReportsViewModel+TxFilter.Incomes}">
-                                        <Setter Property="Text" Value="Na konto"/>
-                                    </DataTrigger>
-                                    <DataTrigger Binding="{Binding SelectedTxFilter}" Value="{x:Static vm:ReportsViewModel+TxFilter.Transfers}">
-                                        <Setter Property="Text" Value="Transfer"/>
-                                    </DataTrigger>
-                                </Style.Triggers>
-                            </Style>
-                        </TextBlock.Style>
-                    </TextBlock>
+		<!-- ===================== Tabs (TabControl) ===================== -->
+		<Style x:Key="ReportsTabControl" TargetType="TabControl">
+			<Setter Property="Background" Value="Transparent"/>
+			<Setter Property="BorderThickness" Value="0"/>
+			<Setter Property="Padding" Value="0"/>
+			<Setter Property="Template">
+				<Setter.Value>
+					<ControlTemplate TargetType="TabControl">
+						<Grid>
+							<Grid.RowDefinitions>
+								<RowDefinition Height="Auto"/>
+								<RowDefinition Height="*"/>
+							</Grid.RowDefinitions>
 
-                    <TextBlock Grid.Column="4"
-                               Text="Kwota"
-                               Style="{StaticResource MiniTableHeaderText}"
-                               HorizontalAlignment="Right"
-                               TextAlignment="Right"/>
-                </Grid>
-            </Border>
-        </DataTemplate>
+							<!-- pasek zakładek -->
+							<Border Background="Transparent" Grid.Row="0">
+								<TabPanel x:Name="HeaderPanel"
+                                          IsItemsHost="True"
+                                          HorizontalAlignment="Center"
+                                          Margin="0,0,0,10"/>
+							</Border>
 
-        <DataTemplate x:Key="TxTableRowTemplate">
-            <Grid Margin="0,2" VerticalAlignment="Top" MinHeight="24">
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition SharedSizeGroup="cDateR" Width="120"/>
-                    <ColumnDefinition SharedSizeGroup="cTypeR" Width="110"/>
-                    <ColumnDefinition SharedSizeGroup="cCategoryR" Width="180"/>
-                    <ColumnDefinition SharedSizeGroup="cAccountR" Width="200"/>
-                    <ColumnDefinition SharedSizeGroup="cAmountR" Width="110"/>
-                </Grid.ColumnDefinitions>
+							<!-- treść -->
+							<ContentPresenter Grid.Row="1"
+                                              ContentSource="SelectedContent"/>
+						</Grid>
+					</ControlTemplate>
+				</Setter.Value>
+			</Setter>
+		</Style>
 
-                <TextBlock Grid.Column="0"
-                           Text="{Binding Date, StringFormat={}{0:dd.MM.yyyy}}"
-                           Style="{StaticResource MiniTableCellSingleLine}"/>
+		<!-- Zakładki: prostokąt, zawsze niebieskie wypełnienie, po wyborze pomarańczowa ramka -->
+		<Style x:Key="ReportsTabItem" TargetType="TabItem">
+			<Setter Property="Foreground" Value="White"/>
+			<Setter Property="FontWeight" Value="SemiBold"/>
+			<Setter Property="Margin" Value="6,0,6,0"/>
+			<Setter Property="Padding" Value="16,10"/>
+			<Setter Property="Background" Value="{DynamicResource Brand.Blue}"/>
+			<Setter Property="BorderBrush" Value="{DynamicResource Brand.Blue}"/>
+			<Setter Property="BorderThickness" Value="2"/>
+			<Setter Property="Template">
+				<Setter.Value>
+					<ControlTemplate TargetType="TabItem">
+						<Border x:Name="Bd"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="0"
+                                Padding="{TemplateBinding Padding}">
+							<ContentPresenter ContentSource="Header"
+                                              HorizontalAlignment="Center"
+                                              VerticalAlignment="Center"/>
+						</Border>
 
-                <TextBlock Grid.Column="1"
-                           Text="{Binding Type}"
-                           Style="{StaticResource MiniTableCellSingleLine}"/>
+						<ControlTemplate.Triggers>
+							<Trigger Property="IsSelected" Value="True">
+								<Setter TargetName="Bd" Property="BorderBrush" Value="{DynamicResource Separator.Orange}"/>
+								<Setter TargetName="Bd" Property="BorderThickness" Value="3"/>
+							</Trigger>
 
-                <TextBlock Grid.Column="2"
-                           Text="{Binding Category}"
-                           Style="{StaticResource MiniTableCellSingleLine}"
-                           ToolTip="{Binding Category}"/>
+							<Trigger Property="IsMouseOver" Value="True">
+								<Setter TargetName="Bd" Property="Opacity" Value="0.95"/>
+							</Trigger>
 
-                <!-- Konto / Transfer format -->
-                <TextBlock Grid.Column="3"
-                           ToolTip="{Binding Account}">
-                    <TextBlock.Style>
-                        <Style TargetType="TextBlock" BasedOn="{StaticResource MiniTableCellSingleLine}">
-                            <Setter Property="Text" Value="{Binding Account}"/>
-                            <Style.Triggers>
-                                <DataTrigger Binding="{Binding Type}" Value="Transfer">
-                                    <Setter Property="Text" Value="{Binding Account, StringFormat=Transfer: Konto. {0}}"/>
-                                </DataTrigger>
-                            </Style.Triggers>
-                        </Style>
-                    </TextBlock.Style>
-                </TextBlock>
+							<Trigger Property="IsEnabled" Value="False">
+								<Setter TargetName="Bd" Property="Opacity" Value="0.55"/>
+							</Trigger>
+						</ControlTemplate.Triggers>
+					</ControlTemplate>
+				</Setter.Value>
+			</Setter>
+		</Style>
 
-                <TextBlock Grid.Column="4"
-                           Text="{Binding Amount, StringFormat={}{0:N2} zł}"
-                           Style="{StaticResource MiniTableCellSingleLine}"
-                           HorizontalAlignment="Right"
-                           TextAlignment="Right"/>
-            </Grid>
-        </DataTemplate>
+	</UserControl.Resources>
 
-    </UserControl.Resources>
+	<!-- Kluczowe: ScrollViewer tylko do całej strony (OK),
+         a w samym OverviewTab masz MiniTable z własnym scrollowaniem. -->
+	<ScrollViewer VerticalScrollBarVisibility="Auto"
+                  HorizontalScrollBarVisibility="Disabled"
+                  PanningMode="VerticalOnly">
 
-    <!-- ===================== MAIN LAYOUT ===================== -->
-    <Grid Margin="12,0,12,12">
-        <Grid.RowDefinitions>
-            <RowDefinition Height="Auto"/>
-            <!-- KPI -->
-            <RowDefinition Height="Auto"/>
-            <!-- PeriodBar -->
-            <RowDefinition Height="Auto"/>
-            <!-- Global export -->
-            <RowDefinition Height="*"/>
-            <!-- Tabs -->
-        </Grid.RowDefinitions>
+		<Grid Margin="8,0,8,12">
+			<Grid.RowDefinitions>
+				<RowDefinition Height="Auto"/>
+				<RowDefinition Height="Auto"/>
+				<RowDefinition Height="Auto"/>
+				<RowDefinition Height="*"/>
+			</Grid.RowDefinitions>
 
-        <!-- ROW 0: KPI -->
-        <Grid Grid.Row="0" Margin="0,0,0,12">
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="*"/>
-                <ColumnDefinition Width="*"/>
-                <ColumnDefinition Width="*"/>
-            </Grid.ColumnDefinitions>
+			<!-- ROW 0: KPI -->
+			<Grid Grid.Row="0" Margin="0,0,0,12">
+				<Grid.ColumnDefinitions>
+					<ColumnDefinition Width="*"/>
+					<ColumnDefinition Width="*"/>
+					<ColumnDefinition Width="*"/>
+				</Grid.ColumnDefinitions>
 
-            <Border Grid.Column="0" Style="{StaticResource AccentCard}" Margin="0,0,10,0">
-                <StackPanel>
-                    <TextBlock Text="Obecny okres" Style="{StaticResource CardHeader}" FontSize="18" FontWeight="Bold"/>
-                    <TextBlock Text="{Binding PeriodLabel, FallbackValue=Brak danych, TargetNullValue=Brak danych}"
-                               Style="{StaticResource KpiSubHeader}"/>
+				<!-- Obecny okres -->
+				<Border Grid.Column="0" Style="{StaticResource AccentCard}" Margin="0,0,10,0">
+					<StackPanel>
+						<TextBlock Text="Obecny okres" Style="{StaticResource CardHeader}" FontSize="18" FontWeight="Bold"/>
+						<TextBlock Text="{Binding PeriodLabel, FallbackValue=Brak danych, TargetNullValue=Brak danych}"
+                                   Style="{StaticResource CardHeader}"
+                                   Opacity="0.75"
+                                   Margin="0,4,0,10"/>
 
-                    <StackPanel Orientation="Horizontal">
-                        <TextBlock Text="Wydatki:" Style="{StaticResource KpiInlineLabel}"/>
-                        <TextBlock Text="{Binding TotalExpensesStr, FallbackValue=Brak danych, TargetNullValue=Brak danych}"
-                                   Style="{StaticResource KpiInlineValueNormal}"/>
-                    </StackPanel>
+						<Grid>
+							<Grid.RowDefinitions>
+								<RowDefinition Height="Auto"/>
+								<RowDefinition Height="Auto"/>
+								<RowDefinition Height="Auto"/>
+							</Grid.RowDefinitions>
+							<Grid.ColumnDefinitions>
+								<ColumnDefinition Width="Auto"/>
+								<ColumnDefinition Width="*"/>
+							</Grid.ColumnDefinitions>
 
-                    <StackPanel Orientation="Horizontal">
-                        <TextBlock Text="Przychody:" Style="{StaticResource KpiInlineLabel}"/>
-                        <TextBlock Text="{Binding TotalIncomesStr, FallbackValue=Brak danych, TargetNullValue=Brak danych}"
-                                   Style="{StaticResource KpiInlineValueNormal}"/>
-                    </StackPanel>
+							<TextBlock Grid.Row="0" Grid.Column="0" Text="Wydatki:" FontWeight="SemiBold" Margin="0,0,10,6"/>
+							<TextBlock Grid.Row="0" Grid.Column="1" Text="{Binding TotalExpensesStr}" FontSize="14" Opacity="0.9" Margin="0,0,0,6"/>
 
-                    <StackPanel Orientation="Horizontal">
-                        <TextBlock Text="Bilans:" Style="{StaticResource KpiInlineLabel}" Margin="0,0,6,0"/>
-                        <TextBlock Text="{Binding BalanceStr, FallbackValue=Brak danych, TargetNullValue=Brak danych}"
-                                   Style="{StaticResource KpiInlineValueNormal}" Margin="0,0,0,0"/>
-                    </StackPanel>
-                </StackPanel>
-            </Border>
+							<TextBlock Grid.Row="1" Grid.Column="0" Text="Przychody:" FontWeight="SemiBold" Margin="0,0,10,6"/>
+							<TextBlock Grid.Row="1" Grid.Column="1" Text="{Binding TotalIncomesStr}" FontSize="14" Opacity="0.9" Margin="0,0,0,6"/>
 
-            <Border Grid.Column="1" Style="{StaticResource AccentCard}" Margin="0,0,10,0">
-                <StackPanel>
-                    <TextBlock Text="Poprzedni okres" Style="{StaticResource CardHeader}" FontSize="18" FontWeight="Bold"/>
-                    <TextBlock Text="{Binding PreviousPeriodLabel, FallbackValue=Brak danych, TargetNullValue=Brak danych}"
-                               Style="{StaticResource KpiSubHeader}"/>
+							<TextBlock Grid.Row="2" Grid.Column="0" Text="Bilans:" FontWeight="SemiBold" Margin="0,0,10,0"/>
+							<TextBlock Grid.Row="2" Grid.Column="1" Text="{Binding BalanceStr}" FontSize="14" Opacity="0.9"/>
+						</Grid>
+					</StackPanel>
+				</Border>
 
-                    <StackPanel Orientation="Horizontal">
-                        <TextBlock Text="Wydatki:" Style="{StaticResource KpiInlineLabel}"/>
-                        <TextBlock Text="{Binding PreviousTotalExpensesStr, FallbackValue=Brak danych, TargetNullValue=Brak danych}"
-                                   Style="{StaticResource KpiInlineValueNormal}"/>
-                    </StackPanel>
+				<!-- Poprzedni okres -->
+				<Border Grid.Column="1" Style="{StaticResource AccentCard}" Margin="0,0,10,0">
+					<StackPanel>
+						<TextBlock Text="Poprzedni okres" Style="{StaticResource CardHeader}" FontSize="18" FontWeight="Bold"/>
+						<TextBlock Text="{Binding PreviousPeriodLabel, FallbackValue=Brak danych, TargetNullValue=Brak danych}"
+                                   Style="{StaticResource CardHeader}"
+                                   Opacity="0.75"
+                                   Margin="0,4,0,10"/>
 
-                    <StackPanel Orientation="Horizontal">
-                        <TextBlock Text="Przychody:" Style="{StaticResource KpiInlineLabel}"/>
-                        <TextBlock Text="{Binding PreviousTotalIncomesStr, FallbackValue=Brak danych, TargetNullValue=Brak danych}"
-                                   Style="{StaticResource KpiInlineValueNormal}"/>
-                    </StackPanel>
+						<Grid>
+							<Grid.RowDefinitions>
+								<RowDefinition Height="Auto"/>
+								<RowDefinition Height="Auto"/>
+								<RowDefinition Height="Auto"/>
+							</Grid.RowDefinitions>
+							<Grid.ColumnDefinitions>
+								<ColumnDefinition Width="Auto"/>
+								<ColumnDefinition Width="*"/>
+							</Grid.ColumnDefinitions>
 
-                    <StackPanel Orientation="Horizontal">
-                        <TextBlock Text="Bilans:" Style="{StaticResource KpiInlineLabel}" Margin="0,0,6,0"/>
-                        <TextBlock Text="{Binding PreviousBalanceStr, FallbackValue=Brak danych, TargetNullValue=Brak danych}"
-                                   Style="{StaticResource KpiInlineValueNormal}" Margin="0,0,0,0"/>
-                    </StackPanel>
-                </StackPanel>
-            </Border>
+							<TextBlock Grid.Row="0" Grid.Column="0" Text="Wydatki:" FontWeight="SemiBold" Margin="0,0,10,6"/>
+							<TextBlock Grid.Row="0" Grid.Column="1" Text="{Binding PreviousTotalExpensesStr}" FontSize="14" Opacity="0.9" Margin="0,0,0,6"/>
 
-            <Border Grid.Column="2" Style="{StaticResource AccentCard}">
-                <StackPanel>
-                    <TextBlock Text="Porównanie okresów" Style="{StaticResource CardHeader}" FontSize="18" FontWeight="Bold"/>
+							<TextBlock Grid.Row="1" Grid.Column="0" Text="Przychody:" FontWeight="SemiBold" Margin="0,0,10,6"/>
+							<TextBlock Grid.Row="1" Grid.Column="1" Text="{Binding PreviousTotalIncomesStr}" FontSize="14" Opacity="0.9" Margin="0,0,0,6"/>
 
-                    <Grid Margin="0,4,0,10">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*"/>
-                            <ColumnDefinition Width="*"/>
-                        </Grid.ColumnDefinitions>
+							<TextBlock Grid.Row="2" Grid.Column="0" Text="Bilans:" FontWeight="SemiBold" Margin="0,0,10,0"/>
+							<TextBlock Grid.Row="2" Grid.Column="1" Text="{Binding PreviousBalanceStr}" FontSize="14" Opacity="0.9"/>
+						</Grid>
+					</StackPanel>
+				</Border>
 
-                        <StackPanel Grid.Column="0" Orientation="Horizontal">
-                            <TextBlock Text="Poprzedni: " Style="{StaticResource CardHeader}" Opacity="0.75"/>
-                            <TextBlock Text="{Binding PreviousPeriodLabel}" Style="{StaticResource CardHeader}" Opacity="0.75"/>
-                        </StackPanel>
+				<!-- Porównanie -->
+				<Border Grid.Column="2" Style="{StaticResource AccentCard}">
+					<StackPanel>
+						<TextBlock Text="Porównanie okresów" Style="{StaticResource CardHeader}" FontSize="18" FontWeight="Bold"/>
 
-                        <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Right">
-                            <TextBlock Text="Obecny: " Style="{StaticResource CardHeader}" Opacity="0.75"/>
-                            <TextBlock Text="{Binding PeriodLabel}" Style="{StaticResource CardHeader}" Opacity="0.75"/>
-                        </StackPanel>
-                    </Grid>
+						<TextBlock FontSize="14" Opacity="0.9" Margin="0,10,0,6" TextWrapping="Wrap">
+							<Run Text="Wydatki: " FontWeight="Bold"/>
+							<Run Text="{Binding CompareExpensesText, Mode=OneWay}"/>
+						</TextBlock>
 
-                    <StackPanel Orientation="Horizontal">
-                        <TextBlock Text="Wydatki:" Style="{StaticResource KpiInlineLabel}"/>
-                        <TextBlock Text="{Binding DeltaExpensesStr, FallbackValue=Brak danych, TargetNullValue=Brak danych}"
-                                   Style="{StaticResource KpiInlineValueNormal}"/>
-                    </StackPanel>
+						<TextBlock FontSize="14" Opacity="0.9" Margin="0,0,0,6" TextWrapping="Wrap">
+							<Run Text="Przychody: " FontWeight="Bold"/>
+							<Run Text="{Binding CompareIncomesText, Mode=OneWay}"/>
+						</TextBlock>
 
-                    <StackPanel Orientation="Horizontal">
-                        <TextBlock Text="Przychody:" Style="{StaticResource KpiInlineLabel}"/>
-                        <TextBlock Text="{Binding DeltaIncomesStr, FallbackValue=Brak danych, TargetNullValue=Brak danych}"
-                                   Style="{StaticResource KpiInlineValueNormal}"/>
-                    </StackPanel>
+						<TextBlock FontSize="13" Opacity="0.85" TextWrapping="Wrap">
+							<Run Text="Bilans: " FontWeight="Bold"/>
+							<Run Text="{Binding CompareBalanceText, Mode=OneWay}"/>
+						</TextBlock>
+					</StackPanel>
+				</Border>
+			</Grid>
 
-                    <StackPanel Orientation="Horizontal">
-                        <TextBlock Text="Bilans:" Style="{StaticResource KpiInlineLabel}" Margin="0,0,6,0"/>
-                        <TextBlock Text="{Binding DeltaBalanceStr, FallbackValue=Brak danych, TargetNullValue=Brak danych}"
-                                   Style="{StaticResource KpiInlineValueNormal}" Margin="0,0,0,0"/>
-                    </StackPanel>
-                </StackPanel>
-            </Border>
-        </Grid>
-
-        <!-- ROW 1: PeriodBar -->
-        <Border Grid.Row="1" Background="Transparent" Margin="0,0,0,8">
-            <controls:PeriodBarControl x:Name="PeriodBar"
-                                       HorizontalAlignment="Center"
-                                       StartDate="{Binding FromDate, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                                       EndDate="{Binding ToDate, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
-        </Border>
-
-        <!-- ROW 2: Global Export -->
-        <Border Grid.Row="2" Background="Transparent" Margin="0,0,0,12">
-            <Button Content="Pobierz raport całościowy (PDF)"
-                    Style="{StaticResource PrimaryButton}"
-                    HorizontalAlignment="Center"
-                    FontSize="18"
-                    FontWeight="Bold"
-                    Padding="34,16"
-                    MinWidth="420"
-                    Click="ExportButton_Click"/>
-        </Border>
-
-        <!-- ROW 3: Tabs -->
-        <Border Grid.Row="3" Background="Transparent">
-            <TabControl Style="{StaticResource ReportsTabControlStyle}"
-                        SelectedIndex="{Binding SelectedTabIndex, Mode=TwoWay}">
-                <TabControl.ItemContainerStyle>
-                    <Style TargetType="TabItem" BasedOn="{StaticResource ReportsTabItemStyle}"/>
-                </TabControl.ItemContainerStyle>
-
-                <!-- ===================== TAB 1: PRZEGLĄD OGÓLNY ===================== -->
-                <TabItem Header="Przegląd ogólny">
-                    <Grid Margin="0,12,0,0">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="3*"/>
-                            <ColumnDefinition Width="2*"/>
-                        </Grid.ColumnDefinitions>
-
-                        <!-- LEWA KOLUMNA -->
-                        <ScrollViewer Grid.Column="0"
-                                      VerticalScrollBarVisibility="Auto"
-                                      HorizontalScrollBarVisibility="Disabled"
-                                      Margin="0,0,10,0">
-                            <Grid>
-                                <Grid.RowDefinitions>
-                                    <RowDefinition Height="Auto"/>
-                                    <RowDefinition Height="Auto"/>
-                                    <RowDefinition Height="Auto"/>
-                                </Grid.RowDefinitions>
-
-                                <Border Grid.Row="0" Style="{StaticResource Card}" Margin="0,0,0,10">
-                                    <StackPanel>
-                                        <TextBlock Text="Ilość transakcji (okres)" Style="{StaticResource CardHeader}" FontSize="16" FontWeight="Bold"/>
-                                        <lvc:CartesianChart Height="260"
-                                                           Style="{StaticResource BaseCartesianChart}"
-                                                           Series="{Binding OverviewCountSeries}"
-                                                           XAxes="{Binding OverviewCountAxesX}"
-                                                           YAxes="{Binding OverviewCountAxesY}"/>
-                                    </StackPanel>
-                                </Border>
-
-                                <Border Grid.Row="1" Style="{StaticResource Card}" Margin="0,0,0,10">
-                                    <StackPanel>
-                                        <TextBlock Text="Wartość transakcji (zł) (okres)" Style="{StaticResource CardHeader}" FontSize="16" FontWeight="Bold"/>
-                                        <lvc:CartesianChart Height="260"
-                                                           Style="{StaticResource BaseCartesianChart}"
-                                                           Series="{Binding OverviewAmountSeries}"
-                                                           XAxes="{Binding OverviewAmountAxesX}"
-                                                           YAxes="{Binding OverviewAmountAxesY}"/>
-                                    </StackPanel>
-                                </Border>
-
-                                <!-- PODIUM (zostawiam jak u Ciebie – bez konwerterów) -->
-                                <Grid Grid.Row="2">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="*"/>
-                                        <ColumnDefinition Width="*"/>
-                                    </Grid.ColumnDefinitions>
-
-                                    <Border Grid.Column="0" Style="{StaticResource Card}" Margin="0,0,10,0">
-                                        <Grid>
-                                            <Grid.RowDefinitions>
-                                                <RowDefinition Height="Auto"/>
-                                                <RowDefinition Height="*"/>
-                                            </Grid.RowDefinitions>
-
-                                            <TextBlock Grid.Row="0"
-                                                       Text="TOP 3 wydatki"
-                                                       Style="{StaticResource CardHeader}"
-                                                       FontSize="16"
-                                                       FontWeight="Bold"
-                                                       TextAlignment="Center"
-                                                       HorizontalAlignment="Center"/>
-
-                                            <Grid Grid.Row="1" Margin="0,12,0,0">
-                                                <Grid.ColumnDefinitions>
-                                                    <ColumnDefinition Width="*"/>
-                                                    <ColumnDefinition Width="*"/>
-                                                    <ColumnDefinition Width="*"/>
-                                                </Grid.ColumnDefinitions>
-
-                                                <StackPanel Grid.Column="0" VerticalAlignment="Bottom" HorizontalAlignment="Center" Margin="4,0">
-                                                    <TextBlock Text="2" FontSize="18" FontWeight="Bold"
-                                                               Foreground="{DynamicResource App.Foreground}"
-                                                               HorizontalAlignment="Center"/>
-                                                    <Border Margin="0,4,0,0"
-                                                            CornerRadius="6"
-                                                            Background="{DynamicResource Sidebar.Hover}"
-                                                            Padding="8">
-                                                        <StackPanel>
-                                                            <TextBlock Text="{Binding TopExp2.Category, TargetNullValue=Brak danych}"
-                                                                       FontWeight="SemiBold"
-                                                                       Foreground="{DynamicResource App.Foreground}"
-                                                                       FontSize="12"
-                                                                       TextAlignment="Center"
-                                                                       TextWrapping="Wrap"/>
-                                                            <TextBlock Text="{Binding TopExp2.AmountStr, TargetNullValue=—}"
-                                                                       Foreground="{DynamicResource App.Foreground}"
-                                                                       FontSize="11"
-                                                                       TextAlignment="Center"/>
-                                                        </StackPanel>
-                                                    </Border>
-                                                </StackPanel>
-
-                                                <StackPanel Grid.Column="1" VerticalAlignment="Bottom" HorizontalAlignment="Center" Margin="4,0">
-                                                    <TextBlock Text="1" FontSize="20" FontWeight="Bold"
-                                                               Foreground="{DynamicResource Separator.Orange}"
-                                                               HorizontalAlignment="Center"/>
-                                                    <Border Margin="0,4,0,0"
-                                                            CornerRadius="6"
-                                                            Background="{DynamicResource Brand.Blue}"
-                                                            Padding="10">
-                                                        <StackPanel>
-                                                            <TextBlock Text="{Binding TopExp1.Category, TargetNullValue=Brak danych}"
-                                                                       FontWeight="Bold"
-                                                                       Foreground="{DynamicResource OnAccent}"
-                                                                       FontSize="13"
-                                                                       TextAlignment="Center"
-                                                                       TextWrapping="Wrap"/>
-                                                            <TextBlock Text="{Binding TopExp1.AmountStr, TargetNullValue=—}"
-                                                                       Foreground="{DynamicResource OnAccent}"
-                                                                       FontSize="12"
-                                                                       TextAlignment="Center"/>
-                                                        </StackPanel>
-                                                    </Border>
-                                                </StackPanel>
-
-                                                <StackPanel Grid.Column="2" VerticalAlignment="Bottom" HorizontalAlignment="Center" Margin="4,0">
-                                                    <TextBlock Text="3" FontSize="18" FontWeight="Bold"
-                                                               Foreground="{DynamicResource App.Foreground}"
-                                                               HorizontalAlignment="Center"/>
-                                                    <Border Margin="0,4,0,0"
-                                                            CornerRadius="6"
-                                                            Background="{DynamicResource Surface.Border}"
-                                                            Padding="8">
-                                                        <StackPanel>
-                                                            <TextBlock Text="{Binding TopExp3.Category, TargetNullValue=Brak danych}"
-                                                                       FontWeight="SemiBold"
-                                                                       Foreground="{DynamicResource App.Foreground}"
-                                                                       FontSize="12"
-                                                                       TextAlignment="Center"
-                                                                       TextWrapping="Wrap"/>
-                                                            <TextBlock Text="{Binding TopExp3.AmountStr, TargetNullValue=—}"
-                                                                       Foreground="{DynamicResource App.Foreground}"
-                                                                       FontSize="11"
-                                                                       TextAlignment="Center"/>
-                                                        </StackPanel>
-                                                    </Border>
-                                                </StackPanel>
-                                            </Grid>
-                                        </Grid>
-                                    </Border>
-
-                                    <Border Grid.Column="1" Style="{StaticResource Card}">
-                                        <Grid>
-                                            <Grid.RowDefinitions>
-                                                <RowDefinition Height="Auto"/>
-                                                <RowDefinition Height="*"/>
-                                            </Grid.RowDefinitions>
-
-                                            <TextBlock Grid.Row="0"
-                                                       Text="TOP 3 przychody"
-                                                       Style="{StaticResource CardHeader}"
-                                                       FontSize="16"
-                                                       FontWeight="Bold"
-                                                       TextAlignment="Center"
-                                                       HorizontalAlignment="Center"/>
-
-                                            <Grid Grid.Row="1" Margin="0,12,0,0">
-                                                <Grid.ColumnDefinitions>
-                                                    <ColumnDefinition Width="*"/>
-                                                    <ColumnDefinition Width="*"/>
-                                                    <ColumnDefinition Width="*"/>
-                                                </Grid.ColumnDefinitions>
-
-                                                <StackPanel Grid.Column="0" VerticalAlignment="Bottom" HorizontalAlignment="Center" Margin="4,0">
-                                                    <TextBlock Text="2" FontSize="18" FontWeight="Bold"
-                                                               Foreground="{DynamicResource App.Foreground}"
-                                                               HorizontalAlignment="Center"/>
-                                                    <Border Margin="0,4,0,0"
-                                                            CornerRadius="6"
-                                                            Background="{DynamicResource Sidebar.Hover}"
-                                                            Padding="8">
-                                                        <StackPanel>
-                                                            <TextBlock Text="{Binding TopInc2.Category, TargetNullValue=Brak danych}"
-                                                                       FontWeight="SemiBold"
-                                                                       Foreground="{DynamicResource App.Foreground}"
-                                                                       FontSize="12"
-                                                                       TextAlignment="Center"
-                                                                       TextWrapping="Wrap"/>
-                                                            <TextBlock Text="{Binding TopInc2.AmountStr, TargetNullValue=—}"
-                                                                       Foreground="{DynamicResource App.Foreground}"
-                                                                       FontSize="11"
-                                                                       TextAlignment="Center"/>
-                                                        </StackPanel>
-                                                    </Border>
-                                                </StackPanel>
-
-                                                <StackPanel Grid.Column="1" VerticalAlignment="Bottom" HorizontalAlignment="Center" Margin="4,0">
-                                                    <TextBlock Text="1" FontSize="20" FontWeight="Bold"
-                                                               Foreground="{DynamicResource Separator.Orange}"
-                                                               HorizontalAlignment="Center"/>
-                                                    <Border Margin="0,4,0,0"
-                                                            CornerRadius="6"
-                                                            Background="{DynamicResource Brand.Blue}"
-                                                            Padding="10">
-                                                        <StackPanel>
-                                                            <TextBlock Text="{Binding TopInc1.Category, TargetNullValue=Brak danych}"
-                                                                       FontWeight="Bold"
-                                                                       Foreground="{DynamicResource OnAccent}"
-                                                                       FontSize="13"
-                                                                       TextAlignment="Center"
-                                                                       TextWrapping="Wrap"/>
-                                                            <TextBlock Text="{Binding TopInc1.AmountStr, TargetNullValue=—}"
-                                                                       Foreground="{DynamicResource OnAccent}"
-                                                                       FontSize="12"
-                                                                       TextAlignment="Center"/>
-                                                        </StackPanel>
-                                                    </Border>
-                                                </StackPanel>
-
-                                                <StackPanel Grid.Column="2" VerticalAlignment="Bottom" HorizontalAlignment="Center" Margin="4,0">
-                                                    <TextBlock Text="3" FontSize="18" FontWeight="Bold"
-                                                               Foreground="{DynamicResource App.Foreground}"
-                                                               HorizontalAlignment="Center"/>
-                                                    <Border Margin="0,4,0,0"
-                                                            CornerRadius="6"
-                                                            Background="{DynamicResource Surface.Border}"
-                                                            Padding="8">
-                                                        <StackPanel>
-                                                            <TextBlock Text="{Binding TopInc3.Category, TargetNullValue=Brak danych}"
-                                                                       FontWeight="SemiBold"
-                                                                       Foreground="{DynamicResource App.Foreground}"
-                                                                       FontSize="12"
-                                                                       TextAlignment="Center"
-                                                                       TextWrapping="Wrap"/>
-                                                            <TextBlock Text="{Binding TopInc3.AmountStr, TargetNullValue=—}"
-                                                                       Foreground="{DynamicResource App.Foreground}"
-                                                                       FontSize="11"
-                                                                       TextAlignment="Center"/>
-                                                        </StackPanel>
-                                                    </Border>
-                                                </StackPanel>
-                                            </Grid>
-                                        </Grid>
-                                    </Border>
-                                </Grid>
-                            </Grid>
-                        </ScrollViewer>
-
-                        <!-- PRAWA KOLUMNA -->
-                        <Border Grid.Column="1" Style="{StaticResource Card}">
-                            <Grid>
-                                <Grid.RowDefinitions>
-                                    <RowDefinition Height="Auto"/>
-                                    <!-- export -->
-                                    <RowDefinition Height="Auto"/>
-                                    <!-- tytuł -->
-                                    <RowDefinition Height="Auto"/>
-                                    <!-- filtry -->
-                                    <RowDefinition Height="*"/>
-                                    <!-- tabela -->
-                                </Grid.RowDefinitions>
-
-                                <Button Grid.Row="0"
-                                        Content="Eksportuj ten raport (PDF)"
-                                        Style="{StaticResource PrimaryButton}"
-                                        HorizontalAlignment="Right"
-                                        Padding="14,9"
-                                        Command="{Binding ExportPdfCommand}"
-                                        CommandParameter="overview"/>
-
-                                <TextBlock Grid.Row="1"
-                                           Text="Wszystkie transakcje z okresu"
-                                           Style="{StaticResource CardHeader}"
-                                           FontSize="16"
-                                           FontWeight="Bold"
-                                           Margin="0,10,0,10"/>
-
-                                <WrapPanel Grid.Row="2"
+			<!-- ROW 1: PeriodBar -->
+			<Border Grid.Row="1" Background="Transparent" Margin="0,0,0,8">
+				<controls:PeriodBarControl x:Name="PeriodBar"
                                            HorizontalAlignment="Center"
-                                           Margin="0,0,0,10">
+                                           StartDate="{Binding FromDate, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                           EndDate="{Binding ToDate, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
+			</Border>
 
-                                    <ToggleButton Style="{StaticResource ModeFilterButton}"
-                                                  IsChecked="{Binding FilterAll, Mode=TwoWay}">
-                                        <TextBlock Text="Wszystko"/>
-                                    </ToggleButton>
+			<!-- ROW 2: Export global -->
+			<Border Grid.Row="2" Background="Transparent" Margin="0,0,0,12">
+				<Button Content="Pobierz raport całościowy (PDF)"
+                        Style="{DynamicResource PrimaryButton}"
+                        HorizontalAlignment="Center"
+                        FontSize="18"
+                        FontWeight="Bold"
+                        Padding="34,16"
+                        MinWidth="420"
+                        Click="ExportButton_Click"/>
+			</Border>
 
-                                    <ToggleButton Style="{StaticResource ModeFilterButton}"
-                                                  IsChecked="{Binding FilterIncomes, Mode=TwoWay}">
-                                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
-                                            <Image Source="/Assets/Icons/przychody.png"
-                                                   Width="18" Height="18"
-                                                   Stretch="Uniform"
-                                                   Margin="0,0,8,0"/>
-                                            <TextBlock Text="Przychody"/>
-                                        </StackPanel>
-                                    </ToggleButton>
+			<!-- ROW 3: Tabs + treść (lazy-load w code-behind) -->
+			<TabControl x:Name="ReportsTabs"
+						Grid.Row="3"
+						Style="{StaticResource ReportsTabControl}"
+						SelectedIndex="{Binding SelectedTabIndex, Mode=TwoWay}">
 
-                                    <ToggleButton Style="{StaticResource ModeFilterButton}"
-                                                  IsChecked="{Binding FilterExpenses, Mode=TwoWay}">
-                                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
-                                            <Image Source="/Assets/Icons/wydatki.png"
-                                                   Width="18" Height="18"
-                                                   Stretch="Uniform"
-                                                   Margin="0,0,8,0"/>
-                                            <TextBlock Text="Wydatki"/>
-                                        </StackPanel>
-                                    </ToggleButton>
+				<TabItem Header="Przegląd ogólny" Style="{StaticResource ReportsTabItem}" />
 
-                                    <ToggleButton Style="{StaticResource ModeFilterButton}"
-                                                  IsChecked="{Binding FilterTransfers, Mode=TwoWay}">
-                                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
-                                            <Image Source="/Assets/Icons/transfer.png"
-                                                   Width="18" Height="18"
-                                                   Stretch="Uniform"
-                                                   Margin="0,0,8,0"/>
-                                            <TextBlock Text="Transfery"/>
-                                        </StackPanel>
-                                    </ToggleButton>
-                                </WrapPanel>
+				<TabItem Header="Budżety" Style="{StaticResource ReportsTabItem}" />
 
-                                <!-- MiniTable: jak Dashboard -->
-                                <Border Grid.Row="3" Background="Transparent" Padding="0">
-                                    <controls:MiniTableControl ItemsSource="{Binding TransactionsView}"
-                                                               HeaderTemplate="{StaticResource TxTableHeaderTemplate}"
-                                                               RowTemplate="{StaticResource TxTableRowTemplate}"
-                                                               SelectionMode="Single"
-                                                               VerticalScrollBarVisibility="Auto"
-                                                               HorizontalScrollBarVisibility="Disabled"/>
-                                </Border>
-                            </Grid>
-                        </Border>
-                    </Grid>
-                </TabItem>
+				<TabItem Header="Kredyty" Style="{StaticResource ReportsTabItem}" />
 
-                <!-- pozostałe zakładki -->
-                <TabItem Header="Budżety">
-                    <Grid/>
-                </TabItem>
-                <TabItem Header="Inwestycje">
-                    <Grid/>
-                </TabItem>
-                <TabItem Header="Kategorie">
-                    <Grid/>
-                </TabItem>
-                <TabItem Header="Kredyty">
-                    <Grid/>
-                </TabItem>
-                <TabItem Header="Cele">
-                    <Grid/>
-                </TabItem>
-                <TabItem Header="Symulacja">
-                    <Grid/>
-                </TabItem>
+				<TabItem Header="Cele" Style="{StaticResource ReportsTabItem}" />
 
-            </TabControl>
-        </Border>
-    </Grid>
+				<TabItem Header="Inwestycje" Style="{StaticResource ReportsTabItem}" />
+
+				<TabItem Header="Symulacja" Style="{StaticResource ReportsTabItem}" />
+
+			</TabControl>
+
+
+		</Grid>
+	</ScrollViewer>
 </UserControl>

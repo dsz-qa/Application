@@ -62,8 +62,6 @@ namespace Finly.Pages
 
         public BudgetsPage() : this(UserService.CurrentUserId) { }
 
-        // =================== LIFECYCLE ===================
-
         private void BudgetsPage_Loaded(object sender, RoutedEventArgs e)
         {
             if (!_initializedOk) return;
@@ -179,7 +177,6 @@ namespace Finly.Pages
                 ApplyFilters();
                 UpdateTopKpis();
 
-                // restore selection
                 try
                 {
                     if (BudgetsList != null && BudgetsList.ItemsSource is IEnumerable<BudgetRow> list)
@@ -275,7 +272,7 @@ namespace Finly.Pages
             return "Monthly";
         }
 
-        // =================== DB ===================
+        // =================== BAZA DANYCH ===================
 
         private void LoadBudgetsFromDatabase()
         {
@@ -401,7 +398,7 @@ ORDER BY date(b.StartDate);";
             }
         }
 
-        // =================== LIVE FILTERY ===================
+        // =================== FILTRY ===================
 
         private void TypeFilterCombo_SelectionChanged(object sender, SelectionChangedEventArgs e) => ApplyFilters();
         private void SearchBox_TextChanged(object sender, TextChangedEventArgs e) => ApplyFilters();
@@ -515,7 +512,7 @@ ORDER BY date(b.StartDate);";
             }
         }
 
-        // =================== KPI OGÓLNE (góra) ===================
+        // =================== KPI  ===================
 
         private void UpdateTopKpis()
         {
@@ -538,7 +535,7 @@ ORDER BY date(b.StartDate);";
             catch { }
         }
 
-        // =================== PANEL (kafelki u góry) ===================
+        // =================== PANEL  ===================
 
         private void UpdateDetailsPanel(BudgetRow? b)
         {
@@ -685,7 +682,7 @@ ORDER BY date(b.StartDate);";
             }
         }
 
-        // =================== WYKRES (historia) ===================
+        // =================== WYKRES ===================
 
         private void ResetChartSafe(string hint)
         {
@@ -766,7 +763,6 @@ ORDER BY date(b.StartDate);";
 
                 using var con = DatabaseService.GetConnection();
 
-                // incomes
                 try
                 {
                     using var cmd = con.CreateCommand();
@@ -801,7 +797,6 @@ ORDER BY date(Date);";
                     System.Diagnostics.Debug.WriteLine("Budget chart incomes error: " + ex);
                 }
 
-                // expenses
                 try
                 {
                     using var cmd = con.CreateCommand();
@@ -904,11 +899,9 @@ ORDER BY date(Date);";
                 var maxLimit = limitValues.Count == 0 ? 0 : limitValues.Max();
                 var maxY = Math.Max(maxSpent, maxLimit);
 
-                // chcemy ~4-5 podziałek
                 var step = NiceStep(maxY / 4.0);
                 if (step <= 0) step = 10;
 
-                // zaokrąglamy max do pełnego kroku (żeby ticki były „ładne”)
                 var maxAxis = Math.Ceiling(maxY / step) * step;
                 if (maxAxis < step) maxAxis = step;
 
@@ -921,7 +914,7 @@ ORDER BY date(Date);";
         MinStep = step,
         ForceStepToMin = true,
 
-        SeparatorsPaint = null, // możesz zmienić na delikatne kreski, jeśli chcesz
+        SeparatorsPaint = null,
         Labeler = v => $"{v:N2} zł",
         TextSize = 12,
         LabelsPaint = whitePaint,
@@ -1003,7 +996,7 @@ ORDER BY date(Date);";
             }
         }
 
-        // =================== CRUD ===================
+        // =================== DODAWANIE BUDŻETU ===================
 
         private void AddBudget_Click(object sender, MouseButtonEventArgs e)
             => AddBudget_Click(sender, new RoutedEventArgs());

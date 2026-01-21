@@ -92,7 +92,7 @@ namespace Finly.Pages
             SetKpiText("InvestmentsText", snap.Investments);
         }
 
-        // ================= PANELE / ZAKŁADKI =================
+        // ================= ZAKŁADKI =================
 
         private void ModeTabs_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
@@ -119,8 +119,6 @@ namespace Finly.Pages
 
             UpdateAllPlannedInfo();
         }
-
-        // ================= EVENT OVERLOADS (XAML) =================
 
         private void ExpenseForm_Changed(object sender, RoutedEventArgs e) => UpdateExpensePlannedInfo();
         private void ExpenseForm_Changed(object sender, SelectionChangedEventArgs e) => UpdateExpensePlannedInfo();
@@ -159,8 +157,6 @@ namespace Finly.Pages
                 if (TransferCategoryBox.SelectedIndex < 0) TransferCategoryBox.SelectedIndex = 0;
             }
         }
-
-
 
         private void LoadEnvelopes()
         {
@@ -251,7 +247,6 @@ namespace Finly.Pages
             if (TransferToBox.Items.Count > 1) TransferToBox.SelectedIndex = 1;
         }
 
-        // ================= OBSŁUGA FORM =================
 
         private void ExpenseSourceCombo_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
@@ -392,7 +387,7 @@ namespace Finly.Pages
             }
         }
 
-        // ================= PLANOWANIE (INFO + FLAGA) =================
+        // ================= PLANOWANE PŁATNOŚCI =================
 
         private static bool IsPlannedDate(DateTime date) => date.Date > DateTime.Today;
 
@@ -722,7 +717,6 @@ namespace Finly.Pages
             {
                 AddIncomeRaw(_uid, amount, date, categoryId, sourceDisplay, desc, isPlanned, incomeBudgetId);
 
-                // Sald NIE ruszamy dla planowanych operacji
                 if (!isPlanned)
                 {
                     if (formTag == "cash_free")
@@ -911,7 +905,7 @@ namespace Finly.Pages
             }
         }
 
-        // ================= INCOME DB HELPERS =================
+        // ================= POMOCNICZE =================
 
         private void AddIncomeRaw(int userId, decimal amount, DateTime date, int? categoryId, string source, string? desc, bool isPlanned = false, int? budgetId = null)
         {
@@ -948,7 +942,6 @@ VALUES (@u, @a, @d, @desc, @s, @cat, @p, @b);";
                 Owner = Window.GetWindow(this)
             };
 
-            // wstępne ustawienie startu na wybraną datę (dialog sam policzy EndDate)
             dlg.Budget.Name = "";
             dlg.Budget.StartDate = date;
             dlg.Budget.Type = "Monthly";
@@ -961,7 +954,6 @@ VALUES (@u, @a, @d, @desc, @s, @cat, @p, @b);";
 
             LoadExpenseBudgetsForDate(date);
 
-            // ustaw zaznaczenie na nowo utworzony
             if (ExpenseBudgetCombo.ItemsSource is System.Collections.IEnumerable src)
             {
                 foreach (var item in src)

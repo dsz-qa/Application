@@ -3,7 +3,7 @@
     public enum DateRangeMode
     {
         Day,
-        Week,      // <— DODANE
+        Week,
         Month,
         Quarter,
         Year,

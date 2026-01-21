@@ -19,7 +19,6 @@ namespace Finly.Helpers.Converters
             if (parameter == null) return Binding.DoNothing;
             if (value is bool b && b)
             {
-                // attempt to parse enum from parameter using targetType
                 try
                 {
                     if (targetType.IsEnum)

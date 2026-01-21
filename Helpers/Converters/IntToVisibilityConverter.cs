@@ -7,7 +7,6 @@ namespace Finly.Helpers.Converters
 {
     public class IntToVisibilityConverter : IValueConverter
     {
-        // If parameter is "Invert", converter returns Visible when value ==0
         public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
         {
             int count = 0;

@@ -4,7 +4,6 @@ using System.Windows.Data;
 
 namespace Finly.Helpers.Converters
 {
-    /// Zwraca „✓”/„✗” dla bool.
     public sealed class BoolToSymbolConverter : IValueConverter
     {
         public string TrueSymbol { get; set; } = "✓";

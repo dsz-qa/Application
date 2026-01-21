@@ -111,7 +111,7 @@ namespace Finly.ViewModels
             }
             catch
             {
-                // VM ma działać nawet jeśli event nie jest dostępny w danym kontekście
+                
             }
 
             LoadStatistics();
@@ -222,7 +222,6 @@ namespace Finly.ViewModels
             {
                 var data = BuildAggregates(from, to, bucket);
 
-                // ===== Pie =====
                 if (data.ByCategory.Count == 0)
                 {
                     CategoriesSeries.Add(new PieSeries<double>
@@ -295,37 +294,31 @@ namespace Finly.ViewModels
 
                 ApplyAxisByMode(TrendYAxes, trendValues);
 
-                // ===== Envelopes =====
                 BuildColumnChart(
                     data.ByEnvelope,
                     EnvelopeLabels, EnvelopesSeries, EnvelopesXAxes, EnvelopesYAxes,
                     accentStroke, accentFill, maxBarWidth: 46);
 
-                // ===== Weekday =====
                 BuildColumnChart(
                     data.ByWeekday,
                     WeekdayLabels, WeekdaySeries, WeekdayXAxes, WeekdayYAxes,
                     accentStroke, accentFill, maxBarWidth: 42);
 
-                // ===== Bank accounts =====
                 BuildColumnChart(
                     data.ByBankAccount,
                     BankAccountLabels, BankAccountsSeries, BankAccountsXAxes, BankAccountsYAxes,
                     accentStroke, accentFill, maxBarWidth: 46);
 
-                // ===== Free cash =====
                 BuildColumnChart(
                     data.FreeCash,
                     FreeCashLabels, FreeCashSeries, FreeCashXAxes, FreeCashYAxes,
                     accentStroke, accentFill, maxBarWidth: 46);
 
-                // ===== Saved cash =====
                 BuildColumnChart(
                     data.SavedCash,
                     SavedCashLabels, SavedCashSeries, SavedCashXAxes, SavedCashYAxes,
                     accentStroke, accentFill, maxBarWidth: 46);
 
-                // ===== Amount buckets =====
                 BuildAmountBucketsChart(from, to, accentStroke, accentFill);
             }
             catch
@@ -368,10 +361,6 @@ namespace Finly.ViewModels
                 AmountBucketsYAxes.Add(new Axis());
             }
         }
-
-        // =========================
-        // One unified column builder
-        // =========================
 
         private void BuildColumnChart(
             List<(string Name, decimal Sum)> rows,
@@ -438,10 +427,6 @@ namespace Finly.ViewModels
             ApplyAxisByMode(yAxes, values);
         }
 
-        // =========================
-        // Helpers (ONLY ONE COPY)
-        // =========================
-
         private double Sign(double v)
             => SelectedMode == Mode.Expenses ? -Math.Abs(v) : Math.Abs(v);
 
@@ -496,10 +481,6 @@ namespace Finly.ViewModels
             _ => "Brak danych"
         };
 
-        // =========================
-        // Amount buckets
-        // =========================
-
         private void BuildAmountBucketsChart(
             DateTime? from, DateTime? to,
             SolidColorPaint accentStroke, SolidColorPaint accentFill)
@@ -534,7 +515,6 @@ namespace Finly.ViewModels
                 foreach (var b in bucketsData)
                     AmountBucketsLabels.Add(b.Name);
 
-                // histogram liczności -> dodatnie zawsze
                 values = bucketsData.Select(b => (double)b.Sum).ToArray();
 
                 AmountBucketsSeries.Add(new ColumnSeries<double>
@@ -612,7 +592,7 @@ namespace Finly.ViewModels
                 var inc = DatabaseService.GetIncomes(_userId, from, to);
                 amounts.AddRange(inc.AsEnumerable().Select(r => Math.Abs(SafeDecimal(r["Amount"]))));
             }
-            else // Expenses
+            else
             {
                 var exp = DatabaseService.GetExpenses(_userId, from, to);
                 amounts.AddRange(exp.AsEnumerable().Select(r => Math.Abs(SafeDecimal(r["Amount"]))));
@@ -641,11 +621,6 @@ namespace Finly.ViewModels
             var ordered = new[] { "0–50", "50–100", "100–200", "200–500", "500–1000", ">1000" };
             return ordered.Select(l => (l, result.TryGetValue(l, out var c) ? c : 0m)).ToList();
         }
-
-
-        // =========================
-        // Export PDF / CSV
-        // =========================
 
         public async Task ExportToPdfAsync()
         {
@@ -725,7 +700,7 @@ namespace Finly.ViewModels
                             col.Item().PaddingTop(12).Text("Koperty").Bold();
                             AddTwoColTable(col, "Koperta", "Suma [PLN]", data.ByEnvelope);
 
-                            // ===== 8) Histogram kwot (liczność) =====
+                            // ===== 8) Histogram kwot =====
                             col.Item().PaddingTop(12).Text("Liczba transakcji wg przedziału kwot").Bold();
                             var buckets = GetAmountBucketsData(from, to);
                             AddTwoColTable(col, "Przedział", "Liczba", buckets);
@@ -779,7 +754,6 @@ namespace Finly.ViewModels
                     var name = string.IsNullOrWhiteSpace(r.Name) ? "(brak)" : r.Name;
                     t.Cell().Text(name);
 
-                    // UWAGA: w histogramie "Sum" to liczność, więc pokazujemy bez .N2
                     if (rightHeader.Contains("Liczba", StringComparison.OrdinalIgnoreCase))
                         t.Cell().AlignRight().Text(r.Sum.ToString("N0", _pl));
                     else
@@ -828,10 +802,6 @@ namespace Finly.ViewModels
             return $"{from:yyyy-MM-dd} – {to:yyyy-MM-dd}";
         }
 
-        // =========================
-        // Aggregates (core)
-        // =========================
-
         private (decimal SummaryTotal, decimal TotalIncomes, decimal TotalExpenses,
                  List<(string Name, decimal Sum)> ByCategory,
                  List<(string Label, decimal Value)> Trend,
@@ -846,7 +816,7 @@ namespace Finly.ViewModels
 
             if (SelectedMode == Mode.All)
             {
-                // ===== EXPENSES =====
+                // ===== WYDATKI =====
                 var expDt = DatabaseService.GetExpenses(_userId, from, to);
                 var expRows = expDt.AsEnumerable().Select(r => new
                 {
@@ -857,7 +827,7 @@ namespace Finly.ViewModels
                     AccountId = SafeNullableInt(r.Table.Columns.Contains("AccountId") ? r["AccountId"] : null)
                 }).ToList();
 
-                // ===== INCOMES =====
+                // ===== PRZYCHODY =====
                 var incDt = DatabaseService.GetIncomes(_userId, from, to);
                 var incRows = incDt.AsEnumerable().Select(r => new
                 {
@@ -870,7 +840,6 @@ namespace Finly.ViewModels
                 var incomeTotal = incRows.Sum(x => x.Amount);
                 var expenseTotal = expRows.Sum(x => x.Amount);
 
-                // ===== Category split (Income + Expense prefixes) =====
                 var catDict = new Dictionary<string, decimal>(StringComparer.OrdinalIgnoreCase);
 
                 foreach (var r in incRows)
@@ -892,15 +861,12 @@ namespace Finly.ViewModels
                     .OrderByDescending(x => x.Sum)
                     .ToList();
 
-                // ===== Trend (net: incomes positive, expenses negative) =====
+                // ===== Trend =====
                 var merged = new List<(DateTime Date, decimal Amount)>();
                 merged.AddRange(incRows.Select(x => (x.Date, x.Amount)));
                 merged.AddRange(expRows.Select(x => (x.Date, -x.Amount)));
 
                 var trend = BuildTrendList(merged, from, to, bucket, null);
-
-                // ===== Accounts breakdown for charts/tables =====
-                // (w All chcemy realne "konta bankowe", a nie pustą listę)
                 var byBank = new Dictionary<string, decimal>(StringComparer.OrdinalIgnoreCase);
                 var byFree = new Dictionary<string, decimal>(StringComparer.OrdinalIgnoreCase);
                 var bySaved = new Dictionary<string, decimal>(StringComparer.OrdinalIgnoreCase);
@@ -908,7 +874,6 @@ namespace Finly.ViewModels
 
                 Dictionary<int, string>? accountsCache = null;
 
-                // expenses -> Account/AccountId
                 foreach (var row in expRows)
                 {
                     var amount = row.Amount;
@@ -958,7 +923,6 @@ namespace Finly.ViewModels
                     }
                 }
 
-                // incomes -> Source
                 foreach (var row in incRows)
                 {
                     var name = row.Source ?? "Przychody";
@@ -980,7 +944,6 @@ namespace Finly.ViewModels
                     }
                 }
 
-                // fallback z snapshotu (żeby sekcje nie były puste, gdy brak transakcji w okresie)
                 if (byFree.Count == 0 && snapshot.Cash != 0m)
                     byFree["Wolna gotówka"] = Math.Abs(snapshot.Cash);
 
@@ -1010,7 +973,6 @@ namespace Finly.ViewModels
                     .OrderByDescending(x => x.Sum)
                     .ToList();
 
-                // weekday (net)
                 var weekdays = GroupByWeekday(merged, null);
                 var order = new[]
                 {
@@ -1137,7 +1099,6 @@ namespace Finly.ViewModels
                     rows.Select(r => (r.Date, (decimal)r.Amount)),
                     from, to, bucket, false);
 
-                // Transfery nie są "salda kont" – zostawiamy puste listy (jak wcześniej)
                 var byAccount = new List<(string Name, decimal Sum)>();
                 var byFreeCash = new List<(string Name, decimal Sum)>();
                 var bySavedCash = new List<(string Name, decimal Sum)>();
@@ -1265,10 +1226,6 @@ namespace Finly.ViewModels
             }
         }
 
-        // =========================
-        // Trend + weekday
-        // =========================
-
         private List<(string Label, decimal Value)> BuildTrendList(
             IEnumerable<(DateTime Date, decimal Amount)> items,
             DateTime? from, DateTime? to, string bucket, bool? isExpense)
@@ -1356,10 +1313,6 @@ namespace Finly.ViewModels
             DayOfWeek.Sunday => "Nd",
             _ => d.ToString()
         };
-
-        // =========================
-        // Safe conversions
-        // =========================
 
         private static DateTime SafeDate(object? o)
         {
