@@ -91,7 +91,15 @@
         <Setter Property="Padding" Value="12"/>
     </Style>
 
-    <!-- UWAGA: BasedOn musi zostać StaticResource (DynamicResource tu nie działa) -->
+	<Style x:Key="ReportsAccentCard"
+       TargetType="Border"
+       BasedOn="{StaticResource Card}">
+		<Setter Property="BorderBrush" Value="{DynamicResource Separator.Orange}"/>
+		<Setter Property="BorderThickness" Value="2"/>
+	</Style>
+
+
+	<!-- UWAGA: BasedOn musi zostać StaticResource (DynamicResource tu nie działa) -->
     <Style x:Key="AccentCard" TargetType="Border" BasedOn="{StaticResource Card}">
         <Setter Property="BorderBrush" Value="{DynamicResource Brand.Blue}"/>
         <Setter Property="BorderThickness" Value="2"/>

@@ -10,9 +10,15 @@
 	<Grid Margin="0,0,0,12">
 		<Grid.RowDefinitions>
 			<RowDefinition Height="Auto"/>
+			<!-- KPI -->
+			<RowDefinition Height="Auto"/>
+			<!-- FILTER -->
 			<RowDefinition Height="320"/>
+			<!-- Chart 1 -->
 			<RowDefinition Height="260"/>
+			<!-- Chart 2 -->
 			<RowDefinition Height="*"/>
+			<!-- Table -->
 		</Grid.RowDefinitions>
 
 		<!-- ========== ROW 0: MINI KPI ========== -->
@@ -24,7 +30,7 @@
 			</Grid.ColumnDefinitions>
 
 			<!-- OK -->
-			<Border Grid.Column="0" Style="{StaticResource AccentCard}" Margin="0,0,10,0">
+			<Border Grid.Column="0" Style="{StaticResource ReportsAccentCard}" Margin="0,0,10,0">
 				<StackPanel>
 					<TextBlock Text="Budżety w normie" Style="{StaticResource CardHeader}" FontSize="16" FontWeight="Bold"/>
 					<TextBlock Text="{Binding BudgetsOkCount}" FontSize="34" FontWeight="Bold" Margin="0,10,0,0"/>
@@ -33,7 +39,7 @@
 			</Border>
 
 			<!-- OVER -->
-			<Border Grid.Column="1" Style="{StaticResource AccentCard}" Margin="0,0,10,0">
+			<Border Grid.Column="1" Style="{StaticResource ReportsAccentCard}" Margin="0,0,10,0">
 				<StackPanel>
 					<TextBlock Text="Budżety przekroczone" Style="{StaticResource CardHeader}" FontSize="16" FontWeight="Bold"/>
 					<TextBlock Text="{Binding BudgetsOverCount}" FontSize="34" FontWeight="Bold" Margin="0,10,0,0"/>
@@ -42,7 +48,7 @@
 			</Border>
 
 			<!-- SUMA PRZEKROCZEŃ -->
-			<Border Grid.Column="2" Style="{StaticResource AccentCard}">
+			<Border Grid.Column="2" Style="{StaticResource ReportsAccentCard}">
 				<StackPanel>
 					<TextBlock Text="Suma przekroczeń" Style="{StaticResource CardHeader}" FontSize="16" FontWeight="Bold"/>
 					<TextBlock Text="{Binding BudgetsOverTotalStr}" FontSize="28" FontWeight="Bold" Margin="0,12,0,0"/>
@@ -51,8 +57,38 @@
 			</Border>
 		</Grid>
 
-		<!-- ========== ROW 1: WYKRES TOP 8 (Wydano vs Limit) ========== -->
-		<Border Grid.Row="1" Style="{StaticResource Card}">
+		<!-- ========== ROW 1: FILTER (WYBÓR BUDŻETU) ========== -->
+		<Border Grid.Row="1" Style="{StaticResource Card}" Margin="0,0,0,12">
+			<Grid>
+				<Grid.ColumnDefinitions>
+					<ColumnDefinition Width="Auto"/>
+					<ColumnDefinition Width="320"/>
+					<ColumnDefinition Width="*"/>
+				</Grid.ColumnDefinitions>
+
+				<TextBlock Grid.Column="0"
+                           Text="Budżet:"
+                           VerticalAlignment="Center"
+                           Margin="0,0,10,0"
+                           Opacity="0.85"/>
+
+				<ComboBox Grid.Column="1"
+                          Height="34"
+                          ItemsSource="{Binding BudgetPickerItems}"
+                          DisplayMemberPath="Name"
+                          SelectedValuePath="Id"
+                          SelectedValue="{Binding SelectedBudgetId, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
+
+				<TextBlock Grid.Column="2"
+                           Text="{Binding BudgetPickerHint}"
+                           VerticalAlignment="Center"
+                           Margin="12,0,0,0"
+                           Opacity="0.65"/>
+			</Grid>
+		</Border>
+
+		<!-- ========== ROW 2: WYKRES (Wydano vs Limit) ========== -->
+		<Border Grid.Row="2" Style="{StaticResource Card}">
 			<Grid>
 				<Grid.RowDefinitions>
 					<RowDefinition Height="Auto"/>
@@ -60,7 +96,7 @@
 				</Grid.RowDefinitions>
 
 				<TextBlock Grid.Row="0"
-                           Text="Top 8 budżetów – Wydano vs Limit"
+                           Text="Budżety – Wydano vs Limit"
                            Style="{StaticResource CardHeader}"
                            FontSize="16"
                            FontWeight="Bold"
@@ -74,8 +110,8 @@
 			</Grid>
 		</Border>
 
-		<!-- ========== ROW 2: DRUGI WYKRES (Wykorzystanie %) ========== -->
-		<Border Grid.Row="2" Style="{StaticResource Card}" Margin="0,12,0,0">
+		<!-- ========== ROW 3: WYKRES (Wykorzystanie limitu) ========== -->
+		<Border Grid.Row="3" Style="{StaticResource Card}" Margin="0,12,0,0">
 			<Grid>
 				<Grid.RowDefinitions>
 					<RowDefinition Height="Auto"/>
@@ -83,7 +119,7 @@
 				</Grid.RowDefinitions>
 
 				<TextBlock Grid.Row="0"
-                           Text="Wykorzystanie budżetu (%) – TOP 8"
+                           Text="Budżety – Wykorzystanie limitu (%)"
                            Style="{StaticResource CardHeader}"
                            FontSize="16"
                            FontWeight="Bold"
@@ -97,8 +133,8 @@
 			</Grid>
 		</Border>
 
-		<!-- ========== ROW 3: TABELA PEŁNA (MiniTableControl) ========== -->
-		<Border Grid.Row="3" Style="{StaticResource Card}" Margin="0,12,0,0">
+		<!-- ========== ROW 4: TABELA PEŁNA (MiniTableControl) ========== -->
+		<Border Grid.Row="4" Style="{StaticResource Card}" Margin="0,12,0,0">
 			<Grid>
 				<Grid.RowDefinitions>
 					<RowDefinition Height="Auto"/>
@@ -117,7 +153,6 @@
 				<TextBlock Grid.Row="1"
                            Text="Brak budżetów w systemie.">
 					<TextBlock.Style>
-						<!-- BasedOn MUSI BYĆ StaticResource -->
 						<Style TargetType="TextBlock" BasedOn="{StaticResource MiniTableHintText}">
 							<Setter Property="Visibility" Value="Collapsed"/>
 							<Style.Triggers>
@@ -146,7 +181,6 @@
 										<ColumnDefinition Width="*"/>
 										<ColumnDefinition Width="*"/>
 										<ColumnDefinition Width="*"/>
-										<ColumnDefinition Width="*"/>
 										<ColumnDefinition Width="1.1*"/>
 									</Grid.ColumnDefinitions>
 
@@ -154,9 +188,8 @@
 									<TextBlock Grid.Column="1" Text="Limit" Style="{DynamicResource MiniTableHeaderText}" TextAlignment="Right"/>
 									<TextBlock Grid.Column="2" Text="Wydano" Style="{DynamicResource MiniTableHeaderText}" TextAlignment="Right"/>
 									<TextBlock Grid.Column="3" Text="Pozostało" Style="{DynamicResource MiniTableHeaderText}" TextAlignment="Right"/>
-									<TextBlock Grid.Column="4" Text="% użycia" Style="{DynamicResource MiniTableHeaderText}" TextAlignment="Right"/>
-									<TextBlock Grid.Column="5" Text="Delta" Style="{DynamicResource MiniTableHeaderText}" TextAlignment="Right"/>
-									<TextBlock Grid.Column="6" Text="Status" Style="{DynamicResource MiniTableHeaderText}" TextAlignment="Center"/>
+									<TextBlock Grid.Column="4" Text="Wykorzystanie limitu" Style="{DynamicResource MiniTableHeaderText}" TextAlignment="Right"/>
+									<TextBlock Grid.Column="5" Text="Status" Style="{DynamicResource MiniTableHeaderText}" TextAlignment="Center"/>
 								</Grid>
 							</Border>
 						</DataTemplate>
@@ -172,18 +205,31 @@
 									<ColumnDefinition Width="*"/>
 									<ColumnDefinition Width="*"/>
 									<ColumnDefinition Width="*"/>
-									<ColumnDefinition Width="*"/>
 									<ColumnDefinition Width="1.1*"/>
 								</Grid.ColumnDefinitions>
 
 								<TextBlock Grid.Column="0" Text="{Binding Name}" Style="{DynamicResource MiniTableCellText}"/>
 								<TextBlock Grid.Column="1" Text="{Binding PlannedStr}" Style="{DynamicResource MiniTableCellText}" TextAlignment="Right"/>
 								<TextBlock Grid.Column="2" Text="{Binding SpentStr}" Style="{DynamicResource MiniTableCellText}" TextAlignment="Right"/>
-								<TextBlock Grid.Column="3" Text="{Binding RemainingStr}" Style="{DynamicResource MiniTableCellText}" TextAlignment="Right"/>
-								<TextBlock Grid.Column="4" Text="{Binding UsedPercentStr}" Style="{DynamicResource MiniTableCellText}" TextAlignment="Right"/>
-								<TextBlock Grid.Column="5" Text="{Binding DeltaStr}" Style="{DynamicResource MiniTableCellText}" TextAlignment="Right"/>
 
-								<TextBlock Grid.Column="6" TextAlignment="Center">
+								<!-- Pozostało: opcjonalne wyróżnienie przy przekroczeniu -->
+								<TextBlock Grid.Column="3" Text="{Binding RemainingStr}" TextAlignment="Right">
+									<TextBlock.Style>
+										<Style TargetType="TextBlock" BasedOn="{StaticResource MiniTableCellText}">
+											<Style.Triggers>
+												<DataTrigger Binding="{Binding IsOver}" Value="True">
+													<Setter Property="Foreground" Value="#FFCC2B2B"/>
+													<Setter Property="FontWeight" Value="SemiBold"/>
+												</DataTrigger>
+											</Style.Triggers>
+										</Style>
+									</TextBlock.Style>
+								</TextBlock>
+
+
+								<TextBlock Grid.Column="4" Text="{Binding UsedPercentStr}" Style="{DynamicResource MiniTableCellText}" TextAlignment="Right"/>
+
+								<TextBlock Grid.Column="5" TextAlignment="Center">
 									<TextBlock.Style>
 										<Style TargetType="TextBlock" BasedOn="{StaticResource MiniTableCellText}">
 											<Setter Property="Text" Value="OK"/>
@@ -191,13 +237,12 @@
 											<Style.Triggers>
 												<DataTrigger Binding="{Binding IsOver}" Value="True">
 													<Setter Property="Text" Value="Przekroczony"/>
-													<Setter Property="Foreground" Value="{DynamicResource Separator.Orange}"/>
+													<Setter Property="Foreground" Value="#FFCC2B2B"/>
 												</DataTrigger>
 											</Style.Triggers>
 										</Style>
 									</TextBlock.Style>
 								</TextBlock>
-
 							</Grid>
 						</DataTemplate>
 					</controls:MiniTableControl.RowTemplate>

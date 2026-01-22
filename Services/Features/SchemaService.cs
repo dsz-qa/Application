@@ -266,6 +266,9 @@ CREATE TABLE IF NOT EXISTS CompanyProfiles(
                 AddColumnIfMissing(con, tx, "Budgets", "OverState", "INTEGER", "NOT NULL DEFAULT 0");
                 AddColumnIfMissing(con, tx, "Budgets", "OverNotifiedAt", "TEXT");
 
+                // NOWE (wariant B): Budgets -> Categories
+                AddColumnIfMissing(con, tx, "Budgets", "CategoryId", "INTEGER");
+
                 // Categories
                 AddColumnIfMissing(con, tx, "Categories", "Type", "INTEGER", "NOT NULL DEFAULT 0");
                 AddColumnIfMissing(con, tx, "Categories", "Color", "TEXT");
@@ -312,8 +315,6 @@ CREATE TABLE IF NOT EXISTS CompanyProfiles(
                 AddColumnIfMissing(con, tx, "Investments", "CurrentAmount", "NUMERIC", "NOT NULL DEFAULT 0");
                 AddColumnIfMissing(con, tx, "Investments", "TargetDate", "TEXT");
                 AddColumnIfMissing(con, tx, "Investments", "Description", "TEXT");
-
-                // InvestmentValuations (na wypadek starych baz bez tej tabeli -> brak ALTER, bo to osobna tabela)
 
                 // Envelopes – brakujące kolumny używane w kodzie
                 AddColumnIfMissing(con, tx, "Envelopes", "Deadline", "TEXT");
@@ -379,8 +380,12 @@ CREATE INDEX IF NOT EXISTS IX_BankAccounts_User
     ON BankAccounts(UserId);
 
 CREATE INDEX IF NOT EXISTS IX_BankConnections_User
-    ON BankConnections(UserId);";
+    ON BankConnections(UserId);
 
+-- NOWE: budżety po kategorii (wariant B)
+CREATE INDEX IF NOT EXISTS IX_Budgets_User_Category
+    ON Budgets(UserId, CategoryId);
+";
                 idx.ExecuteNonQuery();
             }
         }

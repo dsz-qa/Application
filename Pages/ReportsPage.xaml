@@ -139,72 +139,92 @@
 		</Style>
 
 		<!-- ===================== Tabs (TabControl) ===================== -->
+
+		<!-- TabControl: brak obcinania + prawy zapas -->
 		<Style x:Key="ReportsTabControl" TargetType="TabControl">
 			<Setter Property="Background" Value="Transparent"/>
 			<Setter Property="BorderThickness" Value="0"/>
 			<Setter Property="Padding" Value="0"/>
+			<Setter Property="SnapsToDevicePixels" Value="True"/>
+			<Setter Property="UseLayoutRounding" Value="True"/>
+			<Setter Property="ClipToBounds" Value="False"/>
 			<Setter Property="Template">
 				<Setter.Value>
 					<ControlTemplate TargetType="TabControl">
-						<Grid>
+						<Grid ClipToBounds="False">
 							<Grid.RowDefinitions>
 								<RowDefinition Height="Auto"/>
 								<RowDefinition Height="*"/>
 							</Grid.RowDefinitions>
 
-							<!-- pasek zakładek -->
-							<Border Background="Transparent" Grid.Row="0">
+							<!-- pasek zakładek (dajemy wewnętrzny prawy zapas, żeby ostatnia ramka nie była ucinana) -->
+							<Border Grid.Row="0"
+                                    Background="Transparent"
+                                    ClipToBounds="False"
+                                    Padding="0,0,18,0">
 								<TabPanel x:Name="HeaderPanel"
                                           IsItemsHost="True"
                                           HorizontalAlignment="Center"
-                                          Margin="0,0,0,10"/>
+                                          Margin="0,0,0,10"
+                                          ClipToBounds="False"/>
 							</Border>
 
 							<!-- treść -->
-							<ContentPresenter Grid.Row="1"
-                                              ContentSource="SelectedContent"/>
+							<Border Grid.Row="1" Background="Transparent" ClipToBounds="False">
+								<ContentPresenter ContentSource="SelectedContent"/>
+							</Border>
 						</Grid>
 					</ControlTemplate>
 				</Setter.Value>
 			</Setter>
 		</Style>
 
-		<!-- Zakładki: prostokąt, zawsze niebieskie wypełnienie, po wyborze pomarańczowa ramka -->
+		<!-- TabItem: zawsze niebieskie, Selected = pomarańczowa ramka (nieucinana) -->
 		<Style x:Key="ReportsTabItem" TargetType="TabItem">
 			<Setter Property="Foreground" Value="White"/>
 			<Setter Property="FontWeight" Value="SemiBold"/>
-			<Setter Property="Margin" Value="6,0,6,0"/>
-			<Setter Property="Padding" Value="16,10"/>
 			<Setter Property="Background" Value="{DynamicResource Brand.Blue}"/>
-			<Setter Property="BorderBrush" Value="{DynamicResource Brand.Blue}"/>
-			<Setter Property="BorderThickness" Value="2"/>
+			<Setter Property="BorderBrush" Value="Transparent"/>
+			<Setter Property="BorderThickness" Value="3"/>
+			<Setter Property="Padding" Value="18,10"/>
+			<Setter Property="Margin" Value="8,0,8,0"/>
+			<Setter Property="Panel.ZIndex" Value="0"/>
+			<Setter Property="SnapsToDevicePixels" Value="True"/>
+			<Setter Property="UseLayoutRounding" Value="True"/>
 			<Setter Property="Template">
 				<Setter.Value>
 					<ControlTemplate TargetType="TabItem">
-						<Border x:Name="Bd"
-                                Background="{TemplateBinding Background}"
+						<!-- Outer = ramka; Inner = wypełnienie -->
+						<Border x:Name="Outer"
+                                Background="Transparent"
                                 BorderBrush="{TemplateBinding BorderBrush}"
                                 BorderThickness="{TemplateBinding BorderThickness}"
-                                CornerRadius="0"
-                                Padding="{TemplateBinding Padding}">
-							<ContentPresenter ContentSource="Header"
-                                              HorizontalAlignment="Center"
-                                              VerticalAlignment="Center"/>
+                                Padding="2"
+                                SnapsToDevicePixels="True">
+							<Border x:Name="Inner"
+                                    Background="{TemplateBinding Background}"
+                                    Padding="{TemplateBinding Padding}">
+								<ContentPresenter ContentSource="Header"
+                                                  HorizontalAlignment="Center"
+                                                  VerticalAlignment="Center"/>
+							</Border>
 						</Border>
 
 						<ControlTemplate.Triggers>
+
 							<Trigger Property="IsSelected" Value="True">
-								<Setter TargetName="Bd" Property="BorderBrush" Value="{DynamicResource Separator.Orange}"/>
-								<Setter TargetName="Bd" Property="BorderThickness" Value="3"/>
+								<Setter Property="Panel.ZIndex" Value="10"/>
+								<Setter TargetName="Outer" Property="BorderBrush" Value="{DynamicResource Separator.Orange}"/>
 							</Trigger>
 
 							<Trigger Property="IsMouseOver" Value="True">
-								<Setter TargetName="Bd" Property="Opacity" Value="0.95"/>
+								<Setter TargetName="Inner" Property="Opacity" Value="0.95"/>
 							</Trigger>
 
 							<Trigger Property="IsEnabled" Value="False">
-								<Setter TargetName="Bd" Property="Opacity" Value="0.55"/>
+								<Setter TargetName="Inner" Property="Opacity" Value="0.55"/>
 							</Trigger>
+
 						</ControlTemplate.Triggers>
 					</ControlTemplate>
 				</Setter.Value>
@@ -213,13 +233,13 @@
 
 	</UserControl.Resources>
 
-	<!-- Kluczowe: ScrollViewer tylko do całej strony (OK),
-         a w samym OverviewTab masz MiniTable z własnym scrollowaniem. -->
+	<!-- ScrollViewer dla całej strony -->
 	<ScrollViewer VerticalScrollBarVisibility="Auto"
                   HorizontalScrollBarVisibility="Disabled"
-                  PanningMode="VerticalOnly">
+                  PanningMode="VerticalOnly"
+                  ClipToBounds="False">
 
-		<Grid Margin="8,0,8,12">
+		<Grid Margin="8,0,8,12" ClipToBounds="False">
 			<Grid.RowDefinitions>
 				<RowDefinition Height="Auto"/>
 				<RowDefinition Height="Auto"/>
@@ -228,7 +248,7 @@
 			</Grid.RowDefinitions>
 
 			<!-- ROW 0: KPI -->
-			<Grid Grid.Row="0" Margin="0,0,0,12">
+			<Grid Grid.Row="0" Margin="0,0,0,12" ClipToBounds="False">
 				<Grid.ColumnDefinitions>
 					<ColumnDefinition Width="*"/>
 					<ColumnDefinition Width="*"/>
@@ -323,7 +343,7 @@
 			</Grid>
 
 			<!-- ROW 1: PeriodBar -->
-			<Border Grid.Row="1" Background="Transparent" Margin="0,0,0,8">
+			<Border Grid.Row="1" Background="Transparent" Margin="0,0,0,8" ClipToBounds="False">
 				<controls:PeriodBarControl x:Name="PeriodBar"
                                            HorizontalAlignment="Center"
                                            StartDate="{Binding FromDate, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
@@ -331,7 +351,7 @@
 			</Border>
 
 			<!-- ROW 2: Export global -->
-			<Border Grid.Row="2" Background="Transparent" Margin="0,0,0,12">
+			<Border Grid.Row="2" Background="Transparent" Margin="0,0,0,12" ClipToBounds="False">
 				<Button Content="Pobierz raport całościowy (PDF)"
                         Style="{DynamicResource PrimaryButton}"
                         HorizontalAlignment="Center"
@@ -342,26 +362,21 @@
                         Click="ExportButton_Click"/>
 			</Border>
 
-			<!-- ROW 3: Tabs + treść (lazy-load w code-behind) -->
+			<!-- ROW 3: Tabs + treść -->
 			<TabControl x:Name="ReportsTabs"
-						Grid.Row="3"
-						Style="{StaticResource ReportsTabControl}"
-						SelectedIndex="{Binding SelectedTabIndex, Mode=TwoWay}">
+                        Grid.Row="3"
+                        Style="{StaticResource ReportsTabControl}"
+                        ItemContainerStyle="{StaticResource ReportsTabItem}"
+                        SelectedIndex="{Binding SelectedTabIndex, Mode=TwoWay}">
 
-				<TabItem Header="Przegląd ogólny" Style="{StaticResource ReportsTabItem}" />
-
-				<TabItem Header="Budżety" Style="{StaticResource ReportsTabItem}" />
-
-				<TabItem Header="Kredyty" Style="{StaticResource ReportsTabItem}" />
-
-				<TabItem Header="Cele" Style="{StaticResource ReportsTabItem}" />
-
-				<TabItem Header="Inwestycje" Style="{StaticResource ReportsTabItem}" />
-
-				<TabItem Header="Symulacja" Style="{StaticResource ReportsTabItem}" />
+				<TabItem Header="Przegląd ogólny"/>
+				<TabItem Header="Budżety"/>
+				<TabItem Header="Kredyty"/>
+				<TabItem Header="Cele"/>
+				<TabItem Header="Inwestycje"/>
+				<TabItem Header="Symulacja"/>
 
 			</TabControl>
-
 
 		</Grid>
 	</ScrollViewer>

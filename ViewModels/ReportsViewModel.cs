@@ -52,6 +52,14 @@ namespace Finly.ViewModels
             Investments = new ObservableCollection<InvestmentRow>();
             PlannedSim = new ObservableCollection<PlannedRow>();
 
+            // Picker budżetów: ustaw od razu sensowną pozycję,
+            // aby ComboBox nie próbował renderować typu i nie pokazywał namespace.
+            BudgetPickerItems = new ObservableCollection<BudgetPickerItem>
+            {
+                BudgetPickerItem.Top8()
+            };
+            _selectedBudgetId = BudgetPickerItem.Top8Id;
+
             // Komendy
             RefreshCommand = new RelayCommand(_ => _ = RefreshAsync());
             ExportPdfCommand = new RelayCommand(param => ExportPdf(param?.ToString()));
@@ -467,21 +475,42 @@ namespace Finly.ViewModels
         public string CompareExpensesText
         {
             get => _compareExpensesText;
-            private set { if (_compareExpensesText != value) { _compareExpensesText = value; Raise(nameof(CompareExpensesText)); } }
+            private set
+            {
+                if (_compareExpensesText != value)
+                {
+                    _compareExpensesText = value;
+                    Raise(nameof(CompareExpensesText));
+                }
+            }
         }
 
         private string _compareIncomesText = "";
         public string CompareIncomesText
         {
             get => _compareIncomesText;
-            private set { if (_compareIncomesText != value) { _compareIncomesText = value; Raise(nameof(CompareIncomesText)); } }
+            private set
+            {
+                if (_compareIncomesText != value)
+                {
+                    _compareIncomesText = value;
+                    Raise(nameof(CompareIncomesText));
+                }
+            }
         }
 
         private string _compareBalanceText = "";
         public string CompareBalanceText
         {
             get => _compareBalanceText;
-            private set { if (_compareBalanceText != value) { _compareBalanceText = value; Raise(nameof(CompareBalanceText)); } }
+            private set
+            {
+                if (_compareBalanceText != value)
+                {
+                    _compareBalanceText = value;
+                    Raise(nameof(CompareBalanceText));
+                }
+            }
         }
 
         // =========================
@@ -684,7 +713,6 @@ namespace Finly.ViewModels
         private Axis[] _budgetsAxesY = Array.Empty<Axis>();
         public Axis[] BudgetsAxesY { get => _budgetsAxesY; private set { _budgetsAxesY = value; Raise(nameof(BudgetsAxesY)); } }
 
-        // NOWY: Budgets usage (%)
         private ISeries[] _budgetsUsageSeries = Array.Empty<ISeries>();
         public ISeries[] BudgetsUsageSeries { get => _budgetsUsageSeries; private set { _budgetsUsageSeries = value; Raise(nameof(BudgetsUsageSeries)); } }
 
@@ -743,7 +771,6 @@ namespace Finly.ViewModels
         {
             var txLabels = new[] { "Wydatki", "Przychody", "Transfery" };
 
-            // Overview: COUNT
             OverviewCountAxesX = new[] { CreateAxisX(txLabels) };
             OverviewCountAxesY = new[] { CreateAxisY(min: 0) };
             OverviewCountSeries = new ISeries[]
@@ -751,7 +778,6 @@ namespace Finly.ViewModels
                 new ColumnSeries<double?> { Name = "Ilość", Values = new double?[] { null, null, null } }
             };
 
-            // Overview: AMOUNT
             OverviewAmountAxesX = new[] { CreateAxisX(txLabels) };
             OverviewAmountAxesY = new[] { CreateAxisY(min: 0) };
             OverviewAmountSeries = new ISeries[]
@@ -759,7 +785,6 @@ namespace Finly.ViewModels
                 new ColumnSeries<double?> { Name = "Wartość (zł)", Values = new double?[] { null, null, null } }
             };
 
-            // Budżety: Wydano vs Limit
             BudgetsAxesX = new[] { CreateAxisX(SafeLabels(null)) };
             BudgetsAxesY = new[] { CreateAxisY(min: 0) };
             BudgetsSeries = new ISeries[]
@@ -768,7 +793,6 @@ namespace Finly.ViewModels
                 new ColumnSeries<double> { Name = "Limit",  Values = SafeValues(null) }
             };
 
-            // Budżety: Usage %
             BudgetsUsageAxesX = new[] { CreateAxisX(SafeLabels(null)) };
             BudgetsUsageAxesY = new[] { CreateAxisY(min: 0, max: 160) };
             BudgetsUsageSeries = new ISeries[]
@@ -776,7 +800,6 @@ namespace Finly.ViewModels
                 new ColumnSeries<double> { Name = "Użycie (%)", Values = SafeValues(null) }
             };
 
-            // Inwestycje
             InvestmentsAxesX = new[] { CreateAxisX(SafeLabels(null)) };
             InvestmentsAxesY = new[] { CreateAxisY(min: 0) };
             InvestmentsSeries = new ISeries[]
@@ -784,12 +807,10 @@ namespace Finly.ViewModels
                 new ColumnSeries<double> { Name = "Zysk/Strata", Values = SafeValues(null) }
             };
 
-            // Donuty
             ExpenseDonutSeries = Array.Empty<ISeries>();
             IncomeDonutSeries = Array.Empty<ISeries>();
             TransferDonutSeries = Array.Empty<ISeries>();
 
-            // Kredyty
             LoansAxesX = new[] { CreateAxisX(SafeLabels(null)) };
             LoansAxesY = new[] { CreateAxisY(min: 0) };
             LoansSeries = new ISeries[]
@@ -799,7 +820,6 @@ namespace Finly.ViewModels
                 new ColumnSeries<double> { Name = "Pozostało", Values = SafeValues(null) }
             };
 
-            // Cele
             GoalsAxesX = new[] { CreateAxisX(SafeLabels(null)) };
             GoalsAxesY = new[] { CreateAxisY(min: 0, max: 100) };
             GoalsSeries = new ISeries[]
@@ -807,7 +827,6 @@ namespace Finly.ViewModels
                 new ColumnSeries<double> { Name = "Postęp (%)", Values = SafeValues(null) }
             };
 
-            // Symulacja
             SimulationAxesX = new[] { CreateAxisX(SafeLabels(null)) };
             SimulationAxesY = new[] { CreateAxisY(min: null) };
             SimulationSeries = new ISeries[]
@@ -849,11 +868,6 @@ namespace Finly.ViewModels
             public double SumTrf { get; init; }
 
             public List<BudgetRow> Budgets { get; init; } = new();
-            public string[] BudgetLabels { get; init; } = Array.Empty<string>();
-            public double[] BudgetSpent { get; init; } = Array.Empty<double>();
-            public double[] BudgetLimit { get; init; } = Array.Empty<double>();
-            public double[] BudgetUsagePercent { get; init; } = Array.Empty<double>();
-
             public List<LoanRow> Loans { get; init; } = new();
             public List<GoalRow> Goals { get; init; } = new();
 
@@ -907,57 +921,94 @@ namespace Finly.ViewModels
 
             // Budżety
             var budgetsRows = new List<BudgetRow>();
-            string[] budgetLabels = new[] { "" };
-            double[] budgetSpent = new[] { 0d };
-            double[] budgetLimit = new[] { 0d };
-            double[] budgetUsage = new[] { 0d };
-
             try
             {
-                var spentByCategory = cur.Where(r => r.Type == "Wydatek")
+                var spentByCategoryId = cur
+                    .Where(r => r.Type == "Wydatek")
+                    .GroupBy(r => r.CategoryId) // int?
+                    .ToDictionary(g => g.Key, g => g.Sum(x => Math.Abs(x.Amount)));
+
+                var spentByCategoryName = cur
+                    .Where(r => r.Type == "Wydatek")
                     .GroupBy(r => string.IsNullOrWhiteSpace(r.Category) ? "(brak kategorii)" : r.Category)
                     .ToDictionary(g => g.Key, g => g.Sum(x => Math.Abs(x.Amount)));
 
                 var rawBudgets = BudgetService.GetBudgetsWithSummary(uid) ?? new List<BudgetService.BudgetSummary>();
 
+                var bsType = typeof(BudgetService.BudgetSummary);
+                var pCategoryId = bsType.GetProperty("CategoryId");
+                var pCategoryName = bsType.GetProperty("CategoryName") ?? bsType.GetProperty("Category") ?? bsType.GetProperty("CategoryTitle");
+
+                int? ReadCategoryId(BudgetService.BudgetSummary b)
+                {
+                    try
+                    {
+                        if (pCategoryId == null) return null;
+                        var v = pCategoryId.GetValue(b);
+                        if (v == null) return null;
+
+                        if (v is int i) return i;
+                        if (v is long l) return checked((int)l);
+
+                        return Convert.ToInt32(v, CultureInfo.InvariantCulture);
+                    }
+                    catch
+                    {
+                        return null;
+                    }
+                }
+
+                string? ReadCategoryName(BudgetService.BudgetSummary b)
+                {
+                    try
+                    {
+                        if (pCategoryName == null) return null;
+                        var v = pCategoryName.GetValue(b)?.ToString();
+                        return string.IsNullOrWhiteSpace(v) ? null : v;
+                    }
+                    catch
+                    {
+                        return null;
+                    }
+                }
+
                 foreach (var b in rawBudgets)
                 {
                     var plannedAmount = b.PlannedAmount;
-                    var spentAmount = b.Spent;
 
-                    // jeśli nazwa budżetu pokrywa się z kategorią -> licz wydatki z okresu
-                    if (!string.IsNullOrWhiteSpace(b.Name) && spentByCategory.TryGetValue(b.Name, out var inPeriod))
-                        spentAmount = inPeriod;
+                    var budgetCatId = ReadCategoryId(b);
+                    decimal spentInPeriod = 0m;
+
+                    if (budgetCatId != null && spentByCategoryId.TryGetValue(budgetCatId, out var byId))
+                    {
+                        spentInPeriod = byId;
+                    }
+                    else
+                    {
+                        var catName = ReadCategoryName(b);
+                        var key = !string.IsNullOrWhiteSpace(catName)
+                            ? catName
+                            : (!string.IsNullOrWhiteSpace(b.Name) ? b.Name : "(brak kategorii)");
+
+                        if (spentByCategoryName.TryGetValue(key, out var byName))
+                            spentInPeriod = byName;
+                    }
 
                     budgetsRows.Add(new BudgetRow
                     {
                         Id = b.Id,
                         Name = b.Name ?? "(budżet)",
                         Planned = plannedAmount,
-                        Spent = spentAmount
+                        Spent = spentInPeriod
                     });
                 }
-
-                var topBudgets = budgetsRows.OrderByDescending(b => b.Planned).Take(8).ToList();
-                budgetLabels = topBudgets.Select(x => x.Name).ToArray();
-                budgetSpent = topBudgets.Select(x => (double)x.Spent).ToArray();
-                budgetLimit = topBudgets.Select(x => (double)x.Planned).ToArray();
-
-                budgetUsage = topBudgets
-                    .Select(x => x.Planned <= 0 ? 0d : (double)(x.Spent / x.Planned * 100m))
-                    .ToArray();
-
-                if (budgetLabels.Length == 0) budgetLabels = new[] { "" };
-                if (budgetSpent.Length == 0) budgetSpent = new[] { 0d };
-                if (budgetLimit.Length == 0) budgetLimit = new[] { 0d };
-                if (budgetUsage.Length == 0) budgetUsage = new[] { 0d };
             }
             catch
             {
-                // budżety zostają na placeholderach
+                // budżety zostają puste; UI nie powinno polecieć
             }
 
-            // Kredyty – minimal, żeby nie wywalać się na zależnościach
+            // Kredyty – minimal placeholder
             var loans = new List<LoanRow>();
             try
             {
@@ -1003,14 +1054,8 @@ namespace Finly.ViewModels
             // Symulacja – placeholder
             var plannedTx = new List<PlannedRow>();
             decimal simDelta = 0m;
-            string[] simLabels = new[] { "" };
-            double[] simValues = new[] { 0d };
 
-            try
-            {
-                simDelta = plannedTx.Sum(x => x.Amount);
-            }
-            catch { simDelta = 0m; }
+            try { simDelta = plannedTx.Sum(x => x.Amount); } catch { simDelta = 0m; }
 
             return new ReportsSnapshot
             {
@@ -1034,19 +1079,114 @@ namespace Finly.ViewModels
                 SumTrf = sumTrf,
 
                 Budgets = budgetsRows,
-                BudgetLabels = budgetLabels,
-                BudgetSpent = budgetSpent,
-                BudgetLimit = budgetLimit,
-                BudgetUsagePercent = budgetUsage,
-
                 Loans = loans,
                 Goals = goals,
 
                 Planned = plannedTx,
                 SimDelta = simDelta,
-                SimLabels = simLabels,
-                SimValues = simValues
+                SimLabels = new[] { "" },
+                SimValues = new[] { 0d }
             };
+        }
+
+        // =========================
+        // Budgets picker (ComboBox)
+        // =========================
+        public sealed class BudgetPickerItem
+        {
+            public const int Top8Id = -1;
+
+            public int Id { get; init; }         // -1 = TOP 8
+            public string Name { get; init; } = "";
+
+            public static BudgetPickerItem Top8() => new BudgetPickerItem { Id = Top8Id, Name = "TOP 8 budżetów" };
+
+            // Kluczowe: gdyby gdzieś w XAML jednak nie zadziałał DisplayMemberPath,
+            // ToString i tak zapewni poprawny tekst zamiast namespace.
+            public override string ToString() => Name;
+        }
+
+        private ObservableCollection<BudgetPickerItem> _budgetPickerItems = new();
+        public ObservableCollection<BudgetPickerItem> BudgetPickerItems
+        {
+            get => _budgetPickerItems;
+            private set { _budgetPickerItems = value; Raise(nameof(BudgetPickerItems)); }
+        }
+
+        private int _selectedBudgetId = BudgetPickerItem.Top8Id;
+        public int SelectedBudgetId
+        {
+            get => _selectedBudgetId;
+            set
+            {
+                if (_selectedBudgetId != value)
+                {
+                    _selectedBudgetId = value;
+                    Raise(nameof(SelectedBudgetId));
+                    Raise(nameof(BudgetPickerHint));
+                    RebuildBudgetChartsFromCurrentBudgets();
+                }
+            }
+        }
+
+        public string BudgetPickerHint
+            => SelectedBudgetId == BudgetPickerItem.Top8Id
+                ? "Widok: TOP 8 budżetów (domyślnie)."
+                : "Widok: wybrany budżet.";
+
+        private void RebuildBudgetChartsFromCurrentBudgets()
+        {
+            try
+            {
+                var list = Budgets?.ToList() ?? new List<BudgetRow>();
+                List<BudgetRow> display;
+
+                if (SelectedBudgetId == BudgetPickerItem.Top8Id)
+                {
+                    display = list
+                        .OrderByDescending(b => b.Planned)
+                        .Take(8)
+                        .ToList();
+                }
+                else
+                {
+                    display = list.Where(b => b.Id == SelectedBudgetId).ToList();
+                    if (display.Count == 0)
+                    {
+                        _selectedBudgetId = BudgetPickerItem.Top8Id;
+                        Raise(nameof(SelectedBudgetId));
+                        Raise(nameof(BudgetPickerHint));
+                        display = list.OrderByDescending(b => b.Planned).Take(8).ToList();
+                    }
+                }
+
+                var labels = display.Select(x => x.Name).DefaultIfEmpty("").ToArray();
+                var spent = display.Select(x => (double)x.Spent).DefaultIfEmpty(0d).ToArray();
+                var lim = display.Select(x => (double)x.Planned).DefaultIfEmpty(0d).ToArray();
+                var usage = display
+                    .Select(x => x.Planned <= 0 ? 0d : (double)(x.Spent / x.Planned * 100m))
+                    .DefaultIfEmpty(0d)
+                    .ToArray();
+
+                BudgetsAxesX = new[] { CreateAxisX(labels) };
+                BudgetsAxesY = new[] { CreateAxisY(min: 0) };
+                BudgetsSeries = new ISeries[]
+                {
+                    new ColumnSeries<double> { Name = "Wydano", Values = spent },
+                    new ColumnSeries<double> { Name = "Limit",  Values = lim }
+                };
+
+                BudgetsUsageAxesX = new[] { CreateAxisX(labels) };
+                BudgetsUsageAxesY = new[] { CreateAxisY(min: 0, max: 160) };
+                BudgetsUsageSeries = new ISeries[]
+                {
+                    new ColumnSeries<double> { Name = "Wykorzystanie (%)", Values = usage }
+                };
+            }
+            catch
+            {
+                // UI ma nie polecieć
+            }
         }
 
         // =========================
@@ -1121,7 +1261,6 @@ namespace Finly.ViewModels
             OverviewAmountAxesX = new[] { CreateAxisX(xLabels) };
             OverviewAmountAxesY = new[] { CreateAxisY(min: 0) };
 
-            // 3 osobne serie z wartościami w odpowiednich slotach (czytelne i stabilne)
             OverviewCountSeries = new ISeries[]
             {
                 new StackedColumnSeries<double?>
@@ -1176,39 +1315,49 @@ namespace Finly.ViewModels
             BudgetsOverCount = budgetsList.Count(b => b.IsOver);
             BudgetsOverTotal = budgetsList.Where(b => b.IsOver).Sum(b => b.Delta);
 
-            // 6) Budżety: wykres Wydano vs Limit (TOP8)
-            var bx = (s.BudgetLabels != null && s.BudgetLabels.Length > 0) ? s.BudgetLabels : new[] { "" };
-            var bs = (s.BudgetSpent != null && s.BudgetSpent.Length > 0) ? s.BudgetSpent : new[] { 0d };
-            var bl = (s.BudgetLimit != null && s.BudgetLimit.Length > 0) ? s.BudgetLimit : new[] { 0d };
-
-            BudgetsAxesX = new[] { CreateAxisX(bx) };
-            BudgetsAxesY = new[] { CreateAxisY(min: 0) };
-            BudgetsSeries = new ISeries[]
+            // 5a) Picker budżetów (ComboBox)
+            try
             {
-                new ColumnSeries<double> { Name = "Wydano", Values = bs },
-                new ColumnSeries<double> { Name = "Limit",  Values = bl }
-            };
+                var picker = new ObservableCollection<BudgetPickerItem>
+                {
+                    BudgetPickerItem.Top8()
+                };
 
-            // 7) Budżety: wykres użycia %
-            var bu = (s.BudgetUsagePercent != null && s.BudgetUsagePercent.Length > 0) ? s.BudgetUsagePercent : new[] { 0d };
-            BudgetsUsageAxesX = new[] { CreateAxisX(bx) };
-            BudgetsUsageAxesY = new[] { CreateAxisY(min: 0, max: 160) };
-            BudgetsUsageSeries = new ISeries[]
+                foreach (var b in budgetsList
+                             .Where(x => !string.IsNullOrWhiteSpace(x.Name))
+                             .OrderBy(x => x.Name))
+                {
+                    picker.Add(new BudgetPickerItem { Id = b.Id, Name = b.Name });
+                }
+
+                BudgetPickerItems = picker;
+
+                if (SelectedBudgetId != BudgetPickerItem.Top8Id && !picker.Any(x => x.Id == SelectedBudgetId))
+                {
+                    _selectedBudgetId = BudgetPickerItem.Top8Id;
+                    Raise(nameof(SelectedBudgetId));
+                    Raise(nameof(BudgetPickerHint));
+                }
+            }
+            catch
             {
-                new ColumnSeries<double> { Name = "Użycie (%)", Values = bu }
-            };
+                // nic – nie wywalamy UI
+            }
 
-            // 8) Kredyty
+            // 6) Budżety: wykresy buduj z bieżącej kolekcji Budgets + SelectedBudgetId
+            RebuildBudgetChartsFromCurrentBudgets();
+
+            // 7) Kredyty
             Loans.Clear();
             foreach (var l in s.Loans ?? new List<LoanRow>())
                 Loans.Add(l);
 
-            // 9) Cele
+            // 8) Cele
             Goals.Clear();
             foreach (var g in s.Goals ?? new List<GoalRow>())
                 Goals.Add(g);
 
-            // 10) Symulacja
+            // 9) Symulacja
             PlannedSim.Clear();
             foreach (var p in (s.Planned ?? new List<PlannedRow>()).OrderBy(x => x.Date))
                 PlannedSim.Add(p);
@@ -1230,7 +1379,7 @@ namespace Finly.ViewModels
                 }
             };
 
-            // 11) Donuty (placeholder)
+            // 10) Donuty (placeholder)
             ExpenseDonutSeries = Array.Empty<ISeries>();
             IncomeDonutSeries = Array.Empty<ISeries>();
             TransferDonutSeries = Array.Empty<ISeries>();

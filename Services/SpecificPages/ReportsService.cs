@@ -2,7 +2,6 @@
 using System.Collections.Generic;
 using System.Data;
 using System.Globalization;
-using System.Linq;
 using Finly.Services.Features;
 
 namespace Finly.Services.SpecificPages
@@ -12,25 +11,25 @@ namespace Finly.Services.SpecificPages
         public sealed class ReportItem
         {
             public DateTime Date { get; set; }
+
+            // NOWE (wariant B): stabilne mapowanie po CategoryId
+            public int? CategoryId { get; set; }
+
             public string Category { get; set; } = "";
             public decimal Amount { get; set; }          // Wydatek: ujemny, Przychód: dodatni, Transfer: dodatni
             public string Account { get; set; } = "";
             public string Type { get; set; } = "";      // "Wydatek" / "Przychód" / "Transfer"
         }
 
-
         private static readonly object _transferLock = new();
         private static bool _transferSqlInitialized;
         private static string? _cachedTransferSql;
-
 
         /// <summary>
         /// Ładuje raport transakcji w zadanym okresie.
         /// transactionType: "Wszystko" | "Wydatki" | "Przychody" | "Transfery"
         /// category: "Wszystkie kategorie" lub konkretna nazwa kategorii
         /// </summary>
-        /// 
-
         public static List<ReportItem> LoadReport(
             int userId,
             string category,
@@ -103,10 +102,22 @@ WHERE 1=1
                 var dateStr = r["TxDate"]?.ToString();
                 _ = DateTime.TryParse(dateStr, out var dt);
 
+                int? catId = null;
+                try
+                {
+                    if (r["CategoryId"] != DBNull.Value)
+                        catId = Convert.ToInt32(r["CategoryId"], CultureInfo.InvariantCulture);
+                }
+                catch
+                {
+                    catId = null;
+                }
+
                 result.Add(new ReportItem
                 {
                     Date = dt == default ? DateTime.MinValue : dt,
                     Type = r["TxType"]?.ToString() ?? "",
+                    CategoryId = catId,
                     Category = r["CategoryName"]?.ToString() ?? "(brak kategorii)",
                     Account = r["AccountName"]?.ToString() ?? "",
                     Amount = SafeDecimal(r["Amount"])
@@ -115,7 +126,6 @@ WHERE 1=1
 
             return result;
         }
-
 
         private static string? GetCachedTransfersSql(IDbConnection con)
         {
@@ -138,6 +148,7 @@ WHERE 1=1
 SELECT 
     e.Date                                   AS TxDate,
     'Wydatek'                                AS TxType,
+    c.Id                                     AS CategoryId,
     COALESCE(c.Name,'(brak kategorii)')      AS CategoryName,
     ''                                       AS AccountName,
     (ABS(e.Amount) * -1)                     AS Amount
@@ -152,6 +163,7 @@ WHERE e.UserId = @uid
 SELECT 
     i.Date                                   AS TxDate,
     'Przychód'                               AS TxType,
+    c.Id                                     AS CategoryId,
     COALESCE(c.Name,'(brak kategorii)')      AS CategoryName,
     ''                                       AS AccountName,
     ABS(i.Amount)                            AS Amount
@@ -163,12 +175,8 @@ WHERE i.UserId = @uid
 ";
 
         // =========================
-        // Transfery – “best effort”
+        // Transfery – best effort
         // =========================
-        /// <summary>
-        /// Próbuje zbudować SQL na transfery.
-        /// Jeśli nie znajdziemy sensownej tabeli – zwraca null/empty i raport działa dalej (transfery będą 0).
-        /// </summary>
         private static string? TryBuildTransfersSql(IDbConnection con)
         {
             // typowe nazwy tabel spotykane w apkach finansowych
@@ -179,7 +187,7 @@ WHERE i.UserId = @uid
                 "BankTransfers",
                 "MoneyTransfers",
                 "InternalTransfers",
-                "Transactions" // czasem transfery są w ogólnej tabeli
+                "Transactions"
             };
 
             var existing = GetExistingTables(con);
@@ -191,34 +199,36 @@ WHERE i.UserId = @uid
 
                 var cols = GetTableColumns(con, table);
 
-                // Minimalny zestaw: Date, Amount, UserId, IsPlanned
-                // + opcjonalnie CategoryId (dla wykresów kategorii transferów)
                 if (!HasCol(cols, "Date") || !HasCol(cols, "Amount") || !HasCol(cols, "UserId"))
                     continue;
 
-                // IsPlanned może nie istnieć – wtedy traktujemy jak 0
                 var hasIsPlanned = HasCol(cols, "IsPlanned");
 
-                // CategoryId może nie istnieć – wtedy CategoryName damy "(brak kategorii)"
+                // UWAGA: Twoja tabela Transfers nie ma CategoryId, więc zwykle to będzie false.
                 var hasCategoryId = HasCol(cols, "CategoryId");
 
-                // budujemy SQL “dopasowany” do tabeli
                 var isPlannedFilter = hasIsPlanned ? "AND IFNULL(t.IsPlanned,0) = 0" : "";
+
                 var categoryJoin = hasCategoryId
                     ? "LEFT JOIN Categories c ON c.Id = t.CategoryId"
                     : "";
-                var categorySelect = hasCategoryId
+
+                var categoryIdSelect = hasCategoryId
+                    ? "c.Id"
+                    : "NULL";
+
+                var categoryNameSelect = hasCategoryId
                     ? "COALESCE(c.Name,'(brak kategorii)')"
                     : "'(brak kategorii)'";
 
-                // accounty: jeśli są pola From/To, możemy coś złożyć w string, ale to opcjonalne
                 var accountExpr = BuildTransferAccountExpr(cols);
 
                 return $@"
 SELECT
     t.Date                      AS TxDate,
     'Transfer'                  AS TxType,
-    {categorySelect}            AS CategoryName,
+    {categoryIdSelect}          AS CategoryId,
+    {categoryNameSelect}        AS CategoryName,
     {accountExpr}               AS AccountName,
     ABS(t.Amount)               AS Amount
 FROM {table} t
@@ -229,23 +239,17 @@ WHERE t.UserId = @uid
 ";
             }
 
-            // Nie znaleźliśmy nic sensownego
             return null;
         }
 
         private static string BuildTransferAccountExpr(HashSet<string> cols)
         {
-            // Jeśli masz w tabeli transferów np. FromAccountName/ToAccountName lub FromAccountId/ToAccountId,
-            // to tu później dopniesz joiny. Na teraz: składamy czytelny placeholder, jeśli są kolumny tekstowe.
-
-            // Spotykane warianty:
             var fromName = FirstExisting(cols, "FromAccountName", "FromName", "SourceAccountName");
             var toName = FirstExisting(cols, "ToAccountName", "ToName", "TargetAccountName");
 
             if (!string.IsNullOrWhiteSpace(fromName) && !string.IsNullOrWhiteSpace(toName))
                 return $"(COALESCE(t.{fromName},'') || ' → ' || COALESCE(t.{toName},''))";
 
-            // Jak nie ma nazw, zostawiamy puste
             return "''";
         }
 
