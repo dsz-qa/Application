@@ -18,23 +18,27 @@ namespace Finly.Views.Dialogs
         public EditBankAccountDialog()
         {
             InitializeComponent();
-
-            Loaded += (_, __) =>
-            {
-                // domyślnie zaznacz "Inny bank"
-                SelectBankInCombo("Inny bank");
-            };
         }
 
         public void SetMode(DialogMode mode)
         {
             _mode = mode;
 
-            HeaderTitleText.Text = mode == DialogMode.Add ? "Dodaj konto bankowe" : "Edytuj konto bankowe";
+            HeaderTitleText.Text = mode == DialogMode.Add
+                ? "Dodaj konto bankowe"
+                : "Edytuj konto bankowe";
+
             HeaderSubtitleText.Text = mode == DialogMode.Add
                 ? "Uzupełnij dane konta i zapisz."
                 : "Zmień dane konta i zapisz zmiany.";
+
+            // TYLKO przy dodawaniu ustaw domyślny bank
+            if (mode == DialogMode.Add)
+            {
+                SelectBankInCombo("Inny bank");
+            }
         }
+
 
         public void Load(BankAccountModel model)
         {
