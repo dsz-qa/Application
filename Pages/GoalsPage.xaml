@@ -227,13 +227,44 @@
                            Foreground="{DynamicResource App.Foreground}"
                            Margin="0,4,0,12"/>
 
-                <ItemsControl x:Name="GoalsRepeater" Margin="0,8,0,0">
-                    <ItemsControl.ItemsPanel>
+                <!-- STABILNE DnD: ListBox daje kontenery ListBoxItem -->
+                <ListBox x:Name="GoalsList"
+                         Margin="0,8,0,0"
+                         AllowDrop="True"
+                         Background="Transparent"
+                         BorderThickness="0"
+                         Padding="0"
+                         PreviewMouseLeftButtonDown="GoalsList_PreviewMouseLeftButtonDown"
+                         PreviewMouseMove="GoalsList_PreviewMouseMove"
+                         Drop="GoalsList_Drop">
+
+                    <ListBox.ItemsPanel>
                         <ItemsPanelTemplate>
                             <WrapPanel HorizontalAlignment="Stretch"/>
                         </ItemsPanelTemplate>
-                    </ItemsControl.ItemsPanel>
-                </ItemsControl>
+                    </ListBox.ItemsPanel>
+
+                    <!-- usuwa “listboxowy” wygląd i zaznaczenia -->
+                    <ListBox.ItemContainerStyle>
+                        <Style TargetType="ListBoxItem">
+                            <Setter Property="Padding" Value="0"/>
+                            <Setter Property="Margin" Value="0"/>
+                            <Setter Property="Background" Value="Transparent"/>
+                            <Setter Property="BorderThickness" Value="0"/>
+                            <Setter Property="Focusable" Value="False"/>
+                            <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+                            <Setter Property="VerticalContentAlignment" Value="Top"/>
+                            <Setter Property="Template">
+                                <Setter.Value>
+                                    <ControlTemplate TargetType="ListBoxItem">
+                                        <ContentPresenter/>
+                                    </ControlTemplate>
+                                </Setter.Value>
+                            </Setter>
+                        </Style>
+                    </ListBox.ItemContainerStyle>
+                </ListBox>
+
             </StackPanel>
 
         </Grid>

@@ -23,6 +23,8 @@ namespace Finly.Pages
         public DateTime? DueDate { get; set; }
         public string Description { get; set; } = "";
 
+
+
         // BACKWARD COMPAT
         public string Name
         {
@@ -81,15 +83,21 @@ namespace Finly.Pages
         private readonly ObservableCollection<GoalVm> _goals = new();
         private readonly ObservableCollection<object> _items = new();
 
+
+        private Point _dragStartPoint;
+        private object? _dragItem;
+
         private int _uid => UserService.GetCurrentUserId();
 
         public GoalsPage()
         {
             InitializeComponent();
 
-            GoalsRepeater.ItemsSource = _items;
+            GoalsList.ItemsSource = _items;
             Loaded += GoalsPage_Loaded;
         }
+
+
 
         private void GoalsPage_Loaded(object sender, RoutedEventArgs e)
         {
@@ -120,6 +128,113 @@ namespace Finly.Pages
             RebuildItems();
             RefreshKpis();
         }
+        private static T? FindAncestor<T>(DependencyObject? current) where T : DependencyObject
+        {
+            while (current != null)
+            {
+                if (current is T typed) return typed;
+                current = VisualTreeHelper.GetParent(current);
+            }
+            return null;
+        }
+
+        private object? GetItemUnderMouse(DependencyObject? source)
+        {
+            if (source == null) return null;
+
+            var container = FindAncestor<ListBoxItem>(source);
+            container ??= GoalsList.ContainerFromElement(source) as ListBoxItem;
+
+            if (container == null) return null;
+
+            var item = GoalsList.ItemContainerGenerator.ItemFromContainer(container);
+            if (item == DependencyProperty.UnsetValue) return null;
+
+            return item;
+        }
+
+
+        private void GoalsList_PreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+        {
+            _dragItem = null;
+
+            // Klik na Button (Edytuj/Usuń) nie startuje drag&drop
+            if (FindAncestor<Button>(e.OriginalSource as DependencyObject) != null)
+                return;
+
+            _dragStartPoint = e.GetPosition(GoalsList);
+            _dragItem = GetItemUnderMouse(e.OriginalSource as DependencyObject);
+        }
+
+        private void GoalsList_PreviewMouseMove(object sender, MouseEventArgs e)
+        {
+            if (e.LeftButton != MouseButtonState.Pressed) return;
+            if (_dragItem == null) return;
+
+            // nie przeciągamy kafelka “Dodaj cel”
+            if (_dragItem is AddGoalTile) return;
+
+            var pos = e.GetPosition(GoalsList);
+            var diff = _dragStartPoint - pos;
+
+            if (Math.Abs(diff.X) < SystemParameters.MinimumHorizontalDragDistance &&
+                Math.Abs(diff.Y) < SystemParameters.MinimumVerticalDragDistance)
+                return;
+
+            // USZCZELNIENIE: drag niesie TYLKO GoalVm
+            if (_dragItem is not GoalVm vm) return;
+
+            try
+            {
+                var data = new DataObject(typeof(GoalVm), vm);
+                DragDrop.DoDragDrop(GoalsList, data, DragDropEffects.Move);
+            }
+            finally
+            {
+                _dragItem = null;
+            }
+        }
+
+        private void GoalsList_Drop(object sender, DragEventArgs e)
+        {
+            if (!e.Data.GetDataPresent(typeof(GoalVm))) return;
+
+            var dropped = e.Data.GetData(typeof(GoalVm)) as GoalVm;
+            if (dropped == null) return;
+
+            var targetObj = GetItemUnderMouse(e.OriginalSource as DependencyObject);
+            if (targetObj is not GoalVm target) return;
+
+            if (ReferenceEquals(dropped, target)) return;
+
+            var oldIndex = _goals.IndexOf(dropped);
+            var newIndex = _goals.IndexOf(target);
+
+            if (oldIndex < 0 || newIndex < 0) return;
+
+            _goals.Move(oldIndex, newIndex);
+            RebuildItems();
+
+            PersistOrder(); // DOCZELOWO: zapis do bazy
+        }
+
+        private void PersistOrder()
+        {
+            try
+            {
+                var orderedIds = _goals.Select(g => g.EnvelopeId).Where(id => id > 0).ToList();
+                DatabaseService.SaveGoalsOrder(_uid, orderedIds);
+            }
+            catch (Exception ex)
+            {
+                // Nie blokuj UI – tylko info
+                ToastService.Error("Nie udało się zapisać kolejności celów: " + ex.Message);
+            }
+        }
+
+
+
+
 
         private void RebuildItems()
         {

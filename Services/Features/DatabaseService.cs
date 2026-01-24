@@ -878,6 +878,38 @@ SELECT last_insert_rowid();";
             RaiseDataChanged();
         }
 
+        public static void SaveGoalsOrder(int userId, IReadOnlyList<int> orderedEnvelopeIds)
+        {
+            if (userId <= 0) return;
+            if (orderedEnvelopeIds == null) throw new ArgumentNullException(nameof(orderedEnvelopeIds));
+
+            using var c = OpenAndEnsureSchema();
+
+            if (!ColumnExists(c, "Envelopes", "GoalSortOrder"))
+                return;
+
+            using var tx = c.BeginTransaction();
+
+            using var cmd = c.CreateCommand();
+            cmd.Transaction = tx;
+            cmd.CommandText = "UPDATE Envelopes SET GoalSortOrder=@o WHERE Id=@id AND UserId=@u;";
+
+            var pOrder = cmd.CreateParameter(); pOrder.ParameterName = "@o"; cmd.Parameters.Add(pOrder);
+            var pId = cmd.CreateParameter(); pId.ParameterName = "@id"; cmd.Parameters.Add(pId);
+            var pU = cmd.CreateParameter(); pU.ParameterName = "@u"; pU.Value = userId; cmd.Parameters.Add(pU);
+
+            for (int i = 0; i < orderedEnvelopeIds.Count; i++)
+            {
+                pOrder.Value = i;
+                pId.Value = orderedEnvelopeIds[i];
+                cmd.ExecuteNonQuery();
+            }
+
+            tx.Commit();
+            RaiseDataChanged();
+        }
+
+
 
 
         public static void UpdateAccount(BankAccountModel a)
@@ -1058,12 +1090,19 @@ SELECT
             sql += hasDeadline ? ", Deadline" : ", NULL AS Deadline";
             sql += hasGoalText ? ", GoalText" : ", Note AS GoalText";
 
+            bool hasGoalSort = ColumnExists(c, "Envelopes", "GoalSortOrder");
+
             sql += @"
 FROM Envelopes
 WHERE UserId = @u
   AND Target IS NOT NULL
   AND Target > 0
-ORDER BY Name COLLATE NOCASE;";
+";
+
+            sql += hasGoalSort
+                ? "ORDER BY COALESCE(GoalSortOrder, 999999) ASC, Name COLLATE NOCASE ASC;"
+                : "ORDER BY Name COLLATE NOCASE ASC;";
+
 
             cmd.CommandText = sql;
             cmd.Parameters.AddWithValue("@u", userId);
