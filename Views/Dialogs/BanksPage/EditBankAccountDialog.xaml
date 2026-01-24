@@ -194,7 +194,16 @@
 								<TextBlock Text="Inny bank"/>
 							</StackPanel>
 						</ComboBoxItem>
-					</ComboBox>
+
+                        <ComboBoxItem>
+                            <StackPanel Orientation="Horizontal">
+                                <Image Width="20" Height="20" Margin="0,0,8,0"
+               Source="pack://application:,,,/Assets/Banks/xtblogo.png"/>
+                                <TextBlock Text="XTB"/>
+                            </StackPanel>
+                        </ComboBoxItem>
+
+                    </ComboBox>
 
 					<!-- Nazwa rachunku -->
 					<TextBlock Grid.Row="3" Grid.Column="0"

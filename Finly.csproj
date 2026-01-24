@@ -30,6 +30,7 @@
 	  <None Remove="Assets\Banks\pkobplogo.jpg" />
 	  <None Remove="Assets\Banks\revolutlogo.png" />
 	  <None Remove="Assets\Banks\santanderlogo.png" />
+	  <None Remove="Assets\Banks\xtblogo.png" />
 	  <None Remove="Assets\Icons\add_24.png" />
 	  <None Remove="Assets\Icons\add_48.png" />
 	  <None Remove="Assets\Icons\budgets.png" />
@@ -68,6 +69,7 @@
 	  <Resource Include="Assets\Banks\pkobplogo.jpg" />
 	  <Resource Include="Assets\Banks\revolutlogo.png" />
 	  <Resource Include="Assets\Banks\santanderlogo.png" />
+	  <Resource Include="Assets\Banks\xtblogo.png" />
 	  <Resource Include="Assets\Icons\delete.png">
 	    <CopyToOutputDirectory>Never</CopyToOutputDirectory>
 	  </Resource>
