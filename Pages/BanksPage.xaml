@@ -271,14 +271,50 @@
                            Margin="0,4,0,12"/>
 
                 <!-- ===== Lista kafelków ===== -->
-                <ItemsControl x:Name="AccountsRepeater"
-                              Margin="0,8,0,0">
-                    <ItemsControl.ItemsPanel>
+                <ListBox x:Name="AccountsList"
+         Margin="0,8,0,0"
+         Background="Transparent"
+         BorderThickness="0"
+         AllowDrop="True"
+         PreviewMouseLeftButtonUp="AccountsList_PreviewMouseLeftButtonUp"
+         PreviewMouseLeftButtonDown="AccountsList_PreviewMouseLeftButtonDown"
+         PreviewMouseMove="AccountsList_PreviewMouseMove"
+         Drop="AccountsList_Drop">
+
+                    <ListBox.Resources>
+                        <!-- Usunięcie domyślnego zaznaczania/ramki ListBoxItem -->
+                        <Style TargetType="ListBoxItem">
+                            <Setter Property="Padding" Value="0"/>
+                            <Setter Property="Margin" Value="0"/>
+                            <Setter Property="Background" Value="Transparent"/>
+                            <Setter Property="BorderBrush" Value="Transparent"/>
+                            <Setter Property="BorderThickness" Value="0"/>
+                            <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
+                            <Setter Property="Focusable" Value="False"/>
+
+                            <Setter Property="Template">
+                                <Setter.Value>
+                                    <ControlTemplate TargetType="ListBoxItem">
+                                        <Border Background="{TemplateBinding Background}"
+                        BorderBrush="{TemplateBinding BorderBrush}"
+                        BorderThickness="{TemplateBinding BorderThickness}"
+                        SnapsToDevicePixels="True">
+                                            <ContentPresenter/>
+                                        </Border>
+                                    </ControlTemplate>
+                                </Setter.Value>
+                            </Setter>
+                        </Style>
+
+                    </ListBox.Resources>
+
+                    <ListBox.ItemsPanel>
                         <ItemsPanelTemplate>
                             <WrapPanel HorizontalAlignment="Stretch"/>
                         </ItemsPanelTemplate>
-                    </ItemsControl.ItemsPanel>
-                </ItemsControl>
+                    </ListBox.ItemsPanel>
+                </ListBox>
+
 
             </StackPanel>
         </Grid>

@@ -277,7 +277,12 @@ CREATE TABLE IF NOT EXISTS CompanyProfiles(
                 AddColumnIfMissing(con, tx, "Categories", "IsArchived", "INTEGER", "NOT NULL DEFAULT 0");
 
                 // BankAccounts (UI używa BankName)
+                // BankAccounts (UI używa BankName)
                 AddColumnIfMissing(con, tx, "BankAccounts", "BankName", "TEXT");
+
+                // NOWE: SortOrder do ręcznego sortowania kafelków kont
+                AddColumnIfMissing(con, tx, "BankAccounts", "SortOrder", "INTEGER", "NOT NULL DEFAULT 0");
+
 
                 // Incomes
                 AddColumnIfMissing(con, tx, "Incomes", "Description", "TEXT");
@@ -376,8 +381,8 @@ CREATE INDEX IF NOT EXISTS IX_InvestmentValuations_User_Inv_Date
 CREATE INDEX IF NOT EXISTS IX_InvestmentValuations_User_Date
     ON InvestmentValuations(UserId, Date);
 
-CREATE INDEX IF NOT EXISTS IX_BankAccounts_User
-    ON BankAccounts(UserId);
+CREATE INDEX IF NOT EXISTS IX_BankAccounts_User_SortOrder
+    ON BankAccounts(UserId, SortOrder);
 
 CREATE INDEX IF NOT EXISTS IX_BankConnections_User
     ON BankConnections(UserId);

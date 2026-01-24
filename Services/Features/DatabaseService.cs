@@ -746,8 +746,12 @@ ORDER BY AccountName;";
         {
             var list = new List<BankAccountModel>();
             using var c = OpenAndEnsureSchema();
+
+            bool hasSort = ColumnExists(c, "BankAccounts", "SortOrder");
+
             using var cmd = c.CreateCommand();
-            cmd.CommandText = @"
+            cmd.CommandText = hasSort
+                ? @"
 SELECT 
     Id,
     UserId,
@@ -759,7 +763,21 @@ SELECT
     Balance
 FROM BankAccounts 
 WHERE UserId=@u 
-ORDER BY AccountName;";
+ORDER BY COALESCE(SortOrder, 999999) ASC, AccountName COLLATE NOCASE ASC;"
+                : @"
+SELECT 
+    Id,
+    UserId,
+    ConnectionId,
+    BankName,
+    AccountName,
+    Iban,
+    Currency,
+    Balance
+FROM BankAccounts 
+WHERE UserId=@u 
+ORDER BY AccountName COLLATE NOCASE ASC;";
+
             cmd.Parameters.AddWithValue("@u", userId);
 
             using var r = cmd.ExecuteReader();
@@ -777,8 +795,10 @@ ORDER BY AccountName;";
                     Balance = r.IsDBNull(7) ? 0m : Convert.ToDecimal(r.GetValue(7))
                 });
             }
+
             return list;
         }
+
 
         public static int InsertAccount(BankAccountModel a)
         {
@@ -792,11 +812,28 @@ ORDER BY AccountName;";
                 if (chk.ExecuteScalar() is null) a.ConnectionId = null;
             }
 
+            bool hasSort = ColumnExists(c, "BankAccounts", "SortOrder");
+
             using var cmd = c.CreateCommand();
-            cmd.CommandText = @"
+
+            if (hasSort)
+            {
+                cmd.CommandText = @"
+INSERT INTO BankAccounts(UserId, ConnectionId, BankName, AccountName, Iban, Currency, Balance, SortOrder)
+VALUES (
+ @u, @conn, @bank, @name, @iban, @cur, @bal,
+ (SELECT COALESCE(MAX(SortOrder), 0) + 1 FROM BankAccounts WHERE UserId=@u)
+);
+SELECT last_insert_rowid();";
+            }
+            else
+            {
+                cmd.CommandText = @"
 INSERT INTO BankAccounts(UserId, ConnectionId, BankName, AccountName, Iban, Currency, Balance)
 VALUES (@u, @conn, @bank, @name, @iban, @cur, @bal);
 SELECT last_insert_rowid();";
+            }
+
             cmd.Parameters.AddWithValue("@u", a.UserId);
             cmd.Parameters.AddWithValue("@conn", (object?)a.ConnectionId ?? DBNull.Value);
             cmd.Parameters.AddWithValue("@bank", a.BankName ?? "");
@@ -809,6 +846,39 @@ SELECT last_insert_rowid();";
             RaiseDataChanged();
             return id;
         }
+
+        public static void SaveBankAccountsOrder(int userId, IReadOnlyList<int> orderedAccountIds)
+        {
+            if (userId <= 0) return;
+            if (orderedAccountIds == null) throw new ArgumentNullException(nameof(orderedAccountIds));
+
+            using var c = OpenAndEnsureSchema();
+
+            if (!ColumnExists(c, "BankAccounts", "SortOrder"))
+                return; // stara baza bez migracji
+
+            using var tx = c.BeginTransaction();
+
+            using var cmd = c.CreateCommand();
+            cmd.Transaction = tx;
+            cmd.CommandText = "UPDATE BankAccounts SET SortOrder=@o WHERE Id=@id AND UserId=@u;";
+
+            var pOrder = cmd.CreateParameter(); pOrder.ParameterName = "@o"; cmd.Parameters.Add(pOrder);
+            var pId = cmd.CreateParameter(); pId.ParameterName = "@id"; cmd.Parameters.Add(pId);
+            var pU = cmd.CreateParameter(); pU.ParameterName = "@u"; pU.Value = userId; cmd.Parameters.Add(pU);
+
+            for (int i = 0; i < orderedAccountIds.Count; i++)
+            {
+                pOrder.Value = i;
+                pId.Value = orderedAccountIds[i];
+                cmd.ExecuteNonQuery();
+            }
+
+            tx.Commit();
+            RaiseDataChanged();
+        }
+
+
 
         public static void UpdateAccount(BankAccountModel a)
         {

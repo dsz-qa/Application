@@ -1,4 +1,5 @@
 ﻿using Finly.Models;
+using Finly.ViewModels; // albo właściwy namespace gdzie masz BankAccountVm
 using Finly.Services;
 using Finly.Services.Features;
 using Finly.Views.Dialogs;
@@ -29,10 +30,13 @@ namespace Finly.Pages
             public override string ToString() => Name;
         }
 
+        private Point _dragStartPoint;
+        private object? _dragItem;
+
         public BanksPage()
         {
             InitializeComponent();
-            AccountsRepeater.ItemsSource = _cards;
+            AccountsList.ItemsSource = _cards;
             Loaded += BanksPage_Loaded;
         }
 
@@ -52,6 +56,171 @@ namespace Finly.Pages
             LblTotalBanks.Text = snapshot.Banks.ToString("N2", CultureInfo.CurrentCulture) + " zł";
         }
 
+        private void AccountsList_PreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+        {
+            _dragItem = null; // zawsze reset
+
+            // klik na Button nie powinien inicjować dragu
+            if (FindAncestor<Button>(e.OriginalSource as DependencyObject) != null)
+                return;
+
+            _dragStartPoint = e.GetPosition(AccountsList);
+            _dragItem = GetItemUnderMouse(e.OriginalSource as DependencyObject);
+        }
+
+
+        private void AccountsList_PreviewMouseLeftButtonUp(object sender, MouseButtonEventArgs e)
+        {
+            _dragItem = null;
+        }
+
+
+        private void AccountsList_PreviewMouseMove(object sender, MouseEventArgs e)
+        {
+            if (e.LeftButton != MouseButtonState.Pressed) return;
+            if (_dragItem == null) return;
+
+            // nie przenosimy kafelka "Dodaj konto"
+            if (_dragItem is AddAccountTile) return;
+
+            var pos = e.GetPosition(AccountsList);
+            var diff = _dragStartPoint - pos;
+
+            if (Math.Abs(diff.X) < SystemParameters.MinimumHorizontalDragDistance &&
+                Math.Abs(diff.Y) < SystemParameters.MinimumVerticalDragDistance)
+                return;
+
+            // WYMUSZENIE: drag niesie tylko VM, nie kontrolkę
+            if (_dragItem is not BankAccountVm vm) return;
+
+            try
+            {
+                var data = new DataObject(typeof(BankAccountVm), vm);
+                DragDrop.DoDragDrop(AccountsList, data, DragDropEffects.Move);
+            }
+            finally
+            {
+                _dragItem = null; // ważne: czyścimy po dragu
+            }
+        }
+
+
+
+        private void AccountsList_Drop(object sender, DragEventArgs e)
+        {
+            // Akceptujemy tylko BankAccountVm
+            if (!e.Data.GetDataPresent(typeof(BankAccountVm))) return;
+
+            var dropped = e.Data.GetData(typeof(BankAccountVm)) as BankAccountVm;
+            if (dropped == null) return;
+
+            var targetObj = GetItemUnderMouse(e.OriginalSource as DependencyObject);
+
+            // Targetem też musi być BankAccountVm (nie kafelek "Add", nie null)
+            if (targetObj is not BankAccountVm target) return;
+            if (ReferenceEquals(dropped, target)) return;
+
+            var oldIndex = _cards.IndexOf(dropped);
+            var newIndex = _cards.IndexOf(target);
+
+            if (oldIndex < 0 || newIndex < 0) return;
+
+            _cards.Move(oldIndex, newIndex);
+            EnsureAddTileAtEnd();
+            PersistOrder();
+        }
+
+
+
+        private void PersistOrder()
+        {
+            try
+            {
+                if (_uid <= 0) return;
+
+                var ids = _cards
+                    .OfType<BankAccountVm>()
+                    .Select(x => x.Id)
+                    .Where(id => id > 0)
+                    .ToList();
+
+                DatabaseService.SaveBankAccountsOrder(_uid, ids);
+            }
+            catch
+            {
+                // nie wywalaj UI jeśli zapis nie wyjdzie
+            }
+        }
+
+
+        private object? GetItemUnderMouse(DependencyObject? source)
+        {
+            if (source == null) return null;
+
+            // 1) spróbuj znaleźć ListBoxItem po drzewie wizualnym
+            var container = FindAncestor<ListBoxItem>(source);
+
+            // 2) fallback – działa, gdy klik jest w środku złożonego template'u
+            container ??= AccountsList.ContainerFromElement(source) as ListBoxItem;
+
+            if (container == null) return null;
+
+            var item = AccountsList.ItemContainerGenerator.ItemFromContainer(container);
+
+            // WPF czasem zwraca UnsetValue, gdy nie umie dopasować kontenera do itemu
+            if (item == DependencyProperty.UnsetValue) return null;
+
+            return item;
+        }
+
+
+        private static T? FindAncestor<T>(DependencyObject? current) where T : DependencyObject
+        {
+            while (current != null)
+            {
+                if (current is T match)
+                    return match;
+
+                current = System.Windows.Media.VisualTreeHelper.GetParent(current);
+            }
+            return null;
+        }
+
+
+        private void MoveCardToEnd(object dragged)
+        {
+            var oldIndex = _cards.IndexOf(dragged);
+            if (oldIndex < 0) return;
+
+            // End = przed AddAccountTile (jeśli istnieje)
+            var addIndex = _cards.IndexOf(_addTile);
+            if (addIndex < 0)
+            {
+                _cards.Move(oldIndex, _cards.Count - 1);
+                return;
+            }
+
+            var targetIndex = Math.Max(0, addIndex - 1);
+            _cards.Move(oldIndex, targetIndex);
+            EnsureAddTileAtEnd();
+        }
+
+        private void EnsureAddTileAtEnd()
+        {
+            var addIndex = _cards.IndexOf(_addTile);
+            if (addIndex < 0)
+            {
+                _cards.Add(_addTile);
+                return;
+            }
+
+            if (addIndex != _cards.Count - 1)
+            {
+                _cards.Move(addIndex, _cards.Count - 1);
+            }
+        }
+
+
         private void LoadAccounts()
         {
             _accounts.Clear();
@@ -67,8 +236,10 @@ namespace Finly.Pages
                 _cards.Add(vm);
             }
 
-            _cards.Add(_addTile);
+            // Dokładnie raz, na końcu:
+            EnsureAddTileAtEnd();
         }
+
 
         private static BankAccountVm? GetVmFromSender(object? sender)
         {
@@ -100,10 +271,12 @@ namespace Finly.Pages
 
         private void ResetAllActionButtons()
         {
-            foreach (var item in AccountsRepeater.Items)
+            foreach (var item in AccountsList.Items)
             {
-                var container =
-                    AccountsRepeater.ItemContainerGenerator.ContainerFromItem(item) as FrameworkElement;
+                // Nie tykamy kafelka "Dodaj konto"
+                if (item is AddAccountTile) continue;
+
+                var container = AccountsList.ItemContainerGenerator.ContainerFromItem(item) as FrameworkElement;
                 if (container == null) continue;
 
                 var withdrawBtn = FindInTree<Button>(container, "WithdrawButton");
@@ -113,6 +286,8 @@ namespace Finly.Pages
                 SetActionButtonState(depositBtn, false);
             }
         }
+
+
 
         private static void SetActionButtonState(Button? btn, bool active)
         {
@@ -380,22 +555,16 @@ namespace Finly.Pages
                 return;
             }
 
-            if (sender is not FrameworkElement fe)
-                return;
-
             HideAllDeletePanels();
 
-            FrameworkElement? container = fe;
-            while (container != null &&
-                   container is not ContentPresenter &&
-                   container is not Border)
-            {
-                container = VisualTreeHelper.GetParent(container) as FrameworkElement;
-            }
+            if (sender is not DependencyObject dep)
+                return;
 
-            if (container == null) return;
+            // W ListBox kontenerem jest ListBoxItem
+            var itemContainer = FindAncestor<ListBoxItem>(dep);
+            if (itemContainer == null) return;
 
-            var panel = FindInTree<Border>(container, "DeleteConfirmPanel");
+            var panel = FindInTree<Border>(itemContainer, "DeleteConfirmPanel");
             if (panel == null) return;
 
             panel.Visibility = panel.Visibility == Visibility.Visible
@@ -403,12 +572,16 @@ namespace Finly.Pages
                 : Visibility.Visible;
         }
 
+
+
         private void HideAllDeletePanels()
         {
-            foreach (var item in AccountsRepeater.Items)
+            foreach (var item in AccountsList.Items)
             {
-                var container =
-                    AccountsRepeater.ItemContainerGenerator.ContainerFromItem(item) as FrameworkElement;
+                // Kafelek "Dodaj konto" nie ma panelu delete
+                if (item is AddAccountTile) continue;
+
+                var container = AccountsList.ItemContainerGenerator.ContainerFromItem(item) as FrameworkElement;
                 if (container == null) continue;
 
                 var panel = FindInTree<Border>(container, "DeleteConfirmPanel");
@@ -416,6 +589,8 @@ namespace Finly.Pages
                     panel.Visibility = Visibility.Collapsed;
             }
         }
+
+
 
         private void DeleteCancel_Click(object sender, RoutedEventArgs e)
         {
