@@ -45,6 +45,12 @@
             <Setter Property="Foreground" Value="{DynamicResource App.Foreground}"/>
         </Style>
 
+        <!-- Ujednolicenie kontenerów w ItemsControl (żeby WrapPanel równo układał) -->
+        <Style x:Key="CardsContainerPresenterStyle" TargetType="ContentPresenter">
+            <Setter Property="SnapsToDevicePixels" Value="True"/>
+            <Setter Property="UseLayoutRounding" Value="True"/>
+        </Style>
+
         <!-- ===== KAFEL KOPERTY ===== -->
         <DataTemplate DataType="{x:Type data:DataRowView}">
             <Border Style="{StaticResource Card}" Width="340">
@@ -185,37 +191,41 @@
         <!-- ===== KAFEL „DODAJ KOPERTĘ” ===== -->
         <DataTemplate DataType="{x:Type local:AddEnvelopeTile}">
             <Border Style="{StaticResource Card}"
-                    Width="260"
-                    Cursor="Hand"
-                    MouseLeftButtonUp="AddEnvelopeCard_Click">
-                <Grid>
+            Width="260"
+            Cursor="Hand"
+            ForceCursor="True"
+            MouseLeftButtonUp="AddEnvelopeCard_Click">
+                <Grid Background="Transparent">
                     <Border Margin="10"
-                            BorderThickness="1"
-                            CornerRadius="8"
-                            BorderBrush="{DynamicResource Surface.Border}"/>
+                    BorderThickness="1"
+                    CornerRadius="8"
+                    BorderBrush="{DynamicResource Surface.Border}"/>
+
                     <StackPanel HorizontalAlignment="Center"
-                                VerticalAlignment="Center"
-                                Margin="0,16,0,16">
+                        VerticalAlignment="Center"
+                        Margin="0,16,0,16">
                         <TextBlock Text="+"
-                                   FontSize="28"
-                                   FontWeight="Bold"
-                                   HorizontalAlignment="Center"
-                                   Foreground="{DynamicResource App.Foreground}"/>
+                           FontSize="28"
+                           FontWeight="Bold"
+                           HorizontalAlignment="Center"
+                           Foreground="{DynamicResource App.Foreground}"/>
                         <TextBlock Text="Dodaj kopertę"
-                                   Margin="0,6,0,0"
-                                   FontSize="13"
-                                   FontWeight="SemiBold"
-                                   Foreground="{DynamicResource App.Foreground}"
-                                   HorizontalAlignment="Center"/>
+                           Margin="0,6,0,0"
+                           FontSize="13"
+                           FontWeight="SemiBold"
+                           Foreground="{DynamicResource App.Foreground}"
+                           HorizontalAlignment="Center"/>
                     </StackPanel>
                 </Grid>
             </Border>
         </DataTemplate>
 
+
     </UserControl.Resources>
 
     <!-- CAŁA STRONA -->
-    <ScrollViewer VerticalScrollBarVisibility="Auto">
+    <ScrollViewer VerticalScrollBarVisibility="Auto"
+                  HorizontalScrollBarVisibility="Disabled">
         <Grid Margin="24,24,24,60">
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto"/>
@@ -294,13 +304,50 @@
                            Foreground="{DynamicResource App.Foreground}"
                            Margin="0,4,0,12"/>
 
-                <ItemsControl x:Name="EnvelopesCards">
-                    <ItemsControl.ItemsPanel>
+                <!-- POPRAWIONE: kontener + WrapPanel + brak rozjeżdżania -->
+                <ListBox x:Name="EnvelopesCards"
+         ItemsSource="{Binding}"
+         Background="Transparent"
+         BorderThickness="0"
+         Padding="0"
+         AllowDrop="True"
+         PreviewMouseLeftButtonDown="EnvelopesCards_PreviewMouseLeftButtonDown"
+         MouseMove="EnvelopesCards_MouseMove"
+         DragOver="EnvelopesCards_DragOver"
+         Drop="EnvelopesCards_Drop"
+         ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+         ScrollViewer.VerticalScrollBarVisibility="Disabled">
+
+                    <!-- żeby nie było zaznaczeń jak w klasycznym ListBox -->
+                    <ListBox.ItemContainerStyle>
+                        <Style TargetType="{x:Type ListBoxItem}">
+                            <Setter Property="Padding" Value="0"/>
+                            <Setter Property="Margin" Value="0"/>
+                            <Setter Property="Background" Value="Transparent"/>
+                            <Setter Property="BorderThickness" Value="0"/>
+                            <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+                            <Setter Property="VerticalContentAlignment" Value="Top"/>
+                            <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
+                            <Setter Property="IsHitTestVisible" Value="True"/>
+                            <Setter Property="Template">
+                                <Setter.Value>
+                                    <ControlTemplate TargetType="{x:Type ListBoxItem}">
+                                        <ContentPresenter/>
+                                    </ControlTemplate>
+                                </Setter.Value>
+                            </Setter>
+                        </Style>
+                    </ListBox.ItemContainerStyle>
+
+                    <ListBox.ItemsPanel>
                         <ItemsPanelTemplate>
-                            <WrapPanel HorizontalAlignment="Stretch"/>
+                            <WrapPanel Orientation="Horizontal"
+                       HorizontalAlignment="Left"
+                       IsItemsHost="True"/>
                         </ItemsPanelTemplate>
-                    </ItemsControl.ItemsPanel>
-                </ItemsControl>
+                    </ListBox.ItemsPanel>
+                </ListBox>
+
 
                 <TextBlock x:Name="UnassignedText"
                            Text="Brak przypisanej gotówki"

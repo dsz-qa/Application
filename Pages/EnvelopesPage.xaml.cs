@@ -24,18 +24,110 @@ namespace Finly.Pages
         // kolekcja kart (koperty + kafelek Dodaj)
         private readonly ObservableCollection<object> _cards = new();
 
-        // aktualna "Odłożona gotówka" w bazie
+        // aktualna "Odłożona gotówka" w bazie (SavedCash)
         private decimal _savedTotal = 0m;
+
+        // pilnujemy subskrypcji, żeby nie dublować eventów przy ponownym wejściu na stronę
+        private bool _isSubscribed;
 
         public EnvelopesPage()
         {
             InitializeComponent();
+
             EnvelopesCards.ItemsSource = _cards;
 
             Loaded += EnvelopesPage_Loaded;
             Unloaded += EnvelopesPage_Unloaded;
+        }
 
-            DatabaseService.DataChanged += DatabaseService_DataChanged;
+        private Point _dragStartPoint;
+        private object? _dragItem;
+
+        private void EnvelopesCards_PreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+        {
+            _dragStartPoint = e.GetPosition(null);
+
+            // bierzemy element spod kursora
+            var lbi = FindVisualParent<ListBoxItem>(e.OriginalSource as DependencyObject);
+            if (lbi?.DataContext is DataRowView)
+                _dragItem = lbi.DataContext;     // tylko koperty
+            else
+                _dragItem = null;                // kafelek "Dodaj" albo coś innego
+        }
+
+        private void EnvelopesCards_MouseMove(object sender, MouseEventArgs e)
+        {
+            if (e.LeftButton != MouseButtonState.Pressed) return;
+            if (_dragItem is not DataRowView) return;
+
+            var pos = e.GetPosition(null);
+            var diff = _dragStartPoint - pos;
+
+            if (Math.Abs(diff.X) < SystemParameters.MinimumHorizontalDragDistance &&
+                Math.Abs(diff.Y) < SystemParameters.MinimumVerticalDragDistance)
+                return;
+
+            DragDrop.DoDragDrop(EnvelopesCards, _dragItem, DragDropEffects.Move);
+        }
+
+        private void EnvelopesCards_DragOver(object sender, DragEventArgs e)
+        {
+            // akceptujemy tylko koperta->koperta
+            if (e.Data.GetDataPresent(typeof(DataRowView)))
+                e.Effects = DragDropEffects.Move;
+            else
+                e.Effects = DragDropEffects.None;
+
+            e.Handled = true;
+        }
+
+        private void EnvelopesCards_Drop(object sender, DragEventArgs e)
+        {
+            if (!e.Data.GetDataPresent(typeof(DataRowView))) return;
+
+            var source = e.Data.GetData(typeof(DataRowView)) as DataRowView;
+            if (source == null) return;
+
+            // target pod kursorem
+            var lbi = FindVisualParent<ListBoxItem>(e.OriginalSource as DependencyObject);
+            var target = lbi?.DataContext as DataRowView;
+
+            // nie pozwalamy upuszczać na kafelek "Dodaj" ani poza kartami
+            if (target == null) return;
+            if (ReferenceEquals(source, target)) return;
+
+            // indeksy liczymy TYLKO wśród kopert (bez AddEnvelopeTile)
+            var envelopeItems = _cards.OfType<DataRowView>().ToList();
+            int oldIndex = envelopeItems.IndexOf(source);
+            int newIndex = envelopeItems.IndexOf(target);
+
+            if (oldIndex < 0 || newIndex < 0) return;
+
+            // faktyczny indeks w _cards (uwzględnia AddEnvelopeTile na końcu)
+            int oldIndexInCards = _cards.IndexOf(source);
+            int newIndexInCards = _cards.IndexOf(target);
+
+            if (oldIndexInCards < 0 || newIndexInCards < 0) return;
+
+            // przeniesienie w UI
+            _cards.Move(oldIndexInCards, newIndexInCards);
+
+            // zapis kolejności do DB
+            try
+            {
+                var orderedIds = _cards
+                    .OfType<DataRowView>()
+                    .Select(drv => Convert.ToInt32(drv.Row["Id"]))
+                    .ToList();
+
+                DatabaseService.SaveEnvelopesOrder(_userId, orderedIds);
+                // nie musisz LoadAll() – UI już przestawione,
+                // a DB order będzie użyty przy kolejnym wejściu/odświeżeniu.
+            }
+            catch (Exception ex)
+            {
+                ToastService.Error("Nie udało się zapisać kolejności kopert: " + ex.Message);
+            }
         }
 
         public EnvelopesPage(int userId) : this()
@@ -51,7 +143,26 @@ namespace Finly.Pages
             if (_userId <= 0)
                 return;
 
+            EnsureSubscriptions();
             LoadAll();
+        }
+
+        private void EnsureSubscriptions()
+        {
+            if (_isSubscribed) return;
+
+            DatabaseService.DataChanged += DatabaseService_DataChanged;
+            _isSubscribed = true;
+        }
+
+        private void RemoveSubscriptions()
+        {
+            if (!_isSubscribed) return;
+
+            try { DatabaseService.DataChanged -= DatabaseService_DataChanged; }
+            catch { /* ignore */ }
+
+            _isSubscribed = false;
         }
 
         // ===================== LOAD =====================
@@ -60,11 +171,12 @@ namespace Finly.Pages
         {
             try
             {
+                // Snapshoty
                 _savedTotal = DatabaseService.GetSavedCash(_userId);
-                var cashOnHand = DatabaseService.GetCashOnHand(_userId);
+                var cashOnHandTotal = DatabaseService.GetCashOnHand(_userId);
 
+                // Koperty
                 _dt = DatabaseService.GetEnvelopesTable(_userId);
-
                 if (_dt != null)
                 {
                     EnsureComputedColumns(_dt);
@@ -74,8 +186,10 @@ namespace Finly.Pages
                         var target = SafeDec(r["Target"]);
                         var alloc = SafeDec(r["Allocated"]);
 
+                        // Remaining
                         r["Remaining"] = target - alloc;
 
+                        // Cel/Opis/Termin z NOTE
                         SplitNote(r["Note"]?.ToString(), out var goal, out var description, out var deadline);
 
                         r["GoalText"] = string.IsNullOrWhiteSpace(goal) ? "Brak" : goal;
@@ -105,6 +219,7 @@ namespace Finly.Pages
                     }
                 }
 
+                // Karty UI
                 _cards.Clear();
                 if (_dt != null)
                 {
@@ -116,17 +231,26 @@ namespace Finly.Pages
                 // ===== AGREGATY =====
                 var allocatedSum = _dt?.AsEnumerable().Sum(r => SafeDec(r["Allocated"])) ?? 0m;
 
-                var freeSpending = cashOnHand - _savedTotal;
-                if (freeSpending < 0m) freeSpending = 0m;
+                // Wolna gotówka = CashOnHand - SavedCash (SavedCash jest częścią CashOnHand)
+                var freeCash = cashOnHandTotal - _savedTotal;
+                if (freeCash < 0m) freeCash = 0m;
+
+                // Do rozdysponowania w SavedCash po odjęciu alokacji kopert
+                var distributable = _savedTotal - allocatedSum;
 
                 TotalEnvelopesText.Text = allocatedSum.ToString("N2", CultureInfo.CurrentCulture) + " zł";
-                SavedCashText.Text = freeSpending.ToString("N2", CultureInfo.CurrentCulture) + " zł";
+                SavedCashText.Text = freeCash.ToString("N2", CultureInfo.CurrentCulture) + " zł";
 
-                var distributable = _savedTotal - allocatedSum;
                 EnvelopesSumText.Text = distributable.ToString("N2", CultureInfo.CurrentCulture) + " zł";
-                EnvelopesSumText.Foreground = distributable < 0
+                EnvelopesSumText.Foreground = distributable < 0m
                     ? Brushes.IndianRed
-                    : (Brush)FindResource("App.Foreground");
+                    : TryFindResource("App.Foreground") as Brush ?? Foreground;
+
+                // Opcjonalny tekst "Brak przypisanej gotówki"
+                if (UnassignedText != null)
+                {
+                    UnassignedText.Visibility = distributable > 0m ? Visibility.Visible : Visibility.Collapsed;
+                }
             }
             catch (Exception ex)
             {
@@ -136,6 +260,8 @@ namespace Finly.Pages
 
         private static void EnsureComputedColumns(DataTable dt)
         {
+            // Uwaga: GetEnvelopesTable zwraca tylko kolumny z SELECT-a,
+            // więc dodajemy "wyliczane" kolumny do bindowania w XAML.
             if (!dt.Columns.Contains("Remaining"))
                 dt.Columns.Add("Remaining", typeof(decimal));
 
@@ -223,7 +349,7 @@ namespace Finly.Pages
 
         private void SaveEnvelopeFromDialog(EnvelopeEditDialog.EnvelopeEditResult r)
         {
-            // walidacja środków (zostaje jak było)
+            // Walidacja środków w "Odłożonej gotówce"
             if (!ValidateAllocationAgainstSavedCash(_userId, r.EditingId, r.Allocated, out var fundsMsg))
             {
                 ToastService.Info(fundsMsg);
@@ -246,7 +372,7 @@ namespace Finly.Pages
                     ToastService.Success("Dodano kopertę.");
                 }
 
-                // cel tylko gdy spełnione warunki
+                // Cel tylko gdy warunki spełnione
                 if (r.ShouldCreateGoal && r.Deadline.HasValue)
                 {
                     DatabaseService.UpdateEnvelopeGoal(
@@ -329,14 +455,20 @@ namespace Finly.Pages
         private static decimal SafeDec(object? o)
         {
             if (o == null || o == DBNull.Value) return 0m;
-            try { return Convert.ToDecimal(o); }
-            catch { return 0m; }
+            try { return Convert.ToDecimal(o, CultureInfo.CurrentCulture); }
+            catch
+            {
+                try { return Convert.ToDecimal(o, CultureInfo.InvariantCulture); }
+                catch { return 0m; }
+            }
         }
 
         private static int MonthsBetween(DateTime from, DateTime to)
         {
             if (to <= from) return 0;
             int months = (to.Year - from.Year) * 12 + (to.Month - from.Month);
+
+            // jeśli termin ma dzień większy niż "from", doliczamy rozpoczęty miesiąc
             if (to.Day > from.Day) months++;
             return months;
         }
@@ -371,6 +503,7 @@ namespace Finly.Pages
                 else if (line.StartsWith("Termin:", StringComparison.OrdinalIgnoreCase))
                 {
                     var dateText = line.Substring(7).Trim();
+
                     if (DateTime.TryParseExact(dateText, "yyyy-MM-dd",
                             CultureInfo.InvariantCulture, DateTimeStyles.None, out var d1))
                     {
@@ -384,6 +517,7 @@ namespace Finly.Pages
                 }
                 else
                 {
+                    // fallback: jeśli ktoś wpisał "po prostu tekst"
                     if (string.IsNullOrEmpty(goal))
                         goal = line;
                     else if (string.IsNullOrEmpty(description))
@@ -467,8 +601,7 @@ namespace Finly.Pages
                 foreach (DataRow r in dt.Rows)
                 {
                     var id = Convert.ToInt32(r["Id"]);
-                    var alloc = 0m;
-                    try { alloc = Convert.ToDecimal(r["Allocated"]); } catch { }
+                    var alloc = SafeDec(r["Allocated"]);
 
                     totalAllocated += alloc;
 
@@ -482,8 +615,9 @@ namespace Finly.Pages
 
             if (newAllocated > availableForThis)
             {
-                message = $"Masz za mało środków w „Odłożonej gotówce”. " +
-                          $"Dostępne do przydzielenia: {availableForThis:N2} zł, próbujesz ustawić: {newAllocated:N2} zł.";
+                message =
+                    $"Masz za mało środków w „Odłożonej gotówce”. " +
+                    $"Dostępne do przydzielenia: {availableForThis:N2} zł, próbujesz ustawić: {newAllocated:N2} zł.";
                 return false;
             }
 
@@ -494,15 +628,16 @@ namespace Finly.Pages
 
         private void EnvelopesPage_Unloaded(object sender, RoutedEventArgs e)
         {
-            Unloaded -= EnvelopesPage_Unloaded;
             Loaded -= EnvelopesPage_Loaded;
+            Unloaded -= EnvelopesPage_Unloaded;
 
-            try { DatabaseService.DataChanged -= DatabaseService_DataChanged; }
-            catch { }
+            RemoveSubscriptions();
         }
 
         private void DatabaseService_DataChanged(object? sender, EventArgs e)
         {
+            // jeśli kontrolka już “znika”, nie ma sensu odświeżać
+            if (!IsLoaded) return;
             LoadAll();
         }
     }

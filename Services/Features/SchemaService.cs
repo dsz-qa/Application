@@ -199,6 +199,7 @@ CREATE TABLE IF NOT EXISTS Envelopes(
     Target     NUMERIC NOT NULL DEFAULT 0,
     Allocated  NUMERIC NOT NULL DEFAULT 0,
     Note       TEXT    NULL,
+    SortOrder INTEGER NULL,
     GoalSortOrder INTEGER NULL,
     CreatedAt  TEXT    NOT NULL DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY(UserId) REFERENCES Users(Id) ON DELETE CASCADE
@@ -326,6 +327,7 @@ CREATE TABLE IF NOT EXISTS CompanyProfiles(
                 AddColumnIfMissing(con, tx, "Envelopes", "Deadline", "TEXT");
                 AddColumnIfMissing(con, tx, "Envelopes", "GoalText", "TEXT");
                 AddColumnIfMissing(con, tx, "Envelopes", "GoalSortOrder", "INTEGER");
+                AddColumnIfMissing(con, tx, "Envelopes", "SortOrder", "INTEGER");
 
 
                 // Backfill: jeśli ktoś miał Description a Title puste
@@ -378,6 +380,8 @@ CREATE INDEX IF NOT EXISTS IX_Envelopes_User
 CREATE INDEX IF NOT EXISTS IX_Envelopes_User_GoalSortOrder
     ON Envelopes(UserId, GoalSortOrder);
 
+CREATE INDEX IF NOT EXISTS IX_Envelopes_User_SortOrder
+    ON Envelopes(UserId, SortOrder);
 
 CREATE INDEX IF NOT EXISTS IX_Investments_User
     ON Investments(UserId);

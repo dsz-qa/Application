@@ -909,6 +909,36 @@ SELECT last_insert_rowid();";
             RaiseDataChanged();
         }
 
+        public static void SaveEnvelopesOrder(int userId, IReadOnlyList<int> orderedEnvelopeIds)
+        {
+            if (userId <= 0) return;
+            if (orderedEnvelopeIds == null) throw new ArgumentNullException(nameof(orderedEnvelopeIds));
+
+            using var c = OpenAndEnsureSchema();
+
+            if (!ColumnExists(c, "Envelopes", "SortOrder"))
+                return;
+
+            using var tx = c.BeginTransaction();
+
+            using var cmd = c.CreateCommand();
+            cmd.Transaction = tx;
+            cmd.CommandText = "UPDATE Envelopes SET SortOrder=@o WHERE Id=@id AND UserId=@u;";
+
+            var pOrder = cmd.CreateParameter(); pOrder.ParameterName = "@o"; cmd.Parameters.Add(pOrder);
+            var pId = cmd.CreateParameter(); pId.ParameterName = "@id"; cmd.Parameters.Add(pId);
+            var pU = cmd.CreateParameter(); pU.ParameterName = "@u"; pU.Value = userId; cmd.Parameters.Add(pU);
+
+            for (int i = 0; i < orderedEnvelopeIds.Count; i++)
+            {
+                pOrder.Value = i;
+                pId.Value = orderedEnvelopeIds[i];
+                cmd.ExecuteNonQuery();
+            }
+
+            tx.Commit();
+            RaiseDataChanged();
+        }
 
 
 
@@ -1004,18 +1034,20 @@ WHERE Id=@id AND UserId=@u;";
         {
             using var c = OpenAndEnsureSchema();
             using var cmd = c.CreateCommand();
-            cmd.CommandText = @"
-SELECT 
-    Id,
-    UserId,
-    Name,
-    Target,
-    Allocated,
-    Note,
-    CreatedAt
+            bool hasSort = ColumnExists(c, "Envelopes", "SortOrder");
+
+            cmd.CommandText = hasSort
+                ? @"
+SELECT Id, UserId, Name, Target, Allocated, Note, CreatedAt
+FROM Envelopes
+WHERE UserId=@u
+ORDER BY COALESCE(SortOrder, 999999) ASC, Name COLLATE NOCASE ASC;"
+                : @"
+SELECT Id, UserId, Name, Target, Allocated, Note, CreatedAt
 FROM Envelopes
 WHERE UserId=@u
 ORDER BY Name COLLATE NOCASE;";
+
             cmd.Parameters.AddWithValue("@u", userId);
 
             var dt = new DataTable();
