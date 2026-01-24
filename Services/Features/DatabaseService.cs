@@ -1894,31 +1894,47 @@ WHERE i.UserId=@u");
             int userId,
             decimal amount,
             DateTime date,
-            string? description,
-            string? source,
             int? categoryId,
-            bool isPlanned = false,
-            int? budgetId = null,
-            Finly.Models.PaymentKind paymentKind = Finly.Models.PaymentKind.FreeCash,
-            int? paymentRefId = null)
+            string? source,
+            string? description,
+            bool isPlanned,
+            int? budgetId,
+            PaymentKind paymentKind,
+            int? paymentRefId)
         {
-            using var con = OpenAndEnsureSchema();
+            if (userId <= 0) throw new ArgumentException("Nieprawid³owy userId.", nameof(userId));
+            if (amount <= 0m) throw new ArgumentException("Kwota musi byæ dodatnia.", nameof(amount));
 
-            bool hasBudgetId = ColumnExists(con, "Incomes", "BudgetId");
-            bool hasPk = ColumnExists(con, "Incomes", "PaymentKind");
-            bool hasPr = ColumnExists(con, "Incomes", "PaymentRefId");
+            EnsureTables();
+            using var c = GetConnection();
 
-            using var tx = con.BeginTransaction();
+            // Kompatybilnoœæ ze starszymi DB (kolumny mog¹ nie istnieæ)
+            bool hasPaymentKind = ColumnExists(c, "Incomes", "PaymentKind");
+            bool hasPaymentRefId = ColumnExists(c, "Incomes", "PaymentRefId");
+            bool hasBudgetId = ColumnExists(c, "Incomes", "BudgetId");
+            bool hasSource = ColumnExists(c, "Incomes", "Source");
+            bool hasDesc = ColumnExists(c, "Incomes", "Description");
+            bool hasPlanned = ColumnExists(c, "Incomes", "IsPlanned");
+            bool hasCategory = ColumnExists(c, "Incomes", "CategoryId");
 
-            var cols = new List<string> { "UserId", "Amount", "Date", "Description", "Source", "CategoryId", "IsPlanned" };
-            var vals = new List<string> { "@u", "@a", "@d", "@desc", "@s", "@c", "@p" };
+            using var tx = c.BeginTransaction();
 
-            if (hasBudgetId) { cols.Add("BudgetId"); vals.Add("@b"); }
-            if (hasPk) { cols.Add("PaymentKind"); vals.Add("@pk"); }
-            if (hasPr) { cols.Add("PaymentRefId"); vals.Add("@pr"); }
-
-            using var cmd = con.CreateCommand();
+            using var cmd = c.CreateCommand();
             cmd.Transaction = tx;
+
+            var cols = new List<string> { "UserId", "Amount", "Date" };
+            var vals = new List<string> { "@u", "@a", "@d" };
+
+            if (hasDesc) { cols.Add("Description"); vals.Add("@desc"); }
+            if (hasSource) { cols.Add("Source"); vals.Add("@src"); }
+            if (hasCategory) { cols.Add("CategoryId"); vals.Add("@cat"); }
+
+            if (hasPlanned) { cols.Add("IsPlanned"); vals.Add("@p"); }
+            if (hasBudgetId) { cols.Add("BudgetId"); vals.Add("@b"); }
+
+            if (hasPaymentKind) { cols.Add("PaymentKind"); vals.Add("@pk"); }
+            if (hasPaymentRefId) { cols.Add("PaymentRefId"); vals.Add("@pr"); }
+
             cmd.CommandText = $@"
 INSERT INTO Incomes({string.Join(",", cols)})
 VALUES ({string.Join(",", vals)});
@@ -1926,30 +1942,42 @@ SELECT last_insert_rowid();";
 
             cmd.Parameters.AddWithValue("@u", userId);
             cmd.Parameters.AddWithValue("@a", amount);
-            cmd.Parameters.AddWithValue("@d", date.ToString("yyyy-MM-dd"));
-            cmd.Parameters.AddWithValue("@desc", (object?)description ?? DBNull.Value);
-            cmd.Parameters.AddWithValue("@s", (object?)source ?? DBNull.Value);
+            cmd.Parameters.AddWithValue("@d", ToIsoDate(date));
 
-            if (categoryId.HasValue && categoryId.Value > 0) cmd.Parameters.AddWithValue("@c", categoryId.Value);
-            else cmd.Parameters.AddWithValue("@c", DBNull.Value);
+            if (hasDesc) cmd.Parameters.AddWithValue("@desc", (object?)description ?? DBNull.Value);
+            if (hasSource) cmd.Parameters.AddWithValue("@src", (object?)source ?? DBNull.Value);
 
-            cmd.Parameters.AddWithValue("@p", isPlanned ? 1 : 0);
+            if (hasCategory)
+            {
+                if (categoryId.HasValue && categoryId.Value > 0)
+                    cmd.Parameters.AddWithValue("@cat", categoryId.Value);
+                else
+                    cmd.Parameters.AddWithValue("@cat", DBNull.Value);
+            }
 
+            if (hasPlanned) cmd.Parameters.AddWithValue("@p", isPlanned ? 1 : 0);
             if (hasBudgetId) cmd.Parameters.AddWithValue("@b", (object?)budgetId ?? DBNull.Value);
-            if (hasPk) cmd.Parameters.AddWithValue("@pk", (int)paymentKind);
-            if (hasPr) cmd.Parameters.AddWithValue("@pr", (object?)paymentRefId ?? DBNull.Value);
 
-            var id = Convert.ToInt32(cmd.ExecuteScalar() ?? 0);
+            if (hasPaymentKind) cmd.Parameters.AddWithValue("@pk", (int)paymentKind);
+            if (hasPaymentRefId) cmd.Parameters.AddWithValue("@pr", (object?)paymentRefId ?? DBNull.Value);
 
-            // Ksiêgowanie tylko jeœli nieplanowane
+            var rowId = Convert.ToInt32(cmd.ExecuteScalar() ?? 0);
+
+            // Ksiêgowanie WY£¥CZNIE dla nieplanowanych i w tej samej transakcji
             if (!isPlanned)
             {
-                LedgerService.ApplyIncomeEffect(con, tx, userId, Math.Abs(amount), (int)paymentKind, paymentRefId);
+                LedgerService.ApplyIncomeEffect(
+                    c, tx,
+                    userId: userId,
+                    amount: amount,
+                    paymentKind: (int)paymentKind,
+                    paymentRefId: paymentRefId
+                );
             }
 
             tx.Commit();
-            RaiseDataChanged();
-            return id;
+            NotifyDataChanged(); // albo RaiseDataChanged() – u¿yj tego, co masz w DatabaseService
+            return rowId;
         }
 
 
@@ -2586,7 +2614,6 @@ VALUES(@u, @n);";
             cmd.ExecuteNonQuery();
             RaiseDataChanged();
         }
-
 
         private static int? TryResolveAccountIdFromExpenseAccountText(SqliteConnection c, SqliteTransaction tx, int userId, string? accountText)
         {

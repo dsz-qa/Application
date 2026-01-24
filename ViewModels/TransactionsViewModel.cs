@@ -556,6 +556,35 @@ namespace Finly.ViewModels
             };
         }
 
+        private string ResolveIncomeTargetFromSource(string? source)
+        {
+            var s = (source ?? string.Empty).Trim();
+            if (string.IsNullOrWhiteSpace(s)) return string.Empty;
+
+            // Jeśli już jest w formacie "Koperta: X" – zostaw
+            if (s.StartsWith("Koperta:", StringComparison.CurrentCultureIgnoreCase))
+                return s;
+
+            // Jeśli Source pasuje nazwą do konta bankowego – zwróć nazwę konta
+            foreach (var kv in _accountNameById)
+            {
+                if (string.Equals(kv.Value, s, StringComparison.CurrentCultureIgnoreCase))
+                    return kv.Value;
+            }
+
+            // Jeśli Source pasuje nazwą do koperty – zwróć "Koperta: X"
+            foreach (var kv in _envelopeNameById)
+            {
+                if (string.Equals(kv.Value, s, StringComparison.CurrentCultureIgnoreCase))
+                    return $"Koperta: {kv.Value}";
+            }
+
+            // W innym przypadku pokaż tekst Source (to jest Twoje „źródło / konto docelowe” z UI)
+            return s;
+        }
+
+
+
         // ------------------ DODAWANIE WIERSZY Z DB ------------------
 
         private void AddExpenseRow(DataRow r)
@@ -645,27 +674,34 @@ namespace Finly.ViewModels
                     ? (int?)Convert.ToInt32(r["PaymentRefId"])
                     : null;
 
+            string? sourceTxt =
+                (r.Table.Columns.Contains("Source") && r["Source"] != DBNull.Value)
+                    ? (r["Source"]?.ToString())
+                    : null;
+
+            // 1) Najpierw próbuj stabilnego księgowania (PaymentKind/PaymentRefId)
             string toName = ResolvePaymentDisplay(pk, pr, fallbackAccountId: null);
 
+            // 2) Jeśli PaymentKind wskazuje na gotówkę (0/1) ALBO wynik jest nieprzydatny,
+            //    a Source ma wartość – to Source ma pierwszeństwo do wyświetlenia.
+            var sourceResolved = ResolveIncomeTargetFromSource(sourceTxt);
+
+            bool paymentLooksLikeCash = (pk == 0 || pk == 1);
+            bool paymentUnresolved = string.IsNullOrWhiteSpace(toName) || toName == "?";
+
+            if (!string.IsNullOrWhiteSpace(sourceResolved) && (paymentLooksLikeCash || paymentUnresolved))
+            {
+                toName = sourceResolved;
+            }
+
+            // 3) Ostateczny fallback (gdy nie ma ani payment ani source)
             if (string.IsNullOrWhiteSpace(toName) || toName == "?")
             {
-                if (r.Table.Columns.Contains("AccountId") && r["AccountId"] != DBNull.Value)
-                {
-                    var accId = Convert.ToInt32(r["AccountId"]);
-                    if (_accountNameById.TryGetValue(accId, out var accName))
-                        toName = accName;
-                }
-
-                if (string.IsNullOrWhiteSpace(toName) &&
-                    r.Table.Columns.Contains("Source") &&
-                    r["Source"] != DBNull.Value)
-                {
-                    toName = r["Source"]?.ToString() ?? string.Empty;
-                }
-
-                if (string.IsNullOrWhiteSpace(toName))
-                    toName = "Wolna gotówka";
+                toName = paymentLooksLikeCash
+                    ? (pk == 1 ? "Odłożona gotówka" : "Wolna gotówka")
+                    : "Wolna gotówka";
             }
+
 
             AllTransactions.Add(new TransactionCardVm
             {

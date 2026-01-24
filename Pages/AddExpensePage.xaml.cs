@@ -672,12 +672,14 @@ namespace Finly.Pages
                 return;
             }
 
-            var formTag = formItem.Tag as string ?? string.Empty;
+            var formTag = (formItem.Tag as string ?? string.Empty).Trim();
 
             var date = IncomeDatePicker.SelectedDate ?? DateTime.Today;
             var isPlanned = IsPlannedDate(date);
 
-            var desc = string.IsNullOrWhiteSpace(IncomeDescBox.Text) ? null : IncomeDescBox.Text.Trim();
+            var desc = string.IsNullOrWhiteSpace(IncomeDescBox.Text)
+                ? null
+                : IncomeDescBox.Text.Trim();
 
             var catName = ResolveCategoryName(IncomeCategoryBox, IncomeNewCategoryBox);
             int? categoryId = GetCategoryIdOrZero(catName);
@@ -685,26 +687,34 @@ namespace Finly.Pages
 
             int? incomeBudgetId = GetSelectedBudgetId(IncomeBudgetCombo, date);
 
+            // WYLICZENIE STABILNEGO KSIĘGOWANIA:
+            PaymentKind paymentKind;
+            int? paymentRefId;
             string sourceDisplay;
-            BankAccountModel? acc = null;
 
             switch (formTag)
             {
                 case "cash_free":
+                    paymentKind = PaymentKind.FreeCash;
+                    paymentRefId = null;
                     sourceDisplay = "Wolna gotówka";
                     break;
 
                 case "cash_saved":
+                    paymentKind = PaymentKind.SavedCash;
+                    paymentRefId = null;
                     sourceDisplay = "Odłożona gotówka";
                     break;
 
                 case "transfer":
-                    if (IncomeAccountCombo.SelectedItem is not BankAccountModel a)
+                    if (IncomeAccountCombo.SelectedItem is not BankAccountModel acc)
                     {
                         ToastService.Info("Wybierz konto bankowe, na które wpływa przelew.");
                         return;
                     }
-                    acc = a;
+
+                    paymentKind = PaymentKind.BankAccount;
+                    paymentRefId = acc.Id; // BankAccounts.Id
                     sourceDisplay = $"Konto: {acc.AccountName}";
                     break;
 
@@ -715,31 +725,25 @@ namespace Finly.Pages
 
             try
             {
-                AddIncomeRaw(_uid, amount, date, categoryId, sourceDisplay, desc, isPlanned, incomeBudgetId);
-
-                if (!isPlanned)
-                {
-                    if (formTag == "cash_free")
-                    {
-                        UpdateCashOnHand(_uid, amount);
-                    }
-                    else if (formTag == "cash_saved")
-                    {
-                        UpdateSavedCash(_uid, amount);
-                        UpdateCashOnHand(_uid, amount);
-                    }
-                    else if (formTag == "transfer" && acc != null)
-                    {
-                        IncreaseBankBalance(acc.Id, _uid, amount);
-                    }
-                }
+                // ZAMIANA: żadnego AddIncomeRaw + żadnych ręcznych UpdateCash/Bank.
+                DatabaseService.InsertIncome(
+                    userId: _uid,
+                    amount: amount,
+                    date: date,
+                    categoryId: categoryId,
+                    source: sourceDisplay,
+                    description: desc,
+                    isPlanned: isPlanned,
+                    budgetId: incomeBudgetId,
+                    paymentKind: paymentKind,
+                    paymentRefId: paymentRefId
+                );
 
                 ToastService.Success(isPlanned ? "Dodano zaplanowany przychód." : "Dodano przychód.");
 
                 LoadCategories();
                 LoadIncomeAccounts();
                 RefreshMoneySummary();
-
                 ResetForms();
             }
             catch (Exception ex)
@@ -747,6 +751,7 @@ namespace Finly.Pages
                 ToastService.Error("Nie udało się dodać przychodu.\n" + ex.Message);
             }
         }
+
 
         // ================= TRANSFER =================
 
@@ -907,32 +912,6 @@ namespace Finly.Pages
 
         // ================= POMOCNICZE =================
 
-        private void AddIncomeRaw(int userId, decimal amount, DateTime date, int? categoryId, string source, string? desc, bool isPlanned = false, int? budgetId = null)
-        {
-            using var con = DatabaseService.GetConnection();
-            using var cmd = con.CreateCommand();
-            cmd.CommandText = @"
-INSERT INTO Incomes (UserId, Amount, Date, Description, Source, CategoryId, IsPlanned, BudgetId)
-VALUES (@u, @a, @d, @desc, @s, @cat, @p, @b);";
-
-            cmd.Parameters.AddWithValue("@u", userId);
-            cmd.Parameters.AddWithValue("@a", amount);
-            cmd.Parameters.AddWithValue("@d", date.ToString("yyyy-MM-dd"));
-            cmd.Parameters.AddWithValue("@desc", (object?)desc ?? DBNull.Value);
-            cmd.Parameters.AddWithValue("@s", (object?)source ?? DBNull.Value);
-
-            if (categoryId.HasValue && categoryId.Value > 0)
-                cmd.Parameters.AddWithValue("@cat", categoryId.Value);
-            else
-                cmd.Parameters.AddWithValue("@cat", DBNull.Value);
-
-            cmd.Parameters.AddWithValue("@p", isPlanned ? 1 : 0);
-            cmd.Parameters.AddWithValue("@b", (object?)budgetId ?? DBNull.Value);
-
-            cmd.ExecuteNonQuery();
-        }
-
-
         private void CreateBudgetFromExpense_Click(object sender, RoutedEventArgs e)
         {
             var date = ExpenseDatePicker.SelectedDate ?? DateTime.Today;
@@ -1005,39 +984,5 @@ VALUES (@u, @a, @d, @desc, @s, @cat, @p, @b);";
             ToastService.Success("Dodano budżet.");
         }
 
-
-
-        private void UpdateCashOnHand(int userId, decimal delta)
-        {
-            using var con = DatabaseService.GetConnection();
-            using var cmd = con.CreateCommand();
-            cmd.CommandText = @"UPDATE CashOnHand SET Amount = Amount + @d WHERE UserId=@u;
-INSERT INTO CashOnHand(UserId,Amount) SELECT @u,@d WHERE (SELECT changes())=0;";
-            cmd.Parameters.AddWithValue("@u", userId);
-            cmd.Parameters.AddWithValue("@d", delta);
-            cmd.ExecuteNonQuery();
-        }
-
-        private void UpdateSavedCash(int userId, decimal delta)
-        {
-            using var con = DatabaseService.GetConnection();
-            using var cmd = con.CreateCommand();
-            cmd.CommandText = @"UPDATE SavedCash SET Amount = Amount + @d WHERE UserId=@u;
-INSERT INTO SavedCash(UserId,Amount) SELECT @u,@d WHERE (SELECT changes())=0;";
-            cmd.Parameters.AddWithValue("@u", userId);
-            cmd.Parameters.AddWithValue("@d", delta);
-            cmd.ExecuteNonQuery();
-        }
-
-        private void IncreaseBankBalance(int accountId, int userId, decimal delta)
-        {
-            using var con = DatabaseService.GetConnection();
-            using var cmd = con.CreateCommand();
-            cmd.CommandText = "UPDATE BankAccounts SET Balance = Balance + @d WHERE Id=@id AND UserId=@u;";
-            cmd.Parameters.AddWithValue("@d", delta);
-            cmd.Parameters.AddWithValue("@id", accountId);
-            cmd.Parameters.AddWithValue("@u", userId);
-            cmd.ExecuteNonQuery();
-        }
     }
 }
