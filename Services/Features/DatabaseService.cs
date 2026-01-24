@@ -1287,7 +1287,8 @@ WHERE UserId = @u
             decimal target,
             decimal allocated,
             DateTime deadline,
-            string? goalText)
+            string? goalText,
+            string? newEnvelopeName = null)
         {
             using var c = OpenAndEnsureSchema();
 
@@ -1298,6 +1299,10 @@ WHERE UserId = @u
 UPDATE Envelopes
    SET Target   = @t,
        Allocated = @a");
+
+            // NOWE: jeœli zmieniamy tytu³ celu, to zmieniamy te¿ nazwê koperty
+            if (!string.IsNullOrWhiteSpace(newEnvelopeName))
+                sb.Append(", Name = @n");
 
             if (hasDeadline)
                 sb.Append(", Deadline = @d");
@@ -1311,8 +1316,12 @@ UPDATE Envelopes
 
             using var cmd = c.CreateCommand();
             cmd.CommandText = sb.ToString();
+
             cmd.Parameters.AddWithValue("@t", target);
             cmd.Parameters.AddWithValue("@a", allocated);
+
+            if (!string.IsNullOrWhiteSpace(newEnvelopeName))
+                cmd.Parameters.AddWithValue("@n", newEnvelopeName.Trim());
 
             if (hasDeadline)
                 cmd.Parameters.AddWithValue("@d", deadline.ToString("yyyy-MM-dd"));
@@ -1320,9 +1329,11 @@ UPDATE Envelopes
             cmd.Parameters.AddWithValue("@g", (object?)goalText ?? DBNull.Value);
             cmd.Parameters.AddWithValue("@id", envelopeId);
             cmd.Parameters.AddWithValue("@u", userId);
+
             cmd.ExecuteNonQuery();
             RaiseDataChanged();
         }
+
 
         public static int InsertEnvelope(int userId, string name, decimal target, decimal allocated, string? note)
         {

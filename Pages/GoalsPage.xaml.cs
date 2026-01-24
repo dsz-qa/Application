@@ -384,7 +384,6 @@ namespace Finly.Pages
 
         private void SaveGoalFromDialog(GoalEditDialog.GoalEditResult r)
         {
-            // walidacje takie jak miałaś wcześniej
             if (string.IsNullOrWhiteSpace(r.GoalTitle))
             {
                 ToastService.Info("Podaj nazwę celu.");
@@ -421,7 +420,8 @@ namespace Finly.Pages
                 return;
             }
 
-            var note = BuildNote(r.GoalTitle, r.Description, r.DueDate.Value);
+            var goalTitleTrim = r.GoalTitle.Trim();
+            var note = BuildNote(goalTitleTrim, r.Description, r.DueDate.Value);
 
             try
             {
@@ -433,18 +433,28 @@ namespace Finly.Pages
                 }
                 else
                 {
-                    var existingId = DatabaseService.GetEnvelopeIdByName(_uid, r.GoalTitle);
+                    var existingId = DatabaseService.GetEnvelopeIdByName(_uid, goalTitleTrim);
                     if (existingId.HasValue)
                     {
                         envelopeId = existingId.Value;
                     }
                     else
                     {
-                        envelopeId = DatabaseService.InsertEnvelope(_uid, r.GoalTitle, r.TargetAmount, r.CurrentAmount, note);
+                        envelopeId = DatabaseService.InsertEnvelope(_uid, goalTitleTrim, r.TargetAmount, r.CurrentAmount, note);
                     }
                 }
 
-                DatabaseService.UpdateEnvelopeGoal(_uid, envelopeId, r.TargetAmount, r.CurrentAmount, r.DueDate.Value, note);
+                // KLUCZOWA ZMIANA:
+                // Aktualizujemy Goal i jednocześnie Name koperty (żeby KopertyPage pokazywała nową nazwę).
+                DatabaseService.UpdateEnvelopeGoal(
+                    _uid,
+                    envelopeId,
+                    r.TargetAmount,
+                    r.CurrentAmount,
+                    r.DueDate.Value,
+                    note,
+                    newEnvelopeName: goalTitleTrim
+                );
 
                 ToastService.Success(r.EditingEnvelopeId.HasValue ? "Cel zaktualizowany." : "Cel dodany.");
                 LoadGoals();
@@ -454,6 +464,7 @@ namespace Finly.Pages
                 ToastService.Error("Nie udało się zapisać celu: " + ex.Message);
             }
         }
+
 
         // ========= Delete (bez zmian) =========
 
