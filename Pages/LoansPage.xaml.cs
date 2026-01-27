@@ -21,17 +21,15 @@ namespace Finly.Pages
         private readonly ObservableCollection<LoanCardVm> _loans = new();
         private readonly int _userId;
 
-        // Cache runtime TYLKO dla sparsowanych wierszy (OK)
+        // Cache runtime TYLKO dla sparsowanych wierszy
         private readonly Dictionary<int, List<LoanInstallmentRow>> _parsedSchedules = new();
 
-        // Jeżeli dalej trzymasz mapowanie kredyt->konto w RAM, zostawiamy (docelowo też do DB)
+        // Jeśli dalej trzymasz mapowanie kredyt->konto w RAM (OK na teraz)
         private readonly Dictionary<int, int> _loanAccounts = new();
 
         private List<BankAccountModel> _accounts = new();
 
-        public LoansPage() : this(UserService.GetCurrentUserId())
-        {
-        }
+        public LoansPage() : this(UserService.GetCurrentUserId()) { }
 
         public LoansPage(int userId)
         {
@@ -167,6 +165,60 @@ namespace Finly.Pages
             return destPath;
         }
 
+        // ===================== SCHEDULE READ (shared) =====================
+
+        private bool TryGetSchedule(
+            int loanId,
+            bool showToasts,
+            out string? path,
+            out List<LoanInstallmentRow> schedule)
+        {
+            path = null;
+            schedule = new List<LoanInstallmentRow>();
+
+            path = DatabaseService.GetLoanSchedulePath(loanId, _userId);
+            if (string.IsNullOrWhiteSpace(path))
+                return false;
+
+            if (!File.Exists(path))
+            {
+                if (showToasts)
+                    ToastService.Info("Nie znaleziono pliku harmonogramu. Załącz ponownie.");
+
+                // czyścimy DB, bo ścieżka jest martwa
+                DatabaseService.SetLoanSchedulePath(loanId, _userId, null);
+                DatabaseService.NotifyDataChanged();
+                _parsedSchedules.Remove(loanId);
+                return false;
+            }
+
+            if (!string.Equals(Path.GetExtension(path), ".csv", StringComparison.OrdinalIgnoreCase))
+                return false;
+
+            if (_parsedSchedules.TryGetValue(loanId, out var cached) && cached != null && cached.Count > 0)
+            {
+                schedule = cached;
+                return true;
+            }
+
+            try
+            {
+                var parser = new LoanScheduleCsvParser();
+                schedule = parser.Parse(path).ToList();
+                _parsedSchedules[loanId] = schedule;
+                return schedule.Count > 0;
+            }
+            catch (Exception ex)
+            {
+                _parsedSchedules.Remove(loanId);
+                if (showToasts)
+                    ToastService.Error("Błąd importu CSV: " + ex.Message);
+
+                System.Diagnostics.Debug.WriteLine(ex);
+                return false;
+            }
+        }
+
         // ===================== KPI / ANALYSES =====================
 
         private (decimal totalDebt, decimal monthlySum, decimal yearlySum, int maxRemainingMonths)
@@ -230,46 +282,7 @@ namespace Finly.Pages
             remainingMonths = 0;
             yearSum = 0m;
 
-            var path = DatabaseService.GetLoanSchedulePath(vm.Id, _userId);
-            if (string.IsNullOrWhiteSpace(path))
-                return false;
-
-            if (!File.Exists(path))
-            {
-                ToastService.Info("Nie znaleziono pliku harmonogramu. Załącz ponownie.");
-                DatabaseService.SetLoanSchedulePath(vm.Id, _userId, null);
-                DatabaseService.NotifyDataChanged();
-                _parsedSchedules.Remove(vm.Id);
-                return false;
-            }
-
-            if (!string.Equals(Path.GetExtension(path), ".csv", StringComparison.OrdinalIgnoreCase))
-                return false;
-
-            List<LoanInstallmentRow> schedule;
-
-            if (_parsedSchedules.TryGetValue(vm.Id, out var cached) && cached != null && cached.Count > 0)
-            {
-                schedule = cached;
-            }
-            else
-            {
-                try
-                {
-                    var parser = new LoanScheduleCsvParser();
-                    schedule = parser.Parse(path).ToList();
-                    _parsedSchedules[vm.Id] = schedule;
-                }
-                catch (Exception ex)
-                {
-                    ToastService.Error("Błąd importu CSV: " + ex.Message);
-                    System.Diagnostics.Debug.WriteLine(ex);
-                    return false;
-                }
-
-            }
-
-            if (schedule.Count == 0)
+            if (!TryGetSchedule(vm.Id, showToasts: true, out _, out var schedule))
                 return false;
 
             var today = DateTime.Today;
@@ -383,43 +396,7 @@ namespace Finly.Pages
         {
             remainingSum = 0m;
 
-            // Źródło prawdy: DB
-            var path = DatabaseService.GetLoanSchedulePath(vm.Id, _userId);
-            if (string.IsNullOrWhiteSpace(path))
-                return false;
-
-            if (!File.Exists(path))
-            {
-                DatabaseService.SetLoanSchedulePath(vm.Id, _userId, null);
-                DatabaseService.NotifyDataChanged();
-                _parsedSchedules.Remove(vm.Id);
-                return false;
-            }
-
-            if (!string.Equals(Path.GetExtension(path), ".csv", StringComparison.OrdinalIgnoreCase))
-                return false;
-
-            List<LoanInstallmentRow> schedule;
-
-            if (_parsedSchedules.TryGetValue(vm.Id, out var cached) && cached != null && cached.Count > 0)
-            {
-                schedule = cached;
-            }
-            else
-            {
-                try
-                {
-                    var parser = new LoanScheduleCsvParser();
-                    schedule = parser.Parse(path).ToList();
-                    _parsedSchedules[vm.Id] = schedule;
-                }
-                catch
-                {
-                    return false;
-                }
-            }
-
-            if (schedule.Count == 0)
+            if (!TryGetSchedule(vm.Id, showToasts: false, out _, out var schedule))
                 return false;
 
             var today = DateTime.Today;
@@ -535,21 +512,15 @@ namespace Finly.Pages
                     else
                         _loanAccounts.Remove(vm.Id);
 
-                    // Harmonogram
+                    // Harmonogram: jeśli wybrano nowy, kopiujemy do AppData i podmieniamy ścieżkę w DB
                     if (!string.IsNullOrWhiteSpace(dlg.AttachedSchedulePath) && File.Exists(dlg.AttachedSchedulePath))
                     {
                         var dest = CopyLoanScheduleToAppData(vm.Id, dlg.AttachedSchedulePath!);
                         DatabaseService.SetLoanSchedulePath(vm.Id, _userId, dest);
-                    }
-                    else
-                    {
-                        // jeśli w edycji usunięto plik / nie wybrano nic nowego, nie kasujemy automatycznie
-                        // (jeśli chcesz kasować – daj checkbox w dialogu)
-                        // DatabaseService.SetLoanSchedulePath(vm.Id, _userId, null);
+                        _parsedSchedules.Remove(vm.Id);
                     }
 
                     DatabaseService.NotifyDataChanged();
-                    _parsedSchedules.Remove(vm.Id);
 
                     ToastService.Success("Kredyt zaktualizowany.");
                     LoadLoans();
@@ -647,45 +618,15 @@ namespace Finly.Pages
             if ((sender as FrameworkElement)?.Tag is not LoanCardVm vm)
                 return;
 
-            var path = DatabaseService.GetLoanSchedulePath(vm.Id, _userId);
-            if (string.IsNullOrWhiteSpace(path))
+            if (!TryGetSchedule(vm.Id, showToasts: true, out var path, out var rows))
             {
-                ToastService.Error("Nie załączyłaś jeszcze harmonogramu spłaty rat dla tego kredytu.");
+                ToastService.Error("Nie udało się odczytać harmonogramu. Załącz poprawny plik CSV.");
                 return;
             }
 
-            if (!File.Exists(path))
-            {
-                ToastService.Error("Nie znaleziono pliku harmonogramu. Załącz go ponownie.");
-                DatabaseService.SetLoanSchedulePath(vm.Id, _userId, null);
-                DatabaseService.NotifyDataChanged();
-                _parsedSchedules.Remove(vm.Id);
-                return;
-            }
-
-            var ext = Path.GetExtension(path) ?? string.Empty;
-
-            if (string.Equals(ext, ".pdf", StringComparison.OrdinalIgnoreCase))
-            {
-                ToastService.Info("Plik PDF jest załączony, ale aktualnie obsługujemy podgląd harmonogramu tylko dla CSV.");
-                return;
-            }
-
-            if (!string.Equals(ext, ".csv", StringComparison.OrdinalIgnoreCase))
-            {
-                ToastService.Error("Nieobsługiwany format harmonogramu. Wybierz plik CSV (PDF dodamy później).");
-                return;
-            }
-
+            // path jest CSV (TryGetSchedule to gwarantuje)
             try
             {
-                if (!_parsedSchedules.TryGetValue(vm.Id, out var rows) || rows == null || rows.Count == 0)
-                {
-                    var parser = new LoanScheduleCsvParser();
-                    rows = parser.Parse(path).ToList();
-                    _parsedSchedules[vm.Id] = rows;
-                }
-
                 if (rows == null || rows.Count == 0)
                 {
                     ToastService.Error("Plik CSV nie zawiera rat do wyświetlenia (brak poprawnych wierszy).");
@@ -701,7 +642,7 @@ namespace Finly.Pages
             }
             catch (Exception ex)
             {
-                ToastService.Error("Nie udało się odczytać harmonogramu: " + ex.Message);
+                ToastService.Error("Nie udało się otworzyć harmonogramu: " + ex.Message);
                 System.Diagnostics.Debug.WriteLine("LoanSchedule open error: " + ex);
                 _parsedSchedules.Remove(vm.Id);
             }
@@ -735,10 +676,13 @@ namespace Finly.Pages
             {
                 try
                 {
+                    // 1) Usuń harmonogram z DB (przed DeleteLoan, bo po usunięciu rekordu Update/Set może nie działać)
+                    DatabaseService.SetLoanSchedulePath(vm.Id, _userId, null);
+
+                    // 2) Usuń rekord kredytu
                     DatabaseService.DeleteLoan(vm.Id, _userId);
 
-                    // Czyścimy powiązania/cache
-                    DatabaseService.SetLoanSchedulePath(vm.Id, _userId, null);
+                    // 3) Czyścimy cache/powiązania w RAM
                     _loanAccounts.Remove(vm.Id);
                     _parsedSchedules.Remove(vm.Id);
 

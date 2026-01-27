@@ -80,18 +80,27 @@
                         <RowDefinition Height="Auto"/>
                     </Grid.RowDefinitions>
 
+                    <!-- ===== Header + podsumowania ===== -->
                     <StackPanel Grid.Row="0">
                         <TextBlock x:Name="HeaderText"
                                    Text="Harmonogram spłat"
                                    FontSize="18"
                                    FontWeight="Bold"
                                    Foreground="{DynamicResource App.Foreground}"/>
+
                         <TextBlock x:Name="SubText"
                                    Text=""
                                    Opacity="0.75"
                                    Foreground="{DynamicResource App.Foreground}"/>
+
+                        <TextBlock x:Name="SummaryText"
+                                   Text=""
+                                   Margin="0,6,0,0"
+                                   Opacity="0.85"
+                                   Foreground="{DynamicResource App.Foreground}"/>
                     </StackPanel>
 
+                    <!-- ===== Box: next payment + tabela ===== -->
                     <Border Grid.Row="2"
                             Background="{DynamicResource App.Background}"
                             BorderBrush="{DynamicResource Surface.Border}"
@@ -116,21 +125,31 @@
                                            Foreground="{DynamicResource App.Foreground}"/>
                             </StackPanel>
 
-                            <ScrollViewer Grid.Row="2"
-                                          VerticalScrollBarVisibility="Auto"
-                                          HorizontalScrollBarVisibility="Disabled"
-                                          Height="380">
-                                <ItemsControl x:Name="RowsList">
-                                    <ItemsControl.ItemTemplate>
-                                        <DataTemplate>
-                                            <TextBlock Text="{Binding}"
-                                                       Foreground="{DynamicResource App.Foreground}"
-                                                       Margin="0,2,0,2"
-                                                       TextWrapping="NoWrap"/>
-                                        </DataTemplate>
-                                    </ItemsControl.ItemTemplate>
-                                </ItemsControl>
-                            </ScrollViewer>
+                            <!-- ===== DataGrid zamiast ItemsControl ===== -->
+                            <DataGrid x:Name="RowsGrid"
+                                      Grid.Row="2"
+                                      AutoGenerateColumns="False"
+                                      CanUserAddRows="False"
+                                      CanUserDeleteRows="False"
+                                      IsReadOnly="True"
+                                      HeadersVisibility="Column"
+                                      GridLinesVisibility="None"
+                                      RowHeaderWidth="0"
+                                      Height="380"
+                                      Background="{DynamicResource App.Background}"
+                                      Foreground="{DynamicResource App.Foreground}"
+                                      BorderBrush="{DynamicResource Surface.Border}"
+                                      BorderThickness="0">
+
+                                <DataGrid.Columns>
+                                    <DataGridTextColumn Header="Nr raty" Binding="{Binding No}" Width="70"/>
+                                    <DataGridTextColumn Header="Termin spłaty" Binding="{Binding Date}" Width="120"/>
+                                    <DataGridTextColumn Header="Kwota kapitału (PLN)" Binding="{Binding Principal}" Width="160"/>
+                                    <DataGridTextColumn Header="Kwota odsetek (PLN)" Binding="{Binding Interest}" Width="160"/>
+                                    <DataGridTextColumn Header="Kwota raty łącznie (PLN)" Binding="{Binding Total}" Width="190"/>
+                                    <DataGridTextColumn Header="Saldo po spłacie raty (PLN)" Binding="{Binding Remaining}" Width="200"/>
+                                </DataGrid.Columns>
+                            </DataGrid>
                         </Grid>
                     </Border>
 
@@ -147,4 +166,3 @@
         </Border>
     </Grid>
 </Window>
-
