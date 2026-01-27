@@ -146,15 +146,16 @@
                                    FontWeight="Bold"
                                    Foreground="OrangeRed"/>
 
+                        <!-- Oprocentowanie + DATA kolejnej raty (bez kwoty) -->
                         <StackPanel Orientation="Horizontal" Margin="0,6,0,0" HorizontalAlignment="Left">
                             <TextBlock Text="Oprocentowanie:" Foreground="Gray" FontSize="11" Margin="0,0,6,0"/>
-                            <TextBlock Text="{Binding InterestRate, StringFormat={}{0}%}"
+                            <TextBlock Text="{Binding InterestRate, StringFormat={}{0:N2}%}"
                                        FontSize="12"
                                        Foreground="{DynamicResource App.Foreground}"
                                        Margin="0,0,12,0"/>
 
-                            <TextBlock Text="Kolejna rata:" Foreground="Gray" FontSize="11" Margin="0,0,6,0"/>
-                            <TextBlock Text="{Binding NextPaymentInfo}"
+                            <TextBlock Text="Data kolejnej raty:" Foreground="Gray" FontSize="11" Margin="0,0,6,0"/>
+                            <TextBlock Text="{Binding NextPaymentDateStr}"
                                        FontSize="12"
                                        Foreground="{DynamicResource App.Foreground}"/>
                         </StackPanel>
@@ -164,8 +165,10 @@
                                      Height="12"
                                      Margin="0,8,0,0"/>
 
+                        <!-- Następna rata + Kapitał w racie + Odsetki w racie -->
                         <Grid Margin="0,8,0,0">
                             <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
                                 <ColumnDefinition Width="*"/>
                                 <ColumnDefinition Width="*"/>
                             </Grid.ColumnDefinitions>
@@ -178,6 +181,28 @@
                             </StackPanel>
 
                             <StackPanel Grid.Column="1">
+                                <TextBlock Text="Kapitał w racie:" Foreground="Gray" FontSize="11"/>
+                                <TextBlock Text="{Binding NextPaymentPrincipalStr}"
+                                           FontSize="12"
+                                           Foreground="{DynamicResource App.Foreground}"/>
+                            </StackPanel>
+
+                            <StackPanel Grid.Column="2">
+                                <TextBlock Text="Odsetki w racie:" Foreground="Gray" FontSize="11"/>
+                                <TextBlock Text="{Binding NextPaymentInterestStr}"
+                                           FontSize="12"
+                                           Foreground="{DynamicResource App.Foreground}"/>
+                            </StackPanel>
+                        </Grid>
+
+                        <!-- Do końca -->
+                        <Grid Margin="0,8,0,0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+
+                            <StackPanel Grid.Column="0">
                                 <TextBlock Text="Do końca:" Foreground="Gray" FontSize="11"/>
                                 <TextBlock Text="{Binding RemainingTermStr}"
                                            FontSize="12"
@@ -298,7 +323,7 @@
 
                 <Border Grid.Column="0" Style="{StaticResource RedAccentCard}" Margin="0,0,16,16">
                     <StackPanel>
-                        <TextBlock Text="Całkowita kwota wszystkich kredytów"
+                        <TextBlock Text="Przyznana kwota wszystkich kredytów"
                                    Style="{StaticResource CardHeader}"/>
                         <TextBlock x:Name="TotalLoansTileAmount"
                                    Text="0,00 zł"
@@ -327,7 +352,7 @@
 
                 <Border Grid.Column="0" Style="{StaticResource OrangeAccentCard}">
                     <StackPanel>
-                        <TextBlock Text="Średnie oprocentowanie portfela (ważone saldem)"
+                        <TextBlock Text="Kapitał w tym miesiącu"
                                    Style="{StaticResource CardHeader}"
                                    FontSize="14"/>
                         <TextBlock x:Name="Analysis1Value"
@@ -339,7 +364,7 @@
 
                 <Border Grid.Column="1" Style="{StaticResource OrangeAccentCard}">
                     <StackPanel>
-                        <TextBlock Text="Szacowane odsetki w kolejne 30 dni"
+                        <TextBlock Text="Odsetki w tym miesiącu"
                                    Style="{StaticResource CardHeader}"
                                    FontSize="14"/>
                         <TextBlock x:Name="Analysis2Value"
@@ -351,7 +376,7 @@
 
                 <Border Grid.Column="2" Style="{StaticResource OrangeAccentCard}" Margin="0,0,0,16">
                     <StackPanel>
-                        <TextBlock Text="Łącznie do spłaty (kapitał + odsetki)"
+                        <TextBlock Text="Całkowity koszt wszystkich kredytów (kapitał + odsetki)"
                                    Style="{StaticResource CardHeader}"
                                    FontSize="14"/>
                         <TextBlock x:Name="Analysis3Value"
@@ -380,7 +405,7 @@
             <ItemsControl Grid.Row="3" x:Name="LoansGrid">
                 <ItemsControl.ItemsPanel>
                     <ItemsPanelTemplate>
-                        <WrapPanel IsItemsHost="True" />
+                        <WrapPanel IsItemsHost="True"/>
                     </ItemsPanelTemplate>
                 </ItemsControl.ItemsPanel>
             </ItemsControl>

@@ -20,11 +20,17 @@ namespace Finly.ViewModels
 
         // ======= Snapshot z harmonogramu (CSV) =======
         private bool _hasSchedule;
+
         private decimal? _scheduleOriginalPrincipal;
         private decimal? _scheduleRemainingPrincipal;
+
         private decimal? _scheduleNextPaymentAmount;
         private DateTime? _scheduleNextPaymentDate;
         private int? _scheduleRemainingInstallments;
+
+        // NOWE: podział kolejnej raty
+        private decimal? _scheduleNextPaymentPrincipalPart;
+        private decimal? _scheduleNextPaymentInterestPart;
 
         public int Id
         {
@@ -135,8 +141,33 @@ namespace Finly.ViewModels
 
         /// <summary>
         /// Wywołuj z LoansPage po sparsowaniu harmonogramu.
-        /// To jest klucz: UI dalej binduje do tych samych pól, ale wartości idą z schedule.
+        /// Snapshot zawiera też rozbicie kolejnej raty (kapitał/odsetki) jeśli dostępne.
         /// </summary>
+        public void ApplyScheduleSnapshot(
+            decimal? originalPrincipal,
+            decimal? remainingPrincipal,
+            decimal? nextPaymentAmount,
+            DateTime? nextPaymentDate,
+            int? remainingInstallments,
+            decimal? nextPaymentPrincipalPart,
+            decimal? nextPaymentInterestPart)
+        {
+            HasSchedule = true;
+
+            _scheduleOriginalPrincipal = originalPrincipal;
+            _scheduleRemainingPrincipal = remainingPrincipal;
+
+            _scheduleNextPaymentAmount = nextPaymentAmount;
+            _scheduleNextPaymentDate = nextPaymentDate;
+            _scheduleRemainingInstallments = remainingInstallments;
+
+            _scheduleNextPaymentPrincipalPart = nextPaymentPrincipalPart;
+            _scheduleNextPaymentInterestPart = nextPaymentInterestPart;
+
+            NotifyDerived();
+        }
+
+        // kompatybilność wstecz (jeśli gdzieś jeszcze wołasz starą wersję)
         public void ApplyScheduleSnapshot(
             decimal? originalPrincipal,
             decimal? remainingPrincipal,
@@ -144,15 +175,14 @@ namespace Finly.ViewModels
             DateTime? nextPaymentDate,
             int? remainingInstallments)
         {
-            HasSchedule = true;
-
-            _scheduleOriginalPrincipal = originalPrincipal;
-            _scheduleRemainingPrincipal = remainingPrincipal;
-            _scheduleNextPaymentAmount = nextPaymentAmount;
-            _scheduleNextPaymentDate = nextPaymentDate;
-            _scheduleRemainingInstallments = remainingInstallments;
-
-            NotifyDerived();
+            ApplyScheduleSnapshot(
+                originalPrincipal,
+                remainingPrincipal,
+                nextPaymentAmount,
+                nextPaymentDate,
+                remainingInstallments,
+                nextPaymentPrincipalPart: null,
+                nextPaymentInterestPart: null);
         }
 
         public void ClearScheduleSnapshot()
@@ -161,9 +191,13 @@ namespace Finly.ViewModels
 
             _scheduleOriginalPrincipal = null;
             _scheduleRemainingPrincipal = null;
+
             _scheduleNextPaymentAmount = null;
             _scheduleNextPaymentDate = null;
             _scheduleRemainingInstallments = null;
+
+            _scheduleNextPaymentPrincipalPart = null;
+            _scheduleNextPaymentInterestPart = null;
 
             NotifyDerived();
         }
@@ -235,12 +269,16 @@ namespace Finly.ViewModels
             }
         }
 
+        /// <summary>
+        /// Kwota kolejnej raty (2 miejsca po przecinku).
+        /// Z harmonogramu jeśli jest; fallback annuitetowy gdy nie ma harmonogramu.
+        /// </summary>
         public decimal NextPayment
         {
             get
             {
                 if (_scheduleNextPaymentAmount.HasValue && _scheduleNextPaymentAmount.Value > 0m)
-                    return Math.Round(_scheduleNextPaymentAmount.Value, 0);
+                    return Math.Round(_scheduleNextPaymentAmount.Value, 2);
 
                 // fallback (tylko gdy nie ma harmonogramu):
                 var remaining = DisplayRemainingPrincipal;
@@ -250,18 +288,35 @@ namespace Finly.ViewModels
                 if (monthsLeft <= 0) monthsLeft = 1;
 
                 var r = InterestRate / 100m / 12m;
-                if (r == 0m) return Math.Round(remaining / monthsLeft, 0);
+                if (r == 0m) return Math.Round(remaining / monthsLeft, 2);
 
                 var denom = 1m - (decimal)Math.Pow((double)(1m + r), -monthsLeft);
-                if (denom == 0m) return Math.Round(remaining / monthsLeft, 0);
+                if (denom == 0m) return Math.Round(remaining / monthsLeft, 2);
 
                 var payment = remaining * r / denom;
-                return Math.Round(payment, 0);
+                return Math.Round(payment, 2);
             }
         }
 
+        // NOWE: data jako string (bez kwoty) do UI
+        public string NextPaymentDateStr => NextPaymentDate.ToString("dd.MM.yyyy");
+
+        // NOWE: stringi kwot (2 miejsca po przecinku)
+        public string NextPaymentStr => NextPayment.ToString("N2") + " zł";
+
         public string NextPaymentInfo =>
-            NextPayment.ToString("N0") + " zł · " + NextPaymentDate.ToString("dd.MM.yyyy");
+            NextPayment.ToString("N2") + " zł · " + NextPaymentDate.ToString("dd.MM.yyyy");
+
+        // NOWE: podział raty (jeżeli harmonogram podał; inaczej — “—”)
+        public string NextPaymentPrincipalStr =>
+            _scheduleNextPaymentPrincipalPart.HasValue
+                ? Math.Round(_scheduleNextPaymentPrincipalPart.Value, 2).ToString("N2") + " zł"
+                : "—";
+
+        public string NextPaymentInterestStr =>
+            _scheduleNextPaymentInterestPart.HasValue
+                ? Math.Round(_scheduleNextPaymentInterestPart.Value, 2).ToString("N2") + " zł"
+                : "—";
 
         public string RemainingTermStr
         {
@@ -284,8 +339,6 @@ namespace Finly.ViewModels
             }
         }
 
-        public string NextPaymentStr => NextPayment.ToString("N0") + " zł";
-
         private int RemainingMonthsFallback()
         {
             if (TermMonths <= 0) return 0;
@@ -306,9 +359,14 @@ namespace Finly.ViewModels
             OnPropertyChanged(nameof(PercentPaidClamped));
 
             OnPropertyChanged(nameof(NextPaymentDate));
+            OnPropertyChanged(nameof(NextPaymentDateStr));
+
             OnPropertyChanged(nameof(NextPayment));
             OnPropertyChanged(nameof(NextPaymentInfo));
             OnPropertyChanged(nameof(NextPaymentStr));
+
+            OnPropertyChanged(nameof(NextPaymentPrincipalStr));
+            OnPropertyChanged(nameof(NextPaymentInterestStr));
 
             OnPropertyChanged(nameof(RemainingTermStr));
         }

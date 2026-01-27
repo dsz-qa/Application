@@ -123,6 +123,10 @@ namespace Finly.Pages
                 decimal? nextAmount = next != null ? next.Total : (decimal?)null;
                 DateTime? nextDate = next != null ? next.Date : (DateTime?)null;
 
+                decimal? nextCap = next?.Principal;
+                decimal? nextInt = next?.Interest;
+
+
                 int? remainingInstallments = upcoming.Count;
 
                 // ORIGINAL principal: najlepsze źródło to największe Remaining (zwykle na początku harmonogramu),
@@ -180,7 +184,10 @@ namespace Finly.Pages
                     remainingPrincipal: remainingPrincipal,
                     nextPaymentAmount: nextAmount,
                     nextPaymentDate: nextDate,
-                    remainingInstallments: remainingInstallments);
+                    remainingInstallments: remainingInstallments,
+                    nextPaymentPrincipalPart: nextCap,
+                    nextPaymentInterestPart: nextInt);
+
             }
             catch
             {
@@ -430,57 +437,81 @@ namespace Finly.Pages
             if (!loans.Any())
                 return;
 
-            var (totalDebt, _, _, _) = CalculatePortfolioStats(loans);
-
-            // Ważone oprocentowanie – ważymy “pozostałym saldem”
-            decimal weightedRate = 0m;
-            if (totalDebt > 0m)
-                weightedRate = loans.Sum(l => l.DisplayRemainingPrincipal * l.InterestRate) / totalDebt;
-
-            // Odsetki 30 dni – liczymy od “pozostałego salda”
+            // 1) Kapitał/odsetki w tym miesiącu (najczęściej 1 rata na kredyt w miesiącu)
             var today = DateTime.Today;
-            var in30 = today.AddDays(30);
+            var monthStart = new DateTime(today.Year, today.Month, 1);
+            var monthEnd = monthStart.AddMonths(1);
 
-            decimal interest30 = 0m;
-            foreach (var l in loans)
-                interest30 += LoanMathService.CalculateInterest(l.DisplayRemainingPrincipal, l.InterestRate, today, in30);
-
-            // Łącznie do spłaty od dziś — z harmonogramu jeśli jest
-            decimal totalToPayFromToday = 0m;
+            decimal capitalThisMonth = 0m;
+            decimal interestThisMonth = 0m;
 
             foreach (var vm in loans)
             {
-                if (TryGetScheduleRemainingSum(vm, out var scheduleRemaining))
+                // Jeśli mamy harmonogram, bierzemy raty w tym miesiącu
+                if (TryGetSchedule(vm.Id, showToasts: false, out _, out var schedule) && schedule.Count > 0)
                 {
-                    totalToPayFromToday += scheduleRemaining;
+                    var rowsThisMonth = schedule
+                        .Where(r => r.Date >= monthStart && r.Date < monthEnd)
+                        .ToList();
+
+                    // Sumujemy tylko jeśli bank podał breakdown
+                    capitalThisMonth += rowsThisMonth.Sum(r => r.Principal ?? 0m);
+                    interestThisMonth += rowsThisMonth.Sum(r => r.Interest ?? 0m);
                     continue;
                 }
 
+                // Fallback bez harmonogramu: przybliżenie z raty annuitetowej
                 int monthsLeft = GetRemainingMonths(vm);
-                if (monthsLeft <= 0)
-                    continue;
+                if (monthsLeft <= 0) continue;
 
-                var monthly = LoansService.CalculateMonthlyPayment(vm.DisplayRemainingPrincipal, vm.InterestRate, monthsLeft);
-                totalToPayFromToday += monthly * monthsLeft;
+                var (interestPart, principalPart) =
+                    LoansService.CalculateFirstInstallmentBreakdown(vm.DisplayRemainingPrincipal, vm.InterestRate, monthsLeft);
+
+                capitalThisMonth += principalPart;
+                interestThisMonth += interestPart;
+            }
+
+            // 2) Całkowity koszt wszystkich kredytów (kapitał+odsetki) – pełny koszt wg harmonogramu, a bez niego aproksymacja
+            decimal totalCostAllLoans = 0m;
+
+            foreach (var vm in loans)
+            {
+                if (TryGetSchedule(vm.Id, showToasts: false, out _, out var schedule) && schedule.Count > 0)
+                {
+                    totalCostAllLoans += schedule.Sum(r => r.Total);
+                    continue;
+                }
+
+                if (vm.TermMonths > 0)
+                {
+                    // koszt całkowity ~ rata * liczba miesięcy
+                    var monthly = LoansService.CalculateMonthlyPayment(vm.Principal, vm.InterestRate, vm.TermMonths);
+                    totalCostAllLoans += monthly * vm.TermMonths;
+                }
             }
 
             SetAnalysisText(
-                $"{weightedRate:N2} %",
-                $"{interest30:N2} zł",
-                $"{totalToPayFromToday:N2} zł"
+                $"{capitalThisMonth:N2} zł",
+                $"{interestThisMonth:N2} zł",
+                $"{totalCostAllLoans:N2} zł"
             );
+
         }
 
         private void UpdateKpiTiles()
         {
             var loans = _loans.OfType<LoanCardVm>().ToList();
-            var (totalDebt, monthlySum, _, _) = CalculatePortfolioStats(loans);
+            var (_, monthlySum, _, _) = CalculatePortfolioStats(loans);
+
+            // Przyznana kwota = “oryginalny kapitał” z harmonogramu jeśli jest, inaczej Principal z DB
+            decimal grantedSum = loans.Sum(x => x.DisplayOriginalPrincipal);
 
             if (FindName("TotalLoansTileAmount") is TextBlock tbTotal)
-                tbTotal.Text = totalDebt.ToString("N2") + " zł";
+                tbTotal.Text = grantedSum.ToString("N2") + " zł";
 
             if (FindName("MonthlyLoansTileAmount") is TextBlock tbMonthly)
                 tbMonthly.Text = monthlySum.ToString("N2") + " zł";
+
         }
 
         private void SetAnalysisText(string a1, string a2, string a3)
