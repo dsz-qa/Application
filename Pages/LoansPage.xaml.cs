@@ -45,6 +45,10 @@ namespace Finly.Pages
         {
             LoadAccounts();
             LoadLoans();
+
+            // klucz: po załadowaniu kart wstrzykujemy snapshoty z harmonogramów
+            ApplyScheduleSnapshotsToLoanVms();
+
             RefreshKpisAndLists();
         }
 
@@ -84,8 +88,105 @@ namespace Finly.Pages
 
             // kafelek "Dodaj kredyt" ma być na końcu
             _loans.Add(new AddLoanTile());
+        }
 
-            UpdateKpiTiles();
+        // ===================== SNAPSHOT FROM SCHEDULE -> VM =====================
+
+        private void ApplyScheduleSnapshotsToLoanVms()
+        {
+            foreach (var vm in _loans.OfType<LoanCardVm>())
+            {
+                ApplyScheduleSnapshotToVm(vm);
+            }
+        }
+
+        private void ApplyScheduleSnapshotToVm(LoanCardVm vm)
+        {
+            try
+            {
+                // jeśli nie ma harmonogramu / nie da się odczytać -> czyścimy snapshot
+                if (!TryGetSchedule(vm.Id, showToasts: false, out _, out var schedule) || schedule == null || schedule.Count == 0)
+                {
+                    vm.ClearScheduleSnapshot();
+                    return;
+                }
+
+                var today = DateTime.Today;
+
+                // sort pewności (parser już sortuje, ale defensywnie)
+                var ordered = schedule.OrderBy(r => r.Date).ToList();
+
+                // next installment (>= today)
+                var upcoming = ordered.Where(r => r.Date >= today).OrderBy(r => r.Date).ToList();
+                var next = upcoming.FirstOrDefault();
+
+                decimal? nextAmount = next != null ? next.Total : (decimal?)null;
+                DateTime? nextDate = next != null ? next.Date : (DateTime?)null;
+
+                int? remainingInstallments = upcoming.Count;
+
+                // ORIGINAL principal: najlepsze źródło to największe Remaining (zwykle na początku harmonogramu),
+                // ale banki różnie zapisują saldo (przed/po). Bezpiecznie: max(Remaining) jeśli istnieje, inaczej vm.Principal
+                decimal? originalPrincipal = null;
+                var remainingValsAll = ordered.Where(x => x.Remaining.HasValue && x.Remaining.Value >= 0m).Select(x => x.Remaining!.Value).ToList();
+                if (remainingValsAll.Count > 0)
+                    originalPrincipal = remainingValsAll.Max();
+
+                // REMAINING principal:
+                // 1) jeśli wiersz "next" ma Remaining -> bierzemy go
+                // 2) inaczej bierzemy ostatni Remaining z przyszłości
+                // 3) inaczej (brak Remaining) -> sum(przyszły Principal) jeśli jest
+                // 4) fallback -> vm.Principal
+                decimal? remainingPrincipal = null;
+
+                if (next != null && next.Remaining.HasValue && next.Remaining.Value >= 0m)
+                {
+                    remainingPrincipal = next.Remaining.Value;
+                }
+                else
+                {
+                    var remFuture = upcoming
+                        .Where(x => x.Remaining.HasValue && x.Remaining.Value >= 0m)
+                        .Select(x => x.Remaining!.Value)
+                        .ToList();
+
+                    if (remFuture.Count > 0)
+                    {
+                        // bierzemy wartość z najbliższego sensownego wiersza (pierwszy z Remaining)
+                        remainingPrincipal = remFuture.First();
+                    }
+                    else
+                    {
+                        // brak Remaining w ogóle -> próbujemy zsumować przyszły kapitał
+                        var capFuture = upcoming
+                            .Where(x => x.Principal.HasValue && x.Principal.Value >= 0m)
+                            .Select(x => x.Principal!.Value)
+                            .ToList();
+
+                        if (capFuture.Count > 0)
+                            remainingPrincipal = capFuture.Sum();
+                    }
+                }
+
+                // jeśli nadal null, fallback do pola w DB
+                if (!remainingPrincipal.HasValue)
+                    remainingPrincipal = vm.Principal;
+
+                // jeśli nadal null/<=0, to chociaż nie rozwalaj %:
+                if (remainingPrincipal < 0m) remainingPrincipal = 0m;
+
+                vm.ApplyScheduleSnapshot(
+                    originalPrincipal: originalPrincipal,
+                    remainingPrincipal: remainingPrincipal,
+                    nextPaymentAmount: nextAmount,
+                    nextPaymentDate: nextDate,
+                    remainingInstallments: remainingInstallments);
+            }
+            catch
+            {
+                // w razie jakiegokolwiek błędu snapshotu nie wywracamy UI
+                vm.ClearScheduleSnapshot();
+            }
         }
 
         // ===================== SCHEDULE ATTACH (CSV) =====================
@@ -129,7 +230,10 @@ namespace Finly.Pages
                 // 3) Wyczyść cache parsowania (żeby nie trzymać starego)
                 _parsedSchedules.Remove(loanId);
 
-                // 4) Odśwież UI
+                // 4) Zastosuj snapshot natychmiast dla tej karty (bez czekania)
+                ApplyScheduleSnapshotToVm(loanVm);
+
+                // 5) Odśwież KPI/analizy
                 DatabaseService.NotifyDataChanged();
                 RefreshKpisAndLists();
 
@@ -224,7 +328,9 @@ namespace Finly.Pages
         private (decimal totalDebt, decimal monthlySum, decimal yearlySum, int maxRemainingMonths)
             CalculatePortfolioStats(List<LoanCardVm> loans)
         {
-            decimal totalDebt = loans.Sum(x => x.Principal);
+            // totalDebt ma być “pozostało” — z harmonogramu jeśli jest
+            decimal totalDebt = loans.Sum(x => x.DisplayRemainingPrincipal);
+
             decimal monthlySum = 0m;
             decimal yearlySum = 0m;
             int maxRemainingMonths = 0;
@@ -242,9 +348,10 @@ namespace Finly.Pages
                 }
                 else
                 {
+                    // fallback tylko gdy nie ma schedule
                     if (vm.TermMonths > 0)
                     {
-                        loanMonthly = LoansService.CalculateMonthlyPayment(vm.Principal, vm.InterestRate, vm.TermMonths);
+                        loanMonthly = LoansService.CalculateMonthlyPayment(vm.DisplayRemainingPrincipal, vm.InterestRate, vm.TermMonths);
                         loanYearly = loanMonthly * 12m;
                     }
                     else
@@ -253,11 +360,7 @@ namespace Finly.Pages
                         loanYearly = 0m;
                     }
 
-                    var monthsElapsed =
-                        (DateTime.Today.Year - vm.StartDate.Year) * 12 +
-                        DateTime.Today.Month - vm.StartDate.Month;
-
-                    remainingMonths = Math.Max(0, vm.TermMonths - monthsElapsed);
+                    remainingMonths = GetRemainingMonths(vm);
                 }
 
                 monthlySum += loanMonthly;
@@ -282,7 +385,7 @@ namespace Finly.Pages
             remainingMonths = 0;
             yearSum = 0m;
 
-            if (!TryGetSchedule(vm.Id, showToasts: true, out _, out var schedule))
+            if (!TryGetSchedule(vm.Id, showToasts: false, out _, out var schedule))
                 return false;
 
             var today = DateTime.Today;
@@ -314,7 +417,11 @@ namespace Finly.Pages
 
         private void RefreshKpisAndLists()
         {
-            var loans = _loans.Where(x => x is not AddLoanTile).ToList();
+            // bierzemy tylko realne kredyty
+            var loans = _loans.OfType<LoanCardVm>().ToList();
+
+            // snapshoty z harmonogramu muszą być zawsze aktualne przed KPI
+            ApplyScheduleSnapshotsToLoanVms();
 
             UpdateKpiTiles();
 
@@ -325,17 +432,20 @@ namespace Finly.Pages
 
             var (totalDebt, _, _, _) = CalculatePortfolioStats(loans);
 
+            // Ważone oprocentowanie – ważymy “pozostałym saldem”
             decimal weightedRate = 0m;
             if (totalDebt > 0m)
-                weightedRate = loans.Sum(l => l.Principal * l.InterestRate) / totalDebt;
+                weightedRate = loans.Sum(l => l.DisplayRemainingPrincipal * l.InterestRate) / totalDebt;
 
+            // Odsetki 30 dni – liczymy od “pozostałego salda”
             var today = DateTime.Today;
             var in30 = today.AddDays(30);
 
             decimal interest30 = 0m;
             foreach (var l in loans)
-                interest30 += LoanMathService.CalculateInterest(l.Principal, l.InterestRate, today, in30);
+                interest30 += LoanMathService.CalculateInterest(l.DisplayRemainingPrincipal, l.InterestRate, today, in30);
 
+            // Łącznie do spłaty od dziś — z harmonogramu jeśli jest
             decimal totalToPayFromToday = 0m;
 
             foreach (var vm in loans)
@@ -350,7 +460,7 @@ namespace Finly.Pages
                 if (monthsLeft <= 0)
                     continue;
 
-                var monthly = LoansService.CalculateMonthlyPayment(vm.Principal, vm.InterestRate, monthsLeft);
+                var monthly = LoansService.CalculateMonthlyPayment(vm.DisplayRemainingPrincipal, vm.InterestRate, monthsLeft);
                 totalToPayFromToday += monthly * monthsLeft;
             }
 
@@ -382,6 +492,14 @@ namespace Finly.Pages
 
         private int GetRemainingMonths(LoanCardVm vm)
         {
+            // jeśli VM ma harmonogram – to jest lepsze źródło
+            if (vm.HasSchedule)
+            {
+                // RemainingTermStr jest tekstem, więc tu bierzemy z harmonogramu przez TryGetScheduleStats
+                if (TryGetScheduleStats(vm, out _, out _, out var remainingMonths, out _))
+                    return remainingMonths;
+            }
+
             if (vm.TermMonths <= 0)
                 return 0;
 
@@ -453,6 +571,7 @@ namespace Finly.Pages
 
                     ToastService.Success("Kredyt dodany.");
                     LoadLoans();
+                    ApplyScheduleSnapshotsToLoanVms();
                     RefreshKpisAndLists();
                 }
                 catch (Exception ex)
@@ -524,6 +643,7 @@ namespace Finly.Pages
 
                     ToastService.Success("Kredyt zaktualizowany.");
                     LoadLoans();
+                    ApplyScheduleSnapshotsToLoanVms();
                     RefreshKpisAndLists();
                 }
                 catch (Exception ex)
@@ -555,13 +675,15 @@ namespace Finly.Pages
 
             try
             {
+                // nadpłata działa na "Principal" w DB (saldo),
+                // ale jeśli masz harmonogram, to on się rozjedzie dopóki go nie podmienisz/odświeżysz.
                 int paymentDay = vm.PaymentDay;
                 var today = DateTime.Today;
 
                 var lastDue = LoansService.GetPreviousDueDate(today, paymentDay, vm.StartDate);
 
                 var interest = LoanMathService.CalculateInterest(
-                    vm.Principal,
+                    vm.DisplayRemainingPrincipal, // ważne: od pozostałego salda
                     vm.InterestRate,
                     lastDue,
                     today);
@@ -571,7 +693,7 @@ namespace Finly.Pages
                 var principalPart = amt - interest;
                 if (principalPart < 0) principalPart = 0;
 
-                var newPrincipal = vm.Principal - principalPart;
+                var newPrincipal = vm.Principal - principalPart; // DB principal
                 if (newPrincipal < 0) newPrincipal = 0;
 
                 var loanToUpdate = new LoanModel
@@ -597,6 +719,7 @@ namespace Finly.Pages
                     $"Nadpłata {amt:N2} zł. Nowy kapitał: {newPrincipal:N2} zł. Szac. nowa rata: {newMonthly:N2} zł.");
 
                 LoadLoans();
+                ApplyScheduleSnapshotsToLoanVms();
                 RefreshKpisAndLists();
             }
             catch (Exception ex)
@@ -624,7 +747,6 @@ namespace Finly.Pages
                 return;
             }
 
-            // path jest CSV (TryGetSchedule to gwarantuje)
             try
             {
                 if (rows == null || rows.Count == 0)
@@ -645,6 +767,8 @@ namespace Finly.Pages
                 ToastService.Error("Nie udało się otworzyć harmonogramu: " + ex.Message);
                 System.Diagnostics.Debug.WriteLine("LoanSchedule open error: " + ex);
                 _parsedSchedules.Remove(vm.Id);
+                vm.ClearScheduleSnapshot();
+                RefreshKpisAndLists();
             }
         }
 
@@ -676,13 +800,9 @@ namespace Finly.Pages
             {
                 try
                 {
-                    // 1) Usuń harmonogram z DB (przed DeleteLoan, bo po usunięciu rekordu Update/Set może nie działać)
                     DatabaseService.SetLoanSchedulePath(vm.Id, _userId, null);
-
-                    // 2) Usuń rekord kredytu
                     DatabaseService.DeleteLoan(vm.Id, _userId);
 
-                    // 3) Czyścimy cache/powiązania w RAM
                     _loanAccounts.Remove(vm.Id);
                     _parsedSchedules.Remove(vm.Id);
 
@@ -690,6 +810,7 @@ namespace Finly.Pages
 
                     ToastService.Success("Kredyt usunięty.");
                     LoadLoans();
+                    ApplyScheduleSnapshotsToLoanVms();
                     RefreshKpisAndLists();
                 }
                 catch (Exception ex)

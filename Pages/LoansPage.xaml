@@ -12,7 +12,6 @@
              TextOptions.TextFormattingMode="Display"
              TextOptions.TextRenderingMode="ClearType">
 
-
     <UserControl.Resources>
 
         <!-- ========== STYLE jak GoalsPage (Card / AccentCard / KPI) ========== -->
@@ -26,19 +25,16 @@
             <Setter Property="Margin"          Value="0,0,16,16"/>
         </Style>
 
-        <!-- KPI: czerwona ramka (jak chciałaś) -->
         <Style x:Key="RedAccentCard" TargetType="Border" BasedOn="{StaticResource Card}">
             <Setter Property="BorderBrush"     Value="{DynamicResource Brand.Red}"/>
             <Setter Property="BorderThickness" Value="2"/>
         </Style>
 
-        <!-- Analizy: pomarańczowa ramka -->
         <Style x:Key="OrangeAccentCard" TargetType="Border" BasedOn="{StaticResource Card}">
             <Setter Property="BorderBrush"     Value="{DynamicResource Brand.Orange}"/>
             <Setter Property="BorderThickness" Value="2"/>
         </Style>
 
-        <!-- KPI header/value – jak w GoalsPage (pogrubione) -->
         <Style x:Key="CardHeader" TargetType="TextBlock">
             <Setter Property="FontSize"   Value="18"/>
             <Setter Property="FontWeight" Value="Bold"/>
@@ -53,7 +49,6 @@
             <Setter Property="Foreground" Value="{DynamicResource App.Foreground}"/>
         </Style>
 
-        <!-- Karty kredytów: czerwona ramka -->
         <Style x:Key="LoanCardBorder" TargetType="Border" BasedOn="{StaticResource Card}">
             <Setter Property="BorderBrush"     Value="{DynamicResource Brand.Red}"/>
             <Setter Property="BorderThickness" Value="2"/>
@@ -63,14 +58,12 @@
             <Setter Property="MaxWidth"        Value="420"/>
         </Style>
 
-        <!-- Add tile: identyczny jak w GoalsPage, tylko szerokość dopasowana do kart kredytów -->
         <Style x:Key="AddTileBorder" TargetType="Border" BasedOn="{StaticResource Card}">
             <Setter Property="MinWidth"  Value="420"/>
             <Setter Property="MaxWidth"  Value="420"/>
             <Setter Property="Cursor"    Value="Hand"/>
         </Style>
 
-        <!-- Przyciski (zostawiam Twoje bazowe style) -->
         <Style x:Key="LoansPrimarySmallButton" TargetType="Button" BasedOn="{StaticResource PrimaryButton}">
             <Setter Property="MinHeight" Value="30"/>
             <Setter Property="Padding" Value="12,4"/>
@@ -99,7 +92,6 @@
 
         <!-- ===================== TEMPLATES ===================== -->
 
-        <!-- KAFEL „DODAJ KREDYT” – jak w GoalsPage -->
         <DataTemplate DataType="{x:Type vm:AddLoanTile}">
             <Border Style="{StaticResource AddTileBorder}"
                     MouseLeftButtonUp="AddLoanCard_Click">
@@ -160,6 +152,7 @@
                                        FontSize="12"
                                        Foreground="{DynamicResource App.Foreground}"
                                        Margin="0,0,12,0"/>
+
                             <TextBlock Text="Kolejna rata:" Foreground="Gray" FontSize="11" Margin="0,0,6,0"/>
                             <TextBlock Text="{Binding NextPaymentInfo}"
                                        FontSize="12"
@@ -179,12 +172,16 @@
 
                             <StackPanel Grid.Column="0">
                                 <TextBlock Text="Następna rata:" Foreground="Gray" FontSize="11"/>
-                                <TextBlock Text="{Binding NextPayment}" FontSize="12" Foreground="{DynamicResource App.Foreground}"/>
+                                <TextBlock Text="{Binding NextPaymentStr}"
+                                           FontSize="12"
+                                           Foreground="{DynamicResource App.Foreground}"/>
                             </StackPanel>
 
                             <StackPanel Grid.Column="1">
                                 <TextBlock Text="Do końca:" Foreground="Gray" FontSize="11"/>
-                                <TextBlock Text="{Binding RemainingTermStr}" FontSize="12" Foreground="{DynamicResource App.Foreground}"/>
+                                <TextBlock Text="{Binding RemainingTermStr}"
+                                           FontSize="12"
+                                           Foreground="{DynamicResource App.Foreground}"/>
                             </StackPanel>
                         </Grid>
                     </StackPanel>
@@ -287,16 +284,12 @@
         <Grid Margin="24">
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto"/>
-                <!-- KPI (czerwone) -->
                 <RowDefinition Height="Auto"/>
-                <!-- Analizy (pomarańczowe) -->
                 <RowDefinition Height="Auto"/>
-                <!-- Separator + nagłówek -->
                 <RowDefinition Height="*"/>
-                <!-- Karty kredytów -->
             </Grid.RowDefinitions>
 
-            <!-- ===== KPI (czerwone) – jeden rząd, pogrubienia jak GoalsPage ===== -->
+            <!-- KPI -->
             <Grid Grid.Row="0">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*"/>
@@ -324,7 +317,7 @@
                 </Border>
             </Grid>
 
-            <!-- ===== Analizy (pomarańczowe) – jeden rząd POD KPI ===== -->
+            <!-- Analizy -->
             <Grid Grid.Row="1">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*"/>
@@ -383,7 +376,7 @@
                            Margin="0,4,0,0"/>
             </StackPanel>
 
-            <!-- ===== Karty kredytów + Dodaj kredyt ===== -->
+            <!-- Karty -->
             <ItemsControl Grid.Row="3" x:Name="LoansGrid">
                 <ItemsControl.ItemsPanel>
                     <ItemsPanelTemplate>

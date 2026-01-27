@@ -57,8 +57,8 @@ namespace Finly.Views.Dialogs
                 $"Spłacono do dziś (kapitał+odsetki): {paidSoFar.ToString("N2", Pl)} zł  •  " +
                 $"Pozostało do spłaty: {remainingSum.ToString("N2", Pl)} zł";
 
-            // ===== DataGrid =====
-            RowsGrid.ItemsSource = list.Select(r => new RowVm
+            // ===== MiniTable =====
+            RowsMiniTable.ItemsSource = list.Select(r => new RowVm
             {
                 No = r.InstallmentNo?.ToString() ?? "—",
                 Date = r.Date.ToString("dd.MM.yyyy"),
