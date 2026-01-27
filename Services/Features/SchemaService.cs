@@ -166,8 +166,48 @@ CREATE TABLE IF NOT EXISTS Loans(
     PaymentDay   INTEGER NOT NULL DEFAULT 0,
     Note         TEXT NULL,
     SchedulePath TEXT NULL,
+    PaymentKind  INTEGER NOT NULL DEFAULT 0,
+    PaymentRefId INTEGER NULL,
     FOREIGN KEY(UserId) REFERENCES Users(Id) ON DELETE CASCADE
 );
+
+
+CREATE TABLE IF NOT EXISTS LoanSchedules(
+    Id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    UserId      INTEGER NOT NULL,
+    LoanId      INTEGER NOT NULL,
+    ImportedAt  TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    SourceName  TEXT NULL,
+    SchedulePath TEXT NULL,
+    Note        TEXT NULL,
+    FOREIGN KEY(UserId) REFERENCES Users(Id) ON DELETE CASCADE,
+    FOREIGN KEY(LoanId) REFERENCES Loans(Id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS LoanInstallments(
+    Id              INTEGER PRIMARY KEY AUTOINCREMENT,
+    UserId          INTEGER NOT NULL,
+    LoanId          INTEGER NOT NULL,
+    ScheduleId      INTEGER NOT NULL,
+    InstallmentNo   INTEGER NOT NULL,
+    DueDate         TEXT NOT NULL,
+    TotalAmount     NUMERIC NOT NULL DEFAULT 0,
+
+    PrincipalAmount NUMERIC NULL,
+    InterestAmount  NUMERIC NULL,
+    RemainingBalance NUMERIC NULL,
+
+    Status          INTEGER NOT NULL DEFAULT 0, -- 0 Planned, 1 Paid, 2 Cancelled/Replaced
+    PaidAt          TEXT NULL,
+
+    PaymentKind     INTEGER NOT NULL DEFAULT 0,
+    PaymentRefId    INTEGER NULL,
+
+    FOREIGN KEY(UserId) REFERENCES Users(Id) ON DELETE CASCADE,
+    FOREIGN KEY(LoanId) REFERENCES Loans(Id) ON DELETE CASCADE,
+    FOREIGN KEY(ScheduleId) REFERENCES LoanSchedules(Id) ON DELETE CASCADE
+);
+
 
 
 CREATE TABLE IF NOT EXISTS Investments(
@@ -309,6 +349,9 @@ CREATE TABLE IF NOT EXISTS CompanyProfiles(
                 AddColumnIfMissing(con, tx, "Expenses", "IsPlanned", "INTEGER", "NOT NULL DEFAULT 0");
                 AddColumnIfMissing(con, tx, "Expenses", "PaymentKind", "INTEGER", "NOT NULL DEFAULT 0");
                 AddColumnIfMissing(con, tx, "Expenses", "PaymentRefId", "INTEGER");
+                // Expenses – powiązanie z ratami kredytu (planned)
+                AddColumnIfMissing(con, tx, "Expenses", "LoanId", "INTEGER");
+                AddColumnIfMissing(con, tx, "Expenses", "LoanInstallmentId", "INTEGER");
 
                 // Loans
                 AddColumnIfMissing(con, tx, "Loans", "Principal", "NUMERIC", "NOT NULL DEFAULT 0");
@@ -318,6 +361,8 @@ CREATE TABLE IF NOT EXISTS CompanyProfiles(
                 AddColumnIfMissing(con, tx, "Loans", "PaymentDay", "INTEGER", "NOT NULL DEFAULT 0");
                 AddColumnIfMissing(con, tx, "Loans", "Note", "TEXT");
                 AddColumnIfMissing(con, tx, "Loans", "SchedulePath", "TEXT");
+                AddColumnIfMissing(con, tx, "Loans", "PaymentKind", "INTEGER", "NOT NULL DEFAULT 0");
+                AddColumnIfMissing(con, tx, "Loans", "PaymentRefId", "INTEGER");
 
 
                 // Investments
@@ -372,6 +417,13 @@ CREATE INDEX IF NOT EXISTS IX_Expenses_User_Account
 CREATE INDEX IF NOT EXISTS IX_Expenses_User_PaymentKind
     ON Expenses(UserId, PaymentKind);
 
+
+CREATE INDEX IF NOT EXISTS IX_Expenses_User_Loan
+    ON Expenses(UserId, LoanId);
+
+CREATE UNIQUE INDEX IF NOT EXISTS UX_Expenses_User_LoanInstallment
+    ON Expenses(UserId, LoanInstallmentId);
+
 CREATE INDEX IF NOT EXISTS IX_Incomes_User_Date
     ON Incomes(UserId, Date);
 
@@ -386,6 +438,22 @@ CREATE INDEX IF NOT EXISTS IX_Envelopes_User_GoalSortOrder
 
 CREATE INDEX IF NOT EXISTS IX_Envelopes_User_SortOrder
     ON Envelopes(UserId, SortOrder);
+
+CREATE INDEX IF NOT EXISTS IX_LoanSchedules_User_Loan
+    ON LoanSchedules(UserId, LoanId, ImportedAt);
+
+CREATE UNIQUE INDEX IF NOT EXISTS UX_LoanInstallments_Loan_No
+    ON LoanInstallments(UserId, LoanId, InstallmentNo);
+
+CREATE INDEX IF NOT EXISTS IX_LoanInstallments_Loan_DueDate
+    ON LoanInstallments(UserId, LoanId, DueDate);
+
+CREATE INDEX IF NOT EXISTS IX_LoanInstallments_Status_DueDate
+    ON LoanInstallments(UserId, Status, DueDate);
+
+CREATE INDEX IF NOT EXISTS IX_LoanInstallments_Schedule
+    ON LoanInstallments(UserId, ScheduleId);
+
 
 CREATE INDEX IF NOT EXISTS IX_Investments_User
     ON Investments(UserId);

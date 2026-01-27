@@ -71,6 +71,156 @@ namespace Finly.Services.Features
             return con;
         }
 
+
+        public static void SyncLoanInstallmentsToPlannedExpenses(int userId, int loanId, DateTime from, DateTime to)
+        {
+            if (userId <= 0) return;
+            if (loanId <= 0) return;
+
+            using var c = OpenAndEnsureSchema();
+
+            // bezpieczeñstwo: jeœli kolumny/tabele nie istniej¹ w starej DB, nie rób nic
+            if (!ColumnExists(c, "Expenses", "LoanInstallmentId")) return;
+            if (!TableExists(c, "LoanInstallments")) return;
+
+            // kompatybilnie tak¿e dla PaymentKind/PaymentRefId w Expenses
+            bool expHasPk = ColumnExists(c, "Expenses", "PaymentKind");
+            bool expHasPr = ColumnExists(c, "Expenses", "PaymentRefId");
+
+            using var tx = c.BeginTransaction();
+
+            // 1) pobierz raty planned w zakresie
+            var installments = new List<LoanInstallmentDb>();
+
+            using (var cmd = c.CreateCommand())
+            {
+                cmd.Transaction = tx;
+                cmd.CommandText = @"
+SELECT Id, InstallmentNo, DueDate, TotalAmount
+FROM LoanInstallments
+WHERE UserId=@u AND LoanId=@l
+  AND Status=0
+  AND date(DueDate) BETWEEN date(@f) AND date(@t)
+ORDER BY date(DueDate) ASC, InstallmentNo ASC;";
+                cmd.Parameters.AddWithValue("@u", userId);
+                cmd.Parameters.AddWithValue("@l", loanId);
+                cmd.Parameters.AddWithValue("@f", from.ToString("yyyy-MM-dd"));
+                cmd.Parameters.AddWithValue("@t", to.ToString("yyyy-MM-dd"));
+
+                using var r = cmd.ExecuteReader();
+                while (r.Read())
+                {
+                    installments.Add(new LoanInstallmentDb
+                    {
+                        Id = r.GetInt32(0),
+                        InstallmentNo = r.IsDBNull(1) ? 0 : r.GetInt32(1),
+                        DueDate = GetDate(r, 2),
+                        TotalAmount = r.IsDBNull(3) ? 0m : Convert.ToDecimal(r.GetValue(3))
+                    });
+                }
+            }
+
+            // 2) pobierz nazwê kredytu (³adny opis)
+            string loanName = "Kredyt";
+            using (var ln = c.CreateCommand())
+            {
+                ln.Transaction = tx;
+                ln.CommandText = "SELECT Name FROM Loans WHERE Id=@id AND UserId=@u LIMIT 1;";
+                ln.Parameters.AddWithValue("@id", loanId);
+                ln.Parameters.AddWithValue("@u", userId);
+                var obj = ln.ExecuteScalar();
+                if (obj != null && obj != DBNull.Value)
+                {
+                    var s = obj.ToString();
+                    if (!string.IsNullOrWhiteSpace(s)) loanName = s!;
+                }
+            }
+
+            // 2b) NEW: pobierz PaymentKind/PaymentRefId kredytu (kompatybilnie)
+            int loanPayKind = (int)Finly.Models.PaymentKind.FreeCash;
+            int? loanPayRef = null;
+
+            bool loanHasPk = ColumnExists(c, "Loans", "PaymentKind");
+            bool loanHasPr = ColumnExists(c, "Loans", "PaymentRefId");
+
+            if (loanHasPk)
+            {
+                using var lp = c.CreateCommand();
+                lp.Transaction = tx;
+
+                lp.CommandText = loanHasPr
+                    ? "SELECT PaymentKind, PaymentRefId FROM Loans WHERE Id=@id AND UserId=@u LIMIT 1;"
+                    : "SELECT PaymentKind, NULL FROM Loans WHERE Id=@id AND UserId=@u LIMIT 1;";
+
+                lp.Parameters.AddWithValue("@id", loanId);
+                lp.Parameters.AddWithValue("@u", userId);
+
+                using var rr = lp.ExecuteReader();
+                if (rr.Read())
+                {
+                    loanPayKind = rr.IsDBNull(0) ? (int)Finly.Models.PaymentKind.FreeCash : rr.GetInt32(0);
+                    loanPayRef = rr.IsDBNull(1) ? null : rr.GetInt32(1);
+                }
+            }
+
+            // 3) kategoria "Kredyty" (auto-create)
+            int catId = GetOrCreateCategoryId(userId, "Kredyty");
+
+            // 4) UPSERT do Expenses po (UserId, LoanInstallmentId)
+            foreach (var inst in installments)
+            {
+                var desc = $"Rata kredytu: {loanName} • nr {inst.InstallmentNo}";
+                var iso = ToIsoDate(inst.DueDate);
+
+                using var up = c.CreateCommand();
+                up.Transaction = tx;
+
+                // Budujemy SQL kompatybilnie (jeœli stare Expenses nie ma PaymentKind/PaymentRefId)
+                var cols = new List<string> { "UserId", "Date", "Amount", "Description", "CategoryId", "IsPlanned", "LoanId", "LoanInstallmentId" };
+                var vals = new List<string> { "@u", "@d", "@a", "@desc", "@cid", "1", "@loanId", "@liId" };
+
+                if (expHasPk) { cols.Insert(6, "PaymentKind"); vals.Insert(6, "@pk"); } // przed LoanId
+                if (expHasPr) { cols.Insert(7, "PaymentRefId"); vals.Insert(7, "@pr"); } // po PaymentKind
+
+                // Update-set
+                var upd = new List<string>
+        {
+            "Date = excluded.Date",
+            "Amount = excluded.Amount",
+            "Description = excluded.Description",
+            "CategoryId = excluded.CategoryId",
+            "IsPlanned = 1"
+        };
+
+                if (expHasPk) upd.Add("PaymentKind = excluded.PaymentKind");
+                if (expHasPr) upd.Add("PaymentRefId = excluded.PaymentRefId");
+
+                up.CommandText = $@"
+INSERT INTO Expenses({string.Join(", ", cols)})
+VALUES({string.Join(", ", vals)})
+ON CONFLICT(UserId, LoanInstallmentId) DO UPDATE SET
+    {string.Join(",\n    ", upd)};";
+
+                up.Parameters.AddWithValue("@u", userId);
+                up.Parameters.AddWithValue("@d", iso);
+                up.Parameters.AddWithValue("@a", inst.TotalAmount);
+                up.Parameters.AddWithValue("@desc", desc);
+                up.Parameters.AddWithValue("@cid", catId);
+
+                if (expHasPk) up.Parameters.AddWithValue("@pk", loanPayKind);
+                if (expHasPr) up.Parameters.AddWithValue("@pr", (object?)loanPayRef ?? DBNull.Value);
+
+                up.Parameters.AddWithValue("@loanId", loanId);
+                up.Parameters.AddWithValue("@liId", inst.Id);
+
+                up.ExecuteNonQuery();
+            }
+
+            tx.Commit();
+            RaiseDataChanged();
+        }
+
+
         /// <summary>
         /// Zapewnia, ¿e schemat i migracje zosta³y wykonane.
         /// </summary>
@@ -246,16 +396,22 @@ namespace Finly.Services.Features
             using var c = OpenAndEnsureSchema();
 
             bool hasSchedule = ColumnExists(c, "Loans", "SchedulePath");
+            bool hasPayKind = ColumnExists(c, "Loans", "PaymentKind");
+            bool hasPayRef = ColumnExists(c, "Loans", "PaymentRefId");
+
+            var cols = new List<string>
+    {
+        "Id", "UserId", "Name", "Principal", "InterestRate", "StartDate",
+        "TermMonths", "Note", "PaymentDay"
+    };
+
+            if (hasSchedule) cols.Add("SchedulePath");
+            if (hasPayKind) cols.Add("PaymentKind");
+            if (hasPayRef) cols.Add("PaymentRefId");
 
             using var cmd = c.CreateCommand();
-            cmd.CommandText = hasSchedule
-                ? @"
-SELECT Id, UserId, Name, Principal, InterestRate, StartDate, TermMonths, Note, PaymentDay, SchedulePath
-FROM Loans
-WHERE UserId=@u
-ORDER BY Name;"
-                : @"
-SELECT Id, UserId, Name, Principal, InterestRate, StartDate, TermMonths, Note, PaymentDay
+            cmd.CommandText = $@"
+SELECT {string.Join(", ", cols)}
 FROM Loans
 WHERE UserId=@u
 ORDER BY Name;";
@@ -263,6 +419,15 @@ ORDER BY Name;";
             cmd.Parameters.AddWithValue("@u", userId);
 
             using var r = cmd.ExecuteReader();
+
+            // Sta³e ordinale dla bazowych kolumn:
+            // 0 Id, 1 UserId, 2 Name, 3 Principal, 4 InterestRate, 5 StartDate, 6 TermMonths, 7 Note, 8 PaymentDay
+            int scheduleOrd = -1, payKindOrd = -1, payRefOrd = -1;
+
+            if (hasSchedule) scheduleOrd = r.GetOrdinal("SchedulePath");
+            if (hasPayKind) payKindOrd = r.GetOrdinal("PaymentKind");
+            if (hasPayRef) payRefOrd = r.GetOrdinal("PaymentRefId");
+
             while (r.Read())
             {
                 var m = new LoanModel
@@ -276,11 +441,21 @@ ORDER BY Name;";
                     TermMonths = r.IsDBNull(6) ? 0 : r.GetInt32(6),
                     Note = GetNullableString(r, 7),
                     PaymentDay = r.IsDBNull(8) ? 0 : r.GetInt32(8),
-                    SchedulePath = null
+
+                    // kompatybilne defaulty:
+                    SchedulePath = null,
+                    PaymentKind = Finly.Models.PaymentKind.FreeCash,
+                    PaymentRefId = null
                 };
 
-                if (hasSchedule)
-                    m.SchedulePath = GetNullableString(r, 9);
+                if (hasSchedule && scheduleOrd >= 0)
+                    m.SchedulePath = r.IsDBNull(scheduleOrd) ? null : r.GetValue(scheduleOrd)?.ToString();
+
+                if (hasPayKind && payKindOrd >= 0 && !r.IsDBNull(payKindOrd))
+                    m.PaymentKind = (Finly.Models.PaymentKind)r.GetInt32(payKindOrd);
+
+                if (hasPayRef && payRefOrd >= 0 && !r.IsDBNull(payRefOrd))
+                    m.PaymentRefId = r.GetInt32(payRefOrd);
 
                 list.Add(m);
             }
@@ -288,69 +463,66 @@ ORDER BY Name;";
             return list;
         }
 
-        public static void SetLoanSchedulePath(int loanId, int userId, string? schedulePath)
-        {
-            if (loanId <= 0) throw new ArgumentException("Nieprawid³owy loanId.", nameof(loanId));
-            if (userId <= 0) throw new ArgumentException("Nieprawid³owy userId.", nameof(userId));
-
-            using var c = OpenAndEnsureSchema();
-
-            if (!ColumnExists(c, "Loans", "SchedulePath"))
-                return; // stara baza bez migracji – po Ensure() powinna ju¿ mieæ, ale zostawiamy bezpiecznik
-
-            using var cmd = c.CreateCommand();
-            cmd.CommandText = @"
-UPDATE Loans
-SET SchedulePath = @p
-WHERE Id = @id AND UserId = @u;";
-            cmd.Parameters.AddWithValue("@id", loanId);
-            cmd.Parameters.AddWithValue("@u", userId);
-            cmd.Parameters.AddWithValue("@p", (object?)schedulePath ?? DBNull.Value);
-
-            cmd.ExecuteNonQuery();
-            RaiseDataChanged();
-        }
 
         public static string? GetLoanSchedulePath(int loanId, int userId)
         {
-            if (loanId <= 0 || userId <= 0) return null;
-
-            using var c = OpenAndEnsureSchema();
-
-            if (!ColumnExists(c, "Loans", "SchedulePath"))
-                return null;
-
-            using var cmd = c.CreateCommand();
+            using var conn = GetConnection();
+            using var cmd = conn.CreateCommand();
             cmd.CommandText = @"
-SELECT SchedulePath
-FROM Loans
-WHERE Id=@id AND UserId=@u
-LIMIT 1;";
-            cmd.Parameters.AddWithValue("@id", loanId);
-            cmd.Parameters.AddWithValue("@u", userId);
+        SELECT SchedulePath
+        FROM Loans
+        WHERE Id = $id AND UserId = $uid
+        LIMIT 1;";
+            cmd.Parameters.AddWithValue("$id", loanId);
+            cmd.Parameters.AddWithValue("$uid", userId);
 
             var obj = cmd.ExecuteScalar();
-            if (obj == null || obj == DBNull.Value) return null;
-
-            var s = obj.ToString();
+            var s = obj?.ToString();
             return string.IsNullOrWhiteSpace(s) ? null : s;
         }
+
+        public static void SetLoanSchedulePath(int loanId, int userId, string? path)
+        {
+            using var conn = GetConnection();
+            using var cmd = conn.CreateCommand();
+            cmd.CommandText = @"
+        UPDATE Loans
+        SET SchedulePath = $p
+        WHERE Id = $id AND UserId = $uid;";
+            cmd.Parameters.AddWithValue("$id", loanId);
+            cmd.Parameters.AddWithValue("$uid", userId);
+            cmd.Parameters.AddWithValue("$p", (object?)path ?? DBNull.Value);
+
+            cmd.ExecuteNonQuery();
+        }
+
+
 
         public static int InsertLoan(LoanModel loan)
         {
             using var c = OpenAndEnsureSchema();
 
             bool hasSchedule = ColumnExists(c, "Loans", "SchedulePath");
+            bool hasPayKind = ColumnExists(c, "Loans", "PaymentKind");
+            bool hasPayRef = ColumnExists(c, "Loans", "PaymentRefId");
+
+            var cols = new List<string>
+    {
+        "UserId", "Name", "Principal", "InterestRate", "StartDate", "TermMonths", "Note", "PaymentDay"
+    };
+            var vals = new List<string>
+    {
+        "@u", "@n", "@p", "@ir", "@d", "@tm", "@note", "@pd"
+    };
+
+            if (hasSchedule) { cols.Add("SchedulePath"); vals.Add("@sp"); }
+            if (hasPayKind) { cols.Add("PaymentKind"); vals.Add("@pk"); }
+            if (hasPayRef) { cols.Add("PaymentRefId"); vals.Add("@pr"); }
 
             using var cmd = c.CreateCommand();
-            cmd.CommandText = hasSchedule
-                ? @"
-INSERT INTO Loans(UserId, Name, Principal, InterestRate, StartDate, TermMonths, Note, PaymentDay, SchedulePath)
-VALUES (@u, @n, @p, @ir, @d, @tm, @note, @pd, @sp);
-SELECT last_insert_rowid();"
-                : @"
-INSERT INTO Loans(UserId, Name, Principal, InterestRate, StartDate, TermMonths, Note, PaymentDay)
-VALUES (@u, @n, @p, @ir, @d, @tm, @note, @pd);
+            cmd.CommandText = $@"
+INSERT INTO Loans({string.Join(", ", cols)})
+VALUES ({string.Join(", ", vals)});
 SELECT last_insert_rowid();";
 
             cmd.Parameters.AddWithValue("@u", loan.UserId);
@@ -362,8 +534,9 @@ SELECT last_insert_rowid();";
             cmd.Parameters.AddWithValue("@note", (object?)loan.Note ?? DBNull.Value);
             cmd.Parameters.AddWithValue("@pd", loan.PaymentDay);
 
-            if (hasSchedule)
-                cmd.Parameters.AddWithValue("@sp", (object?)loan.SchedulePath ?? DBNull.Value);
+            if (hasSchedule) cmd.Parameters.AddWithValue("@sp", (object?)loan.SchedulePath ?? DBNull.Value);
+            if (hasPayKind) cmd.Parameters.AddWithValue("@pk", (int)loan.PaymentKind);
+            if (hasPayRef) cmd.Parameters.AddWithValue("@pr", (object?)loan.PaymentRefId ?? DBNull.Value);
 
             var id = Convert.ToInt32(cmd.ExecuteScalar() ?? 0);
             RaiseDataChanged();
@@ -371,35 +544,35 @@ SELECT last_insert_rowid();";
         }
 
 
+
         public static void UpdateLoan(LoanModel loan)
         {
             using var c = OpenAndEnsureSchema();
 
             bool hasSchedule = ColumnExists(c, "Loans", "SchedulePath");
+            bool hasPayKind = ColumnExists(c, "Loans", "PaymentKind");
+            bool hasPayRef = ColumnExists(c, "Loans", "PaymentRefId");
+
+            var setParts = new List<string>
+    {
+        "Name = @n",
+        "Principal = @p",
+        "InterestRate = @ir",
+        "StartDate = @d",
+        "TermMonths = @tm",
+        "Note = @note",
+        "PaymentDay = @pd"
+    };
+
+            if (hasSchedule) setParts.Add("SchedulePath = @sp");
+            if (hasPayKind) setParts.Add("PaymentKind = @pk");
+            if (hasPayRef) setParts.Add("PaymentRefId = @pr");
 
             using var cmd = c.CreateCommand();
-            cmd.CommandText = hasSchedule
-                ? @"
+            cmd.CommandText = $@"
 UPDATE Loans
-   SET Name = @n,
-       Principal = @p,
-       InterestRate = @ir,
-       StartDate = @d,
-       TermMonths = @tm,
-       Note = @note,
-       PaymentDay = @pd,
-       SchedulePath = @sp
- WHERE Id = @id AND UserId = @u;"
-                : @"
-UPDATE Loans
-   SET Name = @n,
-       Principal = @p,
-       InterestRate = @ir,
-       StartDate = @d,
-       TermMonths = @tm,
-       Note = @note,
-       PaymentDay = @pd
- WHERE Id = @id AND UserId = @u;";
+SET {string.Join(",\n    ", setParts)}
+WHERE Id = @id AND UserId = @u;";
 
             cmd.Parameters.AddWithValue("@id", loan.Id);
             cmd.Parameters.AddWithValue("@u", loan.UserId);
@@ -411,12 +584,14 @@ UPDATE Loans
             cmd.Parameters.AddWithValue("@note", (object?)loan.Note ?? DBNull.Value);
             cmd.Parameters.AddWithValue("@pd", loan.PaymentDay);
 
-            if (hasSchedule)
-                cmd.Parameters.AddWithValue("@sp", (object?)loan.SchedulePath ?? DBNull.Value);
+            if (hasSchedule) cmd.Parameters.AddWithValue("@sp", (object?)loan.SchedulePath ?? DBNull.Value);
+            if (hasPayKind) cmd.Parameters.AddWithValue("@pk", (int)loan.PaymentKind);
+            if (hasPayRef) cmd.Parameters.AddWithValue("@pr", (object?)loan.PaymentRefId ?? DBNull.Value);
 
             cmd.ExecuteNonQuery();
             RaiseDataChanged();
         }
+
 
 
         public static void DeleteLoan(int id, int userId)
@@ -2154,8 +2329,8 @@ WHERE i.UserId=@u");
             if (userId <= 0) throw new ArgumentException("Nieprawid³owy userId.", nameof(userId));
             if (amount <= 0m) throw new ArgumentException("Kwota musi byæ dodatnia.", nameof(amount));
 
-            EnsureTables();
-            using var c = GetConnection();
+            using var c = OpenAndEnsureSchema();
+
 
             // Kompatybilnoœæ ze starszymi DB (kolumny mog¹ nie istnieæ)
             bool hasPaymentKind = ColumnExists(c, "Incomes", "PaymentKind");
@@ -2863,6 +3038,294 @@ VALUES(@u, @n);";
             cmd.ExecuteNonQuery();
             RaiseDataChanged();
         }
+        public static bool PlannedLoanInstallmentExists(int userId, DateTime date, decimal amount, int accountId, string description)
+        {
+            using var c = OpenAndEnsureSchema();
+            using var cmd = c.CreateCommand();
+
+            bool hasPaymentKind = ColumnExists(c, "Expenses", "PaymentKind");
+            bool hasPaymentRefId = ColumnExists(c, "Expenses", "PaymentRefId");
+
+            cmd.CommandText = @"
+SELECT 1
+FROM Expenses
+WHERE UserId=@u
+  AND IsPlanned=1
+  AND date(Date)=date(@d)
+  AND ABS(Amount - @a) < 0.01
+  AND lower(COALESCE(Description,'')) = lower(@desc)
+" + (hasPaymentKind ? " AND PaymentKind=@pk " : "") +
+            (hasPaymentRefId ? " AND PaymentRefId=@pr " : "") +
+        @"
+LIMIT 1;";
+
+            cmd.Parameters.AddWithValue("@u", userId);
+            cmd.Parameters.AddWithValue("@d", date.ToString("yyyy-MM-dd"));
+            cmd.Parameters.AddWithValue("@a", amount);
+            cmd.Parameters.AddWithValue("@desc", description);
+
+            if (hasPaymentKind) cmd.Parameters.AddWithValue("@pk", (int)Finly.Models.PaymentKind.BankAccount);
+            if (hasPaymentRefId) cmd.Parameters.AddWithValue("@pr", accountId);
+
+            return cmd.ExecuteScalar() != null;
+        }
+
+        public sealed class LoanScheduleModel
+        {
+            public int Id { get; set; }
+            public int UserId { get; set; }
+            public int LoanId { get; set; }
+            public DateTime ImportedAt { get; set; }
+            public string? SourceName { get; set; }
+            public string? SchedulePath { get; set; }
+            public string? Note { get; set; }
+        }
+
+        public sealed class LoanInstallmentDb
+        {
+            public int Id { get; set; }
+            public int UserId { get; set; }
+            public int LoanId { get; set; }
+            public int ScheduleId { get; set; }
+            public int InstallmentNo { get; set; }
+            public DateTime DueDate { get; set; }
+            public decimal TotalAmount { get; set; }
+            public decimal? PrincipalAmount { get; set; }
+            public decimal? InterestAmount { get; set; }
+            public decimal? RemainingBalance { get; set; }
+            public int Status { get; set; }            // 0 planned, 1 paid, 2 cancelled
+            public DateTime? PaidAt { get; set; }
+            public int PaymentKind { get; set; }
+            public int? PaymentRefId { get; set; }
+        }
+
+        public static int InsertLoanSchedule(int userId, int loanId, string? sourceName, string? schedulePath, string? note = null)
+        {
+            if (userId <= 0) throw new ArgumentException("Nieprawid³owy userId.");
+            if (loanId <= 0) throw new ArgumentException("Nieprawid³owy loanId.");
+
+            using var c = OpenAndEnsureSchema();
+            using var cmd = c.CreateCommand();
+            cmd.CommandText = @"
+INSERT INTO LoanSchedules(UserId, LoanId, SourceName, SchedulePath, Note)
+VALUES (@u, @l, @s, @p, @n);
+SELECT last_insert_rowid();";
+            cmd.Parameters.AddWithValue("@u", userId);
+            cmd.Parameters.AddWithValue("@l", loanId);
+            cmd.Parameters.AddWithValue("@s", (object?)sourceName ?? DBNull.Value);
+            cmd.Parameters.AddWithValue("@p", (object?)schedulePath ?? DBNull.Value);
+            cmd.Parameters.AddWithValue("@n", (object?)note ?? DBNull.Value);
+
+            var id = Convert.ToInt32(cmd.ExecuteScalar() ?? 0);
+            RaiseDataChanged();
+            return id;
+        }
+
+
+        public static int UpsertLoanInstallments_MergeByNo(
+    int userId,
+    int loanId,
+    int scheduleId,
+    IReadOnlyList<LoanInstallmentDb> rows)
+        {
+            if (userId <= 0) throw new ArgumentException("Nieprawid³owy userId.");
+            if (loanId <= 0) throw new ArgumentException("Nieprawid³owy loanId.");
+            if (scheduleId <= 0) throw new ArgumentException("Nieprawid³owy scheduleId.");
+            if (rows == null) throw new ArgumentNullException(nameof(rows));
+
+            using var c = OpenAndEnsureSchema();
+            using var tx = c.BeginTransaction();
+
+            int inserted = 0;
+            int updated = 0;
+            int skippedPaid = 0;
+
+            foreach (var r in rows)
+            {
+                // 1) sprawdŸ czy istnieje rata o tym numerze
+                int? existingId = null;
+                int existingStatus = 0;
+
+                using (var chk = c.CreateCommand())
+                {
+                    chk.Transaction = tx;
+                    chk.CommandText = @"
+SELECT Id, Status
+FROM LoanInstallments
+WHERE UserId=@u AND LoanId=@l AND InstallmentNo=@no
+LIMIT 1;";
+                    chk.Parameters.AddWithValue("@u", userId);
+                    chk.Parameters.AddWithValue("@l", loanId);
+                    chk.Parameters.AddWithValue("@no", r.InstallmentNo);
+
+                    using var rd = chk.ExecuteReader();
+                    if (rd.Read())
+                    {
+                        existingId = rd.GetInt32(0);
+                        existingStatus = rd.IsDBNull(1) ? 0 : rd.GetInt32(1);
+                    }
+                }
+
+                // 2) Jeœli ju¿ PAID -> nie ruszamy
+                if (existingId.HasValue && existingStatus == 1)
+                {
+                    skippedPaid++;
+                    continue;
+                }
+
+                // 3) INSERT jeœli brak
+                if (!existingId.HasValue)
+                {
+                    using var ins = c.CreateCommand();
+                    ins.Transaction = tx;
+                    ins.CommandText = @"
+INSERT INTO LoanInstallments(
+    UserId, LoanId, ScheduleId, InstallmentNo, DueDate, TotalAmount,
+    PrincipalAmount, InterestAmount, RemainingBalance,
+    Status, PaidAt, PaymentKind, PaymentRefId
+)
+VALUES(
+    @u, @l, @sid, @no, @d, @a,
+    @p, @i, @rb,
+    0, NULL, 0, NULL
+);";
+                    ins.Parameters.AddWithValue("@u", userId);
+                    ins.Parameters.AddWithValue("@l", loanId);
+                    ins.Parameters.AddWithValue("@sid", scheduleId);
+                    ins.Parameters.AddWithValue("@no", r.InstallmentNo);
+                    ins.Parameters.AddWithValue("@d", ToIsoDate(r.DueDate));
+                    ins.Parameters.AddWithValue("@a", r.TotalAmount);
+                    ins.Parameters.AddWithValue("@p", (object?)r.PrincipalAmount ?? DBNull.Value);
+                    ins.Parameters.AddWithValue("@i", (object?)r.InterestAmount ?? DBNull.Value);
+                    ins.Parameters.AddWithValue("@rb", (object?)r.RemainingBalance ?? DBNull.Value);
+
+                    ins.ExecuteNonQuery();
+                    inserted++;
+                    continue;
+                }
+
+                // 4) UPDATE jeœli istnieje i nie jest paid
+                using (var upd = c.CreateCommand())
+                {
+                    upd.Transaction = tx;
+                    upd.CommandText = @"
+UPDATE LoanInstallments
+SET ScheduleId=@sid,
+    DueDate=@d,
+    TotalAmount=@a,
+    PrincipalAmount=@p,
+    InterestAmount=@i,
+    RemainingBalance=@rb
+WHERE Id=@id AND UserId=@u;";
+                    upd.Parameters.AddWithValue("@sid", scheduleId);
+                    upd.Parameters.AddWithValue("@d", ToIsoDate(r.DueDate));
+                    upd.Parameters.AddWithValue("@a", r.TotalAmount);
+                    upd.Parameters.AddWithValue("@p", (object?)r.PrincipalAmount ?? DBNull.Value);
+                    upd.Parameters.AddWithValue("@i", (object?)r.InterestAmount ?? DBNull.Value);
+                    upd.Parameters.AddWithValue("@rb", (object?)r.RemainingBalance ?? DBNull.Value);
+                    upd.Parameters.AddWithValue("@id", existingId.Value);
+                    upd.Parameters.AddWithValue("@u", userId);
+
+                    upd.ExecuteNonQuery();
+                    updated++;
+                }
+            }
+
+            tx.Commit();
+            RaiseDataChanged();
+            return inserted + updated; // albo zwróæ tuple, jak chcesz
+        }
+
+        public static List<LoanInstallmentDb> GetPlannedInstallments(int userId, int loanId, DateTime from, DateTime to)
+        {
+            var list = new List<LoanInstallmentDb>();
+            using var c = OpenAndEnsureSchema();
+            using var cmd = c.CreateCommand();
+            cmd.CommandText = @"
+SELECT Id, UserId, LoanId, ScheduleId, InstallmentNo, DueDate, TotalAmount,
+       PrincipalAmount, InterestAmount, RemainingBalance,
+       Status, PaidAt, PaymentKind, PaymentRefId
+FROM LoanInstallments
+WHERE UserId=@u AND LoanId=@l
+  AND Status=0
+  AND date(DueDate) BETWEEN date(@f) AND date(@t)
+ORDER BY date(DueDate) ASC, InstallmentNo ASC;";
+            cmd.Parameters.AddWithValue("@u", userId);
+            cmd.Parameters.AddWithValue("@l", loanId);
+            cmd.Parameters.AddWithValue("@f", from.ToString("yyyy-MM-dd"));
+            cmd.Parameters.AddWithValue("@t", to.ToString("yyyy-MM-dd"));
+
+            using var r = cmd.ExecuteReader();
+            while (r.Read())
+            {
+                list.Add(new LoanInstallmentDb
+                {
+                    Id = r.GetInt32(0),
+                    UserId = r.GetInt32(1),
+                    LoanId = r.GetInt32(2),
+                    ScheduleId = r.GetInt32(3),
+                    InstallmentNo = r.GetInt32(4),
+                    DueDate = GetDate(r, 5),
+                    TotalAmount = r.IsDBNull(6) ? 0m : Convert.ToDecimal(r.GetValue(6)),
+                    PrincipalAmount = r.IsDBNull(7) ? null : Convert.ToDecimal(r.GetValue(7)),
+                    InterestAmount = r.IsDBNull(8) ? null : Convert.ToDecimal(r.GetValue(8)),
+                    RemainingBalance = r.IsDBNull(9) ? null : Convert.ToDecimal(r.GetValue(9)),
+                    Status = r.IsDBNull(10) ? 0 : r.GetInt32(10),
+                    PaidAt = r.IsDBNull(11) ? null : GetDate(r, 11),
+                    PaymentKind = r.IsDBNull(12) ? 0 : r.GetInt32(12),
+                    PaymentRefId = r.IsDBNull(13) ? null : r.GetInt32(13)
+                });
+            }
+            return list;
+        }
+
+
+        public static List<LoanInstallmentDb> GetPaidInstallments(int userId, int loanId, DateTime? from = null, DateTime? to = null)
+        {
+            var list = new List<LoanInstallmentDb>();
+            using var c = OpenAndEnsureSchema();
+            using var cmd = c.CreateCommand();
+
+            var sql = @"
+SELECT Id, UserId, LoanId, ScheduleId, InstallmentNo, DueDate, TotalAmount,
+       PrincipalAmount, InterestAmount, RemainingBalance,
+       Status, PaidAt, PaymentKind, PaymentRefId
+FROM LoanInstallments
+WHERE UserId=@u AND LoanId=@l AND Status=1";
+
+            cmd.Parameters.AddWithValue("@u", userId);
+            cmd.Parameters.AddWithValue("@l", loanId);
+
+            if (from.HasValue) { sql += " AND date(PaidAt) >= date(@f)"; cmd.Parameters.AddWithValue("@f", from.Value.ToString("yyyy-MM-dd")); }
+            if (to.HasValue) { sql += " AND date(PaidAt) <= date(@t)"; cmd.Parameters.AddWithValue("@t", to.Value.ToString("yyyy-MM-dd")); }
+
+            sql += " ORDER BY date(PaidAt) DESC, InstallmentNo DESC;";
+            cmd.CommandText = sql;
+
+            using var r = cmd.ExecuteReader();
+            while (r.Read())
+            {
+                list.Add(new LoanInstallmentDb
+                {
+                    Id = r.GetInt32(0),
+                    UserId = r.GetInt32(1),
+                    LoanId = r.GetInt32(2),
+                    ScheduleId = r.GetInt32(3),
+                    InstallmentNo = r.GetInt32(4),
+                    DueDate = GetDate(r, 5),
+                    TotalAmount = r.IsDBNull(6) ? 0m : Convert.ToDecimal(r.GetValue(6)),
+                    PrincipalAmount = r.IsDBNull(7) ? null : Convert.ToDecimal(r.GetValue(7)),
+                    InterestAmount = r.IsDBNull(8) ? null : Convert.ToDecimal(r.GetValue(8)),
+                    RemainingBalance = r.IsDBNull(9) ? null : Convert.ToDecimal(r.GetValue(9)),
+                    Status = r.IsDBNull(10) ? 0 : r.GetInt32(10),
+                    PaidAt = r.IsDBNull(11) ? null : GetDate(r, 11),
+                    PaymentKind = r.IsDBNull(12) ? 0 : r.GetInt32(12),
+                    PaymentRefId = r.IsDBNull(13) ? null : r.GetInt32(13)
+                });
+            }
+            return list;
+        }
+
 
         private static int? TryResolveAccountIdFromExpenseAccountText(SqliteConnection c, SqliteTransaction tx, int userId, string? accountText)
         {

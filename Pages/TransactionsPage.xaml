@@ -35,7 +35,7 @@
             <Setter Property="Foreground" Value="{DynamicResource App.Foreground}"/>
         </Style>
 
-        <!-- Kafelek KPI (jak na screenie: ciemne tło, nieprzeźroczyste) -->
+        <!-- Kafelek KPI -->
         <Style x:Key="AccentCard" TargetType="Border">
             <Setter Property="Background" Value="{DynamicResource Surface.Background}"/>
             <Setter Property="BorderBrush" Value="{DynamicResource Brand.Blue}"/>
@@ -49,14 +49,12 @@
 
         <!-- ===================== FILTRY ===================== -->
 
-        <!-- większy tytuł sekcji (Typ transakcji / Kategorie / Konta) -->
         <Style x:Key="FilterHeaderTextStyle" TargetType="TextBlock">
             <Setter Property="FontSize" Value="16"/>
             <Setter Property="FontWeight" Value="Bold"/>
             <Setter Property="Foreground" Value="{DynamicResource App.Foreground}"/>
         </Style>
 
-        <!-- GroupBox: pomarańczowa ramka + surface w środku (jak na screenie) -->
         <Style x:Key="FilterPanelStyle" TargetType="GroupBox">
             <Setter Property="Height" Value="185"/>
             <Setter Property="MinHeight" Value="185"/>
@@ -98,7 +96,6 @@
             </Setter>
         </Style>
 
-        <!-- przycisk "Pokaż wszystko" -->
         <Style x:Key="FilterHeaderButtonStyle" TargetType="Button">
             <Setter Property="Margin" Value="8,0,0,0"/>
             <Setter Property="Padding" Value="12,0"/>
@@ -139,11 +136,7 @@
             </Setter>
         </Style>
 
-        <!-- checkbox: JAK NA SCREENIE:
-             - mały kwadrat,
-             - checked: pomarańczowe wypełnienie + biały ptaszek,
-             - unchecked: obrys pomarańczowy, środek transparent,
-             - tekst pogrubiony. -->
+        <!-- checkbox style -->
         <Style x:Key="OrangeCheckBoxStyle" TargetType="CheckBox">
             <Setter Property="Foreground" Value="{DynamicResource App.Foreground}"/>
             <Setter Property="FontSize" Value="13"/>
@@ -163,6 +156,7 @@
 
                             <!-- box -->
                             <Border x:Name="Box"
+                                    Grid.Column="0"
                                     Width="14"
                                     Height="14"
                                     CornerRadius="2"
@@ -172,8 +166,9 @@
                                     VerticalAlignment="Center"
                                     Margin="0,0,8,0"/>
 
-                            <!-- check -->
+                            <!-- check (FIX: Grid.Column=0) -->
                             <Path x:Name="Check"
+                                  Grid.Column="0"
                                   Data="M 2 7 L 6 11 L 13 2"
                                   Stroke="White"
                                   StrokeThickness="2.4"
@@ -183,7 +178,8 @@
                                   Width="14"
                                   Height="14"
                                   VerticalAlignment="Center"
-                                  Visibility="Collapsed"/>
+                                  Visibility="Collapsed"
+                                  Margin="0,0,8,0"/>
 
                             <!-- content -->
                             <ContentPresenter Grid.Column="1"
@@ -243,7 +239,7 @@
             </Setter>
         </Style>
 
-        <!-- ========= Transaction Card Template (Read/Edit) ========= -->
+        <!-- ========= Transaction Card Template ========= -->
         <DataTemplate x:Key="TransactionCardTemplate">
             <Border Style="{StaticResource TransactionItemCard}">
                 <Grid>
@@ -264,7 +260,7 @@
                             <StackPanel Orientation="Vertical" Margin="4,0,16,0">
                                 <StackPanel Orientation="Horizontal" Margin="0,0,0,8" VerticalAlignment="Center">
 
-                                    <!-- ICON (pewne: po IsExpense/IsIncome/IsTransfer + pack uri) -->
+                                    <!-- ICON -->
                                     <Image Width="20" Height="20" Margin="0,0,6,0">
                                         <Image.Style>
                                             <Style TargetType="Image">
@@ -598,16 +594,34 @@
                                                 <Setter Property="Opacity" Value="0.5"/>
                                                 <Setter Property="ToolTip" Value="Transferów nie edytujesz inline."/>
                                             </DataTrigger>
+
+                                            <DataTrigger Binding="{Binding IsReadOnly}" Value="True">
+                                                <Setter Property="IsEnabled" Value="False"/>
+                                                <Setter Property="Opacity" Value="0.5"/>
+                                                <Setter Property="ToolTip" Value="To jest rata kredytu (harmonogram) – edycja wkrótce."/>
+                                            </DataTrigger>
                                         </Style.Triggers>
                                     </Style>
                                 </Button.Style>
                             </Button>
 
-                            <Button ToolTip="Usuń"
-                                    Command="{Binding ShowDeleteConfirmationCommand}"
-                                    Style="{StaticResource DeleteIconButton}"
+                            <!-- FIX: Delete też blokujemy dla IsReadOnly -->
+                            <Button Command="{Binding ShowDeleteConfirmationCommand}"
+                                    ToolTip="Usuń"
                                     Focusable="False"
-                                    IsTabStop="False"/>
+                                    IsTabStop="False">
+                                <Button.Style>
+                                    <Style TargetType="Button" BasedOn="{StaticResource DeleteIconButton}">
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding IsReadOnly}" Value="True">
+                                                <Setter Property="IsEnabled" Value="False"/>
+                                                <Setter Property="Opacity" Value="0.5"/>
+                                                <Setter Property="ToolTip" Value="To jest rata kredytu (harmonogram) – usuwanie wkrótce."/>
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </Button.Style>
+                            </Button>
                         </StackPanel>
 
                         <StackPanel x:Name="EditActions" Orientation="Horizontal" Visibility="Collapsed">
@@ -670,6 +684,7 @@
                   HorizontalScrollBarVisibility="Disabled"
                   PanningMode="VerticalOnly">
 
+        <!-- Reszta Twojego layoutu bez zmian -->
         <Grid>
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto"/>
@@ -762,7 +777,7 @@
                 </Border>
             </Grid>
 
-            <!-- FILTRY (Typ / Kategorie / Konta) -->
+            <!-- FILTRY -->
             <Grid Grid.Row="2" Margin="16,0,16,12">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*"/>
@@ -785,8 +800,6 @@
                     </GroupBox.Header>
 
                     <StackPanel VerticalAlignment="Top">
-
-                        <!-- Wydatki -->
                         <CheckBox Style="{StaticResource OrangeCheckBoxStyle}"
                                   IsChecked="{Binding ShowExpenses, Mode=TwoWay}">
                             <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
@@ -796,7 +809,6 @@
                             </StackPanel>
                         </CheckBox>
 
-                        <!-- Przychody -->
                         <CheckBox Style="{StaticResource OrangeCheckBoxStyle}"
                                   IsChecked="{Binding ShowIncomes, Mode=TwoWay}">
                             <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
@@ -806,7 +818,6 @@
                             </StackPanel>
                         </CheckBox>
 
-                        <!-- Transfery -->
                         <CheckBox Style="{StaticResource OrangeCheckBoxStyle}"
                                   IsChecked="{Binding ShowTransfers, Mode=TwoWay}"
                                   Margin="0">
@@ -816,7 +827,6 @@
                                 <TextBlock Text="Transfery" FontWeight="Bold" />
                             </StackPanel>
                         </CheckBox>
-
                     </StackPanel>
                 </GroupBox>
 

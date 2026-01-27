@@ -88,6 +88,9 @@ namespace Finly.Pages
 
             // kafelek "Dodaj kredyt" ma być na końcu
             _loans.Add(new AddLoanTile());
+
+            UpdatePaidStatusForCurrentMonth(_loans);
+
         }
 
         // ===================== SNAPSHOT FROM SCHEDULE -> VM =====================
@@ -422,22 +425,50 @@ namespace Finly.Pages
             return true;
         }
 
+        private void UpdatePaidStatusForCurrentMonth(IReadOnlyCollection<LoanCardVm> loans)
+        {
+            if (loans == null || loans.Count == 0)
+            {
+                if (FindName("Analysis1PaidStatus") is TextBlock s1) s1.Text = "";
+                if (FindName("Analysis2PaidStatus") is TextBlock s2) s2.Text = "";
+                return;
+            }
+
+            var today = DateTime.Today.Date;
+
+            // "Zapłacone" pokazujemy dopiero, gdy minął termin ostatniej raty z bieżącego miesiąca
+            var dueDates = loans
+                .Select(vm => GetDueDateForMonth(vm, today.Year, today.Month))
+                .ToList();
+
+            var lastDueThisMonth = dueDates.Max().Date;
+
+            bool monthInstallmentsAlreadyPaid = today > lastDueThisMonth;
+
+            if (FindName("Analysis1PaidStatus") is TextBlock t1)
+                t1.Text = monthInstallmentsAlreadyPaid ? "✓ Zapłacone w tym miesiącu" : "";
+
+            if (FindName("Analysis2PaidStatus") is TextBlock t2)
+                t2.Text = monthInstallmentsAlreadyPaid ? "✓ Zapłacone w tym miesiącu" : "";
+        }
+
+
+
         private void RefreshKpisAndLists()
         {
-            // bierzemy tylko realne kredyty
             var loans = _loans.OfType<LoanCardVm>().ToList();
 
-            // snapshoty z harmonogramu muszą być zawsze aktualne przed KPI
             ApplyScheduleSnapshotsToLoanVms();
-
             UpdateKpiTiles();
 
+            // domyślnie
             SetAnalysisText("—", "—", "—");
+
+            
 
             if (!loans.Any())
                 return;
 
-            // 1) Kapitał/odsetki w tym miesiącu (najczęściej 1 rata na kredyt w miesiącu)
             var today = DateTime.Today;
             var monthStart = new DateTime(today.Year, today.Month, 1);
             var monthEnd = monthStart.AddMonths(1);
@@ -445,22 +476,62 @@ namespace Finly.Pages
             decimal capitalThisMonth = 0m;
             decimal interestThisMonth = 0m;
 
+            // A3: koszt całkowity od dziś do końca
+            decimal totalCostAllLoans = 0m;
+
             foreach (var vm in loans)
             {
-                // Jeśli mamy harmonogram, bierzemy raty w tym miesiącu
+                // ==== jeśli jest harmonogram ====
                 if (TryGetSchedule(vm.Id, showToasts: false, out _, out var schedule) && schedule.Count > 0)
                 {
+                    // A1/A2: raty w tym miesiącu
                     var rowsThisMonth = schedule
                         .Where(r => r.Date >= monthStart && r.Date < monthEnd)
                         .ToList();
 
-                    // Sumujemy tylko jeśli bank podał breakdown
-                    capitalThisMonth += rowsThisMonth.Sum(r => r.Principal ?? 0m);
-                    interestThisMonth += rowsThisMonth.Sum(r => r.Interest ?? 0m);
+                    // jeśli bank podał breakdown — używamy
+                    var capSum = rowsThisMonth.Sum(r => r.Principal ?? 0m);
+                    var intSum = rowsThisMonth.Sum(r => r.Interest ?? 0m);
+                    var totalSum = rowsThisMonth.Sum(r => r.Total);
+
+                    // gdy breakdown nie istnieje, ale Total jest:
+                    // wylicz interes dzienny, kapitał = total - interest
+                    if (totalSum > 0m && capSum == 0m && intSum == 0m)
+                    {
+                        foreach (var row in rowsThisMonth.OrderBy(x => x.Date))
+                        {
+                            var prevDue = LoansService.GetPreviousDueDate(row.Date, vm.PaymentDay, vm.StartDate);
+
+                            // baza do odsetek: najlepsze co mamy
+                            var principalBase = vm.DisplayRemainingPrincipal;
+                            if (row.Remaining.HasValue && row.Remaining.Value > 0m)
+                                principalBase = row.Remaining.Value;
+
+                            var i = LoanMathService.CalculateInterest(principalBase, vm.InterestRate, prevDue, row.Date);
+                            if (i < 0m) i = 0m;
+
+                            var c = row.Total - i;
+                            if (c < 0m) c = 0m;
+
+                            interestThisMonth += i;
+                            capitalThisMonth += c;
+                        }
+                    }
+                    else
+                    {
+                        capitalThisMonth += capSum;
+                        interestThisMonth += intSum;
+                    }
+
+                    // A3: suma rat od dziś do końca (kapitał + odsetki = total)
+                    totalCostAllLoans += schedule
+                        .Where(r => r.Date >= today)
+                        .Sum(r => r.Total);
+
                     continue;
                 }
 
-                // Fallback bez harmonogramu: przybliżenie z raty annuitetowej
+                // ==== fallback bez harmonogramu ====
                 int monthsLeft = GetRemainingMonths(vm);
                 if (monthsLeft <= 0) continue;
 
@@ -469,34 +540,43 @@ namespace Finly.Pages
 
                 capitalThisMonth += principalPart;
                 interestThisMonth += interestPart;
+
+                // A3: przybliżenie kosztu = rata * liczba miesięcy pozostałych
+                var monthly = LoansService.CalculateMonthlyPayment(vm.DisplayRemainingPrincipal, vm.InterestRate, monthsLeft);
+                totalCostAllLoans += monthly * monthsLeft;
             }
 
-            // 2) Całkowity koszt wszystkich kredytów (kapitał+odsetki) – pełny koszt wg harmonogramu, a bez niego aproksymacja
-            decimal totalCostAllLoans = 0m;
-
-            foreach (var vm in loans)
-            {
-                if (TryGetSchedule(vm.Id, showToasts: false, out _, out var schedule) && schedule.Count > 0)
-                {
-                    totalCostAllLoans += schedule.Sum(r => r.Total);
-                    continue;
-                }
-
-                if (vm.TermMonths > 0)
-                {
-                    // koszt całkowity ~ rata * liczba miesięcy
-                    var monthly = LoansService.CalculateMonthlyPayment(vm.Principal, vm.InterestRate, vm.TermMonths);
-                    totalCostAllLoans += monthly * vm.TermMonths;
-                }
-            }
-
+            // ustaw analizy w UI
             SetAnalysisText(
                 $"{capitalThisMonth:N2} zł",
                 $"{interestThisMonth:N2} zł",
                 $"{totalCostAllLoans:N2} zł"
             );
 
+            // status “zapłacone w tym miesiącu”
+            UpdatePaidStatusForCurrentMonth(loans);
         }
+
+
+
+        private static DateTime GetDueDateForMonth(LoanCardVm vm, int year, int month)
+        {
+            int pd = vm.PaymentDay <= 0 ? 1 : vm.PaymentDay;
+            int dim = DateTime.DaysInMonth(year, month);
+            int day = Math.Min(pd, dim);
+
+            var due = new DateTime(year, month, day);
+
+            // weekend -> następny roboczy (spójnie z LoansService.GetNextDueDate)
+            if (due.DayOfWeek == DayOfWeek.Saturday) due = due.AddDays(2);
+            else if (due.DayOfWeek == DayOfWeek.Sunday) due = due.AddDays(1);
+
+            // nie wcześniej niż start
+            if (due.Date < vm.StartDate.Date) due = vm.StartDate.Date;
+
+            return due.Date;
+        }
+
 
         private void UpdateKpiTiles()
         {

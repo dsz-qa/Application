@@ -4,12 +4,13 @@ namespace Finly.Models
 {
     public sealed class LoanInstallmentRow
     {
-        public int? InstallmentNo { get; init; }     // NOWE
-        public DateTime Date { get; init; }
-        public decimal Total { get; init; }
-        public decimal? Principal { get; init; }
-        public decimal? Interest { get; init; }
-        public decimal? Remaining { get; init; }
+        public int? InstallmentNo { get; set; }   // <= wa¿ne: set, nie init
+
+        public DateTime Date { get; set; }
+        public decimal Total { get; set; }
+        public decimal? Principal { get; set; }
+        public decimal? Interest { get; set; }
+        public decimal? Remaining { get; set; }
 
         public override string ToString()
             => $"{(InstallmentNo is null ? "—" : InstallmentNo.ToString())} | {Date:dd.MM.yyyy} | rata: {Total:N2} z³"
@@ -18,3 +19,4 @@ namespace Finly.Models
                + (Remaining is null ? "" : $" | saldo: {Remaining:N2} z³");
     }
 }
+

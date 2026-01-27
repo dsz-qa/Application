@@ -27,6 +27,10 @@ namespace Finly.Models
         public int RemainingInstallments { get; set; } = 0;
 
         public string? SchedulePath { get; set; }
+        public PaymentKind PaymentKind { get; set; } = PaymentKind.FreeCash;
+        public int? PaymentRefId { get; set; }  // np. BankAccountId
+
+
     }
 
     public enum LoanOperationType

@@ -58,10 +58,9 @@
             <Setter Property="MaxWidth"        Value="420"/>
         </Style>
 
-        <Style x:Key="AddTileBorder" TargetType="Border" BasedOn="{StaticResource Card}">
-            <Setter Property="MinWidth"  Value="420"/>
-            <Setter Property="MaxWidth"  Value="420"/>
-            <Setter Property="Cursor"    Value="Hand"/>
+        <!-- IMPORTANT: Add tile ma być tej samej wielkości co LoanCard -->
+        <Style x:Key="AddTileBorder" TargetType="Border" BasedOn="{StaticResource LoanCardBorder}">
+            <Setter Property="Cursor" Value="Hand"/>
         </Style>
 
         <Style x:Key="LoansPrimarySmallButton" TargetType="Button" BasedOn="{StaticResource PrimaryButton}">
@@ -352,25 +351,33 @@
 
                 <Border Grid.Column="0" Style="{StaticResource OrangeAccentCard}">
                     <StackPanel>
-                        <TextBlock Text="Kapitał w tym miesiącu"
+                        <TextBlock Text="Kapitał w tym miesiącu ze wszystkich kredytów"
                                    Style="{StaticResource CardHeader}"
                                    FontSize="14"/>
                         <TextBlock x:Name="Analysis1Value"
                                    Text="—"
                                    Style="{StaticResource KpiValueStyle}"
                                    FontSize="18"/>
+                        <TextBlock x:Name="Analysis1PaidStatus"
+                                   Text=""
+                                   Opacity="0.75"
+                                   Margin="0,4,0,0"/>
                     </StackPanel>
                 </Border>
 
                 <Border Grid.Column="1" Style="{StaticResource OrangeAccentCard}">
                     <StackPanel>
-                        <TextBlock Text="Odsetki w tym miesiącu"
+                        <TextBlock Text="Odsetki w tym miesiącu ze wszystkich kredytów"
                                    Style="{StaticResource CardHeader}"
                                    FontSize="14"/>
                         <TextBlock x:Name="Analysis2Value"
                                    Text="—"
                                    Style="{StaticResource KpiValueStyle}"
                                    FontSize="18"/>
+                        <TextBlock x:Name="Analysis2PaidStatus"
+                                   Text=""
+                                   Opacity="0.75"
+                                   Margin="0,4,0,0"/>
                     </StackPanel>
                 </Border>
 
@@ -393,7 +400,6 @@
                            Background="{DynamicResource Surface.Border}"
                            Opacity="0.8"
                            Margin="0,0,0,8"/>
-
                 <TextBlock Text="Kredyty"
                            FontSize="24"
                            FontWeight="Bold"
