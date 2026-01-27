@@ -244,18 +244,28 @@ namespace Finly.Services.Features
         {
             var list = new List<LoanModel>();
             using var c = OpenAndEnsureSchema();
+
+            bool hasSchedule = ColumnExists(c, "Loans", "SchedulePath");
+
             using var cmd = c.CreateCommand();
-            cmd.CommandText = @"
+            cmd.CommandText = hasSchedule
+                ? @"
+SELECT Id, UserId, Name, Principal, InterestRate, StartDate, TermMonths, Note, PaymentDay, SchedulePath
+FROM Loans
+WHERE UserId=@u
+ORDER BY Name;"
+                : @"
 SELECT Id, UserId, Name, Principal, InterestRate, StartDate, TermMonths, Note, PaymentDay
 FROM Loans
 WHERE UserId=@u
 ORDER BY Name;";
+
             cmd.Parameters.AddWithValue("@u", userId);
 
             using var r = cmd.ExecuteReader();
             while (r.Read())
             {
-                list.Add(new LoanModel
+                var m = new LoanModel
                 {
                     Id = r.IsDBNull(0) ? 0 : r.GetInt32(0),
                     UserId = r.IsDBNull(1) ? userId : r.GetInt32(1),
@@ -265,21 +275,84 @@ ORDER BY Name;";
                     StartDate = GetDate(r, 5),
                     TermMonths = r.IsDBNull(6) ? 0 : r.GetInt32(6),
                     Note = GetNullableString(r, 7),
-                    PaymentDay = r.IsDBNull(8) ? 0 : r.GetInt32(8)
-                });
+                    PaymentDay = r.IsDBNull(8) ? 0 : r.GetInt32(8),
+                    SchedulePath = null
+                };
+
+                if (hasSchedule)
+                    m.SchedulePath = GetNullableString(r, 9);
+
+                list.Add(m);
             }
 
             return list;
         }
 
+        public static void SetLoanSchedulePath(int loanId, int userId, string? schedulePath)
+        {
+            if (loanId <= 0) throw new ArgumentException("Nieprawid³owy loanId.", nameof(loanId));
+            if (userId <= 0) throw new ArgumentException("Nieprawid³owy userId.", nameof(userId));
+
+            using var c = OpenAndEnsureSchema();
+
+            if (!ColumnExists(c, "Loans", "SchedulePath"))
+                return; // stara baza bez migracji – po Ensure() powinna ju¿ mieæ, ale zostawiamy bezpiecznik
+
+            using var cmd = c.CreateCommand();
+            cmd.CommandText = @"
+UPDATE Loans
+SET SchedulePath = @p
+WHERE Id = @id AND UserId = @u;";
+            cmd.Parameters.AddWithValue("@id", loanId);
+            cmd.Parameters.AddWithValue("@u", userId);
+            cmd.Parameters.AddWithValue("@p", (object?)schedulePath ?? DBNull.Value);
+
+            cmd.ExecuteNonQuery();
+            RaiseDataChanged();
+        }
+
+        public static string? GetLoanSchedulePath(int loanId, int userId)
+        {
+            if (loanId <= 0 || userId <= 0) return null;
+
+            using var c = OpenAndEnsureSchema();
+
+            if (!ColumnExists(c, "Loans", "SchedulePath"))
+                return null;
+
+            using var cmd = c.CreateCommand();
+            cmd.CommandText = @"
+SELECT SchedulePath
+FROM Loans
+WHERE Id=@id AND UserId=@u
+LIMIT 1;";
+            cmd.Parameters.AddWithValue("@id", loanId);
+            cmd.Parameters.AddWithValue("@u", userId);
+
+            var obj = cmd.ExecuteScalar();
+            if (obj == null || obj == DBNull.Value) return null;
+
+            var s = obj.ToString();
+            return string.IsNullOrWhiteSpace(s) ? null : s;
+        }
+
         public static int InsertLoan(LoanModel loan)
         {
             using var c = OpenAndEnsureSchema();
+
+            bool hasSchedule = ColumnExists(c, "Loans", "SchedulePath");
+
             using var cmd = c.CreateCommand();
-            cmd.CommandText = @"
+            cmd.CommandText = hasSchedule
+                ? @"
+INSERT INTO Loans(UserId, Name, Principal, InterestRate, StartDate, TermMonths, Note, PaymentDay, SchedulePath)
+VALUES (@u, @n, @p, @ir, @d, @tm, @note, @pd, @sp);
+SELECT last_insert_rowid();"
+                : @"
 INSERT INTO Loans(UserId, Name, Principal, InterestRate, StartDate, TermMonths, Note, PaymentDay)
 VALUES (@u, @n, @p, @ir, @d, @tm, @note, @pd);
 SELECT last_insert_rowid();";
+
             cmd.Parameters.AddWithValue("@u", loan.UserId);
             cmd.Parameters.AddWithValue("@n", loan.Name ?? "");
             cmd.Parameters.AddWithValue("@p", loan.Principal);
@@ -289,16 +362,35 @@ SELECT last_insert_rowid();";
             cmd.Parameters.AddWithValue("@note", (object?)loan.Note ?? DBNull.Value);
             cmd.Parameters.AddWithValue("@pd", loan.PaymentDay);
 
+            if (hasSchedule)
+                cmd.Parameters.AddWithValue("@sp", (object?)loan.SchedulePath ?? DBNull.Value);
+
             var id = Convert.ToInt32(cmd.ExecuteScalar() ?? 0);
             RaiseDataChanged();
             return id;
         }
 
+
         public static void UpdateLoan(LoanModel loan)
         {
             using var c = OpenAndEnsureSchema();
+
+            bool hasSchedule = ColumnExists(c, "Loans", "SchedulePath");
+
             using var cmd = c.CreateCommand();
-            cmd.CommandText = @"
+            cmd.CommandText = hasSchedule
+                ? @"
+UPDATE Loans
+   SET Name = @n,
+       Principal = @p,
+       InterestRate = @ir,
+       StartDate = @d,
+       TermMonths = @tm,
+       Note = @note,
+       PaymentDay = @pd,
+       SchedulePath = @sp
+ WHERE Id = @id AND UserId = @u;"
+                : @"
 UPDATE Loans
    SET Name = @n,
        Principal = @p,
@@ -308,6 +400,7 @@ UPDATE Loans
        Note = @note,
        PaymentDay = @pd
  WHERE Id = @id AND UserId = @u;";
+
             cmd.Parameters.AddWithValue("@id", loan.Id);
             cmd.Parameters.AddWithValue("@u", loan.UserId);
             cmd.Parameters.AddWithValue("@n", loan.Name ?? "");
@@ -318,9 +411,13 @@ UPDATE Loans
             cmd.Parameters.AddWithValue("@note", (object?)loan.Note ?? DBNull.Value);
             cmd.Parameters.AddWithValue("@pd", loan.PaymentDay);
 
+            if (hasSchedule)
+                cmd.Parameters.AddWithValue("@sp", (object?)loan.SchedulePath ?? DBNull.Value);
+
             cmd.ExecuteNonQuery();
             RaiseDataChanged();
         }
+
 
         public static void DeleteLoan(int id, int userId)
         {

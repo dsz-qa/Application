@@ -1,4 +1,10 @@
-﻿using System;
+﻿using Finly.Models;
+using Finly.Services;
+using Finly.Services.Features;
+using Finly.ViewModels;
+using Finly.Views.Dialogs;
+using Microsoft.Win32;
+using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.IO;
@@ -7,28 +13,23 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
-using Finly.Models;
-using Finly.Services;
-using Finly.Services.Features;
-using Finly.ViewModels;
-using Finly.Views.Dialogs;
 
 namespace Finly.Pages
 {
     public partial class LoansPage : UserControl
     {
-        private readonly ObservableCollection<object> _loans = new();
+        private readonly ObservableCollection<LoanCardVm> _loans = new();
         private readonly int _userId;
 
-        // Pamięć runtime
-        private readonly Dictionary<int, string> _loanScheduleFiles = new();
+        // Cache runtime TYLKO dla sparsowanych wierszy (OK)
         private readonly Dictionary<int, List<LoanInstallmentRow>> _parsedSchedules = new();
+
+        // Jeżeli dalej trzymasz mapowanie kredyt->konto w RAM, zostawiamy (docelowo też do DB)
         private readonly Dictionary<int, int> _loanAccounts = new();
 
         private List<BankAccountModel> _accounts = new();
 
-        public LoansPage()
-            : this(UserService.GetCurrentUserId())
+        public LoansPage() : this(UserService.GetCurrentUserId())
         {
         }
 
@@ -83,20 +84,90 @@ namespace Finly.Pages
                 });
             }
 
+            // kafelek "Dodaj kredyt" ma być na końcu
+            _loans.Add(new AddLoanTile());
+
             UpdateKpiTiles();
         }
 
-        private static string FormatMonths(int months)
+        // ===================== SCHEDULE ATTACH (CSV) =====================
+
+        private void CardAttachSchedule_Click(object sender, RoutedEventArgs e)
         {
-            if (months <= 0) return "0 mies.";
+            try
+            {
+                if (sender is not FrameworkElement fe || fe.Tag is not LoanCardVm loanVm)
+                {
+                    ToastService.Info("Nie udało się zidentyfikować kredytu.");
+                    return;
+                }
 
-            int years = months / 12;
-            int monthsLeft = months % 12;
+                int loanId = loanVm.Id;
 
-            if (years > 0 && monthsLeft > 0) return $"{years} lat {monthsLeft} mies.";
-            if (years > 0) return $"{years} lat";
-            return $"{monthsLeft} mies.";
+                var dlg = new OpenFileDialog
+                {
+                    Title = "Wybierz plik harmonogramu (CSV)",
+                    Filter = "Pliki CSV (*.csv)|*.csv|Wszystkie pliki (*.*)|*.*",
+                    Multiselect = false,
+                    CheckFileExists = true
+                };
+
+                if (dlg.ShowDialog() != true)
+                    return;
+
+                string selectedPath = dlg.FileName;
+                if (!File.Exists(selectedPath))
+                {
+                    ToastService.Info("Wybrany plik nie istnieje.");
+                    return;
+                }
+
+                // 1) Skopiuj do trwałego katalogu aplikacji
+                string destPath = CopyLoanScheduleToAppData(loanId, selectedPath);
+
+                // 2) Zapisz ścieżkę w DB (jedno źródło prawdy)
+                DatabaseService.SetLoanSchedulePath(loanId, _userId, destPath);
+
+                // 3) Wyczyść cache parsowania (żeby nie trzymać starego)
+                _parsedSchedules.Remove(loanId);
+
+                // 4) Odśwież UI
+                DatabaseService.NotifyDataChanged();
+                RefreshKpisAndLists();
+
+                ToastService.Success("Harmonogram został załączony.");
+            }
+            catch (Exception ex)
+            {
+                ToastService.Error("Nie udało się załączyć harmonogramu: " + ex.Message);
+            }
         }
+
+        private static string CopyLoanScheduleToAppData(int loanId, string sourcePath)
+        {
+            // %AppData%\Finly\LoanSchedules\
+            string baseDir = Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+                "Finly",
+                "LoanSchedules");
+
+            Directory.CreateDirectory(baseDir);
+
+            // zapisujemy zawsze jako csv dla tego loanId
+            string destPath = Path.Combine(baseDir, $"loan_{loanId}.csv");
+            string tempPath = destPath + ".tmp";
+
+            File.Copy(sourcePath, tempPath, overwrite: true);
+
+            if (File.Exists(destPath))
+                File.Delete(destPath);
+
+            File.Move(tempPath, destPath);
+
+            return destPath;
+        }
+
+        // ===================== KPI / ANALYSES =====================
 
         private (decimal totalDebt, decimal monthlySum, decimal yearlySum, int maxRemainingMonths)
             CalculatePortfolioStats(List<LoanCardVm> loans)
@@ -159,13 +230,21 @@ namespace Finly.Pages
             remainingMonths = 0;
             yearSum = 0m;
 
-            if (!_loanScheduleFiles.TryGetValue(vm.Id, out var path) ||
-                string.IsNullOrWhiteSpace(path) ||
-                !string.Equals(Path.GetExtension(path), ".csv", StringComparison.OrdinalIgnoreCase) ||
-                !File.Exists(path))
+            var path = DatabaseService.GetLoanSchedulePath(vm.Id, _userId);
+            if (string.IsNullOrWhiteSpace(path))
+                return false;
+
+            if (!File.Exists(path))
             {
+                ToastService.Info("Nie znaleziono pliku harmonogramu. Załącz ponownie.");
+                DatabaseService.SetLoanSchedulePath(vm.Id, _userId, null);
+                DatabaseService.NotifyDataChanged();
+                _parsedSchedules.Remove(vm.Id);
                 return false;
             }
+
+            if (!string.Equals(Path.GetExtension(path), ".csv", StringComparison.OrdinalIgnoreCase))
+                return false;
 
             List<LoanInstallmentRow> schedule;
 
@@ -181,10 +260,13 @@ namespace Finly.Pages
                     schedule = parser.Parse(path).ToList();
                     _parsedSchedules[vm.Id] = schedule;
                 }
-                catch
+                catch (Exception ex)
                 {
+                    ToastService.Error("Błąd importu CSV: " + ex.Message);
+                    System.Diagnostics.Debug.WriteLine(ex);
                     return false;
                 }
+
             }
 
             if (schedule.Count == 0)
@@ -219,53 +301,51 @@ namespace Finly.Pages
 
         private void RefreshKpisAndLists()
         {
-            var loans = _loans.OfType<LoanCardVm>().ToList();
+            var loans = _loans.Where(x => x is not AddLoanTile).ToList();
 
             UpdateKpiTiles();
 
-            var insights = new ObservableCollection<LoanInsightVm>();
+            SetAnalysisText("—", "—", "—");
 
-            if (loans.Any())
+            if (!loans.Any())
+                return;
+
+            var (totalDebt, _, _, _) = CalculatePortfolioStats(loans);
+
+            decimal weightedRate = 0m;
+            if (totalDebt > 0m)
+                weightedRate = loans.Sum(l => l.Principal * l.InterestRate) / totalDebt;
+
+            var today = DateTime.Today;
+            var in30 = today.AddDays(30);
+
+            decimal interest30 = 0m;
+            foreach (var l in loans)
+                interest30 += LoanMathService.CalculateInterest(l.Principal, l.InterestRate, today, in30);
+
+            decimal totalToPayFromToday = 0m;
+
+            foreach (var vm in loans)
             {
-                var (totalDebt, _, yearlySum, maxRemainingMonths) = CalculatePortfolioStats(loans);
-
-                decimal weightedRate = 0m;
-                if (totalDebt > 0m)
-                    weightedRate = loans.Sum(l => l.Principal * l.InterestRate) / totalDebt;
-
-                var today = DateTime.Today;
-                var in30 = today.AddDays(30);
-
-                decimal interest30 = 0m;
-                foreach (var l in loans)
-                    interest30 += LoanMathService.CalculateInterest(l.Principal, l.InterestRate, today, in30);
-
-                insights.Add(new LoanInsightVm
+                if (TryGetScheduleRemainingSum(vm, out var scheduleRemaining))
                 {
-                    Label = "Średnie oprocentowanie portfela (ważone saldem)",
-                    Value = $"{weightedRate:N2} %"
-                });
+                    totalToPayFromToday += scheduleRemaining;
+                    continue;
+                }
 
-                insights.Add(new LoanInsightVm
-                {
-                    Label = "Szacowane odsetki w kolejne 30 dni",
-                    Value = $"{interest30:N2} zł"
-                });
+                int monthsLeft = GetRemainingMonths(vm);
+                if (monthsLeft <= 0)
+                    continue;
 
-                insights.Add(new LoanInsightVm
-                {
-                    Label = "Prognozowana łączna kwota rat w ciągu roku",
-                    Value = $"{yearlySum:N2} zł"
-                });
-
-                insights.Add(new LoanInsightVm
-                {
-                    Label = "Całkowity czas spłaty kredytów",
-                    Value = FormatMonths(maxRemainingMonths)
-                });
+                var monthly = LoansService.CalculateMonthlyPayment(vm.Principal, vm.InterestRate, monthsLeft);
+                totalToPayFromToday += monthly * monthsLeft;
             }
 
-            InsightsList.ItemsSource = insights;
+            SetAnalysisText(
+                $"{weightedRate:N2} %",
+                $"{interest30:N2} zł",
+                $"{totalToPayFromToday:N2} zł"
+            );
         }
 
         private void UpdateKpiTiles()
@@ -278,6 +358,77 @@ namespace Finly.Pages
 
             if (FindName("MonthlyLoansTileAmount") is TextBlock tbMonthly)
                 tbMonthly.Text = monthlySum.ToString("N2") + " zł";
+        }
+
+        private void SetAnalysisText(string a1, string a2, string a3)
+        {
+            if (FindName("Analysis1Value") is TextBlock t1) t1.Text = a1;
+            if (FindName("Analysis2Value") is TextBlock t2) t2.Text = a2;
+            if (FindName("Analysis3Value") is TextBlock t3) t3.Text = a3;
+        }
+
+        private int GetRemainingMonths(LoanCardVm vm)
+        {
+            if (vm.TermMonths <= 0)
+                return 0;
+
+            var monthsElapsed =
+                (DateTime.Today.Year - vm.StartDate.Year) * 12 +
+                (DateTime.Today.Month - vm.StartDate.Month);
+
+            return Math.Max(0, vm.TermMonths - monthsElapsed);
+        }
+
+        private bool TryGetScheduleRemainingSum(LoanCardVm vm, out decimal remainingSum)
+        {
+            remainingSum = 0m;
+
+            // Źródło prawdy: DB
+            var path = DatabaseService.GetLoanSchedulePath(vm.Id, _userId);
+            if (string.IsNullOrWhiteSpace(path))
+                return false;
+
+            if (!File.Exists(path))
+            {
+                DatabaseService.SetLoanSchedulePath(vm.Id, _userId, null);
+                DatabaseService.NotifyDataChanged();
+                _parsedSchedules.Remove(vm.Id);
+                return false;
+            }
+
+            if (!string.Equals(Path.GetExtension(path), ".csv", StringComparison.OrdinalIgnoreCase))
+                return false;
+
+            List<LoanInstallmentRow> schedule;
+
+            if (_parsedSchedules.TryGetValue(vm.Id, out var cached) && cached != null && cached.Count > 0)
+            {
+                schedule = cached;
+            }
+            else
+            {
+                try
+                {
+                    var parser = new LoanScheduleCsvParser();
+                    schedule = parser.Parse(path).ToList();
+                    _parsedSchedules[vm.Id] = schedule;
+                }
+                catch
+                {
+                    return false;
+                }
+            }
+
+            if (schedule.Count == 0)
+                return false;
+
+            var today = DateTime.Today;
+
+            remainingSum = schedule
+                .Where(r => r.Date >= today)
+                .Sum(r => r.Total);
+
+            return remainingSum > 0m;
         }
 
         // ===================== DIALOGS =====================
@@ -313,8 +464,15 @@ namespace Finly.Pages
                     if (dlg.SelectedAccountId.HasValue)
                         _loanAccounts[loan.Id] = dlg.SelectedAccountId.Value;
 
-                    if (!string.IsNullOrWhiteSpace(dlg.AttachedSchedulePath))
-                        _loanScheduleFiles[loan.Id] = dlg.AttachedSchedulePath!;
+                    // Harmonogram: kopiujemy do AppData i zapisujemy do DB
+                    if (!string.IsNullOrWhiteSpace(dlg.AttachedSchedulePath) && File.Exists(dlg.AttachedSchedulePath))
+                    {
+                        var dest = CopyLoanScheduleToAppData(loan.Id, dlg.AttachedSchedulePath!);
+                        DatabaseService.SetLoanSchedulePath(loan.Id, _userId, dest);
+                        _parsedSchedules.Remove(loan.Id);
+                    }
+
+                    DatabaseService.NotifyDataChanged();
 
                     ToastService.Success("Kredyt dodany.");
                     LoadLoans();
@@ -338,7 +496,9 @@ namespace Finly.Pages
             };
 
             _loanAccounts.TryGetValue(vm.Id, out var accId);
-            _loanScheduleFiles.TryGetValue(vm.Id, out var schedPath);
+
+            // Harmonogram pobieramy z DB
+            var schedPath = DatabaseService.GetLoanSchedulePath(vm.Id, _userId);
 
             var loanToEdit = new LoanModel
             {
@@ -375,10 +535,21 @@ namespace Finly.Pages
                     else
                         _loanAccounts.Remove(vm.Id);
 
-                    if (!string.IsNullOrWhiteSpace(dlg.AttachedSchedulePath))
-                        _loanScheduleFiles[vm.Id] = dlg.AttachedSchedulePath!;
+                    // Harmonogram
+                    if (!string.IsNullOrWhiteSpace(dlg.AttachedSchedulePath) && File.Exists(dlg.AttachedSchedulePath))
+                    {
+                        var dest = CopyLoanScheduleToAppData(vm.Id, dlg.AttachedSchedulePath!);
+                        DatabaseService.SetLoanSchedulePath(vm.Id, _userId, dest);
+                    }
                     else
-                        _loanScheduleFiles.Remove(vm.Id);
+                    {
+                        // jeśli w edycji usunięto plik / nie wybrano nic nowego, nie kasujemy automatycznie
+                        // (jeśli chcesz kasować – daj checkbox w dialogu)
+                        // DatabaseService.SetLoanSchedulePath(vm.Id, _userId, null);
+                    }
+
+                    DatabaseService.NotifyDataChanged();
+                    _parsedSchedules.Remove(vm.Id);
 
                     ToastService.Success("Kredyt zaktualizowany.");
                     LoadLoans();
@@ -476,7 +647,8 @@ namespace Finly.Pages
             if ((sender as FrameworkElement)?.Tag is not LoanCardVm vm)
                 return;
 
-            if (!_loanScheduleFiles.TryGetValue(vm.Id, out var path) || string.IsNullOrWhiteSpace(path))
+            var path = DatabaseService.GetLoanSchedulePath(vm.Id, _userId);
+            if (string.IsNullOrWhiteSpace(path))
             {
                 ToastService.Error("Nie załączyłaś jeszcze harmonogramu spłaty rat dla tego kredytu.");
                 return;
@@ -485,24 +657,39 @@ namespace Finly.Pages
             if (!File.Exists(path))
             {
                 ToastService.Error("Nie znaleziono pliku harmonogramu. Załącz go ponownie.");
-                _loanScheduleFiles.Remove(vm.Id);
+                DatabaseService.SetLoanSchedulePath(vm.Id, _userId, null);
+                DatabaseService.NotifyDataChanged();
                 _parsedSchedules.Remove(vm.Id);
+                return;
+            }
+
+            var ext = Path.GetExtension(path) ?? string.Empty;
+
+            if (string.Equals(ext, ".pdf", StringComparison.OrdinalIgnoreCase))
+            {
+                ToastService.Info("Plik PDF jest załączony, ale aktualnie obsługujemy podgląd harmonogramu tylko dla CSV.");
+                return;
+            }
+
+            if (!string.Equals(ext, ".csv", StringComparison.OrdinalIgnoreCase))
+            {
+                ToastService.Error("Nieobsługiwany format harmonogramu. Wybierz plik CSV (PDF dodamy później).");
                 return;
             }
 
             try
             {
-                if (!string.Equals(Path.GetExtension(path), ".csv", StringComparison.OrdinalIgnoreCase))
-                {
-                    ToastService.Error("Aktualnie harmonogram analizujemy tylko z CSV (PDF dodamy później).");
-                    return;
-                }
-
                 if (!_parsedSchedules.TryGetValue(vm.Id, out var rows) || rows == null || rows.Count == 0)
                 {
                     var parser = new LoanScheduleCsvParser();
                     rows = parser.Parse(path).ToList();
                     _parsedSchedules[vm.Id] = rows;
+                }
+
+                if (rows == null || rows.Count == 0)
+                {
+                    ToastService.Error("Plik CSV nie zawiera rat do wyświetlenia (brak poprawnych wierszy).");
+                    return;
                 }
 
                 var dlg = new LoanScheduleDialog(vm.Name, rows)
@@ -514,54 +701,10 @@ namespace Finly.Pages
             }
             catch (Exception ex)
             {
-                ToastService.Error("Nie udało się odczytać harmonogramu. Sprawdź format pliku CSV.");
+                ToastService.Error("Nie udało się odczytać harmonogramu: " + ex.Message);
                 System.Diagnostics.Debug.WriteLine("LoanSchedule open error: " + ex);
+                _parsedSchedules.Remove(vm.Id);
             }
-        }
-
-        private void CardAttachSchedule_Click(object sender, RoutedEventArgs e)
-        {
-            if ((sender as FrameworkElement)?.Tag is not LoanCardVm vm)
-                return;
-
-            var dlg = new Microsoft.Win32.OpenFileDialog
-            {
-                Filter = "Pliki CSV|*.csv|Pliki PDF|*.pdf|Wszystkie pliki|*.*"
-            };
-
-            var ok = dlg.ShowDialog();
-            if (ok != true) return;
-
-            var path = dlg.FileName;
-
-            _loanScheduleFiles[vm.Id] = path;
-            _parsedSchedules.Remove(vm.Id);
-
-            if (string.Equals(Path.GetExtension(path), ".csv", StringComparison.OrdinalIgnoreCase))
-            {
-                try
-                {
-                    var parser = new LoanScheduleCsvParser();
-                    var rows = parser.Parse(path).ToList();
-                    _parsedSchedules[vm.Id] = rows;
-
-                    ToastService.Success("Harmonogram spłat został załączony i odczytany.");
-
-                    LoadLoans();
-                    RefreshKpisAndLists();
-                    return;
-                }
-                catch (Exception ex)
-                {
-                    ToastService.Error("Nie udało się odczytać harmonogramu. Sprawdź format pliku CSV.");
-                    System.Diagnostics.Debug.WriteLine("LoanScheduleCsvParser error: " + ex);
-                    return;
-                }
-            }
-
-            ToastService.Success("Harmonogram spłat został załączony.");
-            LoadLoans();
-            RefreshKpisAndLists();
         }
 
         // ===================== DELETE =====================
@@ -593,12 +736,15 @@ namespace Finly.Pages
                 try
                 {
                     DatabaseService.DeleteLoan(vm.Id, _userId);
-                    ToastService.Success("Kredyt usunięty.");
 
+                    // Czyścimy powiązania/cache
+                    DatabaseService.SetLoanSchedulePath(vm.Id, _userId, null);
                     _loanAccounts.Remove(vm.Id);
-                    _loanScheduleFiles.Remove(vm.Id);
                     _parsedSchedules.Remove(vm.Id);
 
+                    DatabaseService.NotifyDataChanged();
+
+                    ToastService.Success("Kredyt usunięty.");
                     LoadLoans();
                     RefreshKpisAndLists();
                 }

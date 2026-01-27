@@ -25,6 +25,8 @@ namespace Finly.Models
         public DateTime LastSettlementDate { get; set; } = DateTime.Today;
 
         public int RemainingInstallments { get; set; } = 0;
+
+        public string? SchedulePath { get; set; }
     }
 
     public enum LoanOperationType

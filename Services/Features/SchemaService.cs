@@ -165,8 +165,10 @@ CREATE TABLE IF NOT EXISTS Loans(
     TermMonths   INTEGER NOT NULL DEFAULT 0,
     PaymentDay   INTEGER NOT NULL DEFAULT 0,
     Note         TEXT NULL,
+    SchedulePath TEXT NULL,
     FOREIGN KEY(UserId) REFERENCES Users(Id) ON DELETE CASCADE
 );
+
 
 CREATE TABLE IF NOT EXISTS Investments(
     Id            INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -315,6 +317,8 @@ CREATE TABLE IF NOT EXISTS CompanyProfiles(
                 AddColumnIfMissing(con, tx, "Loans", "TermMonths", "INTEGER", "NOT NULL DEFAULT 0");
                 AddColumnIfMissing(con, tx, "Loans", "PaymentDay", "INTEGER", "NOT NULL DEFAULT 0");
                 AddColumnIfMissing(con, tx, "Loans", "Note", "TEXT");
+                AddColumnIfMissing(con, tx, "Loans", "SchedulePath", "TEXT");
+
 
                 // Investments
                 AddColumnIfMissing(con, tx, "Investments", "Type", "INTEGER", "NOT NULL DEFAULT 0");
@@ -477,20 +481,23 @@ CREATE TABLE BankAccounts_new(
     Iban         TEXT NOT NULL,
     Currency     TEXT NOT NULL,
     Balance      NUMERIC NOT NULL DEFAULT 0,
+    SortOrder    INTEGER NOT NULL DEFAULT 0,
     LastSync     TEXT,
     FOREIGN KEY(UserId)       REFERENCES Users(Id) ON DELETE CASCADE,
     FOREIGN KEY(ConnectionId) REFERENCES BankConnections(Id) ON DELETE SET NULL
 );";
             cmd.ExecuteNonQuery();
 
-            // POPRAWKA: kopiujemy BankName wprost (bez CASE WHEN ...)
             cmd.CommandText = @"
-INSERT INTO BankAccounts_new (Id, ConnectionId, UserId, BankName, AccountName, Iban, Currency, Balance, LastSync)
+INSERT INTO BankAccounts_new (Id, ConnectionId, UserId, BankName, AccountName, Iban, Currency, Balance, SortOrder, LastSync)
 SELECT Id, ConnectionId, UserId,
        BankName,
-       AccountName, Iban, Currency, Balance, LastSync
+       AccountName, Iban, Currency, Balance,
+       COALESCE(SortOrder, 0),
+       LastSync
 FROM BankAccounts;";
             cmd.ExecuteNonQuery();
+
 
             cmd.CommandText = "DROP TABLE BankAccounts;";
             cmd.ExecuteNonQuery();
