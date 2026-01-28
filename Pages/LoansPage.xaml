@@ -140,12 +140,13 @@
                     <!-- Middle -->
                     <StackPanel Grid.Row="1" Margin="0,8,0,8">
                         <TextBlock Text="Pozostało:" Foreground="Gray" FontSize="12"/>
-                        <TextBlock Text="{Binding PrincipalStr}"
-                                   FontSize="20"
-                                   FontWeight="Bold"
-                                   Foreground="OrangeRed"/>
+						<TextBlock Text="{Binding RemainingPrincipalStr}"
+								   FontSize="20"
+								   FontWeight="Bold"
+								   Foreground="OrangeRed"/>
 
-                        <!-- Oprocentowanie + DATA kolejnej raty (bez kwoty) -->
+
+						<!-- Oprocentowanie + DATA kolejnej raty (bez kwoty) -->
                         <StackPanel Orientation="Horizontal" Margin="0,6,0,0" HorizontalAlignment="Left">
                             <TextBlock Text="Oprocentowanie:" Foreground="Gray" FontSize="11" Margin="0,0,6,0"/>
                             <TextBlock Text="{Binding InterestRate, StringFormat={}{0:N2}%}"

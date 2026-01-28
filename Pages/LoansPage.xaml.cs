@@ -89,7 +89,8 @@ namespace Finly.Pages
             // kafelek "Dodaj kredyt" ma być na końcu
             _loans.Add(new AddLoanTile());
 
-            UpdatePaidStatusForCurrentMonth(_loans);
+            UpdatePaidStatusForCurrentMonth(_loans.OfType<LoanCardVm>().ToList());
+
 
         }
 
@@ -234,26 +235,30 @@ namespace Finly.Pages
                 // 1) Skopiuj do trwałego katalogu aplikacji
                 string destPath = CopyLoanScheduleToAppData(loanId, selectedPath);
 
-                // 2) Zapisz ścieżkę w DB (jedno źródło prawdy)
+                // 2) Zapisz ścieżkę w DB (źródło prawdy)
                 DatabaseService.SetLoanSchedulePath(loanId, _userId, destPath);
 
-                // 3) Wyczyść cache parsowania (żeby nie trzymać starego)
+                // 3) Wyczyść cache parsowania
                 _parsedSchedules.Remove(loanId);
 
-                // 4) Zastosuj snapshot natychmiast dla tej karty (bez czekania)
+                // 4) NAJWAŻNIEJSZE: import do DB + sync planned Expenses
+                ImportScheduleIntoDb(loanId, destPath);
+
+                // 5) Snapshot do UI po imporcie
                 ApplyScheduleSnapshotToVm(loanVm);
 
-                // 5) Odśwież KPI/analizy
+                // 6) UI refresh
                 DatabaseService.NotifyDataChanged();
                 RefreshKpisAndLists();
 
-                ToastService.Success("Harmonogram został załączony.");
+                ToastService.Success("Harmonogram został załączony i zaimportowany.");
             }
             catch (Exception ex)
             {
                 ToastService.Error("Nie udało się załączyć harmonogramu: " + ex.Message);
             }
         }
+
 
         private static string CopyLoanScheduleToAppData(int loanId, string sourcePath)
         {
@@ -684,6 +689,8 @@ namespace Finly.Pages
                     LoadLoans();
                     ApplyScheduleSnapshotsToLoanVms();
                     RefreshKpisAndLists();
+                    SyncLoanPlannedExpenses(loan.Id);
+
                 }
                 catch (Exception ex)
                 {
@@ -756,6 +763,8 @@ namespace Finly.Pages
                     LoadLoans();
                     ApplyScheduleSnapshotsToLoanVms();
                     RefreshKpisAndLists();
+                    SyncLoanPlannedExpenses(vm.Id);
+
                 }
                 catch (Exception ex)
                 {
@@ -970,6 +979,91 @@ namespace Finly.Pages
 
             return parent as T;
         }
+
+        private void SyncLoanPlannedExpenses(int loanId)
+        {
+            // zakres: np. od dziś - 1 miesiąc (dla “bieżącego” miesiąca) do dziś + 2 lata
+            var from = DateTime.Today.AddMonths(-1);
+            var to = DateTime.Today.AddYears(2);
+
+            DatabaseService.SyncLoanInstallmentsToPlannedExpenses(_userId, loanId, from, to);
+        }
+
+        private void ImportScheduleIntoDb(int loanId, string schedulePath)
+        {
+            // 1) parsowanie
+            var parser = new LoanScheduleCsvParser();
+            var parsed = parser.Parse(schedulePath).ToList();
+
+            if (parsed.Count == 0)
+                throw new InvalidOperationException("Plik CSV nie zawiera rat do importu.");
+
+            // 2) wpis do LoanSchedules (historia importu)
+            int scheduleId = DatabaseService.InsertLoanSchedule(
+                userId: _userId,
+                loanId: loanId,
+                sourceName: Path.GetFileName(schedulePath),
+                schedulePath: schedulePath,
+                note: null
+            );
+
+            // 3) mapowanie na DB rows
+            var dbRows = parsed
+                .OrderBy(x => x.Date)
+                .Select((x, idx) => new DatabaseService.LoanInstallmentDb
+                {
+                    UserId = _userId,
+                    LoanId = loanId,
+                    ScheduleId = scheduleId,
+
+                    // KLUCZ: numer raty musi być >0 i stabilny
+                    // Jeśli parser nie dał numeru -> nadaj sekwencyjnie po dacie
+                    InstallmentNo = GetInstallmentNoOrFallback(x, idx),
+
+                    DueDate = x.Date.Date,
+                    TotalAmount = x.Total,
+
+                    PrincipalAmount = (x.Principal.HasValue && x.Principal.Value >= 0m) ? x.Principal.Value : (decimal?)null,
+                    InterestAmount = (x.Interest.HasValue && x.Interest.Value >= 0m) ? x.Interest.Value : (decimal?)null,
+                    RemainingBalance = (x.Remaining.HasValue && x.Remaining.Value >= 0m) ? x.Remaining.Value : (decimal?)null,
+
+                    Status = 0
+                })
+                .ToList();
+
+            // 4) UPSERT do LoanInstallments
+            DatabaseService.UpsertLoanInstallments_MergeByNo(
+                userId: _userId,
+                loanId: loanId,
+                scheduleId: scheduleId,
+                rows: dbRows
+            );
+
+            // 5) sync rat -> planned Expenses
+            // (od dziś-1m do dziś+2l jak u Ciebie)
+            var from = DateTime.Today.AddMonths(-1);
+            var to = DateTime.Today.AddYears(2);
+            DatabaseService.SyncLoanInstallmentsToPlannedExpenses(_userId, loanId, from, to);
+        }
+
+        private static int GetInstallmentNoOrFallback(LoanInstallmentRow row, int indexOrderedByDate)
+        {
+            // Jeśli LoanInstallmentRow ma InstallmentNo (prop) — użyj go.
+            // Jeśli nie ma / 0 / null — nadaj kolejno: 1..N
+            try
+            {
+                var prop = typeof(LoanInstallmentRow).GetProperty("InstallmentNo");
+                if (prop != null)
+                {
+                    var val = prop.GetValue(row);
+                    if (val is int n && n > 0) return n;
+                }
+            }
+            catch { }
+
+            return indexOrderedByDate + 1;
+        }
+
 
         private static T? FindDescendantByName<T>(DependencyObject? start, string name) where T : FrameworkElement
         {

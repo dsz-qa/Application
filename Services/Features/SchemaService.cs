@@ -417,12 +417,18 @@ CREATE INDEX IF NOT EXISTS IX_Expenses_User_Account
 CREATE INDEX IF NOT EXISTS IX_Expenses_User_PaymentKind
     ON Expenses(UserId, PaymentKind);
 
-
 CREATE INDEX IF NOT EXISTS IX_Expenses_User_Loan
     ON Expenses(UserId, LoanId);
 
-CREATE UNIQUE INDEX IF NOT EXISTS UX_Expenses_User_LoanInstallment
-    ON Expenses(UserId, LoanInstallmentId);
+-- unikalność mapowania raty -> planned expense (dla sync)
+CREATE UNIQUE INDEX IF NOT EXISTS IX_Expenses_UserId_LoanInstallmentId
+    ON Expenses(UserId, LoanInstallmentId)
+    WHERE LoanInstallmentId IS NOT NULL;
+
+-- przyspieszenie kasowania/szukania
+CREATE INDEX IF NOT EXISTS IX_Expenses_UserId_LoanId_Date
+    ON Expenses(UserId, LoanId, Date);
+
 
 CREATE INDEX IF NOT EXISTS IX_Incomes_User_Date
     ON Incomes(UserId, Date);

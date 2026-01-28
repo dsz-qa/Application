@@ -465,8 +465,6 @@ namespace Finly.ViewModels
             if (trDt != null)
                 foreach (DataRow r in trDt.Rows) AddTransferRow(r);
 
-            // ✅ RATY KREDYTÓW (Planowane) – TU MUSI BYĆ, NIE W CardVm
-            try { AddPlannedLoanInstallments(); } catch { }
 
             SplitTransactionsIntoPrimaryCollections();
             ApplyFilters();
@@ -789,93 +787,7 @@ namespace Finly.ViewModels
             });
         }
 
-        // ✅ RATY KREDYTÓW – przeniesione w poprawne miejsce (VM)
-        private void AddPlannedLoanInstallments()
-        {
-            using var c = DatabaseService.GetConnection();
-            DatabaseService.EnsureTables();
 
-            using var cmd = c.CreateCommand();
-            cmd.CommandText = @"
-SELECT
-    li.Id,
-    li.DueDate,
-    li.TotalAmount,
-    li.InstallmentNo,
-    li.PaymentKind,
-    li.PaymentRefId,
-    l.Name,
-    l.PaymentKind  AS LoanPaymentKind,
-    l.PaymentRefId AS LoanPaymentRefId
-FROM LoanInstallments li
-JOIN Loans l ON l.Id = li.LoanId
-WHERE li.UserId = @u
-  AND COALESCE(li.Status,0) = 0;
-";
-            cmd.Parameters.AddWithValue("@u", UserId);
-
-            using var r = cmd.ExecuteReader();
-            while (r.Read())
-            {
-                var instId = r.IsDBNull(0) ? 0 : r.GetInt32(0);
-                var dueTxt = r.IsDBNull(1) ? "" : (r.GetValue(1)?.ToString() ?? "");
-                var total = r.IsDBNull(2) ? 0m : Convert.ToDecimal(r.GetValue(2));
-                var no = r.IsDBNull(3) ? 0 : Convert.ToInt32(r.GetValue(3));
-
-                int pk = r.IsDBNull(4) ? 0 : Convert.ToInt32(r.GetValue(4));
-                int? pr = r.IsDBNull(5) ? (int?)null : Convert.ToInt32(r.GetValue(5));
-
-                var loanName = r.IsDBNull(6) ? "Kredyt" : (r.GetString(6) ?? "Kredyt");
-
-                int loanPk = r.IsDBNull(7) ? 0 : Convert.ToInt32(r.GetValue(7));
-                int? loanPr = r.IsDBNull(8) ? (int?)null : Convert.ToInt32(r.GetValue(8));
-
-                DateTime due =
-                    DateTime.TryParseExact(dueTxt, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var d1) ? d1 :
-                    (DateTime.TryParse(dueTxt, CultureInfo.InvariantCulture, DateTimeStyles.None, out var d2) ? d2 :
-                     (DateTime.TryParse(dueTxt, CultureInfo.CurrentCulture, DateTimeStyles.None, out var d3) ? d3 : DateTime.MinValue));
-
-                if (due == DateTime.MinValue) continue;
-
-                // Konto płatności: najpierw z raty, jak brak to z loan
-                if (pk == 0 && pr == null && (loanPk != 0 || loanPr != null))
-                {
-                    pk = loanPk;
-                    pr = loanPr;
-                }
-
-                var fromName = ResolvePaymentDisplay(pk, pr, fallbackAccountId: null);
-
-                // Unikalne Id (nie zderza się z Expenses/Incomes/Transfers)
-                var pseudoId = -1000000000 - instId;
-
-                AllTransactions.Add(new TransactionCardVm
-                {
-                    Id = pseudoId,
-                    Kind = TransactionKind.Expense,
-                    CategoryName = "Kredyt",
-                    Description = $"Rata kredytu: {loanName}" + (no > 0 ? $" (#{no})" : ""),
-                    DateDisplay = ToUiDate(due),
-                    AmountStr = total.ToString("N2") + " zł",
-
-                    IsPlanned = true,
-                    IsFuture = due.Date > DateTime.Today,
-
-                    AccountName = fromName,
-                    FromAccountName = fromName,
-                    ToAccountName = null,
-
-                    PaymentKind = pk,
-                    PaymentRefId = pr,
-
-                    SelectedCategory = "Kredyt",
-                    EditDescription = $"Rata kredytu: {loanName}",
-                    EditDate = due,
-
-                    IsReadOnly = true
-                });
-            }
-        }
 
         // ------------------ FILTERS ------------------
 

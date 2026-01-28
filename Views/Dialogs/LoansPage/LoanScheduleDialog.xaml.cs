@@ -5,6 +5,7 @@ using System.Linq;
 using System.Windows;
 using System.Windows.Input;
 using Finly.Models;
+using Finly.Services.Features;
 
 namespace Finly.Views.Dialogs
 {
@@ -22,7 +23,14 @@ namespace Finly.Views.Dialogs
             public string Remaining { get; init; } = "—";
         }
 
+        // ✅ kompatybilność: stary konstruktor działa jak wcześniej
         public LoanScheduleDialog(string loanName, IReadOnlyList<LoanInstallmentRow> rows)
+            : this(loanName, rows, userId: null, loanId: null)
+        {
+        }
+
+        // ✅ nowy konstruktor: opcjonalnie pokazuje validator z DB (planned/paid)
+        public LoanScheduleDialog(string loanName, IReadOnlyList<LoanInstallmentRow> rows, int? userId, int? loanId)
         {
             InitializeComponent();
 
@@ -43,7 +51,7 @@ namespace Finly.Views.Dialogs
             // ===== Podsumowania =====
             SubText.Text = $"Liczba rat w harmonogramie: {list.Count}.";
 
-            var remainingRows = list.Where(r => r.Date >= today).OrderBy(r => r.Date).ToList();
+            var remainingRows = list.Where(r => r.Date >= today).ToList();
             int remainingCount = remainingRows.Count;
 
             DateTime? payoffDate = list.Count > 0 ? list.Max(r => r.Date) : (DateTime?)null;
@@ -51,11 +59,29 @@ namespace Finly.Views.Dialogs
             decimal paidSoFar = list.Where(r => r.Date < today).Sum(r => r.Total);
             decimal remainingSum = remainingRows.Sum(r => r.Total);
 
+            // ✅ VALIDATOR: planned/paid z tabeli LoanInstallments (DEV helper)
+            string validator = "";
+            if (userId.HasValue && loanId.HasValue && userId.Value > 0 && loanId.Value > 0)
+            {
+                try
+                {
+                    var (planned, paid) = DatabaseService.GetLoanInstallmentsStatusCounts(userId.Value, loanId.Value);
+                    validator = $"  •  [DB] Planned: {planned}, Paid: {paid}";
+                    System.Diagnostics.Debug.WriteLine($"Installments (LoanId={loanId}): planned={planned}, paid={paid}");
+                }
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Debug.WriteLine("Validator read failed: " + ex);
+                    // nie psujemy UI – validator jest tylko pomocniczy
+                }
+            }
+
             SummaryText.Text =
                 $"Liczba rat pozostałych: {remainingCount}  •  " +
                 $"Termin spłacenia kredytu: {(payoffDate is null ? "—" : payoffDate.Value.ToString("dd.MM.yyyy"))}  •  " +
                 $"Spłacono do dziś (kapitał+odsetki): {paidSoFar.ToString("N2", Pl)} zł  •  " +
-                $"Pozostało do spłaty: {remainingSum.ToString("N2", Pl)} zł";
+                $"Pozostało do spłaty: {remainingSum.ToString("N2", Pl)} zł" +
+                validator;
 
             // ===== MiniTable =====
             RowsMiniTable.ItemsSource = list.Select(r => new RowVm

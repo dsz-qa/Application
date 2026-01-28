@@ -285,8 +285,6 @@ namespace Finly.Services
 
         private static IEnumerable<string> ReadCsvRecords(string text)
         {
-            // Zwraca "linie" CSV, respektuje \r\n/\n/\r oraz cudzysłowy.
-            // WAŻNE: nie wolno unescape'ować "" tutaj, bo SplitCsvRecord to obsługuje.
             var sb = new StringBuilder();
             bool inQuotes = false;
 
@@ -296,23 +294,23 @@ namespace Finly.Services
 
                 if (ch == '"')
                 {
-                    // "" => zostawiamy jako dwa znaki cudzysłowu w rekordzie
-                    // żeby SplitCsvRecord mógł poprawnie zrobić sb.Append('"') i pominąć drugi.
+                    // "" wewnątrz cudzysłowu = literalny "
                     if (inQuotes && i + 1 < text.Length && text[i + 1] == '"')
                     {
-                        sb.Append("\"\""); // DWA znaki
+                        sb.Append("\"\""); // zachowujemy jako 2 znaki, SplitCsvRecord zrobi z tego 1 znak
                         i++;
                         continue;
                     }
 
                     inQuotes = !inQuotes;
-                    sb.Append('"'); // zachowujemy znak w rekordzie
+                    sb.Append('"'); // zachowujemy cudzysłowy w rekordzie
                     continue;
                 }
 
                 if (!inQuotes && (ch == '\n' || ch == '\r'))
                 {
-                    if (ch == '\r' && i + 1 < text.Length && text[i + 1] == '\n') i++;
+                    if (ch == '\r' && i + 1 < text.Length && text[i + 1] == '\n')
+                        i++;
 
                     var rec = sb.ToString().Trim();
                     sb.Clear();
@@ -330,6 +328,7 @@ namespace Finly.Services
             if (!string.IsNullOrWhiteSpace(last))
                 yield return last;
         }
+
 
 
         private static char DetectDelimiter(List<string> sampleRecords)

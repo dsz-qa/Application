@@ -1,10 +1,11 @@
 ﻿using System;
+using Microsoft.Data.Sqlite;
 
 namespace Finly.Services.Features
 {
     /// <summary>
     /// FASADA dla UI – jedno miejsce do operacji na transakcjach/saldach.
-    /// UI nie powinno wołać DatabaseService do zmiany sald.
+    /// UI nie powinno wołać DatabaseService do zmiany sald (poza SET-ami startowymi).
     /// </summary>
     public static class TransactionsFacadeService
     {
@@ -28,7 +29,7 @@ namespace Finly.Services.Features
 INSERT INTO CashOnHand(UserId, Amount, UpdatedAt)
 VALUES (@u, @a, CURRENT_TIMESTAMP)
 ON CONFLICT(UserId) DO UPDATE
-SET Amount   = excluded.Amount,
+SET Amount    = excluded.Amount,
     UpdatedAt = CURRENT_TIMESTAMP;";
             cmd.Parameters.AddWithValue("@u", userId);
             cmd.Parameters.AddWithValue("@a", amount);
@@ -54,7 +55,7 @@ SET Amount   = excluded.Amount,
 INSERT INTO SavedCash(UserId, Amount, UpdatedAt)
 VALUES (@u, @a, CURRENT_TIMESTAMP)
 ON CONFLICT(UserId) DO UPDATE
-SET Amount   = excluded.Amount,
+SET Amount    = excluded.Amount,
     UpdatedAt = CURRENT_TIMESTAMP;";
             cmd.Parameters.AddWithValue("@u", userId);
             cmd.Parameters.AddWithValue("@a", amount);
@@ -74,17 +75,16 @@ SET Amount   = excluded.Amount,
         //  Delete (jedyny punkt)
         // =========================
 
-        // Bezpieczne API (docelowe): UI przekazuje typ.
         public static void DeleteTransaction(LedgerService.TransactionSource src, int id)
             => LedgerService.DeleteTransactionAndRevertBalance(src, id);
 
-        // Kompatybilne (awaryjne): heurystyka (transfer -> expense -> income).
         public static void DeleteTransaction(int id)
             => LedgerService.DeleteTransactionAndRevertBalance(id);
 
         // =========================
         //  Wydatki – UI -> Ledger
         // =========================
+
         public static void SpendFromFreeCash(int userId, decimal amount)
             => LedgerService.SpendFromFreeCash(userId, amount);
 
@@ -132,7 +132,7 @@ SET Amount   = excluded.Amount,
             => LedgerService.TransferEnvelopeToEnvelope(userId, fromEnvelopeId, toEnvelopeId, amount, date, desc);
 
         // =========================
-        //  Kombinacje „czytelne” (atomowo: 1 transfer Any)
+        //  Planned date update (UI)
         // =========================
 
         public static void UpdatePlannedTransactionDate(LedgerService.TransactionSource src, int userId, int id, DateTime newDate)
@@ -155,6 +155,50 @@ SET Amount   = excluded.Amount,
                     throw new InvalidOperationException("Nieobsługiwany typ transakcji.");
             }
         }
+
+        // =========================
+        //  Raty kredytów
+        // =========================
+
+        /// <summary>
+        /// Realizuje planned Expense (np. rata kredytu): planned -> realized i oznacza ratę jako Paid.
+        /// Bezpiecznie: nie wywracamy appki, nie zakładamy istnienia metod w LedgerService które mogą nie istnieć.
+        /// </summary>
+        public static void SpendPlannedExpense(int userId, int expenseId, DateTime realizedDate)
+        {
+            if (userId <= 0) return;
+            if (expenseId <= 0) return;
+
+            var exp = DatabaseService.GetExpenseById(userId, expenseId);
+            if (exp == null) return;
+
+            if (!exp.IsPlanned)
+                return;
+
+            exp.IsPlanned = false;
+            exp.Date = realizedDate;
+
+            // Stabilnie: zapis przez DatabaseService (zależnie od Twojego projektu)
+            DatabaseService.UpdateExpense(exp);
+
+            // HOOK: oznacz ratę jako PAID
+            if (exp.LoanInstallmentId.HasValue && exp.LoanInstallmentId.Value > 0)
+            {
+                DatabaseService.MarkLoanInstallmentAsPaidFromExpense(
+                    userId: exp.UserId,
+                    loanInstallmentId: exp.LoanInstallmentId.Value,
+                    paidAt: exp.Date,
+                    paymentKind: (int)exp.PaymentKind,
+                    paymentRefId: exp.PaymentRefId
+                );
+            }
+
+            DatabaseService.NotifyDataChanged();
+        }
+
+        // =========================
+        //  Extra kombinacje Any
+        // =========================
 
         public static int TransferBankToFreeCash(int userId, int accountId, decimal amount, DateTime? date = null, string? desc = null)
             => LedgerService.TransferAny(
@@ -185,9 +229,6 @@ SET Amount   = excluded.Amount,
                 isPlanned: false);
 
         public static void DeleteIncome(int incomeId)
-        {
-            LedgerService.DeleteIncome(incomeId);
-        }
-
+            => LedgerService.DeleteIncome(incomeId);
     }
 }
