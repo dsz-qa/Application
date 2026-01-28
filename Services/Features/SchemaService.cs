@@ -7,8 +7,15 @@ namespace Finly.Services.Features
     /// Jedyny właściciel schematu SQLite:
     /// - CREATE TABLE (idempotentnie)
     /// - migracje kolumn (ALTER TABLE ... ADD COLUMN)
-    /// - przebudowy tabel, gdy wymagane (np. FK)
+    /// - przebudowy tabel, gdy wymagane (np. FK / NULLability)
     /// - indeksy
+    ///
+    /// WAŻNE (SQLite): ALTER TABLE ADD COLUMN nie pozwala na DEFAULT będący wyrażeniem
+    /// (np. CURRENT_TIMESTAMP, date('now')). To powodowało błąd startu aplikacji.
+    /// Ten plik robi teraz migracje takich kolumn w trybie:
+    ///  - ADD COLUMN bez DEFAULT i bez NOT NULL
+    ///  - backfill UPDATE dla istniejących rekordów
+    ///  - (opcjonalna przebudowa tabeli to osobny temat; tu nie jest wymagana do stabilnego działania)
     /// </summary>
     public static class SchemaService
     {
@@ -20,11 +27,13 @@ namespace Finly.Services.Features
 
             lock (_schemaLock)
             {
+                // PRAGMA przed transakcją
                 using (var p = con.CreateCommand())
                 {
-                    p.CommandText = @"PRAGMA foreign_keys = ON;
-                                      PRAGMA busy_timeout = 5000;
-                                      PRAGMA journal_mode = WAL;";
+                    p.CommandText = @"
+PRAGMA foreign_keys = ON;
+PRAGMA busy_timeout = 5000;
+PRAGMA journal_mode = WAL;";
                     p.ExecuteNonQuery();
                 }
 
@@ -39,6 +48,7 @@ namespace Finly.Services.Features
                 }
 
                 // ===== 1) CREATE TABLE (idempotentnie) =====
+                // Definicje CREATE są “pełne”, żeby świeża baza nie wymagała migracji/backfilli.
                 using (var cmd = Cmd(@"
 CREATE TABLE IF NOT EXISTS Users(
     Id                      INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -68,6 +78,12 @@ CREATE TABLE IF NOT EXISTS Budgets (
     EndDate       TEXT    NOT NULL,
     PlannedAmount REAL    NOT NULL,
     IsDeleted     INTEGER NOT NULL DEFAULT 0,
+
+    OverState     INTEGER NOT NULL DEFAULT 0,
+    OverNotifiedAt TEXT NULL,
+
+    CategoryId    INTEGER NULL,
+
     FOREIGN KEY(UserId) REFERENCES Users(Id) ON DELETE CASCADE
 );
 
@@ -102,56 +118,71 @@ CREATE TABLE IF NOT EXISTS BankAccounts(
     Iban         TEXT NOT NULL,
     Currency     TEXT NOT NULL,
     Balance      NUMERIC NOT NULL DEFAULT 0,
+    SortOrder    INTEGER NOT NULL DEFAULT 0,
     LastSync     TEXT,
     FOREIGN KEY(UserId)       REFERENCES Users(Id) ON DELETE CASCADE,
     FOREIGN KEY(ConnectionId) REFERENCES BankConnections(Id) ON DELETE SET NULL
 );
 
--- Incomes: planned + stabilne księgowanie (PaymentKind/PaymentRefId)
-CREATE TABLE IF NOT EXISTS Incomes(
-    Id INTEGER PRIMARY KEY AUTOINCREMENT,
-    UserId INTEGER NOT NULL,
-    Amount REAL NOT NULL,
-    Date TEXT NOT NULL,
-    Description TEXT NULL,
-    Source TEXT NULL,
-    CategoryId INTEGER NULL,
-    IsPlanned INTEGER NOT NULL DEFAULT 0,
-    BudgetId INTEGER NULL,
-    PaymentKind  INTEGER NOT NULL DEFAULT 0,
-    PaymentRefId INTEGER NULL,
+CREATE TABLE IF NOT EXISTS AppSettings(
+    Id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    UserId      INTEGER NOT NULL,
+    Key         TEXT    NOT NULL,
+    Value       TEXT    NULL,
+    UpdatedAt   TEXT    NOT NULL DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY(UserId) REFERENCES Users(Id) ON DELETE CASCADE
 );
 
--- Expenses: planned + stabilne księgowanie (PaymentKind/PaymentRefId)
-CREATE TABLE IF NOT EXISTS Expenses(
-    Id           INTEGER PRIMARY KEY AUTOINCREMENT,
-    UserId       INTEGER NOT NULL,
-    Date         TEXT    NOT NULL,
-    Amount       REAL    NOT NULL,
-    Title        TEXT    NULL,
-    Description  TEXT    NULL,
-    CategoryId   INTEGER NULL,
-    AccountId    INTEGER NULL,
-    BudgetId     INTEGER NULL,
-    Note         TEXT    NULL,
-    IsPlanned    INTEGER NOT NULL DEFAULT 0,
+CREATE TABLE IF NOT EXISTS Incomes(
+    Id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    UserId      INTEGER NOT NULL,
+    Amount      REAL NOT NULL,
+    Date        TEXT NOT NULL,
+    Description TEXT NULL,
+    Source      TEXT NULL,
+    CategoryId  INTEGER NULL,
+    IsPlanned   INTEGER NOT NULL DEFAULT 0,
+    BudgetId    INTEGER NULL,
+
     PaymentKind  INTEGER NOT NULL DEFAULT 0,
     PaymentRefId INTEGER NULL,
+
+    FOREIGN KEY(UserId) REFERENCES Users(Id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS Expenses(
+    Id            INTEGER PRIMARY KEY AUTOINCREMENT,
+    UserId        INTEGER NOT NULL,
+    Date          TEXT    NOT NULL,
+    Amount        REAL    NOT NULL,
+    Title         TEXT    NULL,
+    Description   TEXT    NULL,
+    CategoryId    INTEGER NULL,
+    AccountId     INTEGER NULL,
+    BudgetId      INTEGER NULL,
+    Note          TEXT    NULL,
+    IsPlanned     INTEGER NOT NULL DEFAULT 0,
+
+    PaymentKind   INTEGER NOT NULL DEFAULT 0,
+    PaymentRefId  INTEGER NULL,
+
+    LoanId            INTEGER NULL,
+    LoanInstallmentId INTEGER NULL,
+
     FOREIGN KEY(UserId) REFERENCES Users(Id) ON DELETE CASCADE
 );
 
 CREATE TABLE IF NOT EXISTS Transfers(
-    Id         INTEGER PRIMARY KEY AUTOINCREMENT,
-    UserId     INTEGER NOT NULL,
-    Amount     NUMERIC NOT NULL,
-    Date       TEXT NOT NULL,
+    Id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    UserId      INTEGER NOT NULL,
+    Amount      NUMERIC NOT NULL,
+    Date        TEXT NOT NULL,
     Description TEXT NULL,
-    FromKind   TEXT NOT NULL,
-    FromRefId  INTEGER NULL,
-    ToKind     TEXT NOT NULL,
-    ToRefId    INTEGER NULL,
-    IsPlanned  INTEGER NOT NULL DEFAULT 0,
+    FromKind    TEXT NOT NULL,
+    FromRefId   INTEGER NULL,
+    ToKind      TEXT NOT NULL,
+    ToRefId     INTEGER NULL,
+    IsPlanned   INTEGER NOT NULL DEFAULT 0,
     FOREIGN KEY(UserId) REFERENCES Users(Id) ON DELETE CASCADE
 );
 
@@ -161,54 +192,54 @@ CREATE TABLE IF NOT EXISTS Loans(
     Name         TEXT NOT NULL,
     Principal    NUMERIC NOT NULL DEFAULT 0,
     InterestRate NUMERIC NOT NULL DEFAULT 0,
-    StartDate    TEXT NOT NULL,
+    StartDate    TEXT NOT NULL DEFAULT (date('now')),
     TermMonths   INTEGER NOT NULL DEFAULT 0,
     PaymentDay   INTEGER NOT NULL DEFAULT 0,
     Note         TEXT NULL,
+
     SchedulePath TEXT NULL,
+
     PaymentKind  INTEGER NOT NULL DEFAULT 0,
     PaymentRefId INTEGER NULL,
+
     FOREIGN KEY(UserId) REFERENCES Users(Id) ON DELETE CASCADE
 );
 
-
 CREATE TABLE IF NOT EXISTS LoanSchedules(
-    Id          INTEGER PRIMARY KEY AUTOINCREMENT,
-    UserId      INTEGER NOT NULL,
-    LoanId      INTEGER NOT NULL,
-    ImportedAt  TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    SourceName  TEXT NULL,
+    Id           INTEGER PRIMARY KEY AUTOINCREMENT,
+    UserId       INTEGER NOT NULL,
+    LoanId       INTEGER NOT NULL,
+    ImportedAt   TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    SourceName   TEXT NULL,
     SchedulePath TEXT NULL,
-    Note        TEXT NULL,
+    Note         TEXT NULL,
     FOREIGN KEY(UserId) REFERENCES Users(Id) ON DELETE CASCADE,
     FOREIGN KEY(LoanId) REFERENCES Loans(Id) ON DELETE CASCADE
 );
 
 CREATE TABLE IF NOT EXISTS LoanInstallments(
-    Id              INTEGER PRIMARY KEY AUTOINCREMENT,
-    UserId          INTEGER NOT NULL,
-    LoanId          INTEGER NOT NULL,
-    ScheduleId      INTEGER NOT NULL,
-    InstallmentNo   INTEGER NOT NULL,
-    DueDate         TEXT NOT NULL,
-    TotalAmount     NUMERIC NOT NULL DEFAULT 0,
+    Id               INTEGER PRIMARY KEY AUTOINCREMENT,
+    UserId           INTEGER NOT NULL,
+    LoanId           INTEGER NOT NULL,
+    ScheduleId       INTEGER NOT NULL,
+    InstallmentNo    INTEGER NOT NULL,
+    DueDate          TEXT NOT NULL,
+    TotalAmount      NUMERIC NOT NULL DEFAULT 0,
 
-    PrincipalAmount NUMERIC NULL,
-    InterestAmount  NUMERIC NULL,
+    PrincipalAmount  NUMERIC NULL,
+    InterestAmount   NUMERIC NULL,
     RemainingBalance NUMERIC NULL,
 
-    Status          INTEGER NOT NULL DEFAULT 0, -- 0 Planned, 1 Paid, 2 Cancelled/Replaced
-    PaidAt          TEXT NULL,
+    Status           INTEGER NOT NULL DEFAULT 0,
+    PaidAt           TEXT NULL,
 
-    PaymentKind     INTEGER NOT NULL DEFAULT 0,
-    PaymentRefId    INTEGER NULL,
+    PaymentKind      INTEGER NOT NULL DEFAULT 0,
+    PaymentRefId     INTEGER NULL,
 
     FOREIGN KEY(UserId) REFERENCES Users(Id) ON DELETE CASCADE,
     FOREIGN KEY(LoanId) REFERENCES Loans(Id) ON DELETE CASCADE,
     FOREIGN KEY(ScheduleId) REFERENCES LoanSchedules(Id) ON DELETE CASCADE
 );
-
-
 
 CREATE TABLE IF NOT EXISTS Investments(
     Id            INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -222,7 +253,6 @@ CREATE TABLE IF NOT EXISTS Investments(
     FOREIGN KEY(UserId) REFERENCES Users(Id) ON DELETE CASCADE
 );
 
--- BRAKOWAŁO: wyceny inwestycji (używane w DatabaseService)
 CREATE TABLE IF NOT EXISTS InvestmentValuations(
     Id           INTEGER PRIMARY KEY AUTOINCREMENT,
     UserId       INTEGER NOT NULL,
@@ -235,15 +265,17 @@ CREATE TABLE IF NOT EXISTS InvestmentValuations(
 );
 
 CREATE TABLE IF NOT EXISTS Envelopes(
-    Id         INTEGER PRIMARY KEY AUTOINCREMENT,
-    UserId     INTEGER NOT NULL,
-    Name       TEXT    NOT NULL,
-    Target     NUMERIC NOT NULL DEFAULT 0,
-    Allocated  NUMERIC NOT NULL DEFAULT 0,
-    Note       TEXT    NULL,
-    SortOrder INTEGER NULL,
+    Id            INTEGER PRIMARY KEY AUTOINCREMENT,
+    UserId        INTEGER NOT NULL,
+    Name          TEXT    NOT NULL,
+    Target        NUMERIC NOT NULL DEFAULT 0,
+    Allocated     NUMERIC NOT NULL DEFAULT 0,
+    Note          TEXT    NULL,
+    SortOrder     INTEGER NULL,
     GoalSortOrder INTEGER NULL,
-    CreatedAt  TEXT    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    Deadline      TEXT NULL,
+    GoalText      TEXT NULL,
+    CreatedAt     TEXT    NOT NULL DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY(UserId) REFERENCES Users(Id) ON DELETE CASCADE
 );
 
@@ -290,6 +322,7 @@ CREATE TABLE IF NOT EXISTS CompanyProfiles(
                 }
 
                 // ===== 2) Migracje kolumn (idempotentne) =====
+                // Uwaga: tu NIE WOLNO używać DEFAULT z wyrażeniem w ALTER TABLE ADD COLUMN.
 
                 // Users
                 AddColumnIfMissing(con, tx, "Users", "Email", "TEXT");
@@ -306,11 +339,9 @@ CREATE TABLE IF NOT EXISTS CompanyProfiles(
                 AddColumnIfMissing(con, tx, "Users", "IsOnboarded", "INTEGER", "NOT NULL DEFAULT 0");
                 AddColumnIfMissing(con, tx, "Users", "HasSeenEnvelopesIntro", "INTEGER", "NOT NULL DEFAULT 0");
 
-                // Budgets (UI: alerty/over)
+                // Budgets
                 AddColumnIfMissing(con, tx, "Budgets", "OverState", "INTEGER", "NOT NULL DEFAULT 0");
                 AddColumnIfMissing(con, tx, "Budgets", "OverNotifiedAt", "TEXT");
-
-                // NOWE (wariant B): Budgets -> Categories
                 AddColumnIfMissing(con, tx, "Budgets", "CategoryId", "INTEGER");
 
                 // Categories
@@ -320,13 +351,9 @@ CREATE TABLE IF NOT EXISTS CompanyProfiles(
                 AddColumnIfMissing(con, tx, "Categories", "Description", "TEXT");
                 AddColumnIfMissing(con, tx, "Categories", "IsArchived", "INTEGER", "NOT NULL DEFAULT 0");
 
-                // BankAccounts (UI używa BankName)
-                // BankAccounts (UI używa BankName)
+                // BankAccounts
                 AddColumnIfMissing(con, tx, "BankAccounts", "BankName", "TEXT");
-
-                // NOWE: SortOrder do ręcznego sortowania kafelków kont
                 AddColumnIfMissing(con, tx, "BankAccounts", "SortOrder", "INTEGER", "NOT NULL DEFAULT 0");
-
 
                 // Incomes
                 AddColumnIfMissing(con, tx, "Incomes", "Description", "TEXT");
@@ -334,8 +361,6 @@ CREATE TABLE IF NOT EXISTS CompanyProfiles(
                 AddColumnIfMissing(con, tx, "Incomes", "CategoryId", "INTEGER");
                 AddColumnIfMissing(con, tx, "Incomes", "IsPlanned", "INTEGER", "NOT NULL DEFAULT 0");
                 AddColumnIfMissing(con, tx, "Incomes", "BudgetId", "INTEGER");
-
-                // NOWE: stabilne księgowanie przychodów
                 AddColumnIfMissing(con, tx, "Incomes", "PaymentKind", "INTEGER", "NOT NULL DEFAULT 0");
                 AddColumnIfMissing(con, tx, "Incomes", "PaymentRefId", "INTEGER");
 
@@ -349,11 +374,10 @@ CREATE TABLE IF NOT EXISTS CompanyProfiles(
                 AddColumnIfMissing(con, tx, "Expenses", "IsPlanned", "INTEGER", "NOT NULL DEFAULT 0");
                 AddColumnIfMissing(con, tx, "Expenses", "PaymentKind", "INTEGER", "NOT NULL DEFAULT 0");
                 AddColumnIfMissing(con, tx, "Expenses", "PaymentRefId", "INTEGER");
-                // Expenses – powiązanie z ratami kredytu (planned)
                 AddColumnIfMissing(con, tx, "Expenses", "LoanId", "INTEGER");
                 AddColumnIfMissing(con, tx, "Expenses", "LoanInstallmentId", "INTEGER");
 
-                // Loans
+                // Loans (tu był killer: DEFAULT (date('now')))
                 AddColumnIfMissing(con, tx, "Loans", "Principal", "NUMERIC", "NOT NULL DEFAULT 0");
                 AddColumnIfMissing(con, tx, "Loans", "InterestRate", "NUMERIC", "NOT NULL DEFAULT 0");
                 AddColumnIfMissing(con, tx, "Loans", "StartDate", "TEXT", "NOT NULL DEFAULT (date('now'))");
@@ -364,7 +388,6 @@ CREATE TABLE IF NOT EXISTS CompanyProfiles(
                 AddColumnIfMissing(con, tx, "Loans", "PaymentKind", "INTEGER", "NOT NULL DEFAULT 0");
                 AddColumnIfMissing(con, tx, "Loans", "PaymentRefId", "INTEGER");
 
-
                 // Investments
                 AddColumnIfMissing(con, tx, "Investments", "Type", "INTEGER", "NOT NULL DEFAULT 0");
                 AddColumnIfMissing(con, tx, "Investments", "TargetAmount", "NUMERIC", "NOT NULL DEFAULT 0");
@@ -372,19 +395,58 @@ CREATE TABLE IF NOT EXISTS CompanyProfiles(
                 AddColumnIfMissing(con, tx, "Investments", "TargetDate", "TEXT");
                 AddColumnIfMissing(con, tx, "Investments", "Description", "TEXT");
 
-                // Envelopes – brakujące kolumny używane w kodzie
+                // InvestmentValuations (Date default też bywa problematyczny)
+                AddColumnIfMissing(con, tx, "InvestmentValuations", "UserId", "INTEGER", "NOT NULL DEFAULT 0");
+                AddColumnIfMissing(con, tx, "InvestmentValuations", "InvestmentId", "INTEGER", "NOT NULL DEFAULT 0");
+                AddColumnIfMissing(con, tx, "InvestmentValuations", "Date", "TEXT", "NOT NULL DEFAULT (date('now'))");
+                AddColumnIfMissing(con, tx, "InvestmentValuations", "Value", "NUMERIC", "NOT NULL DEFAULT 0");
+                AddColumnIfMissing(con, tx, "InvestmentValuations", "Note", "TEXT");
+
+                // Envelopes
                 AddColumnIfMissing(con, tx, "Envelopes", "Deadline", "TEXT");
                 AddColumnIfMissing(con, tx, "Envelopes", "GoalText", "TEXT");
                 AddColumnIfMissing(con, tx, "Envelopes", "GoalSortOrder", "INTEGER");
                 AddColumnIfMissing(con, tx, "Envelopes", "SortOrder", "INTEGER");
 
+                // LoanSchedules (ImportedAt default CURRENT_TIMESTAMP)
+                AddColumnIfMissing(con, tx, "LoanSchedules", "UserId", "INTEGER", "NOT NULL DEFAULT 0");
+                AddColumnIfMissing(con, tx, "LoanSchedules", "LoanId", "INTEGER", "NOT NULL DEFAULT 0");
+                AddColumnIfMissing(con, tx, "LoanSchedules", "ImportedAt", "TEXT", "NOT NULL DEFAULT CURRENT_TIMESTAMP");
+                AddColumnIfMissing(con, tx, "LoanSchedules", "SourceName", "TEXT");
+                AddColumnIfMissing(con, tx, "LoanSchedules", "SchedulePath", "TEXT");
+                AddColumnIfMissing(con, tx, "LoanSchedules", "Note", "TEXT");
+
+                // LoanInstallments (DueDate default date('now') itp.)
+                AddColumnIfMissing(con, tx, "LoanInstallments", "UserId", "INTEGER", "NOT NULL DEFAULT 0");
+                AddColumnIfMissing(con, tx, "LoanInstallments", "LoanId", "INTEGER", "NOT NULL DEFAULT 0");
+                AddColumnIfMissing(con, tx, "LoanInstallments", "ScheduleId", "INTEGER", "NOT NULL DEFAULT 0");
+                AddColumnIfMissing(con, tx, "LoanInstallments", "InstallmentNo", "INTEGER", "NOT NULL DEFAULT 0");
+                AddColumnIfMissing(con, tx, "LoanInstallments", "DueDate", "TEXT", "NOT NULL DEFAULT (date('now'))");
+                AddColumnIfMissing(con, tx, "LoanInstallments", "TotalAmount", "NUMERIC", "NOT NULL DEFAULT 0");
+
+                AddColumnIfMissing(con, tx, "LoanInstallments", "PrincipalAmount", "NUMERIC");
+                AddColumnIfMissing(con, tx, "LoanInstallments", "InterestAmount", "NUMERIC");
+                AddColumnIfMissing(con, tx, "LoanInstallments", "RemainingBalance", "NUMERIC");
+
+                AddColumnIfMissing(con, tx, "LoanInstallments", "Status", "INTEGER", "NOT NULL DEFAULT 0");
+                AddColumnIfMissing(con, tx, "LoanInstallments", "PaidAt", "TEXT");
+
+                AddColumnIfMissing(con, tx, "LoanInstallments", "PaymentKind", "INTEGER", "NOT NULL DEFAULT 0");
+                AddColumnIfMissing(con, tx, "LoanInstallments", "PaymentRefId", "INTEGER");
+
+                // AppSettings (stare bazy mogły mieć inną wersję)
+                AddColumnIfMissing(con, tx, "AppSettings", "UserId", "INTEGER", "NOT NULL DEFAULT 0");
+                AddColumnIfMissing(con, tx, "AppSettings", "Key", "TEXT", "NOT NULL DEFAULT ''");
+                AddColumnIfMissing(con, tx, "AppSettings", "Value", "TEXT");
+                AddColumnIfMissing(con, tx, "AppSettings", "UpdatedAt", "TEXT", "NOT NULL DEFAULT CURRENT_TIMESTAMP");
 
                 // Backfill: jeśli ktoś miał Description a Title puste
                 if (ColumnExists(con, tx, "Expenses", "Title") && ColumnExists(con, tx, "Expenses", "Description"))
                 {
-                    using var backfill = Cmd(
-                        "UPDATE Expenses SET Title = COALESCE(Title, Description) " +
-                        "WHERE Title IS NULL AND Description IS NOT NULL;");
+                    using var backfill = Cmd(@"
+UPDATE Expenses
+SET Title = COALESCE(Title, Description)
+WHERE Title IS NULL AND Description IS NOT NULL;");
                     backfill.ExecuteNonQuery();
                 }
 
@@ -420,15 +482,12 @@ CREATE INDEX IF NOT EXISTS IX_Expenses_User_PaymentKind
 CREATE INDEX IF NOT EXISTS IX_Expenses_User_Loan
     ON Expenses(UserId, LoanId);
 
--- unikalność mapowania raty -> planned expense (dla sync)
 CREATE UNIQUE INDEX IF NOT EXISTS IX_Expenses_UserId_LoanInstallmentId
     ON Expenses(UserId, LoanInstallmentId)
     WHERE LoanInstallmentId IS NOT NULL;
 
--- przyspieszenie kasowania/szukania
 CREATE INDEX IF NOT EXISTS IX_Expenses_UserId_LoanId_Date
     ON Expenses(UserId, LoanId, Date);
-
 
 CREATE INDEX IF NOT EXISTS IX_Incomes_User_Date
     ON Incomes(UserId, Date);
@@ -460,7 +519,6 @@ CREATE INDEX IF NOT EXISTS IX_LoanInstallments_Status_DueDate
 CREATE INDEX IF NOT EXISTS IX_LoanInstallments_Schedule
     ON LoanInstallments(UserId, ScheduleId);
 
-
 CREATE INDEX IF NOT EXISTS IX_Investments_User
     ON Investments(UserId);
 
@@ -476,9 +534,11 @@ CREATE INDEX IF NOT EXISTS IX_BankAccounts_User_SortOrder
 CREATE INDEX IF NOT EXISTS IX_BankConnections_User
     ON BankConnections(UserId);
 
--- NOWE: budżety po kategorii (wariant B)
 CREATE INDEX IF NOT EXISTS IX_Budgets_User_Category
     ON Budgets(UserId, CategoryId);
+
+CREATE UNIQUE INDEX IF NOT EXISTS UX_AppSettings_User_Key
+    ON AppSettings(UserId, Key COLLATE NOCASE);
 ";
                 idx.ExecuteNonQuery();
             }
@@ -501,6 +561,47 @@ CREATE INDEX IF NOT EXISTS IX_Budgets_User_Category
             return false;
         }
 
+        private static bool HasNonConstantDefault(string extra)
+        {
+            if (string.IsNullOrWhiteSpace(extra)) return false;
+
+            // W SQLite "non-constant default" przy ALTER TABLE to m.in.:
+            // - CURRENT_TIMESTAMP / CURRENT_DATE / CURRENT_TIME
+            // - date('now'), datetime('now'), julianday('now') ...
+            // - jakiekolwiek DEFAULT (...)
+            var e = extra.ToUpperInvariant();
+
+            if (!e.Contains("DEFAULT")) return false;
+
+            if (e.Contains("DEFAULT (")) return true;
+
+            return e.Contains("CURRENT_TIMESTAMP")
+                || e.Contains("CURRENT_DATE")
+                || e.Contains("CURRENT_TIME")
+                || e.Contains("DATE('NOW'")
+                || e.Contains("DATETIME('NOW'")
+                || e.Contains("JULIANDAY('NOW'");
+        }
+
+        private static string? InferBackfillExpression(string extra)
+        {
+            if (string.IsNullOrWhiteSpace(extra)) return null;
+            var e = extra.ToUpperInvariant();
+
+            if (e.Contains("DATE('NOW'")) return "date('now')";
+            if (e.Contains("DATETIME('NOW'")) return "datetime('now')";
+            if (e.Contains("JULIANDAY('NOW'")) return "julianday('now')";
+
+            if (e.Contains("CURRENT_DATE")) return "CURRENT_DATE";
+            if (e.Contains("CURRENT_TIME")) return "CURRENT_TIME";
+
+            // default fallback dla CreatedAt/UpdatedAt
+            if (e.Contains("CURRENT_TIMESTAMP")) return "CURRENT_TIMESTAMP";
+
+            // jeśli było DEFAULT (...) ale nie rozpoznaliśmy — nic nie backfilluj
+            return null;
+        }
+
         private static void AddColumnIfMissing(
             SqliteConnection con,
             SqliteTransaction tx,
@@ -509,12 +610,43 @@ CREATE INDEX IF NOT EXISTS IX_Budgets_User_Category
             string sqlType,
             string extra = "")
         {
-            if (!ColumnExists(con, tx, table, column))
+            if (string.IsNullOrWhiteSpace(table)) throw new ArgumentException("Table name is required.", nameof(table));
+            if (string.IsNullOrWhiteSpace(column)) throw new ArgumentException("Column name is required.", nameof(column));
+            if (string.IsNullOrWhiteSpace(sqlType)) throw new ArgumentException("SQL type is required.", nameof(sqlType));
+
+            if (ColumnExists(con, tx, table, column)) return;
+
+            bool nonConstDefault = HasNonConstantDefault(extra);
+
+            using var alter = con.CreateCommand();
+            alter.Transaction = tx;
+
+            if (!nonConstDefault)
             {
-                using var alter = con.CreateCommand();
-                alter.Transaction = tx;
-                alter.CommandText = $"ALTER TABLE {table} ADD COLUMN {column} {sqlType} {extra};";
+                // Bezpieczny przypadek: DEFAULT jest stałą (np. 0, 'x') albo brak DEFAULT
+                alter.CommandText = $"ALTER TABLE \"{table}\" ADD COLUMN \"{column}\" {sqlType} {extra};";
                 alter.ExecuteNonQuery();
+                return;
+            }
+
+            // Problematiczny przypadek (SQLite): DEFAULT to wyrażenie / funkcja.
+            // Rozwiązanie:
+            // 1) ADD COLUMN bez DEFAULT i bez NOT NULL
+            // 2) backfill istniejących rekordów (jeśli wiemy jak)
+            // 3) zostawiamy kolumnę nullable (zmiana constraints wymaga rebuild tabeli)
+            alter.CommandText = $"ALTER TABLE \"{table}\" ADD COLUMN \"{column}\" {sqlType};";
+            alter.ExecuteNonQuery();
+
+            var backfillExpr = InferBackfillExpression(extra);
+            if (!string.IsNullOrWhiteSpace(backfillExpr))
+            {
+                using var upd = con.CreateCommand();
+                upd.Transaction = tx;
+                upd.CommandText = $@"
+UPDATE ""{table}""
+SET ""{column}"" = {backfillExpr}
+WHERE ""{column}"" IS NULL;";
+                upd.ExecuteNonQuery();
             }
         }
 
@@ -546,7 +678,7 @@ CREATE INDEX IF NOT EXISTS IX_Budgets_User_Category
             cmd.ExecuteNonQuery();
 
             cmd.CommandText = @"
-CREATE TABLE BankAccounts_new(
+CREATE TABLE IF NOT EXISTS BankAccounts_new(
     Id           INTEGER PRIMARY KEY AUTOINCREMENT,
     ConnectionId INTEGER NULL,
     UserId       INTEGER NOT NULL,
@@ -571,7 +703,6 @@ SELECT Id, ConnectionId, UserId,
        LastSync
 FROM BankAccounts;";
             cmd.ExecuteNonQuery();
-
 
             cmd.CommandText = "DROP TABLE BankAccounts;";
             cmd.ExecuteNonQuery();

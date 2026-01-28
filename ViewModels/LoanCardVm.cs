@@ -32,6 +32,8 @@ namespace Finly.ViewModels
         private decimal? _scheduleNextPaymentPrincipalPart;
         private decimal? _scheduleNextPaymentInterestPart;
 
+        public string RemainingPrincipalStr => DisplayRemainingPrincipal.ToString("N2") + " zł";
+
         public int Id
         {
             get => _id;
@@ -369,6 +371,8 @@ namespace Finly.ViewModels
             OnPropertyChanged(nameof(NextPaymentInterestStr));
 
             OnPropertyChanged(nameof(RemainingTermStr));
+            OnPropertyChanged(nameof(RemainingPrincipalStr));
+
         }
 
         protected void OnPropertyChanged([CallerMemberName] string? name = null)

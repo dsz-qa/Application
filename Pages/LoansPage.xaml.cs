@@ -13,6 +13,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
+using static Finly.Services.Features.DatabaseService;
 
 namespace Finly.Pages
 {
@@ -43,12 +44,11 @@ namespace Finly.Pages
 
         private void LoansPage_Loaded(object sender, RoutedEventArgs e)
         {
+            DatabaseService.ProcessDuePlannedTransactions(_userId, DateTime.Today);
+
             LoadAccounts();
             LoadLoans();
-
-            // klucz: po załadowaniu kart wstrzykujemy snapshoty z harmonogramów
             ApplyScheduleSnapshotsToLoanVms();
-
             RefreshKpisAndLists();
         }
 
@@ -89,7 +89,6 @@ namespace Finly.Pages
             // kafelek "Dodaj kredyt" ma być na końcu
             _loans.Add(new AddLoanTile());
 
-            UpdatePaidStatusForCurrentMonth(_loans.OfType<LoanCardVm>().ToList());
 
 
         }
@@ -430,32 +429,55 @@ namespace Finly.Pages
             return true;
         }
 
-        private void UpdatePaidStatusForCurrentMonth(IReadOnlyCollection<LoanCardVm> loans)
+        private static (DateTime from, DateTime to) GetMonthRange(DateTime anyDayInMonth)
         {
-            if (loans == null || loans.Count == 0)
-            {
-                if (FindName("Analysis1PaidStatus") is TextBlock s1) s1.Text = "";
-                if (FindName("Analysis2PaidStatus") is TextBlock s2) s2.Text = "";
-                return;
-            }
-
-            var today = DateTime.Today.Date;
-
-            // "Zapłacone" pokazujemy dopiero, gdy minął termin ostatniej raty z bieżącego miesiąca
-            var dueDates = loans
-                .Select(vm => GetDueDateForMonth(vm, today.Year, today.Month))
-                .ToList();
-
-            var lastDueThisMonth = dueDates.Max().Date;
-
-            bool monthInstallmentsAlreadyPaid = today > lastDueThisMonth;
-
-            if (FindName("Analysis1PaidStatus") is TextBlock t1)
-                t1.Text = monthInstallmentsAlreadyPaid ? "✓ Zapłacone w tym miesiącu" : "";
-
-            if (FindName("Analysis2PaidStatus") is TextBlock t2)
-                t2.Text = monthInstallmentsAlreadyPaid ? "✓ Zapłacone w tym miesiącu" : "";
+            var first = new DateTime(anyDayInMonth.Year, anyDayInMonth.Month, 1);
+            var last = first.AddMonths(1).AddDays(-1);
+            return (first.Date, last.Date);
         }
+
+        /// <summary>
+        /// Status raty "dla bieżącego miesiąca" liczymy po DueDate wpadającym w miesiąc,
+        /// a nie po tym czy termin minął.
+        /// Zwraca:
+        /// - hasInstallmentInMonth: czy w ogóle jest rata w tym miesiącu
+        /// - isPaidInMonth: czy ta rata (lub raty) mają Status=1
+        /// - isOverdue: czy jest rata w miesiącu, która jest po DueDate i nadal Status=0
+        /// - dueDate: najwcześniejszy DueDate raty w miesiącu (do tekstu "do zapłaty dnia ...")
+        /// </summary>
+        private static (bool hasInstallmentInMonth, bool isPaidInMonth, bool isOverdue, DateTime? dueDate)
+            UpdatePaidStatusForCurrentMonth(int userId, int loanId, DateTime month)
+        {
+            if (userId <= 0 || loanId <= 0)
+                return (false, false, false, null);
+
+            var (from, to) = GetMonthRange(month);
+
+            // Źródło prawdy: DB, a nie heurystyki "czy termin minął"
+            var installments = DatabaseService.GetInstallmentsByDueDate(userId, loanId, from, to);
+
+            if (installments == null || installments.Count == 0)
+                return (false, false, false, null);
+
+            // Zwykle 1 rata/miesiąc, ale obsługujemy też >1
+            var due = installments
+                .Where(x => x.DueDate != DateTime.MinValue)
+                .OrderBy(x => x.DueDate)
+                .Select(x => (DateTime?)x.DueDate.Date)
+                .FirstOrDefault();
+
+            bool paid = installments.Any(x => x.Status == 1);
+
+            // zaległość: istnieje rata w miesiącu, jest po DueDate i nadal nieopłacona
+            var today = DateTime.Today;
+            bool overdue = installments.Any(x =>
+                x.Status == 0 &&
+                x.DueDate != DateTime.MinValue &&
+                x.DueDate.Date < today);
+
+            return (true, paid, overdue, due);
+        }
+
 
 
 
@@ -466,101 +488,114 @@ namespace Finly.Pages
             ApplyScheduleSnapshotsToLoanVms();
             UpdateKpiTiles();
 
-            // domyślnie
             SetAnalysisText("—", "—", "—");
-
-            
 
             if (!loans.Any())
                 return;
 
             var today = DateTime.Today;
-            var monthStart = new DateTime(today.Year, today.Month, 1);
-            var monthEnd = monthStart.AddMonths(1);
+            var (mFrom, mTo) = GetMonthRangeInclusive(today);
 
             decimal capitalThisMonth = 0m;
             decimal interestThisMonth = 0m;
 
-            // A3: koszt całkowity od dziś do końca
+            // A3: koszt całkowity od dziś do końca (u Ciebie już było)
             decimal totalCostAllLoans = 0m;
+
+            // Status globalny (jeśli chcesz jeden napis dla całej strony)
+            // Status globalny
+            bool anyOverdue = false;
+            bool allPaid = true;
+            bool anyInstallmentsThisMonth = false;
+            DateTime? nearestDue = null;
 
             foreach (var vm in loans)
             {
-                // ==== jeśli jest harmonogram ====
-                if (TryGetSchedule(vm.Id, showToasts: false, out _, out var schedule) && schedule.Count > 0)
+                var monthInstallments = DatabaseService.GetInstallmentsByDueDate(_userId, vm.Id, mFrom, mTo);
+
+                if (monthInstallments != null && monthInstallments.Count > 0)
                 {
-                    // A1/A2: raty w tym miesiącu
-                    var rowsThisMonth = schedule
-                        .Where(r => r.Date >= monthStart && r.Date < monthEnd)
+                    anyInstallmentsThisMonth = true;
+
+                    capitalThisMonth += monthInstallments.Sum(x => x.PrincipalAmount ?? 0m);
+                    interestThisMonth += monthInstallments.Sum(x => x.InterestAmount ?? 0m);
+
+                    // sortujemy po DueDate – bierzemy “raty należące do miesiąca”
+                    var ordered = monthInstallments
+                        .Where(x => x.DueDate != DateTime.MinValue)
+                        .OrderBy(x => x.DueDate.Date)
                         .ToList();
 
-                    // jeśli bank podał breakdown — używamy
-                    var capSum = rowsThisMonth.Sum(r => r.Principal ?? 0m);
-                    var intSum = rowsThisMonth.Sum(r => r.Interest ?? 0m);
-                    var totalSum = rowsThisMonth.Sum(r => r.Total);
-
-                    // gdy breakdown nie istnieje, ale Total jest:
-                    // wylicz interes dzienny, kapitał = total - interest
-                    if (totalSum > 0m && capSum == 0m && intSum == 0m)
+                    // Jeśli są raty w miesiącu:
+                    // - allPaid: tylko jeśli WSZYSTKIE te raty mają Status=1
+                    // - zaległość: jeśli jest rata Status=0 i dziś > DueDate
+                    if (ordered.Count > 0)
                     {
-                        foreach (var row in rowsThisMonth.OrderBy(x => x.Date))
+                        if (ordered.Any(x => x.Status == 0))
+                            allPaid = false;
+
+                        var overdueInst = ordered
+                            .Where(x => x.Status == 0 && today.Date > x.DueDate.Date)
+                            .OrderBy(x => x.DueDate.Date)
+                            .FirstOrDefault();
+
+                        if (overdueInst != null)
+                            anyOverdue = true;
+
+                        var unpaidNearest = ordered
+                            .Where(x => x.Status == 0)
+                            .OrderBy(x => x.DueDate.Date)
+                            .FirstOrDefault();
+
+                        if (unpaidNearest != null)
                         {
-                            var prevDue = LoansService.GetPreviousDueDate(row.Date, vm.PaymentDay, vm.StartDate);
-
-                            // baza do odsetek: najlepsze co mamy
-                            var principalBase = vm.DisplayRemainingPrincipal;
-                            if (row.Remaining.HasValue && row.Remaining.Value > 0m)
-                                principalBase = row.Remaining.Value;
-
-                            var i = LoanMathService.CalculateInterest(principalBase, vm.InterestRate, prevDue, row.Date);
-                            if (i < 0m) i = 0m;
-
-                            var c = row.Total - i;
-                            if (c < 0m) c = 0m;
-
-                            interestThisMonth += i;
-                            capitalThisMonth += c;
+                            if (nearestDue == null || unpaidNearest.DueDate.Date < nearestDue.Value.Date)
+                                nearestDue = unpaidNearest.DueDate.Date;
                         }
                     }
                     else
                     {
-                        capitalThisMonth += capSum;
-                        interestThisMonth += intSum;
+                        // jeśli DB zwróciło raty ale bez DueDate (nie powinno, ale defensywnie)
+                        allPaid = false;
                     }
-
-                    // A3: suma rat od dziś do końca (kapitał + odsetki = total)
-                    totalCostAllLoans += schedule
-                        .Where(r => r.Date >= today)
-                        .Sum(r => r.Total);
-
-                    continue;
                 }
 
-                // ==== fallback bez harmonogramu ====
-                int monthsLeft = GetRemainingMonths(vm);
-                if (monthsLeft <= 0) continue;
-
-                var (interestPart, principalPart) =
-                    LoansService.CalculateFirstInstallmentBreakdown(vm.DisplayRemainingPrincipal, vm.InterestRate, monthsLeft);
-
-                capitalThisMonth += principalPart;
-                interestThisMonth += interestPart;
-
-                // A3: przybliżenie kosztu = rata * liczba miesięcy pozostałych
-                var monthly = LoansService.CalculateMonthlyPayment(vm.DisplayRemainingPrincipal, vm.InterestRate, monthsLeft);
-                totalCostAllLoans += monthly * monthsLeft;
+                // A3 - koszt całkowity od dziś do końca (Twoja logika – zostawiam)
+                if (TryGetSchedule(vm.Id, showToasts: false, out _, out var schedule) && schedule.Count > 0)
+                {
+                    totalCostAllLoans += schedule.Where(r => r.Date >= today).Sum(r => r.Total);
+                }
+                else
+                {
+                    int monthsLeft = GetRemainingMonths(vm);
+                    if (monthsLeft > 0)
+                    {
+                        var monthly = LoansService.CalculateMonthlyPayment(vm.DisplayRemainingPrincipal, vm.InterestRate, monthsLeft);
+                        totalCostAllLoans += monthly * monthsLeft;
+                    }
+                }
             }
 
-            // ustaw analizy w UI
             SetAnalysisText(
                 $"{capitalThisMonth:N2} zł",
                 $"{interestThisMonth:N2} zł",
                 $"{totalCostAllLoans:N2} zł"
             );
 
-            // status “zapłacone w tym miesiącu”
-            UpdatePaidStatusForCurrentMonth(loans);
+            // Status tekst – tylko jeśli w ogóle istnieją raty w tym miesiącu
+            string statusText = "";
+            if (anyInstallmentsThisMonth)
+            {
+                if (anyOverdue) statusText = "⚠ Zaległe raty w tym miesiącu";
+                else if (allPaid) statusText = "✓ Zapłacone w tym miesiącu";
+                else if (nearestDue != null) statusText = $"Do zapłaty dnia {nearestDue:dd.MM}";
+            }
+
+            if (FindName("Analysis1PaidStatus") is TextBlock t1) t1.Text = statusText;
+            if (FindName("Analysis2PaidStatus") is TextBlock t2) t2.Text = statusText;
         }
+     
+
 
 
 
@@ -1116,6 +1151,29 @@ namespace Finly.Pages
 
             return indexOrderedByDate + 1;
         }
+
+        private static (DateTime from, DateTime to) GetMonthRangeInclusive(DateTime today)
+        {
+            var from = new DateTime(today.Year, today.Month, 1);
+            var to = from.AddMonths(1).AddDays(-1);
+            return (from, to);
+        }
+
+        private static string BuildMonthInstallmentStatusText(LoanInstallmentDb? inst)
+        {
+            if (inst == null || inst.DueDate == DateTime.MinValue) return "";
+
+            var today = DateTime.Today.Date;
+
+            if (inst.Status == 1)
+                return "✓ Zapłacone w tym miesiącu";
+
+            if (today <= inst.DueDate.Date)
+                return $"Do zapłaty dnia {inst.DueDate:dd.MM}";
+
+            return $"Zaległe (termin {inst.DueDate:dd.MM})";
+        }
+
 
 
         private static T? FindDescendantByName<T>(DependencyObject? start, string name) where T : FrameworkElement
