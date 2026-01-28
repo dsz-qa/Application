@@ -3312,8 +3312,9 @@ INSERT INTO LoanInstallments(
 VALUES(
     @u, @l, @sid, @no, @d, @a,
     @p, @i, @rb,
-    0, NULL, 0, NULL
+    0, NULL, @pk, @pr
 );";
+
                     ins.Parameters.AddWithValue("@u", userId);
                     ins.Parameters.AddWithValue("@l", loanId);
                     ins.Parameters.AddWithValue("@sid", scheduleId);
@@ -3340,8 +3341,13 @@ SET ScheduleId=@sid,
     TotalAmount=@a,
     PrincipalAmount=@p,
     InterestAmount=@i,
-    RemainingBalance=@rb
+    RemainingBalance=@rb,
+    PaymentKind=@pk,
+    PaymentRefId=@pr
 WHERE Id=@id AND UserId=@u;";
+
+                    upd.Parameters.AddWithValue("@pk", r.PaymentKind);
+                    upd.Parameters.AddWithValue("@pr", (object?)r.PaymentRefId ?? DBNull.Value);
                     upd.Parameters.AddWithValue("@sid", scheduleId);
                     upd.Parameters.AddWithValue("@d", ToIsoDate(r.DueDate));
                     upd.Parameters.AddWithValue("@a", r.TotalAmount);

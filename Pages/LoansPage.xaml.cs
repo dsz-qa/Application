@@ -991,14 +991,57 @@ namespace Finly.Pages
 
         private void ImportScheduleIntoDb(int loanId, string schedulePath)
         {
-            // 1) parsowanie
+            if (loanId <= 0)
+                throw new ArgumentException("Nieprawidłowe loanId.");
+
+            if (string.IsNullOrWhiteSpace(schedulePath))
+                throw new ArgumentException("Nieprawidłowa ścieżka harmonogramu.");
+
+            if (!File.Exists(schedulePath))
+                throw new FileNotFoundException("Nie znaleziono pliku harmonogramu.", schedulePath);
+
+            // 0) Wyznacz PaymentKind / PaymentRefId dla rat (żeby potem w Expenses nie było 'Wolna gotówka')
+            // Źródła (od najlepszego):
+            //  - Loans.PaymentKind/PaymentRefId (jeśli masz)
+            //  - runtime mapowanie _loanAccounts (bank account)
+            //  - fallback: FreeCash
+            // 0) Wyznacz PaymentKind / PaymentRefId dla rat (żeby potem w Expenses nie było 'Wolna gotówka')
+            Finly.Models.PaymentKind paymentKind = Finly.Models.PaymentKind.FreeCash;
+            int? paymentRefId = null;
+
+            try
+            {
+                var loan = (DatabaseService.GetLoans(_userId) ?? new List<LoanModel>())
+                    .FirstOrDefault(x => x.Id == loanId);
+
+                if (loan != null)
+                {
+                    paymentKind = loan.PaymentKind;   // OK, bo enum <- enum
+                    paymentRefId = loan.PaymentRefId;
+                }
+            }
+            catch
+            {
+                // ignorujemy – fallback poniżej
+            }
+
+            // fallback: jeśli w Loans nie ma ustawionego konta, użyj mapowania runtime (konto bankowe)
+            if (paymentKind == Finly.Models.PaymentKind.FreeCash && !paymentRefId.HasValue
+                && _loanAccounts.TryGetValue(loanId, out var accId))
+            {
+                paymentKind = Finly.Models.PaymentKind.BankAccount;
+                paymentRefId = accId;
+            }
+
+
+            // 1) Parsowanie CSV
             var parser = new LoanScheduleCsvParser();
-            var parsed = parser.Parse(schedulePath).ToList();
+            var parsed = parser.Parse(schedulePath)?.ToList() ?? new List<LoanInstallmentRow>();
 
             if (parsed.Count == 0)
                 throw new InvalidOperationException("Plik CSV nie zawiera rat do importu.");
 
-            // 2) wpis do LoanSchedules (historia importu)
+            // 2) Wpis do LoanSchedules (historia importu)
             int scheduleId = DatabaseService.InsertLoanSchedule(
                 userId: _userId,
                 loanId: loanId,
@@ -1007,17 +1050,17 @@ namespace Finly.Pages
                 note: null
             );
 
-            // 3) mapowanie na DB rows
-            var dbRows = parsed
-                .OrderBy(x => x.Date)
+            // 3) Mapowanie na DB rows (UWAGA: ustawiamy PaymentKind/PaymentRefId!)
+            var ordered = parsed.OrderBy(x => x.Date).ToList();
+
+            var dbRows = ordered
                 .Select((x, idx) => new DatabaseService.LoanInstallmentDb
                 {
                     UserId = _userId,
                     LoanId = loanId,
                     ScheduleId = scheduleId,
 
-                    // KLUCZ: numer raty musi być >0 i stabilny
-                    // Jeśli parser nie dał numeru -> nadaj sekwencyjnie po dacie
+                    // Stabilny klucz raty
                     InstallmentNo = GetInstallmentNoOrFallback(x, idx),
 
                     DueDate = x.Date.Date,
@@ -1027,11 +1070,16 @@ namespace Finly.Pages
                     InterestAmount = (x.Interest.HasValue && x.Interest.Value >= 0m) ? x.Interest.Value : (decimal?)null,
                     RemainingBalance = (x.Remaining.HasValue && x.Remaining.Value >= 0m) ? x.Remaining.Value : (decimal?)null,
 
-                    Status = 0
+                    Status = 0,
+
+                    // KLUCZOWE: skąd ma zejść płatność w wydatkach zaplanowanych
+                    PaymentKind = (int)paymentKind,
+                    PaymentRefId = paymentRefId
+
                 })
                 .ToList();
 
-            // 4) UPSERT do LoanInstallments
+            // 4) UPSERT do LoanInstallments (MergeByNo)
             DatabaseService.UpsertLoanInstallments_MergeByNo(
                 userId: _userId,
                 loanId: loanId,
@@ -1039,12 +1087,17 @@ namespace Finly.Pages
                 rows: dbRows
             );
 
-            // 5) sync rat -> planned Expenses
-            // (od dziś-1m do dziś+2l jak u Ciebie)
+            // 5) Sync rat -> planned Expenses
+            // Jeśli chcesz, żeby przeszłe raty NIE wisiały jako planned, daj from = DateTime.Today
             var from = DateTime.Today.AddMonths(-1);
             var to = DateTime.Today.AddYears(2);
+
             DatabaseService.SyncLoanInstallmentsToPlannedExpenses(_userId, loanId, from, to);
+
+            // 6) Odśwież cache parsera (ważne, bo plik i DB mogły się zmienić)
+            _parsedSchedules.Remove(loanId);
         }
+
 
         private static int GetInstallmentNoOrFallback(LoanInstallmentRow row, int indexOrderedByDate)
         {

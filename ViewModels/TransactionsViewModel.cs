@@ -481,15 +481,21 @@ namespace Finly.ViewModels
             {
                 var d = TryParseDateDisplay(t.DateDisplay, out var parsed) ? parsed : DateTime.MinValue;
 
-                bool isFuture = d != DateTime.MinValue && d.Date > today;
-                bool isPlannedOrFuture = t.IsPlanned || isFuture;
+                bool hasValidDate = d != DateTime.MinValue;
+                bool isFuture = hasValidDate && d.Date > today;
+
+                // Planned ma sens tylko dla przyszłości
+                bool isPlannedEffective = t.IsPlanned && isFuture;
 
                 t.IsFuture = isFuture;
 
-                if (isPlannedOrFuture) PlannedTransactions.Add(t);
-                else Transactions.Add(t);
+                if (isPlannedEffective || isFuture)
+                    PlannedTransactions.Add(t);
+                else
+                    Transactions.Add(t);
             }
         }
+
 
         // ------------------ DATE HELPERS ------------------
 
