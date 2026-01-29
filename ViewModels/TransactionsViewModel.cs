@@ -41,6 +41,8 @@ namespace Finly.ViewModels
 
         // ------------------ SORTOWANIE ------------------
 
+        // ------------------ SORTOWANIE ------------------
+
         public enum TransactionSortMode
         {
             DateDesc,
@@ -67,8 +69,49 @@ namespace Finly.ViewModels
             if (TryParseDateDisplay(t.DateDisplay, out var d))
                 return d.Date;
 
+            // defensywnie: planned na koniec, realized na początek
             return plannedList ? DateTime.MaxValue : DateTime.MinValue;
         }
+
+        /// <summary>
+        /// Drugi klucz sortowania: "ostatnio dodane na górze".
+        /// Bez kolumny CreatedAt w DB, najstabilniej użyć Id malejąco (autoincrement).
+        /// Żeby było deterministycznie także między typami, dokładamy Kind jako tie-breaker.
+        /// </summary>
+        private static long SortKeyId(TransactionCardVm t)
+        {
+            // KindOrder: Expense=3, Income=2, Transfer=1 (tylko jako deterministyczny tie-breaker)
+            // Najważniejsze i tak jest Id (ostatnio dodane -> największe Id w swojej tabeli).
+            long kindOrder = t.Kind switch
+            {
+                TransactionKind.Expense => 3,
+                TransactionKind.Income => 2,
+                TransactionKind.Transfer => 1,
+                _ => 0
+            };
+
+            // Sklejamy klucz: kindOrder * 1_000_000_000 + Id
+            // (nie chodzi o porównywanie globalnie między tabelami, tylko o deterministykę).
+            return (kindOrder * 1_000_000_000L) + t.Id;
+        }
+
+        private IEnumerable<TransactionCardVm> ApplySort(IEnumerable<TransactionCardVm> src, bool plannedList)
+        {
+            // Sort: 1) data 2) "kolejność dodania" (Id) 3) opis (deterministycznie)
+            if (SortMode == TransactionSortMode.DateAsc)
+            {
+                return src
+                    .OrderBy(t => SortKeyDate(t, plannedList))
+                    .ThenBy(t => SortKeyId(t))                 // ASC -> starsze ID wcześniej
+                    .ThenBy(t => t.Description ?? string.Empty, StringComparer.CurrentCultureIgnoreCase);
+            }
+
+            return src
+                .OrderByDescending(t => SortKeyDate(t, plannedList))
+                .ThenByDescending(t => SortKeyId(t))          // DESC -> najnowsze ID na górze
+                .ThenBy(t => t.Description ?? string.Empty, StringComparer.CurrentCultureIgnoreCase);
+        }
+
 
         // ------------------ KPI ------------------
 
@@ -915,10 +958,10 @@ namespace Finly.ViewModels
                 {
                     var typeSelected = new[]
                     {
-                        (TransactionKind.Expense, ShowExpenses),
-                        (TransactionKind.Income, ShowIncomes),
-                        (TransactionKind.Transfer, ShowTransfers)
-                    }
+                (TransactionKind.Expense, ShowExpenses),
+                (TransactionKind.Income, ShowIncomes),
+                (TransactionKind.Transfer, ShowTransfers)
+            }
                     .Where(tpl => tpl.Item2)
                     .Select(tpl => tpl.Item1)
                     .ToList();
@@ -970,9 +1013,7 @@ namespace Finly.ViewModels
             var leftRaw = AllTransactions
                 .Where(t => PassCommonFilters(t) && !(t.IsPlanned || t.IsFuture));
 
-            var leftList = (SortMode == TransactionSortMode.DateAsc)
-                ? leftRaw.OrderBy(t => SortKeyDate(t, plannedList: false)).ToList()
-                : leftRaw.OrderByDescending(t => SortKeyDate(t, plannedList: false)).ToList();
+            var leftList = ApplySort(leftRaw, plannedList: false).ToList();
 
             TransactionsList.Clear();
             foreach (var i in leftList) TransactionsList.Add(i);
@@ -980,9 +1021,7 @@ namespace Finly.ViewModels
             var rightRaw = AllTransactions
                 .Where(t => PassCommonFilters(t) && (t.IsPlanned || t.IsFuture));
 
-            var rightList = (SortMode == TransactionSortMode.DateAsc)
-                ? rightRaw.OrderBy(t => SortKeyDate(t, plannedList: true)).ToList()
-                : rightRaw.OrderByDescending(t => SortKeyDate(t, plannedList: true)).ToList();
+            var rightList = ApplySort(rightRaw, plannedList: true).ToList();
 
             PlannedTransactionsList.Clear();
             foreach (var r in rightList) PlannedTransactionsList.Add(r);
@@ -993,6 +1032,7 @@ namespace Finly.ViewModels
             TotalIncomes = leftList.Where(t => t.Kind == TransactionKind.Income)
                 .Select(x => ParseAmountInternal(x.AmountStr)).Sum();
         }
+
 
         public void SetPeriod(Finly.Models.DateRangeMode mode, DateTime start, DateTime end)
         {
