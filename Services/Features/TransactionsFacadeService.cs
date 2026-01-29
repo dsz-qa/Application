@@ -19,47 +19,11 @@ namespace Finly.Services.Features
             if (e.UserId <= 0) throw new InvalidOperationException("Brak UserId.");
             if (e.Amount <= 0) throw new InvalidOperationException("Kwota musi być > 0.");
 
-            // 1) Zawsze zapisujemy rekord wydatku do DB.
-            // Planned: bez wpływu na salda.
+            // WAŻNE (stabilność): InsertExpense księguje saldo w tej samej transakcji DB
+            // (ApplyExpenseEffect dla nieplanowanych). Jeśli zrobimy to drugi raz tutaj,
+            // saldo zostanie pomniejszone podwójnie (wrażenie „zeszło całe konto”).
+            // Dlatego FASADA zapisuje tylko rekord — a księgowanie zostaje w DatabaseService.
             DatabaseService.InsertExpense(e);
-
-            if (e.IsPlanned)
-                return;
-
-            // 2) Real: księgowanie wyłącznie przez LedgerService (bez parametrów których nie ma).
-            var amount = (decimal)e.Amount;
-
-            switch (e.PaymentKind)
-            {
-                case PaymentKind.FreeCash:
-                    LedgerService.SpendFromFreeCash(e.UserId, amount);
-                    break;
-
-                case PaymentKind.SavedCash:
-                    LedgerService.SpendFromSavedCash(e.UserId, amount);
-                    break;
-
-                case PaymentKind.BankAccount:
-                    {
-                        if (e.PaymentRefId is not int bankId || bankId <= 0)
-                            throw new InvalidOperationException("Brak BankAccountId w PaymentRefId.");
-
-                        LedgerService.SpendFromBankAccount(e.UserId, bankId, amount);
-                        break;
-                    }
-
-                case PaymentKind.Envelope:
-                    {
-                        if (e.PaymentRefId is not int envId || envId <= 0)
-                            throw new InvalidOperationException("Brak EnvelopeId w PaymentRefId.");
-
-                        LedgerService.SpendFromEnvelope(e.UserId, envId, amount);
-                        break;
-                    }
-
-                default:
-                    throw new InvalidOperationException("Nieznany PaymentKind.");
-            }
         }
 
         public static void SetCashOnHand(int userId, decimal amount)
