@@ -40,34 +40,60 @@ namespace Finly.Pages
             if (_isAlive) return;
             _isAlive = true;
 
+            // zawsze czyścimy stan na starcie
             _uid = 0;
 
-            int uid;
-            try { uid = UserService.GetCurrentUserId(); }
-            catch { uid = 0; }
+            int uid = 0;
+            try
+            {
+                uid = UserService.GetCurrentUserId();
+            }
+            catch
+            {
+                uid = 0;
+            }
 
+            // Jeśli nie ma usera -> NIE zostawiaj strony "Alive", bo potem już nie zainicjalizuje się poprawnie.
             if (uid <= 0)
+            {
+                _isAlive = false;
                 return;
+            }
 
             _uid = uid;
 
-            _vm.Initialize(uid);
+            // VM init – jeśli poleci wyjątek, cofamy Alive żeby kolejny Load mógł spróbować ponownie
+            try
+            {
+                _vm.Initialize(uid);
+            }
+            catch
+            {
+                _uid = 0;
+                _isAlive = false;
+                throw;
+            }
 
+            // PeriodBar
             _periodBar = FindName("PeriodBar") as PeriodBarControl;
             if (_periodBar != null)
             {
                 _periodBar.RangeChanged -= PeriodBar_RangeChanged;
                 _periodBar.RangeChanged += PeriodBar_RangeChanged;
 
+                // ustaw okres startowy po Initialize(uid)
                 _vm.SetPeriod(_periodBar.Mode, _periodBar.StartDate, _periodBar.EndDate);
             }
 
-            LoadEditResources(uid);
-            RefreshMoneySummary();
+            // zasoby/summary – defensywnie (żeby UI nie wywracał się przez błąd w helperach)
+            try { LoadEditResources(uid); } catch { /* opcjonalnie log */ }
+            try { RefreshMoneySummary(); } catch { /* opcjonalnie log */ }
 
+            // DataChanged – zawsze podpinamy jednokrotnie
             DatabaseService.DataChanged -= DatabaseService_DataChanged;
             DatabaseService.DataChanged += DatabaseService_DataChanged;
         }
+
 
         private void TransactionsPage_Unloaded(object sender, RoutedEventArgs e)
         {

@@ -13,6 +13,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
+using Windows.System;
 using static Finly.Services.Features.DatabaseService;
 
 namespace Finly.Pages
@@ -40,17 +41,40 @@ namespace Finly.Pages
 
             LoansGrid.ItemsSource = _loans;
             Loaded += LoansPage_Loaded;
+
+            Unloaded += LoansPage_Unloaded;
+            DatabaseService.DataChanged += DatabaseService_DataChanged;
         }
+
+        private void LoansPage_Unloaded(object sender, RoutedEventArgs e)
+        {
+            try { DatabaseService.DataChanged -= DatabaseService_DataChanged; } catch { }
+        }
+
+        private void DatabaseService_DataChanged(object? sender, EventArgs e)
+        {
+            Dispatcher.BeginInvoke(new Action(() =>
+            {
+                try
+                {
+                    LoadAccounts();
+                    LoadLoans();
+                    ApplyScheduleSnapshotsToLoanVms();
+                    RefreshKpisAndLists();
+                }
+                catch { }
+            }), System.Windows.Threading.DispatcherPriority.Background);
+        }
+
 
         private void LoansPage_Loaded(object sender, RoutedEventArgs e)
         {
-            DatabaseService.ProcessDuePlannedTransactions(_userId, DateTime.Today);
-
             LoadAccounts();
             LoadLoans();
             ApplyScheduleSnapshotsToLoanVms();
             RefreshKpisAndLists();
         }
+
 
         private void LoadAccounts()
         {
@@ -456,6 +480,7 @@ namespace Finly.Pages
             // Źródło prawdy: DB, a nie heurystyki "czy termin minął"
             var installments = DatabaseService.GetInstallmentsByDueDate(userId, loanId, from, to);
 
+
             if (installments == null || installments.Count == 0)
                 return (false, false, false, null);
 
@@ -511,53 +536,28 @@ namespace Finly.Pages
 
             foreach (var vm in loans)
             {
-                var monthInstallments = DatabaseService.GetInstallmentsByDueDate(_userId, vm.Id, mFrom, mTo);
+                // ✅ KPI miesiąca z jednego źródła prawdy
+                var kpi = LoansService.GetLoanMonthKpi(_userId, vm.Id, today);
 
-                if (monthInstallments != null && monthInstallments.Count > 0)
-                {
+
+                if (kpi.PlannedCount + kpi.PaidCount > 0)
                     anyInstallmentsThisMonth = true;
 
-                    capitalThisMonth += monthInstallments.Sum(x => x.PrincipalAmount ?? 0m);
-                    interestThisMonth += monthInstallments.Sum(x => x.InterestAmount ?? 0m);
+                capitalThisMonth += kpi.Principal;
+                interestThisMonth += kpi.Interest;
 
-                    // sortujemy po DueDate – bierzemy “raty należące do miesiąca”
-                    var ordered = monthInstallments
-                        .Where(x => x.DueDate != DateTime.MinValue)
-                        .OrderBy(x => x.DueDate.Date)
-                        .ToList();
+                if (kpi.HasOverdue)
+                    anyOverdue = true;
 
-                    // Jeśli są raty w miesiącu:
-                    // - allPaid: tylko jeśli WSZYSTKIE te raty mają Status=1
-                    // - zaległość: jeśli jest rata Status=0 i dziś > DueDate
-                    if (ordered.Count > 0)
-                    {
-                        if (ordered.Any(x => x.Status == 0))
-                            allPaid = false;
+                // allPaid: jeśli istnieją raty w miesiącu i żadna nie jest planned (Status=0)
+                if ((kpi.PlannedCount + kpi.PaidCount) > 0 && kpi.PlannedCount > 0)
+                    allPaid = false;
 
-                        var overdueInst = ordered
-                            .Where(x => x.Status == 0 && today.Date > x.DueDate.Date)
-                            .OrderBy(x => x.DueDate.Date)
-                            .FirstOrDefault();
-
-                        if (overdueInst != null)
-                            anyOverdue = true;
-
-                        var unpaidNearest = ordered
-                            .Where(x => x.Status == 0)
-                            .OrderBy(x => x.DueDate.Date)
-                            .FirstOrDefault();
-
-                        if (unpaidNearest != null)
-                        {
-                            if (nearestDue == null || unpaidNearest.DueDate.Date < nearestDue.Value.Date)
-                                nearestDue = unpaidNearest.DueDate.Date;
-                        }
-                    }
-                    else
-                    {
-                        // jeśli DB zwróciło raty ale bez DueDate (nie powinno, ale defensywnie)
-                        allPaid = false;
-                    }
+                // nearestDue: najbliższy termin NIEOPŁACONEJ raty (z KPI)
+                if (kpi.NextDue != null)
+                {
+                    if (nearestDue == null || kpi.NextDue.Value.Date < nearestDue.Value.Date)
+                        nearestDue = kpi.NextDue.Value.Date;
                 }
 
                 // A3 - koszt całkowity od dziś do końca (Twoja logika – zostawiam)
@@ -575,6 +575,7 @@ namespace Finly.Pages
                     }
                 }
             }
+
 
             SetAnalysisText(
                 $"{capitalThisMonth:N2} zł",
@@ -1114,18 +1115,21 @@ namespace Finly.Pages
                 })
                 .ToList();
 
-            // 4) UPSERT do LoanInstallments (MergeByNo)
-            DatabaseService.UpsertLoanInstallments_MergeByNo(
+            // 4) Replace przyszłych NIEZAPŁACONYCH rat (MODEL A – bez historii wstecz)
+            DatabaseService.ReplaceFutureUnpaidInstallmentsFromSchedule(
                 userId: _userId,
                 loanId: loanId,
                 scheduleId: scheduleId,
-                rows: dbRows
+                newRows: dbRows,
+                today: DateTime.Today
             );
+
+
 
             // 5) Sync rat -> planned Expenses
             // Jeśli chcesz, żeby przeszłe raty NIE wisiały jako planned, daj from = DateTime.Today
-            var from = DateTime.Today.AddMonths(-1);
-            var to = DateTime.Today.AddYears(2);
+            var from = DateTime.Today;
+            var to = from.AddMonths(18);
 
             DatabaseService.SyncLoanInstallmentsToPlannedExpenses(_userId, loanId, from, to);
 

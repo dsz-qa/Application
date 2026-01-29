@@ -1,10 +1,11 @@
-﻿using System;
+﻿using Finly.Models;
+using Finly.Services.Features;
+using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Text;
-using Finly.Models;
 
 namespace Finly.Services
 {
@@ -17,6 +18,49 @@ namespace Finly.Services
         /// <summary>
         /// Standardowa rata annuitetowa.
         /// </summary>
+        /// 
+        public sealed class LoanMonthKpi
+        {
+            public decimal Principal { get; set; }
+            public decimal Interest { get; set; }
+            public decimal Total { get; set; }
+            public int PlannedCount { get; set; }
+            public int PaidCount { get; set; }
+            public DateTime? NextDue { get; set; }
+            public bool HasOverdue { get; set; }
+        }
+
+        public static LoanMonthKpi GetLoanMonthKpi(int userId, int loanId, DateTime month)
+        {
+            var from = new DateTime(month.Year, month.Month, 1);
+            var to = from.AddMonths(1).AddDays(-1);
+
+            var rows = DatabaseService.GetInstallmentsByDueDate(userId, loanId, from, to)
+                       ?? new List<DatabaseService.LoanInstallmentDb>();
+
+            var kpi = new LoanMonthKpi();
+
+            foreach (var r in rows)
+            {
+                kpi.Total += r.TotalAmount;
+                kpi.Principal += r.PrincipalAmount ?? 0m;
+                kpi.Interest += r.InterestAmount ?? 0m;
+
+                if (r.Status == 1) kpi.PaidCount++;
+                else if (r.Status == 0) kpi.PlannedCount++;
+            }
+
+            var next = DatabaseService.GetInstallmentsByDueDate(userId, loanId, DateTime.Today, DateTime.Today.AddYears(50))
+                .Where(x => x.Status == 0 && x.DueDate >= DateTime.Today)
+                .OrderBy(x => x.DueDate)
+                .FirstOrDefault();
+
+            kpi.NextDue = next?.DueDate.Date;
+            kpi.HasOverdue = rows.Any(x => x.Status == 0 && x.DueDate.Date < DateTime.Today);
+
+            return kpi;
+        }
+
         public static decimal CalculateMonthlyPayment(
             decimal principal,
             decimal annualRatePercent,

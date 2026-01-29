@@ -97,10 +97,23 @@ namespace Finly.Views
         // ===== Zdarzenia okna / responsywność =====
         private void Window_Loaded(object sender, RoutedEventArgs e)
         {
+            // ✅ 1) Globalna realizacja rat i innych zaplanowanych płatności
+            try
+            {
+                var uid = UserService.CurrentUserId; // tu już masz to w appce używane
+                if (uid > 0)
+                    DatabaseService.ProcessDuePlannedTransactions(uid, DateTime.Today);
+            }
+            catch
+            {
+                // celowo: nie wywracamy okna
+            }
+
             ApplyBreakpoint(ActualWidth, ActualHeight);
             FitSidebar();
             WindowState = WindowState.Maximized;
         }
+
 
         private void Window_SizeChanged(object sender, SizeChangedEventArgs e)
         {

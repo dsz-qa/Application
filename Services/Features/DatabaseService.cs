@@ -3634,6 +3634,131 @@ SELECT last_insert_rowid();";
             return id;
         }
 
+        public static int ReplaceFutureUnpaidInstallmentsFromSchedule(
+    int userId,
+    int loanId,
+    int scheduleId,
+    IReadOnlyList<LoanInstallmentDb> newRows,
+    DateTime today)
+        {
+            if (userId <= 0) throw new ArgumentException(nameof(userId));
+            if (loanId <= 0) throw new ArgumentException(nameof(loanId));
+            if (scheduleId <= 0) throw new ArgumentException(nameof(scheduleId));
+            if (newRows == null) throw new ArgumentNullException(nameof(newRows));
+
+            today = today.Date;
+
+            using var c = OpenAndEnsureSchema();
+            using var tx = c.BeginTransaction();
+
+            try
+            {
+                // 1) Usuñ planned expenses powi¹zane z przysz³ymi ratami (status=0) od dziœ
+                if (TableExists(c, "Expenses") && ColumnExists(c, "Expenses", "LoanInstallmentId") && ColumnExists(c, "Expenses", "IsPlanned"))
+                {
+                    // Jeœli masz LoanId w Expenses, filtr bêdzie szybszy
+                    bool expHasLoanId = ColumnExists(c, "Expenses", "LoanId");
+
+                    var link = expHasLoanId
+                        ? "LoanId=@l"
+                        : @"LoanInstallmentId IN (
+                        SELECT Id FROM LoanInstallments
+                        WHERE UserId=@u AND LoanId=@l AND Status=0 AND date(DueDate) >= date(@today)
+                   )";
+
+                    using var delExp = c.CreateCommand();
+                    delExp.Transaction = tx;
+                    delExp.CommandText = $@"
+DELETE FROM Expenses
+WHERE UserId=@u
+  AND IsPlanned=1
+  AND LoanInstallmentId IS NOT NULL
+  AND {link}
+  AND date(Date) >= date(@today);";
+                    delExp.Parameters.AddWithValue("@u", userId);
+                    delExp.Parameters.AddWithValue("@l", loanId);
+                    delExp.Parameters.AddWithValue("@today", today.ToString("yyyy-MM-dd"));
+                    delExp.ExecuteNonQuery();
+                }
+
+                // 2) Usuñ przysz³e niezap³acone raty (Status=0) od dziœ
+                using (var delInst = c.CreateCommand())
+                {
+                    delInst.Transaction = tx;
+                    delInst.CommandText = @"
+DELETE FROM LoanInstallments
+WHERE UserId=@u AND LoanId=@l
+  AND Status=0
+  AND date(DueDate) >= date(@today);";
+                    delInst.Parameters.AddWithValue("@u", userId);
+                    delInst.Parameters.AddWithValue("@l", loanId);
+                    delInst.Parameters.AddWithValue("@today", today.ToString("yyyy-MM-dd"));
+                    delInst.ExecuteNonQuery();
+                }
+
+                // 3) Wstaw nowe przysz³e raty z nowego harmonogramu (te¿ od dziœ)
+                int inserted = 0;
+
+                using var ins = c.CreateCommand();
+                ins.Transaction = tx;
+                ins.CommandText = @"
+INSERT INTO LoanInstallments(
+    UserId, LoanId, ScheduleId, InstallmentNo, DueDate, TotalAmount,
+    PrincipalAmount, InterestAmount, RemainingBalance,
+    Status, PaidAt, PaymentKind, PaymentRefId
+)
+VALUES(
+    @u, @l, @sid, @no, @d, @a,
+    @p, @i, @rb,
+    0, NULL, @pk, @pr
+);";
+
+                var pU = ins.CreateParameter(); pU.ParameterName = "@u"; pU.Value = userId; ins.Parameters.Add(pU);
+                var pL = ins.CreateParameter(); pL.ParameterName = "@l"; pL.Value = loanId; ins.Parameters.Add(pL);
+                var pSid = ins.CreateParameter(); pSid.ParameterName = "@sid"; pSid.Value = scheduleId; ins.Parameters.Add(pSid);
+
+                var pNo = ins.CreateParameter(); pNo.ParameterName = "@no"; ins.Parameters.Add(pNo);
+                var pD = ins.CreateParameter(); pD.ParameterName = "@d"; ins.Parameters.Add(pD);
+                var pA = ins.CreateParameter(); pA.ParameterName = "@a"; ins.Parameters.Add(pA);
+                var pP = ins.CreateParameter(); pP.ParameterName = "@p"; ins.Parameters.Add(pP);
+                var pI = ins.CreateParameter(); pI.ParameterName = "@i"; ins.Parameters.Add(pI);
+                var pRb = ins.CreateParameter(); pRb.ParameterName = "@rb"; ins.Parameters.Add(pRb);
+                var pPk = ins.CreateParameter(); pPk.ParameterName = "@pk"; ins.Parameters.Add(pPk);
+                var pPr = ins.CreateParameter(); pPr.ParameterName = "@pr"; ins.Parameters.Add(pPr);
+
+                foreach (var r in newRows)
+                {
+                    if (r.DueDate == DateTime.MinValue) continue;
+                    if (r.TotalAmount <= 0m) continue;
+
+                    var due = r.DueDate.Date;
+                    if (due < today) continue; // MODEL A: nie tworzymy nic wstecz
+
+                    pNo.Value = r.InstallmentNo;
+                    pD.Value = ToIsoDate(due);
+                    pA.Value = r.TotalAmount;
+                    pP.Value = (object?)r.PrincipalAmount ?? DBNull.Value;
+                    pI.Value = (object?)r.InterestAmount ?? DBNull.Value;
+                    pRb.Value = (object?)r.RemainingBalance ?? DBNull.Value;
+                    pPk.Value = r.PaymentKind;
+                    pPr.Value = (object?)r.PaymentRefId ?? DBNull.Value;
+
+                    ins.ExecuteNonQuery();
+                    inserted++;
+                }
+
+                tx.Commit();
+                RaiseDataChanged();
+                return inserted;
+            }
+            catch
+            {
+                try { tx.Rollback(); } catch { }
+                throw;
+            }
+        }
+
+
         public static (int planned, int paid) GetLoanInstallmentsStatusCounts(int userId, int loanId)
         {
             using var c = OpenAndEnsureSchema();
@@ -3657,7 +3782,7 @@ WHERE UserId = @u AND LoanId = @l;";
             return (planned, paid);
         }
 
-
+        [Obsolete("Legacy. Nie u¿ywaæ przy imporcie harmonogramu. U¿yj ReplaceFutureUnpaidInstallmentsFromSchedule(...).", false)]
         public static int UpsertLoanInstallments_MergeByNo(
             int userId,
             int loanId,

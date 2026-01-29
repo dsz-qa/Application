@@ -519,6 +519,10 @@ CREATE INDEX IF NOT EXISTS IX_LoanInstallments_Status_DueDate
 CREATE INDEX IF NOT EXISTS IX_LoanInstallments_Schedule
     ON LoanInstallments(UserId, ScheduleId);
 
+CREATE UNIQUE INDEX IF NOT EXISTS UX_Expenses_PlannedLoanInstallment
+ON Expenses(UserId, LoanInstallmentId)
+WHERE IsPlanned=1 AND LoanInstallmentId IS NOT NULL;
+
 CREATE INDEX IF NOT EXISTS IX_Investments_User
     ON Investments(UserId);
 
