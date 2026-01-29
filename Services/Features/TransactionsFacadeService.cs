@@ -1,5 +1,6 @@
-﻿using System;
+﻿using Finly.Models;
 using Microsoft.Data.Sqlite;
+using System;
 
 namespace Finly.Services.Features
 {
@@ -12,6 +13,54 @@ namespace Finly.Services.Features
         // =========================
         //  SET (ustawienia sald)
         // =========================
+        public static void SpendExpense(Expense e)
+        {
+            if (e == null) throw new ArgumentNullException(nameof(e));
+            if (e.UserId <= 0) throw new InvalidOperationException("Brak UserId.");
+            if (e.Amount <= 0) throw new InvalidOperationException("Kwota musi być > 0.");
+
+            // 1) Zawsze zapisujemy rekord wydatku do DB.
+            // Planned: bez wpływu na salda.
+            DatabaseService.InsertExpense(e);
+
+            if (e.IsPlanned)
+                return;
+
+            // 2) Real: księgowanie wyłącznie przez LedgerService (bez parametrów których nie ma).
+            var amount = (decimal)e.Amount;
+
+            switch (e.PaymentKind)
+            {
+                case PaymentKind.FreeCash:
+                    LedgerService.SpendFromFreeCash(e.UserId, amount);
+                    break;
+
+                case PaymentKind.SavedCash:
+                    LedgerService.SpendFromSavedCash(e.UserId, amount);
+                    break;
+
+                case PaymentKind.BankAccount:
+                    {
+                        if (e.PaymentRefId is not int bankId || bankId <= 0)
+                            throw new InvalidOperationException("Brak BankAccountId w PaymentRefId.");
+
+                        LedgerService.SpendFromBankAccount(e.UserId, bankId, amount);
+                        break;
+                    }
+
+                case PaymentKind.Envelope:
+                    {
+                        if (e.PaymentRefId is not int envId || envId <= 0)
+                            throw new InvalidOperationException("Brak EnvelopeId w PaymentRefId.");
+
+                        LedgerService.SpendFromEnvelope(e.UserId, envId, amount);
+                        break;
+                    }
+
+                default:
+                    throw new InvalidOperationException("Nieznany PaymentKind.");
+            }
+        }
 
         public static void SetCashOnHand(int userId, decimal amount)
         {

@@ -16,6 +16,10 @@ namespace Finly.Pages
     {
         private readonly int _uid;
 
+        private bool _initialized;
+        private bool _restoring;
+        private bool _isUiReady;
+
         private enum TransferItemKind
         {
             FreeCash,
@@ -47,26 +51,51 @@ namespace Finly.Pages
 
             Loaded += (_, __) =>
             {
+                if (_restoring) return;
+
+                // KPI można odświeżać zawsze (przy powrocie na stronę też)
                 RefreshMoneySummary();
 
-                ModeTabs.SelectedIndex = -1;
-                ShowPanels(null);
+                // ONE-TIME init
+                if (_initialized) return;
+
+                _initialized = true;
+                _isUiReady = false;
 
                 DatabaseService.EnsureDefaultCategories(_uid);
-                LoadCategories();
 
-                LoadTransferItems();
+                // Słowniki / źródła danych
+                LoadCategories();
                 LoadEnvelopes();
                 LoadIncomeAccounts();
+                LoadTransferItems();
 
+                // Defaulty tylko jeśli UI nic nie ma ustawione
                 var today = DateTime.Today;
-                ExpenseDatePicker.SelectedDate = today;
-                IncomeDatePicker.SelectedDate = today;
-                TransferDatePicker.SelectedDate = today;
+
+                if (ModeTabs.SelectedIndex < 0)
+                    ModeTabs.SelectedIndex = 1; // Wydatek
+
+                if (ExpenseSourceCombo.SelectedIndex < 0)
+                    ExpenseSourceCombo.SelectedIndex = 0;
+
+                if (IncomeFormTypeCombo.SelectedIndex < 0)
+                    IncomeFormTypeCombo.SelectedIndex = 0;
+
+                ExpenseDatePicker.SelectedDate ??= today;
+                IncomeDatePicker.SelectedDate ??= today;
+                TransferDatePicker.SelectedDate ??= today;
+
+                // Widoczność paneli po ustawieniu SelectedIndex
+                ShowPanels((ModeTabs.SelectedItem as TabItem)?.Header?.ToString());
+
+                // Budżety zależne od dat
+                LoadExpenseBudgetsForDate(ExpenseDatePicker.SelectedDate ?? today);
+                LoadIncomeBudgetsForDate(IncomeDatePicker.SelectedDate ?? today);
 
                 UpdateAllPlannedInfo();
-                LoadExpenseBudgetsForDate(today);
-                LoadIncomeBudgetsForDate(today);
+
+                _isUiReady = true;
             };
         }
 
@@ -96,6 +125,8 @@ namespace Finly.Pages
 
         private void ModeTabs_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
+            if (!_initialized || !_isUiReady) return;
+
             var tab = ModeTabs.SelectedItem as TabItem;
             var header = tab?.Header?.ToString();
 
@@ -120,22 +151,27 @@ namespace Finly.Pages
             UpdateAllPlannedInfo();
         }
 
-        private void ExpenseForm_Changed(object sender, RoutedEventArgs e) => UpdateExpensePlannedInfo();
-        private void ExpenseForm_Changed(object sender, SelectionChangedEventArgs e) => UpdateExpensePlannedInfo();
-        private void ExpenseForm_Changed(object sender, TextChangedEventArgs e) => UpdateExpensePlannedInfo();
+        private void ExpenseForm_Changed(object sender, RoutedEventArgs e) { if (_isUiReady) UpdateExpensePlannedInfo(); }
+        private void ExpenseForm_Changed(object sender, SelectionChangedEventArgs e) { if (_isUiReady) UpdateExpensePlannedInfo(); }
+        private void ExpenseForm_Changed(object sender, TextChangedEventArgs e) { if (_isUiReady) UpdateExpensePlannedInfo(); }
 
-        private void IncomeForm_Changed(object sender, RoutedEventArgs e) => UpdateIncomePlannedInfo();
-        private void IncomeForm_Changed(object sender, SelectionChangedEventArgs e) => UpdateIncomePlannedInfo();
-        private void IncomeForm_Changed(object sender, TextChangedEventArgs e) => UpdateIncomePlannedInfo();
+        private void IncomeForm_Changed(object sender, RoutedEventArgs e) { if (_isUiReady) UpdateIncomePlannedInfo(); }
+        private void IncomeForm_Changed(object sender, SelectionChangedEventArgs e) { if (_isUiReady) UpdateIncomePlannedInfo(); }
+        private void IncomeForm_Changed(object sender, TextChangedEventArgs e) { if (_isUiReady) UpdateIncomePlannedInfo(); }
 
-        private void TransferForm_Changed(object sender, RoutedEventArgs e) => UpdateTransferPlannedInfo();
-        private void TransferForm_Changed(object sender, SelectionChangedEventArgs e) => UpdateTransferPlannedInfo();
-        private void TransferForm_Changed(object sender, TextChangedEventArgs e) => UpdateTransferPlannedInfo();
+        private void TransferForm_Changed(object sender, RoutedEventArgs e) { if (_isUiReady) UpdateTransferPlannedInfo(); }
+        private void TransferForm_Changed(object sender, SelectionChangedEventArgs e) { if (_isUiReady) UpdateTransferPlannedInfo(); }
+        private void TransferForm_Changed(object sender, TextChangedEventArgs e) { if (_isUiReady) UpdateTransferPlannedInfo(); }
 
         // ================= DANE SŁOWNIKOWE =================
 
         private void LoadCategories()
         {
+            // zachowaj wybory
+            var prevExpense = ExpenseCategoryBox.SelectedItem as string;
+            var prevIncome = IncomeCategoryBox.SelectedItem as string;
+            var prevTransfer = TransferCategoryBox.SelectedItem as string;
+
             List<string> cats;
             try
             {
@@ -150,31 +186,56 @@ namespace Finly.Pages
             IncomeCategoryBox.ItemsSource = cats;
             TransferCategoryBox.ItemsSource = cats;
 
-            if (cats.Count > 0)
-            {
-                if (ExpenseCategoryBox.SelectedIndex < 0) ExpenseCategoryBox.SelectedIndex = 0;
-                if (IncomeCategoryBox.SelectedIndex < 0) IncomeCategoryBox.SelectedIndex = 0;
-                if (TransferCategoryBox.SelectedIndex < 0) TransferCategoryBox.SelectedIndex = 0;
-            }
+            if (cats.Count <= 0) return;
+
+            if (!string.IsNullOrWhiteSpace(prevExpense) && cats.Contains(prevExpense))
+                ExpenseCategoryBox.SelectedItem = prevExpense;
+            else if (ExpenseCategoryBox.SelectedIndex < 0)
+                ExpenseCategoryBox.SelectedIndex = 0;
+
+            if (!string.IsNullOrWhiteSpace(prevIncome) && cats.Contains(prevIncome))
+                IncomeCategoryBox.SelectedItem = prevIncome;
+            else if (IncomeCategoryBox.SelectedIndex < 0)
+                IncomeCategoryBox.SelectedIndex = 0;
+
+            if (!string.IsNullOrWhiteSpace(prevTransfer) && cats.Contains(prevTransfer))
+                TransferCategoryBox.SelectedItem = prevTransfer;
+            else if (TransferCategoryBox.SelectedIndex < 0)
+                TransferCategoryBox.SelectedIndex = 0;
         }
 
         private void LoadEnvelopes()
         {
+            var prev = ExpenseEnvelopeCombo.SelectedItem as string;
+
             try
             {
                 var envs = DatabaseService.GetEnvelopesNames(_uid) ?? new List<string>();
                 ExpenseEnvelopeCombo.ItemsSource = envs;
-                if (envs.Count > 0)
+
+                if (envs.Count <= 0)
+                {
+                    ExpenseEnvelopeCombo.SelectedIndex = -1;
+                    return;
+                }
+
+                if (!string.IsNullOrWhiteSpace(prev) && envs.Contains(prev))
+                    ExpenseEnvelopeCombo.SelectedItem = prev;
+                else if (ExpenseEnvelopeCombo.SelectedIndex < 0)
                     ExpenseEnvelopeCombo.SelectedIndex = 0;
             }
             catch
             {
                 ExpenseEnvelopeCombo.ItemsSource = Array.Empty<string>();
+                ExpenseEnvelopeCombo.SelectedIndex = -1;
             }
         }
 
         private void LoadIncomeAccounts()
         {
+            var prevIncomeAccId = IncomeAccountCombo.SelectedValue as int?;
+            var prevExpenseAccId = ExpenseBankAccountCombo.SelectedValue as int?;
+
             try
             {
                 var accs = DatabaseService.GetAccounts(_uid) ?? new List<BankAccountModel>();
@@ -186,6 +247,15 @@ namespace Finly.Pages
                 ExpenseBankAccountCombo.ItemsSource = accs.ToList();
                 ExpenseBankAccountCombo.DisplayMemberPath = "AccountName";
                 ExpenseBankAccountCombo.SelectedValuePath = "Id";
+
+                // przywróć wybór jeśli się da
+                if (prevIncomeAccId.HasValue)
+                    IncomeAccountCombo.SelectedValue = prevIncomeAccId.Value;
+
+                if (prevExpenseAccId.HasValue)
+                    ExpenseBankAccountCombo.SelectedValue = prevExpenseAccId.Value;
+
+                // jeśli nadal brak, zostaw -1 (nie wymuszamy defaultu)
             }
             catch
             {
@@ -196,6 +266,10 @@ namespace Finly.Pages
 
         private void LoadTransferItems()
         {
+            // zachowaj poprzednie wybory po Key
+            var prevFromKey = (TransferFromBox.SelectedItem as TransferItem)?.Key;
+            var prevToKey = (TransferToBox.SelectedItem as TransferItem)?.Key;
+
             var items = new List<TransferItem>
             {
                 new TransferItem { Key="free",  Name="Wolna gotówka",    Kind=TransferItemKind.FreeCash },
@@ -224,8 +298,9 @@ namespace Finly.Pages
                     {
                         var id = Convert.ToInt32(r["Id"]);
                         var name = (r["Name"]?.ToString() ?? "(bez nazwy)").Trim();
+
                         decimal allocated = 0m;
-                        if (r["Allocated"] != DBNull.Value)
+                        if (r.Table.Columns.Contains("Allocated") && r["Allocated"] != DBNull.Value)
                             allocated = Convert.ToDecimal(r["Allocated"]);
 
                         items.Add(new TransferItem
@@ -240,16 +315,31 @@ namespace Finly.Pages
             }
             catch { }
 
-            TransferFromBox.ItemsSource = items.ToList();
-            TransferToBox.ItemsSource = items.ToList();
+            TransferFromBox.ItemsSource = items;
+            TransferToBox.ItemsSource = items;
 
-            if (TransferFromBox.Items.Count > 0) TransferFromBox.SelectedIndex = 0;
-            if (TransferToBox.Items.Count > 1) TransferToBox.SelectedIndex = 1;
+            // przywróć jeśli się da
+            if (!string.IsNullOrWhiteSpace(prevFromKey))
+                TransferFromBox.SelectedItem = items.FirstOrDefault(x => x.Key == prevFromKey);
+
+            if (!string.IsNullOrWhiteSpace(prevToKey))
+                TransferToBox.SelectedItem = items.FirstOrDefault(x => x.Key == prevToKey);
+
+            // fallback defaulty tylko jeśli dalej pusto
+            if (TransferFromBox.SelectedIndex < 0 && TransferFromBox.Items.Count > 0)
+                TransferFromBox.SelectedIndex = 0;
+
+            if (TransferToBox.SelectedIndex < 0)
+            {
+                if (TransferToBox.Items.Count > 1) TransferToBox.SelectedIndex = 1;
+                else if (TransferToBox.Items.Count > 0) TransferToBox.SelectedIndex = 0;
+            }
         }
-
 
         private void ExpenseSourceCombo_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
+            if (!_initialized || !_isUiReady) return;
+
             ExpenseEnvelopeRow.Visibility = Visibility.Collapsed;
             ExpenseBankRow.Visibility = Visibility.Collapsed;
 
@@ -268,6 +358,8 @@ namespace Finly.Pages
 
         private void IncomeFormTypeCombo_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
+            if (!_initialized || !_isUiReady) return;
+
             if (IncomeFormTypeCombo.SelectedItem is ComboBoxItem item &&
                 string.Equals(item.Tag as string, "transfer", StringComparison.OrdinalIgnoreCase))
             {
@@ -297,6 +389,8 @@ namespace Finly.Pages
 
         private void ExpenseDatePicker_SelectedDateChanged(object sender, SelectionChangedEventArgs e)
         {
+            if (!_initialized || !_isUiReady) return;
+
             var d = ExpenseDatePicker.SelectedDate ?? DateTime.Today;
             LoadExpenseBudgetsForDate(d);
             UpdateExpensePlannedInfo();
@@ -304,6 +398,8 @@ namespace Finly.Pages
 
         private void IncomeDatePicker_SelectedDateChanged(object sender, SelectionChangedEventArgs e)
         {
+            if (!_initialized || !_isUiReady) return;
+
             var d = IncomeDatePicker.SelectedDate ?? DateTime.Today;
             LoadIncomeBudgetsForDate(d);
             UpdateIncomePlannedInfo();
@@ -311,29 +407,15 @@ namespace Finly.Pages
 
         private void TransferDatePicker_SelectedDateChanged(object sender, SelectionChangedEventArgs e)
         {
+            if (!_initialized || !_isUiReady) return;
             UpdateTransferPlannedInfo();
         }
 
-        private static string BudgetsPage_ToDbTypeCompat(string? anyType)
-        {
-            var s = (anyType ?? "").Trim();
-
-            if (s.Equals("Tygodniowy", StringComparison.OrdinalIgnoreCase)) return "Weekly";
-            if (s.Equals("Miesięczny", StringComparison.OrdinalIgnoreCase)) return "Monthly";
-            if (s.Equals("Roczny", StringComparison.OrdinalIgnoreCase)) return "Yearly";
-            if (s.Equals("Inny", StringComparison.OrdinalIgnoreCase)) return "Custom";
-
-            if (s.Equals("Weekly", StringComparison.OrdinalIgnoreCase)) return "Weekly";
-            if (s.Equals("Monthly", StringComparison.OrdinalIgnoreCase)) return "Monthly";
-            if (s.Equals("Yearly", StringComparison.OrdinalIgnoreCase)) return "Yearly";
-            if (s.Equals("Custom", StringComparison.OrdinalIgnoreCase)) return "Custom";
-
-            return "Monthly";
-        }
-
-
         private void LoadExpenseBudgetsForDate(DateTime date)
         {
+            // zachowaj wybór (Id)
+            var prevId = (ExpenseBudgetCombo.SelectedItem as Budget)?.Id;
+
             try
             {
                 var budgets = BudgetService.GetBudgetsForUser(_uid, from: date, to: date).ToList();
@@ -341,10 +423,19 @@ namespace Finly.Pages
                 ExpenseBudgetRow.Visibility = Visibility.Visible;
 
                 ExpenseBudgetCombo.ItemsSource = budgets;
-                ExpenseBudgetCombo.SelectedIndex = -1;
 
                 bool any = budgets.Any();
                 ExpenseBudgetCombo.IsEnabled = any;
+
+                if (any && prevId.HasValue)
+                {
+                    var match = budgets.FirstOrDefault(b => b.Id == prevId.Value);
+                    ExpenseBudgetCombo.SelectedItem = match;
+                }
+                else
+                {
+                    ExpenseBudgetCombo.SelectedIndex = -1;
+                }
 
                 if (ExpenseBudgetEmptyHint != null)
                     ExpenseBudgetEmptyHint.Visibility = any ? Visibility.Collapsed : Visibility.Visible;
@@ -364,6 +455,8 @@ namespace Finly.Pages
 
         private void LoadIncomeBudgetsForDate(DateTime date)
         {
+            var prevId = (IncomeBudgetCombo.SelectedItem as Budget)?.Id;
+
             try
             {
                 var budgets = BudgetService.GetBudgetsForUser(_uid, from: date, to: date).ToList();
@@ -372,7 +465,16 @@ namespace Finly.Pages
                 {
                     IncomeBudgetRow.Visibility = Visibility.Visible;
                     IncomeBudgetCombo.ItemsSource = budgets;
-                    IncomeBudgetCombo.SelectedIndex = -1;
+
+                    if (prevId.HasValue)
+                    {
+                        var match = budgets.FirstOrDefault(b => b.Id == prevId.Value);
+                        IncomeBudgetCombo.SelectedItem = match;
+                    }
+                    else
+                    {
+                        IncomeBudgetCombo.SelectedIndex = -1;
+                    }
                 }
                 else
                 {
@@ -504,6 +606,9 @@ namespace Finly.Pages
 
         private void ResetForms()
         {
+            // podczas resetu blokujemy eventy
+            _isUiReady = false;
+
             ClearAmountErrors();
 
             ExpenseAmountBox.Clear();
@@ -540,8 +645,22 @@ namespace Finly.Pages
             ExpenseBudgetCombo.SelectedIndex = -1;
             IncomeBudgetCombo.SelectedIndex = -1;
 
-            UpdateAllPlannedInfo();
+            // odśwież transfer items (i tak resetuje selekcje)
             LoadTransferItems();
+
+            UpdateAllPlannedInfo();
+
+            // przywróć defaulty (jak u Ciebie w Loaded)
+            if (ModeTabs.SelectedIndex < 0) ModeTabs.SelectedIndex = 1;
+            if (ExpenseSourceCombo.SelectedIndex < 0) ExpenseSourceCombo.SelectedIndex = 0;
+            if (IncomeFormTypeCombo.SelectedIndex < 0) IncomeFormTypeCombo.SelectedIndex = 0;
+
+            ShowPanels((ModeTabs.SelectedItem as TabItem)?.Header?.ToString());
+
+            LoadExpenseBudgetsForDate(ExpenseDatePicker.SelectedDate ?? today);
+            LoadIncomeBudgetsForDate(IncomeDatePicker.SelectedDate ?? today);
+
+            _isUiReady = true;
         }
 
         // ================= WYDATEK =================
@@ -637,13 +756,15 @@ namespace Finly.Pages
 
             try
             {
-                DatabaseService.InsertExpense(eModel);
+                TransactionsFacadeService.SpendExpense(eModel);
 
                 ToastService.Success(isPlanned ? "Dodano zaplanowany wydatek." : "Dodano wydatek.");
 
+                // Odśwież słowniki po dodaniu (mogła dojść nowa kategoria)
                 LoadCategories();
                 LoadEnvelopes();
                 LoadIncomeAccounts();
+
                 RefreshMoneySummary();
 
                 ResetForms();
@@ -687,7 +808,6 @@ namespace Finly.Pages
 
             int? incomeBudgetId = GetSelectedBudgetId(IncomeBudgetCombo, date);
 
-            // WYLICZENIE STABILNEGO KSIĘGOWANIA:
             PaymentKind paymentKind;
             int? paymentRefId;
             string sourceDisplay;
@@ -714,7 +834,7 @@ namespace Finly.Pages
                     }
 
                     paymentKind = PaymentKind.BankAccount;
-                    paymentRefId = acc.Id; // BankAccounts.Id
+                    paymentRefId = acc.Id;
                     sourceDisplay = $"Konto: {acc.AccountName}";
                     break;
 
@@ -725,7 +845,6 @@ namespace Finly.Pages
 
             try
             {
-                // ZAMIANA: żadnego AddIncomeRaw + żadnych ręcznych UpdateCash/Bank.
                 DatabaseService.InsertIncome(
                     userId: _uid,
                     amount: amount,
@@ -744,6 +863,7 @@ namespace Finly.Pages
                 LoadCategories();
                 LoadIncomeAccounts();
                 RefreshMoneySummary();
+
                 ResetForms();
             }
             catch (Exception ex)
@@ -751,7 +871,6 @@ namespace Finly.Pages
                 ToastService.Error("Nie udało się dodać przychodu.\n" + ex.Message);
             }
         }
-
 
         // ================= TRANSFER =================
 

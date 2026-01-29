@@ -1095,20 +1095,8 @@ namespace Finly.ViewModels
         public void SaveEdit(TransactionCardVm vm)
         {
             if (vm == null) return;
-
-            // Transferów nie edytujesz inline
-            if (vm.Kind == TransactionKind.Transfer)
-            {
-                vm.IsEditing = false;
-                return;
-            }
-
-            // Raty harmonogramu read-only
-            if (vm.IsReadOnly)
-            {
-                vm.IsEditing = false;
-                return;
-            }
+            if (vm.Kind == TransactionKind.Transfer) { vm.IsEditing = false; return; }
+            if (vm.IsReadOnly) { vm.IsEditing = false; return; }
 
             var newDesc = (vm.EditDescription ?? string.Empty).Trim();
             var newCat = (vm.SelectedCategory ?? string.Empty).Trim();
@@ -1117,68 +1105,132 @@ namespace Finly.ViewModels
             if (string.IsNullOrWhiteSpace(newCat))
                 newCat = "(brak)";
 
-            // Najpierw spróbuj zapisać do DB (best-effort)
             try
             {
                 using var c = DatabaseService.GetConnection();
                 DatabaseService.EnsureTables();
 
-                using var cmd = c.CreateCommand();
+                bool HasColumn(string table, string col)
+                {
+                    using var cmd = c.CreateCommand();
+                    cmd.CommandText = $"PRAGMA table_info({table});";
+                    using var r = cmd.ExecuteReader();
+                    while (r.Read())
+                    {
+                        var name = r["name"]?.ToString();
+                        if (string.Equals(name, col, StringComparison.OrdinalIgnoreCase))
+                            return true;
+                    }
+                    return false;
+                }
+
+                int categoryId = 0;
+                try
+                {
+                    // Twój helper już istnieje w AddExpensePage, ale tu robimy to “centralnie”.
+                    // Jeśli nie masz GetOrCreateCategoryId - to dodaj albo zamień na GetCategoryId.
+                    categoryId = DatabaseService.GetOrCreateCategoryId(UserId, newCat);
+                }
+                catch
+                {
+                    categoryId = 0;
+                }
 
                 if (vm.Kind == TransactionKind.Expense)
                 {
-                    // Najczęściej masz w Expenses: Date, Description, CategoryName
-                    cmd.CommandText = @"
+                    var hasCatId = HasColumn("Expenses", "CategoryId");
+                    var hasCatName = HasColumn("Expenses", "CategoryName");
+
+                    using var cmd = c.CreateCommand();
+                    if (hasCatId)
+                    {
+                        cmd.CommandText = @"
+UPDATE Expenses
+SET Date = @d,
+    Description = @desc,
+    CategoryId = @catId
+WHERE Id = @id;";
+                        cmd.Parameters.AddWithValue("@catId", categoryId);
+                    }
+                    else if (hasCatName)
+                    {
+                        cmd.CommandText = @"
 UPDATE Expenses
 SET Date = @d,
     Description = @desc,
     CategoryName = @cat
-WHERE Id = @id;
-";
+WHERE Id = @id;";
+                        cmd.Parameters.AddWithValue("@cat", newCat);
+                    }
+                    else
+                    {
+                        cmd.CommandText = @"
+UPDATE Expenses
+SET Date = @d,
+    Description = @desc
+WHERE Id = @id;";
+                    }
+
                     cmd.Parameters.AddWithValue("@d", newDate.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture));
                     cmd.Parameters.AddWithValue("@desc", newDesc);
-                    cmd.Parameters.AddWithValue("@cat", newCat);
                     cmd.Parameters.AddWithValue("@id", vm.Id);
-
                     cmd.ExecuteNonQuery();
                 }
                 else if (vm.Kind == TransactionKind.Income)
                 {
-                    // Najczęściej masz w Incomes: Date, Description, CategoryName
-                    cmd.CommandText = @"
+                    var hasCatId = HasColumn("Incomes", "CategoryId");
+                    var hasCatName = HasColumn("Incomes", "CategoryName");
+
+                    using var cmd = c.CreateCommand();
+                    if (hasCatId)
+                    {
+                        cmd.CommandText = @"
+UPDATE Incomes
+SET Date = @d,
+    Description = @desc,
+    CategoryId = @catId
+WHERE Id = @id;";
+                        cmd.Parameters.AddWithValue("@catId", categoryId == 0 ? (object)DBNull.Value : categoryId);
+                    }
+                    else if (hasCatName)
+                    {
+                        cmd.CommandText = @"
 UPDATE Incomes
 SET Date = @d,
     Description = @desc,
     CategoryName = @cat
-WHERE Id = @id;
-";
+WHERE Id = @id;";
+                        cmd.Parameters.AddWithValue("@cat", newCat);
+                    }
+                    else
+                    {
+                        cmd.CommandText = @"
+UPDATE Incomes
+SET Date = @d,
+    Description = @desc
+WHERE Id = @id;";
+                    }
+
                     cmd.Parameters.AddWithValue("@d", newDate.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture));
                     cmd.Parameters.AddWithValue("@desc", newDesc);
-                    cmd.Parameters.AddWithValue("@cat", newCat);
                     cmd.Parameters.AddWithValue("@id", vm.Id);
-
                     cmd.ExecuteNonQuery();
                 }
             }
             catch
             {
-                // Jeśli schemat w DB jest inny (np. CategoryId zamiast CategoryName),
-                // to to się tu wywali – ale UI i tak zaktualizujemy dalej.
-                // Docelowo dostosujemy SQL do realnych kolumn.
+                // best-effort: nawet jak DB odmówi (schemat/kolumny), UI i tak zaktualizujemy poniżej
             }
 
-            // Aktualizacja VM (żeby od razu było w UI)
+            // UI update
             vm.Description = newDesc;
             vm.CategoryName = (vm.Kind == TransactionKind.Income && newCat == "(brak)") ? "Przychód" : newCat;
             vm.DateDisplay = newDate.ToString("dd-MM-yyyy", CultureInfo.CurrentCulture);
             vm.IsEditing = false;
 
-            // Odśwież listy/KPI
             ApplyFilters();
-
-            // Jeśli masz w DatabaseService NotifyDataChanged(), to możesz to odkomentować:
-            // try { DatabaseService.NotifyDataChanged(); } catch { }
         }
+
 
 
 

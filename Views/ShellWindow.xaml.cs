@@ -5,12 +5,15 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Runtime.InteropServices;
+using System.Threading;
+using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
 using System.Windows.Input;
 using System.Windows.Interop;
 using System.Windows.Media;
+using System.Windows.Navigation;
 
 namespace Finly.Views
 {
@@ -18,13 +21,55 @@ namespace Finly.Views
     {
         private ResourceDictionary? _activeSizesDict;
 
+        // =========================
+        // PAGE CACHE (per user)
+        // =========================
+        private readonly Dictionary<string, UserControl> _pageCache = new();
+        private int _cachedUid = -1;
+
+        // =========================
+        // NAVIGATION: cancel + gate + "last wins"
+        // =========================
+        private readonly SemaphoreSlim _navGate = new(1, 1);
+        private CancellationTokenSource? _navCts;
+        private string _currentRouteNormalized = string.Empty;
+
+        // "ostatni klik wygrywa" nawet jeśli taski się skolejkowały
+        private int _navSeq = 0;
+
         public ShellWindow()
         {
             InitializeComponent();
-            GoHome(); // domyślnie: Panel główny
+
+            if (MainFrame != null)
+            {
+                MainFrame.Navigated += MainFrame_Navigated;
+                MainFrame.NavigationFailed += MainFrame_NavigationFailed;
+            }
+
+            GoHome();
         }
 
-        // ===== WinAPI – pełny ekran z poszanowaniem paska zadań =====
+        // =========================
+        // Frame handlers
+        // =========================
+        private void MainFrame_Navigated(object? sender, NavigationEventArgs e)
+        {
+            try
+            {
+                MainFrame?.NavigationService?.RemoveBackEntry();
+            }
+            catch { }
+        }
+
+        private void MainFrame_NavigationFailed(object? sender, NavigationFailedEventArgs e)
+        {
+            e.Handled = true;
+        }
+
+        // =========================
+        // WinAPI – pełny ekran z poszanowaniem paska zadań
+        // =========================
         protected override void OnSourceInitialized(EventArgs e)
         {
             base.OnSourceInitialized(e);
@@ -94,36 +139,48 @@ namespace Finly.Views
             public int dwFlags;
         }
 
-        // ===== Zdarzenia okna / responsywność =====
-        private void Window_Loaded(object sender, RoutedEventArgs e)
+        // =========================
+        // Zdarzenia okna / responsywność
+        // =========================
+        private async void Window_Loaded(object sender, RoutedEventArgs e)
         {
-            // ✅ 1) Globalna realizacja rat i innych zaplanowanych płatności
+            // Ciężkie rzeczy poza UI
             try
             {
-                var uid = UserService.CurrentUserId; // tu już masz to w appce używane
+                var uid = UserService.CurrentUserId;
                 if (uid > 0)
-                    DatabaseService.ProcessDuePlannedTransactions(uid, DateTime.Today);
+                {
+                    _ = Task.Run(() =>
+                    {
+                        try { DatabaseService.ProcessDuePlannedTransactions(uid, DateTime.Today); }
+                        catch { }
+                    });
+                }
             }
-            catch
-            {
-                // celowo: nie wywracamy okna
-            }
+            catch { }
 
             ApplyBreakpoint(ActualWidth, ActualHeight);
-            FitSidebar();
-            WindowState = WindowState.Maximized;
-        }
 
+            await Dispatcher.InvokeAsync(() => FitSidebar(), System.Windows.Threading.DispatcherPriority.Background);
+
+            // ❌ NIE ustawiamy tu WindowState = Maximized (to robi mrugnięcie).
+            // Zrób to w XAML: WindowState="Maximized"
+        }
 
         private void Window_SizeChanged(object sender, SizeChangedEventArgs e)
         {
             ApplyBreakpoint(e.NewSize.Width, e.NewSize.Height);
-            FitSidebar();
+            Dispatcher.InvokeAsync(() => FitSidebar(), System.Windows.Threading.DispatcherPriority.Background);
         }
 
-        private void SidebarHost_SizeChanged(object? sender, SizeChangedEventArgs e) => FitSidebar();
+        private void SidebarHost_SizeChanged(object? sender, SizeChangedEventArgs e)
+        {
+            Dispatcher.InvokeAsync(() => FitSidebar(), System.Windows.Threading.DispatcherPriority.Background);
+        }
 
-        // ===== Pasek tytułu =====
+        // =========================
+        // Pasek tytułu
+        // =========================
         private void TitleBar_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
         {
             if (e.OriginalSource is DependencyObject d &&
@@ -141,7 +198,9 @@ namespace Finly.Views
 
         private void Close_Click(object s, RoutedEventArgs e) => Close();
 
-        // ===== Breakpointy =====
+        // =========================
+        // Breakpointy
+        // =========================
         private void ApplyBreakpoint(double width, double height)
         {
             string key =
@@ -173,13 +232,20 @@ namespace Finly.Views
             }
         }
 
-        /// <summary>Skaluje zawartość sidebara tak, by całość mieściła się bez scrolla.</summary>
+        private double _lastSidebarScale = 1.0;
+        private DateTime _lastSidebarFitAt = DateTime.MinValue;
+
         private void FitSidebar()
         {
             if (SidebarRoot == null || SidebarHost == null || SidebarScale == null) return;
 
-            SidebarRoot.LayoutTransform = null;
+            var now = DateTime.UtcNow;
+            if ((now - _lastSidebarFitAt).TotalMilliseconds < 50)
+                return;
+            _lastSidebarFitAt = now;
+
             SidebarRoot.Measure(new Size(SidebarHost.ActualWidth, double.PositiveInfinity));
+
             double needed = SidebarRoot.DesiredSize.Height;
             double available = SidebarHost.ActualHeight;
 
@@ -190,25 +256,71 @@ namespace Finly.Views
             if (scale < 0.7) scale = 0.7;
             if (scale > 1.0) scale = 1.0;
 
+            if (Math.Abs(scale - _lastSidebarScale) < 0.02)
+                return;
+
+            _lastSidebarScale = scale;
             SidebarScale.ScaleX = SidebarScale.ScaleY = scale;
-            SidebarRoot.LayoutTransform = SidebarScale;
         }
 
         // =====================================================================
-        // NAWIGACJA – JEDNO ŹRÓDŁO PRAWDY (MainFrame)
+        // NAWIGACJA
         // =====================================================================
 
-        /// <summary>Nawigacja do konkretnej strony (UserControl) w MainFrame.</summary>
-        public void NavigateTo(UserControl page)
+        private static string NormalizeRoute(string? route)
+            => (route ?? string.Empty).Trim().ToLowerInvariant();
+
+        private static string MakeKey(int uid, string routeNormalized)
+            => $"{uid}:{routeNormalized}";
+
+        private void ResetCacheIfUserChanged(int uid)
         {
-            if (page == null) return;
-            if (MainFrame == null) return;
-
-            MainFrame.Navigate(page);
+            if (_cachedUid == uid) return;
+            _pageCache.Clear();
+            _cachedUid = uid;
         }
 
-        /// <summary>Nawigacja po "route" (string). Zwraca stronę i podpina do MainFrame.</summary>
-        public void NavigateTo(string route)
+        private UserControl GetOrCreatePage(string routeNormalized, int uid)
+        {
+            ResetCacheIfUserChanged(uid);
+
+            var key = MakeKey(uid, routeNormalized);
+            if (_pageCache.TryGetValue(key, out var cached))
+                return cached;
+
+            UserControl created = routeNormalized switch
+            {
+                "dashboard" or "home" => new DashboardPage(uid),
+                "addexpense" or "add" => new AddExpensePage(uid),
+
+                "transactions" or "transakcje" => new TransactionsPage(),
+
+                "budget" or "budgets" or "budzety" => new BudgetsPage(uid),
+
+                "categories" or "kategorie" => new CategoriesPage(),
+                "goals" or "cele" => new GoalsPage(),
+                "charts" or "statystyki" => new ChartsPage(),
+                "reports" or "raporty" => new ReportsPage(),
+                "settings" or "ustawienia" => new SettingsPage(),
+
+                "banks" or "kontabankowe" => new BanksPage(),
+                "envelopes" or "koperty" => new EnvelopesPage(uid),
+
+                "loans" or "kredyty" => new LoansPage(),
+                "investments" or "inwestycje" => new InvestmentsPage(),
+
+                "account" => new AccountPage(uid),
+
+                _ => new DashboardPage(uid),
+            };
+
+            _pageCache[key] = created;
+            return created;
+        }
+
+        public void NavigateTo(string route) => _ = NavigateToAsync(route);
+
+        private async Task NavigateToAsync(string route)
         {
             var uid = UserService.CurrentUserId;
             if (uid <= 0)
@@ -220,40 +332,54 @@ namespace Finly.Views
                 return;
             }
 
-            string r = (route ?? string.Empty).Trim().ToLowerInvariant();
+            string r = NormalizeRoute(route);
+            if (r == _currentRouteNormalized) return;
 
-            UserControl view = r switch
+            // ✅ generujemy numer żądania (ostatnie wygrywa)
+            int mySeq = Interlocked.Increment(ref _navSeq);
+
+            // ✅ anuluj poprzednie, aby nie stały w kolejce
+            _navCts?.Cancel();
+            _navCts?.Dispose();
+            _navCts = new CancellationTokenSource();
+            var ct = _navCts.Token;
+
+            try
             {
-                "dashboard" or "home" => new DashboardPage(uid),
+                // ✅ KLUCZ: czekamy na gate z tokenem, więc backlog nie powstaje
+                await _navGate.WaitAsync(ct).ConfigureAwait(true);
+            }
+            catch (OperationCanceledException)
+            {
+                return;
+            }
 
-                // AddExpensePage wymaga uid
-                "addexpense" or "add" => new AddExpensePage(uid),
+            try
+            {
+                // jeśli w międzyczasie wpadło nowsze żądanie, wychodzimy natychmiast
+                if (mySeq != Volatile.Read(ref _navSeq)) return;
+                if (ct.IsCancellationRequested) return;
 
-                // Transakcje bez uid
-                "transactions" or "transakcje" => new TransactionsPage(),
+                await Dispatcher.InvokeAsync(() => { }, System.Windows.Threading.DispatcherPriority.Background);
+                if (ct.IsCancellationRequested) return;
+                if (mySeq != Volatile.Read(ref _navSeq)) return;
 
-                // ✅ KLUCZOWA POPRAWKA: BudgetsPage MUSI dostać uid
-                "budget" or "budgets" or "budzety" => new BudgetsPage(uid),
+                var view = GetOrCreatePage(r, uid);
 
-                "categories" or "kategorie" => new CategoriesPage(),
-                "goals" or "cele" => new GoalsPage(),
-                "charts" or "statystyki" => new ChartsPage(),
-                "reports" or "raporty" => new ReportsPage(),
-                "settings" or "ustawienia" => new SettingsPage(),
+                if (MainFrame != null && !ReferenceEquals(MainFrame.Content, view))
+                    MainFrame.Navigate(view);
 
-                "banks" or "kontabankowe" => new BanksPage(),
-
-                // EnvelopesPage wymaga uid
-                "envelopes" or "koperty" => new EnvelopesPage(uid),
-
-                "loans" or "kredyty" => new LoansPage(),
-                "investments" or "inwestycje" => new InvestmentsPage(),
-
-                _ => new DashboardPage(uid),
-            };
-
-            NavigateTo(view);
-            ApplyActiveHighlightForRoute(r);
+                _currentRouteNormalized = r;
+                ApplyActiveHighlightForRoute(r);
+            }
+            catch
+            {
+                // nie wywracamy okna
+            }
+            finally
+            {
+                _navGate.Release();
+            }
         }
 
         private void GoHome()
@@ -262,83 +388,28 @@ namespace Finly.Views
             SetActiveFooter(null);
         }
 
-        // ===== Kliknięcia NAV (lewy sidebar) =====
-        private void Nav_Home_Click(object sender, RoutedEventArgs e)
-        {
-            NavigateTo("home");
-            SetActiveFooter(null);
-        }
+        // =========================
+        // Kliknięcia NAV
+        // =========================
+        private void Nav_Home_Click(object sender, RoutedEventArgs e) { NavigateTo("home"); SetActiveFooter(null); }
+        private void Nav_Add_Click(object s, RoutedEventArgs e) { NavigateTo("addexpense"); SetActiveFooter(null); }
+        private void Nav_Transactions_Click(object s, RoutedEventArgs e) { NavigateTo("transactions"); SetActiveFooter(null); }
+        private void Nav_Charts_Click(object s, RoutedEventArgs e) { NavigateTo("charts"); SetActiveFooter(null); }
+        private void Nav_Budgets_Click(object s, RoutedEventArgs e) { NavigateTo("budgets"); SetActiveFooter(null); }
+        private void Nav_Goals_Click(object s, RoutedEventArgs e) { NavigateTo("goals"); SetActiveFooter(null); }
+        private void Nav_Categories_Click(object s, RoutedEventArgs e) { NavigateTo("categories"); SetActiveFooter(null); }
+        private void Nav_Reports_Click(object s, RoutedEventArgs e) { NavigateTo("reports"); SetActiveFooter(null); }
+        private void Nav_Banks_Click(object s, RoutedEventArgs e) { NavigateTo("banks"); SetActiveFooter(null); }
+        private void Nav_Envelopes_Click(object s, RoutedEventArgs e) { NavigateTo("envelopes"); SetActiveFooter(null); }
+        private void Nav_Loans_Click(object s, RoutedEventArgs e) { NavigateTo("loans"); SetActiveFooter(null); }
+        private void Nav_Investments_Click(object s, RoutedEventArgs e) { NavigateTo("investments"); SetActiveFooter(null); }
 
-        private void Nav_Add_Click(object s, RoutedEventArgs e)
-        {
-            NavigateTo("addexpense");
-            SetActiveFooter(null);
-        }
-
-        private void Nav_Transactions_Click(object s, RoutedEventArgs e)
-        {
-            NavigateTo("transactions");
-            SetActiveFooter(null);
-        }
-
-        private void Nav_Charts_Click(object s, RoutedEventArgs e)
-        {
-            NavigateTo("charts");
-            SetActiveFooter(null);
-        }
-
-        private void Nav_Budgets_Click(object s, RoutedEventArgs e)
-        {
-            NavigateTo("budgets");
-            SetActiveFooter(null);
-        }
-
-        private void Nav_Goals_Click(object s, RoutedEventArgs e)
-        {
-            NavigateTo("goals");
-            SetActiveFooter(null);
-        }
-
-        private void Nav_Categories_Click(object s, RoutedEventArgs e)
-        {
-            NavigateTo("categories");
-            SetActiveFooter(null);
-        }
-
-        private void Nav_Reports_Click(object s, RoutedEventArgs e)
-        {
-            NavigateTo("reports");
-            SetActiveFooter(null);
-        }
-
-        private void Nav_Banks_Click(object s, RoutedEventArgs e)
-        {
-            NavigateTo("banks");
-            SetActiveFooter(null);
-        }
-
-        private void Nav_Envelopes_Click(object s, RoutedEventArgs e)
-        {
-            NavigateTo("envelopes");
-            SetActiveFooter(null);
-        }
-
-        private void Nav_Loans_Click(object s, RoutedEventArgs e)
-        {
-            NavigateTo("loans");
-            SetActiveFooter(null);
-        }
-
-        private void Nav_Investments_Click(object s, RoutedEventArgs e)
-        {
-            NavigateTo("investments");
-            SetActiveFooter(null);
-        }
-
-        // ===== Stopka =====
+        // =========================
+        // Stopka
+        // =========================
         private void OpenProfile_Click(object s, RoutedEventArgs e)
         {
-            NavigateTo(new AccountPage(UserService.CurrentUserId));
+            NavigateTo("account");
             SetActiveNav(null);
             SetActiveFooter(FooterAccount);
         }
@@ -352,6 +423,13 @@ namespace Finly.Views
 
         private void Nav_Logout_Click(object sender, RoutedEventArgs e)
         {
+            _pageCache.Clear();
+            _cachedUid = -1;
+
+            _navCts?.Cancel();
+            _navCts?.Dispose();
+            _navCts = null;
+
             SettingsService.LastUserId = null;
             UserService.ClearCurrentUser();
 
@@ -365,7 +443,6 @@ namespace Finly.Views
         // =====================================================================
         // PODŚWIETLANIA
         // =====================================================================
-
         private void ApplyActiveHighlightForRoute(string r)
         {
             SetActiveFooter(null);
@@ -373,64 +450,51 @@ namespace Finly.Views
             switch (r)
             {
                 case "dashboard":
-                case "home":
-                    SetActiveNav(NavHome);
-                    break;
+                case "home": SetActiveNav(NavHome); break;
 
                 case "addexpense":
-                case "add":
-                    SetActiveNav(NavAdd);
-                    break;
+                case "add": SetActiveNav(NavAdd); break;
 
                 case "transactions":
-                case "transakcje":
-                    SetActiveNav(NavTransactions);
-                    break;
+                case "transakcje": SetActiveNav(NavTransactions); break;
 
                 case "budgets":
                 case "budget":
-                case "budzety":
-                    SetActiveNav(NavBudgets);
-                    break;
+                case "budzety": SetActiveNav(NavBudgets); break;
 
                 case "categories":
-                case "kategorie":
-                    SetActiveNav(NavCategories);
-                    break;
+                case "kategorie": SetActiveNav(NavCategories); break;
 
                 case "charts":
-                case "statystyki":
-                    SetActiveNav(NavCharts);
-                    break;
+                case "statystyki": SetActiveNav(NavCharts); break;
 
                 case "reports":
-                case "raporty":
-                    SetActiveNav(NavReports);
-                    break;
+                case "raporty": SetActiveNav(NavReports); break;
 
                 case "loans":
-                case "kredyty":
-                    SetActiveNav(NavLoans);
-                    break;
+                case "kredyty": SetActiveNav(NavLoans); break;
 
                 case "goals":
-                case "cele":
-                    SetActiveNav(NavGoals);
-                    break;
+                case "cele": SetActiveNav(NavGoals); break;
 
                 case "investments":
-                case "inwestycje":
-                    SetActiveNav(NavInvestments);
-                    break;
+                case "inwestycje": SetActiveNav(NavInvestments); break;
 
                 case "banks":
-                case "kontabankowe":
-                    SetActiveNav(NavBanks);
-                    break;
+                case "kontabankowe": SetActiveNav(NavBanks); break;
 
                 case "envelopes":
-                case "koperty":
-                    SetActiveNav(NavEnvelopes);
+                case "koperty": SetActiveNav(NavEnvelopes); break;
+
+                case "account":
+                    SetActiveNav(null);
+                    SetActiveFooter(FooterAccount);
+                    break;
+
+                case "settings":
+                case "ustawienia":
+                    SetActiveNav(null);
+                    SetActiveFooter(FooterSettings);
                     break;
 
                 default:
@@ -463,7 +527,9 @@ namespace Finly.Views
             if (FooterLogout != null) FooterLogout.IsChecked = false;
         }
 
-        // ===== Helpery visual tree =====
+        // =========================
+        // Helpery visual tree
+        // =========================
         public static IEnumerable<T> FindVisualChildren<T>(DependencyObject depObj) where T : DependencyObject
         {
             if (depObj == null) yield break;
