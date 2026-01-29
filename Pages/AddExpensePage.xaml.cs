@@ -7,8 +7,11 @@ using System.Collections.Generic;
 using System.Data;
 using System.Globalization;
 using System.Linq;
+using System.Text;
 using System.Windows;
 using System.Windows.Controls;
+using Finly.Views.Dialogs;
+
 
 namespace Finly.Pages
 {
@@ -32,12 +35,14 @@ namespace Finly.Pages
         {
             public string Key { get; set; } = "";
             public string Name { get; set; } = "";
+            public string IconPath { get; set; } = "";   // ✅ DODAJ
             public TransferItemKind Kind { get; set; }
             public int? BankAccountId { get; set; }
             public int? EnvelopeId { get; set; }
 
             public override string ToString() => Name;
         }
+
 
         public AddExpensePage() : this(UserService.GetCurrentUserId())
         {
@@ -69,6 +74,7 @@ namespace Finly.Pages
                 LoadEnvelopes();
                 LoadIncomeAccounts();
                 LoadTransferItems();
+                LoadLastTransactionsFromDb();
 
                 // Defaulty tylko jeśli UI nic nie ma ustawione
                 var today = DateTime.Today;
@@ -97,6 +103,114 @@ namespace Finly.Pages
 
                 _isUiReady = true;
             };
+        }
+
+
+
+        // ================= KATEGORIE: NOWA KATEGORIA (DIALOG) =================
+
+        private void CreateCategoryFromExpense_Click(object sender, RoutedEventArgs e)
+        {
+            CreateCategoryAndSelect(
+                targetCombo: ExpenseCategoryBox,
+                newCategoryTextBox: ExpenseNewCategoryBox
+            );
+        }
+
+        private void CreateCategoryFromIncome_Click(object sender, RoutedEventArgs e)
+        {
+            CreateCategoryAndSelect(
+                targetCombo: IncomeCategoryBox,
+                newCategoryTextBox: IncomeNewCategoryBox
+            );
+        }
+
+        private void CreateCategoryFromTransfer_Click(object sender, RoutedEventArgs e)
+        {
+            CreateCategoryAndSelect(
+                targetCombo: TransferCategoryBox,
+                newCategoryTextBox: TransferNewCategoryBox
+            );
+        }
+
+        private void CreateCategoryAndSelect(ComboBox targetCombo, TextBox newCategoryTextBox)
+        {
+            if (_uid <= 0)
+            {
+                ToastService.Error("Brak użytkownika (uid). Zaloguj się ponownie.");
+                return;
+            }
+
+            var dlg = new EditCategoryDialog
+            {
+                Owner = Window.GetWindow(this)
+            };
+
+            // Tryb dodawania (czyści VM, ustawia teksty nagłówka)
+            dlg.LoadForAdd();
+
+            var ok = dlg.ShowDialog();
+            if (ok != true) return;
+
+            var name = (dlg.Category?.Name ?? string.Empty).Trim();
+            if (string.IsNullOrWhiteSpace(name))
+            {
+                ToastService.Info("Podaj nazwę kategorii.");
+                return;
+            }
+
+            try
+            {
+                // Minimalnie stabilnie: tworzymy (lub pobieramy istniejącą) kategorię po nazwie
+                // To daje Ci działanie w UI nawet jeśli nie masz jeszcze kolumn meta (opis/kolor/ikona) w DB.
+                _ = DatabaseService.GetOrCreateCategoryId(_uid, name);
+
+                // Jeśli w przyszłości dodasz w DB metadane kategorii (opis/kolor/ikona),
+                // to tutaj jest bezpieczne miejsce na update — ale NIE wymagamy tego teraz.
+                // (Zostawiamy bezpiecznie w try/catch, żeby nic nie wywaliło aplikacji.)
+                try
+                {
+                    var desc = (dlg.Category?.Description ?? string.Empty).Trim();
+                    var colorHex = (dlg.Category?.ColorHex ?? string.Empty).Trim();
+                    var icon = (dlg.Category?.Icon ?? string.Empty).Trim();
+
+                    // Jeśli masz/utworzysz taką metodę w DatabaseService, odkomentuj:
+                    // DatabaseService.UpdateCategoryMeta(_uid, name, desc, colorHex, icon);
+
+                    _ = desc; _ = colorHex; _ = icon; // brak warningów gdy update nie istnieje
+                }
+                catch
+                {
+                    // celowo ignorujemy — metadane nie są krytyczne do działania dodawania transakcji
+                }
+
+                // Odśwież listy i ustaw nową kategorię w odpowiednim ComboBox
+                LoadCategories();
+
+                // Ustaw wybór (ItemsSource to List<string>)
+                if (targetCombo.ItemsSource is IEnumerable<string> list)
+                {
+                    var match = list.FirstOrDefault(x => string.Equals(x, name, StringComparison.OrdinalIgnoreCase));
+                    if (!string.IsNullOrWhiteSpace(match))
+                        targetCombo.SelectedItem = match;
+                    else
+                        targetCombo.SelectedItem = name; // fallback
+                }
+                else
+                {
+                    targetCombo.SelectedItem = name;
+                }
+
+                // Opcjonalnie: wyczyść pole "Nowa kategoria (opcjonalnie)" aby nie mieszać użytkownikowi
+                if (newCategoryTextBox != null)
+                    newCategoryTextBox.Clear();
+
+                ToastService.Success("Dodano kategorię.");
+            }
+            catch (Exception ex)
+            {
+                ToastService.Error("Nie udało się dodać kategorii.\n" + ex.Message);
+            }
         }
 
         // ================= KPI =================
@@ -190,18 +304,21 @@ namespace Finly.Pages
 
             if (!string.IsNullOrWhiteSpace(prevExpense) && cats.Contains(prevExpense))
                 ExpenseCategoryBox.SelectedItem = prevExpense;
-            else if (ExpenseCategoryBox.SelectedIndex < 0)
-                ExpenseCategoryBox.SelectedIndex = 0;
+            else
+                ExpenseCategoryBox.SelectedIndex = -1;
+
 
             if (!string.IsNullOrWhiteSpace(prevIncome) && cats.Contains(prevIncome))
                 IncomeCategoryBox.SelectedItem = prevIncome;
-            else if (IncomeCategoryBox.SelectedIndex < 0)
-                IncomeCategoryBox.SelectedIndex = 0;
+            else
+                IncomeCategoryBox.SelectedIndex = -1;
+
 
             if (!string.IsNullOrWhiteSpace(prevTransfer) && cats.Contains(prevTransfer))
                 TransferCategoryBox.SelectedItem = prevTransfer;
-            else if (TransferCategoryBox.SelectedIndex < 0)
-                TransferCategoryBox.SelectedIndex = 0;
+            else
+                TransferCategoryBox.SelectedIndex = -1;
+
         }
 
         private void LoadEnvelopes()
@@ -240,12 +357,12 @@ namespace Finly.Pages
             {
                 var accs = DatabaseService.GetAccounts(_uid) ?? new List<BankAccountModel>();
 
+                // IMPORTANT:
+                // Nie ustawiaj DisplayMemberPath, bo to zabija DataTemplate (logo + saldo) z XAML
                 IncomeAccountCombo.ItemsSource = accs;
-                IncomeAccountCombo.DisplayMemberPath = "AccountName";
                 IncomeAccountCombo.SelectedValuePath = "Id";
 
                 ExpenseBankAccountCombo.ItemsSource = accs.ToList();
-                ExpenseBankAccountCombo.DisplayMemberPath = "AccountName";
                 ExpenseBankAccountCombo.SelectedValuePath = "Id";
 
                 // przywróć wybór jeśli się da
@@ -271,10 +388,11 @@ namespace Finly.Pages
             var prevToKey = (TransferToBox.SelectedItem as TransferItem)?.Key;
 
             var items = new List<TransferItem>
-            {
-                new TransferItem { Key="free",  Name="Wolna gotówka",    Kind=TransferItemKind.FreeCash },
-                new TransferItem { Key="saved", Name="Odłożona gotówka", Kind=TransferItemKind.SavedCash }
-            };
+{
+    new TransferItem { Key="free",  Name="Wolna gotówka",    Kind=TransferItemKind.FreeCash,  IconPath="pack://application:,,,/Assets/Icons/wolnagotowka.png" },
+    new TransferItem { Key="saved", Name="Odłożona gotówka", Kind=TransferItemKind.SavedCash, IconPath="pack://application:,,,/Assets/Icons/odlozonagotowka.png" }
+};
+
 
             try
             {
@@ -284,8 +402,10 @@ namespace Finly.Pages
                     Key = $"bank:{a.Id}",
                     Kind = TransferItemKind.BankAccount,
                     BankAccountId = a.Id,
+                    IconPath = "pack://application:,,,/Assets/Icons/kontabankowe.png",
                     Name = $"Konto bankowe: {a.AccountName} — {a.Balance.ToString("N2", CultureInfo.CurrentCulture)} zł"
                 }));
+
             }
             catch { }
 
@@ -308,8 +428,10 @@ namespace Finly.Pages
                             Key = $"env:{id}",
                             Kind = TransferItemKind.Envelope,
                             EnvelopeId = id,
+                            IconPath = "pack://application:,,,/Assets/Icons/koperty.png",
                             Name = $"Koperta: {name} — {allocated.ToString("N2", CultureInfo.CurrentCulture)} zł"
                         });
+
                     }
                 }
             }
@@ -334,6 +456,67 @@ namespace Finly.Pages
                 if (TransferToBox.Items.Count > 1) TransferToBox.SelectedIndex = 1;
                 else if (TransferToBox.Items.Count > 0) TransferToBox.SelectedIndex = 0;
             }
+        }
+
+        private void LoadLastTransactionsFromDb()
+        {
+            try
+            {
+                // OSTATNI WYDATEK
+                var lastExp = DatabaseService.GetLastExpense(_uid);
+                if (lastExp != null)
+                {
+                    SetLastExpenseSummary(
+                        date: lastExp.Date,
+                        amount: (decimal)lastExp.Amount,
+                        fromAccount: lastExp.Account ?? "Nie dotyczy",
+                        category: SafeGetCategoryName(lastExp.CategoryId),
+                        description: lastExp.Description,
+                        isPlanned: lastExp.IsPlanned
+                    );
+                }
+                else if (LastTransactionText != null)
+                {
+                    LastTransactionText.Text = "—";
+                }
+
+                // OSTATNI PRZYCHÓD
+                var lastInc = DatabaseService.GetLastIncome(_uid);
+                if (lastInc != null)
+                {
+                    // źródło w DB trzymasz jako tekst (sourceDisplay)
+                    SetLastIncomeSummary(
+                        date: lastInc.Date,
+                        amount: lastInc.Amount,
+                        toAccount: lastInc.Source ?? "Nie dotyczy",
+                        category: SafeGetCategoryName(lastInc.CategoryId ?? 0),
+                        description: lastInc.Description,
+                        isPlanned: lastInc.IsPlanned,
+                        isTransferToBank: (lastInc.PaymentKind == PaymentKind.BankAccount)
+                    );
+                }
+                else if (LastIncomeTransactionText != null)
+                {
+                    LastIncomeTransactionText.Text = "—";
+                }
+
+                // TRANSFER: jeśli masz tabelę/serwis – dopniemy po nazwie tabeli
+                if (LastTransferText != null && string.IsNullOrWhiteSpace(LastTransferText.Text))
+                    LastTransferText.Text = "—";
+            }
+            catch
+            {
+                if (LastTransactionText != null) LastTransactionText.Text = "—";
+                if (LastIncomeTransactionText != null) LastIncomeTransactionText.Text = "—";
+                if (LastTransferText != null) LastTransferText.Text = "—";
+            }
+        }
+
+        private string? SafeGetCategoryName(int categoryId)
+        {
+            if (categoryId <= 0) return null;
+            try { return DatabaseService.GetCategoryNameById(_uid, categoryId); }
+            catch { return null; }
         }
 
         private void ExpenseSourceCombo_SelectionChanged(object sender, SelectionChangedEventArgs e)
@@ -663,6 +846,78 @@ namespace Finly.Pages
             _isUiReady = true;
         }
 
+        // ================= LAST TRANSACTION (TransactionsPage-like fields) =================
+
+        private static string FormatMoney(decimal amount) =>
+            amount.ToString("N2", CultureInfo.CurrentCulture) + " zł";
+
+        private static string FormatDate(DateTime date) =>
+            date.ToString("dd.MM.yyyy", CultureInfo.CurrentCulture);
+
+        private static string NullOr(string? s, string fallback) =>
+            string.IsNullOrWhiteSpace(s) ? fallback : s.Trim();
+
+        private static string TransferItemShortName(TransferItem? item)
+        {
+            if (item == null) return "Nie dotyczy";
+
+            // item.Name ma czasem saldo: "Konto bankowe: X — 1 234,00 zł"
+            // my chcemy krótko jak w TransactionsPage
+            var name = item.Name ?? "";
+            if (name.Contains("—"))
+                name = name.Split('—')[0].Trim();
+
+            return name;
+        }
+
+        private void SetLastExpenseSummary(DateTime date, decimal amount, string fromAccount, string? category, string? description, bool isPlanned)
+        {
+            if (LastTransactionText == null) return;
+
+            var sb = new StringBuilder();
+            sb.AppendLine(isPlanned ? "Wydatek (zaplanowany)" : "Wydatek");
+            sb.AppendLine($"Data: {FormatDate(date)}");
+            sb.AppendLine($"Kwota: {FormatMoney(amount)}");
+            sb.AppendLine($"Z konta: {NullOr(fromAccount, "Nie dotyczy")}");
+            sb.AppendLine($"Kategoria: {NullOr(category, "(brak)")}");
+            sb.AppendLine($"Opis: {NullOr(description, "Brak danych")}");
+
+            LastTransactionText.Text = sb.ToString().TrimEnd();
+        }
+
+        private void SetLastIncomeSummary(DateTime date, decimal amount, string toAccount, string? category, string? description, bool isPlanned, bool isTransferToBank)
+        {
+            if (LastIncomeTransactionText == null) return;
+
+            var sb = new StringBuilder();
+            sb.AppendLine(isPlanned ? "Przychód (zaplanowany)" : "Przychód");
+            sb.AppendLine($"Data: {FormatDate(date)}");
+            sb.AppendLine($"Kwota: {FormatMoney(amount)}");
+
+            // TransactionsPage dla przychodu ma "Na konto:"
+            sb.AppendLine($"Na konto: {(isTransferToBank ? NullOr(toAccount, "Nie dotyczy") : "Nie dotyczy")}");
+
+            sb.AppendLine($"Kategoria: {NullOr(category, "(brak)")}");
+            sb.AppendLine($"Opis: {NullOr(description, "Brak danych")}");
+
+            LastIncomeTransactionText.Text = sb.ToString().TrimEnd();
+        }
+
+        private void SetLastTransferSummary(DateTime date, decimal amount, string fromAccount, string toAccount, string? description)
+        {
+            if (LastTransferText == null) return;
+
+            var sb = new StringBuilder();
+            sb.AppendLine("Transfer");
+            sb.AppendLine($"Data: {FormatDate(date)}");
+            sb.AppendLine($"Kwota: {FormatMoney(amount)}");
+            sb.AppendLine($"Z konta: {NullOr(fromAccount, "Nie dotyczy")}");
+            sb.AppendLine($"Na konto: {NullOr(toAccount, "Nie dotyczy")}");
+            sb.AppendLine($"Opis: {NullOr(description, "Brak danych")}");
+
+            LastTransferText.Text = sb.ToString().TrimEnd();
+        }
+
         // ================= WYDATEK =================
 
         private void SaveExpense_Click(object sender, RoutedEventArgs e)
@@ -760,6 +1015,16 @@ namespace Finly.Pages
 
                 ToastService.Success(isPlanned ? "Dodano zaplanowany wydatek." : "Dodano wydatek.");
 
+                // ✅ LAST (zanim ResetForms wyczyści formularz)
+                SetLastExpenseSummary(
+                    date: date,
+                    amount: amount,
+                    fromAccount: eModel.Account,
+                    category: catName,
+                    description: desc,
+                    isPlanned: isPlanned
+                );
+
                 // Odśwież słowniki po dodaniu (mogła dojść nowa kategoria)
                 LoadCategories();
                 LoadEnvelopes();
@@ -811,6 +1076,7 @@ namespace Finly.Pages
             PaymentKind paymentKind;
             int? paymentRefId;
             string sourceDisplay;
+            bool isTransferToBank = false;
 
             switch (formTag)
             {
@@ -836,6 +1102,7 @@ namespace Finly.Pages
                     paymentKind = PaymentKind.BankAccount;
                     paymentRefId = acc.Id;
                     sourceDisplay = $"Konto: {acc.AccountName}";
+                    isTransferToBank = true;
                     break;
 
                 default:
@@ -859,6 +1126,17 @@ namespace Finly.Pages
                 );
 
                 ToastService.Success(isPlanned ? "Dodano zaplanowany przychód." : "Dodano przychód.");
+
+                // ✅ LAST (TransactionsPage-like)
+                SetLastIncomeSummary(
+                    date: date,
+                    amount: amount,
+                    toAccount: sourceDisplay,
+                    category: catName,
+                    description: desc,
+                    isPlanned: isPlanned,
+                    isTransferToBank: isTransferToBank
+                );
 
                 LoadCategories();
                 LoadIncomeAccounts();
@@ -899,6 +1177,8 @@ namespace Finly.Pages
                 ToastService.Info("Wybierz różne konta źródłowe i docelowe.");
                 return;
             }
+
+            var desc = string.IsNullOrWhiteSpace(TransferDescBox.Text) ? null : TransferDescBox.Text.Trim();
 
             try
             {
@@ -1020,6 +1300,15 @@ namespace Finly.Pages
 
                 ToastService.Success("Zapisano transfer.");
 
+                // ✅ LAST
+                SetLastTransferSummary(
+                    date: date,
+                    amount: amount,
+                    fromAccount: TransferItemShortName(from),
+                    toAccount: TransferItemShortName(to),
+                    description: desc
+                );
+
                 RefreshMoneySummary();
                 ResetForms();
             }
@@ -1029,7 +1318,7 @@ namespace Finly.Pages
             }
         }
 
-        // ================= POMOCNICZE =================
+        // ================= POMOCNICZE (BUDŻETY) =================
 
         private void CreateBudgetFromExpense_Click(object sender, RoutedEventArgs e)
         {
@@ -1102,6 +1391,5 @@ namespace Finly.Pages
 
             ToastService.Success("Dodano budżet.");
         }
-
     }
 }

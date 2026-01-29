@@ -46,6 +46,7 @@
 	  <None Remove="Assets\Icons\koperty.png" />
 	  <None Remove="Assets\Icons\kredyty.png" />
 	  <None Remove="Assets\Icons\logoFinly.ico" />
+	  <None Remove="Assets\Icons\odlozonagotowka.png" />
 	  <None Remove="Assets\Icons\przychody.png" />
 	  <None Remove="Assets\Icons\raporty.png" />
 	  <None Remove="Assets\Icons\search.png" />
@@ -55,6 +56,7 @@
 	  <None Remove="Assets\Icons\stronaglowna.png" />
 	  <None Remove="Assets\Icons\transakcje.png" />
 	  <None Remove="Assets\Icons\transfer.png" />
+	  <None Remove="Assets\Icons\wolnagotowka.png" />
 	  <None Remove="Assets\Icons\wydatki.png" />
 	  <None Remove="Assets\Images\logoFinly.png" />
 	</ItemGroup>
@@ -111,6 +113,7 @@
 	  <Resource Include="Assets\Icons\logoFinly.ico">
 	    <CopyToOutputDirectory>Never</CopyToOutputDirectory>
 	  </Resource>
+	  <Resource Include="Assets\Icons\odlozonagotowka.png" />
 	  <Resource Include="Assets\Icons\przychody.png" />
 	  <Resource Include="Assets\Icons\raporty.png" />
 	  <Resource Include="Assets\Icons\search.png" />
@@ -118,6 +121,7 @@
 	  <Resource Include="Assets\Icons\stronaglowna.png" />
 	  <Resource Include="Assets\Icons\transakcje.png" />
 	  <Resource Include="Assets\Icons\transfer.png" />
+	  <Resource Include="Assets\Icons\wolnagotowka.png" />
 	  <Resource Include="Assets\Icons\wydatki.png" />
 	  <Resource Include="Assets\Images\logoFinly.png">
 	    <CopyToOutputDirectory>Never</CopyToOutputDirectory>

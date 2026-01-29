@@ -24,6 +24,8 @@ namespace Finly.Services.Features
         private static readonly object _schemaLock = new();
         private static bool _schemaInitialized = false;
 
+
+
         // ====== cieka bazy ======
         private static string DbPath
         {
@@ -70,6 +72,196 @@ namespace Finly.Services.Features
 
             return con;
         }
+
+        // ===================== "Ostatnio dodane" (dla AddExpensePage) =====================
+
+        public sealed class LastExpenseDto
+        {
+            public DateTime Date { get; init; }
+            public double Amount { get; init; }
+            public string? Account { get; init; }
+            public int CategoryId { get; init; }
+            public string? Description { get; init; }
+            public bool IsPlanned { get; init; }
+        }
+
+        public sealed class LastIncomeDto
+        {
+            public DateTime Date { get; init; }
+            public decimal Amount { get; init; }
+            public string? Source { get; init; }
+            public int? CategoryId { get; init; }
+            public string? Description { get; init; }
+            public bool IsPlanned { get; init; }
+            public PaymentKind PaymentKind { get; init; }
+        }
+
+        // Bezpieczne pobieranie wartoœci kolumny (gdy kolumna nie istnieje albo null)
+        private static object? ScalarOrNull(SqliteDataReader r, string col)
+        {
+            try
+            {
+                var idx = r.GetOrdinal(col);
+                return r.IsDBNull(idx) ? null : r.GetValue(idx);
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
+        private static DateTime ReadDate(object? value)
+        {
+            if (value == null || value == DBNull.Value) return DateTime.Today;
+
+            if (value is DateTime dt) return dt;
+
+            if (value is string s)
+            {
+                // wspieramy Twoje "yyyy-MM-dd" i inne formaty
+                if (DateTime.TryParse(s, CultureInfo.InvariantCulture, DateTimeStyles.None, out var d1)) return d1;
+                if (DateTime.TryParse(s, CultureInfo.CurrentCulture, DateTimeStyles.None, out var d2)) return d2;
+            }
+
+            return DateTime.Today;
+        }
+
+        private static double ReadDouble(object? value)
+        {
+            if (value == null || value == DBNull.Value) return 0;
+
+            if (value is double d) return d;
+            if (value is float f) return f;
+            if (value is decimal dec) return (double)dec;
+            if (value is long l) return l;
+            if (value is int i) return i;
+
+            var s = value.ToString();
+            if (double.TryParse(s, NumberStyles.Any, CultureInfo.CurrentCulture, out var x)) return x;
+            if (double.TryParse(s, NumberStyles.Any, CultureInfo.InvariantCulture, out var y)) return y;
+
+            return 0;
+        }
+
+        private static decimal ReadDecimal(object? value)
+        {
+            if (value == null || value == DBNull.Value) return 0m;
+
+            if (value is decimal dec) return dec;
+            if (value is double d) return (decimal)d;
+            if (value is float f) return (decimal)f;
+            if (value is long l) return l;
+            if (value is int i) return i;
+
+            var s = value.ToString();
+            if (decimal.TryParse(s, NumberStyles.Any, CultureInfo.CurrentCulture, out var x)) return x;
+            if (decimal.TryParse(s, NumberStyles.Any, CultureInfo.InvariantCulture, out var y)) return y;
+
+            return 0m;
+        }
+
+        // ===================== API: GetLastExpense =====================
+
+        public static LastExpenseDto? GetLastExpense(int userId)
+        {
+            if (userId <= 0) return null;
+
+            using var c = OpenAndEnsureSchema();
+            if (!TableExists(c, "Expenses")) return null;
+
+            using var cmd = c.CreateCommand();
+            cmd.CommandText = @"
+SELECT Date, Amount, Account, CategoryId, Description, IsPlanned
+FROM Expenses
+WHERE UserId = @u
+ORDER BY Date DESC, Id DESC
+LIMIT 1;";
+            cmd.Parameters.AddWithValue("@u", userId);
+
+            using var r = cmd.ExecuteReader();
+            if (!r.Read()) return null;
+
+            return new LastExpenseDto
+            {
+                Date = ReadDate(ScalarOrNull(r, "Date")),
+                Amount = ReadDouble(ScalarOrNull(r, "Amount")),
+                Account = ScalarOrNull(r, "Account")?.ToString(),
+                CategoryId = Convert.ToInt32(ScalarOrNull(r, "CategoryId") ?? 0),
+                Description = ScalarOrNull(r, "Description")?.ToString(),
+                IsPlanned = Convert.ToInt32(ScalarOrNull(r, "IsPlanned") ?? 0) == 1
+            };
+        }
+
+        // ===================== API: GetLastIncome =====================
+
+        public static LastIncomeDto? GetLastIncome(int userId)
+        {
+            if (userId <= 0) return null;
+
+            using var c = OpenAndEnsureSchema();
+
+            // u Ciebie tabela mo¿e nazywaæ siê Income albo Incomes
+            string? table = null;
+            if (TableExists(c, "Income")) table = "Income";
+            else if (TableExists(c, "Incomes")) table = "Incomes";
+            if (table == null) return null;
+
+            using var cmd = c.CreateCommand();
+            cmd.CommandText = $@"
+SELECT Date, Amount, Source, CategoryId, Description, IsPlanned, PaymentKind
+FROM {table}
+WHERE UserId = @u
+ORDER BY Date DESC, Id DESC
+LIMIT 1;";
+            cmd.Parameters.AddWithValue("@u", userId);
+
+            using var r = cmd.ExecuteReader();
+            if (!r.Read()) return null;
+
+            var pkInt = Convert.ToInt32(ScalarOrNull(r, "PaymentKind") ?? 0);
+
+            object? catObj = ScalarOrNull(r, "CategoryId");
+            int? catId = null;
+            if (catObj != null && catObj != DBNull.Value)
+            {
+                var tmp = Convert.ToInt32(catObj);
+                if (tmp > 0) catId = tmp;
+            }
+
+            return new LastIncomeDto
+            {
+                Date = ReadDate(ScalarOrNull(r, "Date")),
+                Amount = ReadDecimal(ScalarOrNull(r, "Amount")),
+                Source = ScalarOrNull(r, "Source")?.ToString(),
+                CategoryId = catId,
+                Description = ScalarOrNull(r, "Description")?.ToString(),
+                IsPlanned = Convert.ToInt32(ScalarOrNull(r, "IsPlanned") ?? 0) == 1,
+                PaymentKind = (PaymentKind)pkInt
+            };
+        }
+
+        // ===================== API: GetCategoryNameById =====================
+
+        public static string? GetCategoryNameById(int userId, int categoryId)
+        {
+            if (userId <= 0 || categoryId <= 0) return null;
+
+            using var c = OpenAndEnsureSchema();
+            if (!TableExists(c, "Categories")) return null;
+
+            using var cmd = c.CreateCommand();
+            cmd.CommandText = @"
+SELECT Name
+FROM Categories
+WHERE UserId = @u AND Id = @id
+LIMIT 1;";
+            cmd.Parameters.AddWithValue("@u", userId);
+            cmd.Parameters.AddWithValue("@id", categoryId);
+
+            var x = cmd.ExecuteScalar();
+            return x == null || x == DBNull.Value ? null : x.ToString();
+        }
+
 
         public static void MarkLoanInstallmentAsPaidFromExpense(
             int userId,
