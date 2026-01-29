@@ -46,6 +46,7 @@
 	  <None Remove="Assets\Icons\koperty.png" />
 	  <None Remove="Assets\Icons\kredyty.png" />
 	  <None Remove="Assets\Icons\logoFinly.ico" />
+	  <None Remove="Assets\Icons\majatek.png" />
 	  <None Remove="Assets\Icons\odlozonagotowka.png" />
 	  <None Remove="Assets\Icons\przychody.png" />
 	  <None Remove="Assets\Icons\raporty.png" />
@@ -113,6 +114,7 @@
 	  <Resource Include="Assets\Icons\logoFinly.ico">
 	    <CopyToOutputDirectory>Never</CopyToOutputDirectory>
 	  </Resource>
+	  <Resource Include="Assets\Icons\majatek.png" />
 	  <Resource Include="Assets\Icons\odlozonagotowka.png" />
 	  <Resource Include="Assets\Icons\przychody.png" />
 	  <Resource Include="Assets\Icons\raporty.png" />
