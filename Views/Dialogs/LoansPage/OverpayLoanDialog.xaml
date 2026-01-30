@@ -9,30 +9,31 @@
         WindowStyle="None"
         Background="{DynamicResource App.Background}"
         Foreground="{DynamicResource App.Foreground}"
-        Icon="/Assets/Icons/logoFinly.ico">
+        Icon="/Assets/Icons/logoFinly.ico"
+        Loaded="Window_Loaded">
 
-    <shell:WindowChrome.WindowChrome>
-        <shell:WindowChrome CaptionHeight="40"
+	<shell:WindowChrome.WindowChrome>
+		<shell:WindowChrome CaptionHeight="40"
                             ResizeBorderThickness="0"
                             CornerRadius="0"
                             UseAeroCaptionButtons="False"/>
-    </shell:WindowChrome.WindowChrome>
+	</shell:WindowChrome.WindowChrome>
 
-    <Grid>
-        <Grid.RowDefinitions>
-            <RowDefinition Height="40"/>
-            <RowDefinition Height="Auto"/>
-        </Grid.RowDefinitions>
+	<Grid>
+		<Grid.RowDefinitions>
+			<RowDefinition Height="40"/>
+			<RowDefinition Height="Auto"/>
+		</Grid.RowDefinitions>
 
-        <Grid Grid.Row="0"
+		<Grid Grid.Row="0"
               Background="{DynamicResource TitleBar.Background}"
               MouseLeftButtonDown="TitleBar_MouseLeftButtonDown">
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition/>
-                <ColumnDefinition Width="Auto"/>
-            </Grid.ColumnDefinitions>
+			<Grid.ColumnDefinitions>
+				<ColumnDefinition/>
+				<ColumnDefinition Width="Auto"/>
+			</Grid.ColumnDefinitions>
 
-            <TextBlock x:Name="TitleText"
+			<TextBlock x:Name="TitleText"
                        Text="Nadpłata kredytu"
                        VerticalAlignment="Center"
                        Margin="12,0,0,0"
@@ -40,8 +41,8 @@
                        FontSize="13"
                        shell:WindowChrome.IsHitTestVisibleInChrome="True"/>
 
-            <StackPanel Grid.Column="1" Orientation="Horizontal">
-                <Button Width="46" Height="32" Padding="0"
+			<StackPanel Grid.Column="1" Orientation="Horizontal">
+				<Button Width="46" Height="32" Padding="0"
                         Background="Transparent"
                         BorderBrush="{x:Null}"
                         Foreground="{DynamicResource App.Foreground}"
@@ -49,14 +50,14 @@
                         FocusVisualStyle="{x:Null}"
                         shell:WindowChrome.IsHitTestVisibleInChrome="True"
                         Click="Close_Click">
-                    <TextBlock Text="✕" FontSize="12"
+					<TextBlock Text="✕" FontSize="12"
                                HorizontalAlignment="Center"
                                VerticalAlignment="Center"/>
-                </Button>
-            </StackPanel>
-        </Grid>
+				</Button>
+			</StackPanel>
+		</Grid>
 
-        <Border Grid.Row="1"
+		<Border Grid.Row="1"
                 Margin="14"
                 Padding="16"
                 Background="{DynamicResource App.Background}"
@@ -65,70 +66,220 @@
                 CornerRadius="12"
                 MinWidth="520">
 
-            <Border Padding="16"
+			<Border Padding="16"
                     Background="{DynamicResource Surface.Background}"
                     BorderBrush="{DynamicResource Surface.Border}"
                     BorderThickness="1"
                     CornerRadius="10">
 
-                <Grid>
-                    <Grid.RowDefinitions>
-                        <RowDefinition Height="Auto"/>
-                        <RowDefinition Height="12"/>
-                        <RowDefinition Height="Auto"/>
-                        <RowDefinition Height="Auto"/>
-                        <RowDefinition Height="18"/>
-                        <RowDefinition Height="Auto"/>
-                    </Grid.RowDefinitions>
+				<Grid>
+					<Grid.RowDefinitions>
+						<RowDefinition Height="Auto"/>
+						<RowDefinition Height="12"/>
 
-                    <TextBlock x:Name="HeaderText"
-                               Text="Wprowadź kwotę nadpłaty"
+						<RowDefinition Height="Auto"/>
+						<RowDefinition Height="10"/>
+						<RowDefinition Height="Auto"/>
+						<RowDefinition Height="16"/>
+
+						<RowDefinition Height="Auto"/>
+						<RowDefinition Height="10"/>
+						<RowDefinition Height="Auto"/>
+						<RowDefinition Height="18"/>
+
+						<RowDefinition Height="Auto"/>
+					</Grid.RowDefinitions>
+
+					<!-- Header -->
+					<TextBlock x:Name="HeaderText"
+                               Text="Nadpłata"
                                FontSize="18"
                                FontWeight="Bold"
                                Foreground="{DynamicResource App.Foreground}"/>
 
-                    <StackPanel Grid.Row="2">
-                        <TextBlock Text="Kwota nadpłaty:"
-                                   Opacity="0.85"
-                                   Foreground="{DynamicResource App.Foreground}"/>
-                        <TextBox x:Name="AmountTextBox"
-                                 MinWidth="260"
-                                 VerticalContentAlignment="Center"
-                                 TextChanged="AmountTextBox_TextChanged"/>
+					<!-- Kwoty -->
+					<Grid Grid.Row="2">
+						<Grid.ColumnDefinitions>
+							<ColumnDefinition Width="*"/>
+							<ColumnDefinition Width="16"/>
+							<ColumnDefinition Width="*"/>
+						</Grid.ColumnDefinitions>
 
-                        <TextBlock x:Name="InlineErrorText"
-                                   Text=""
-                                   Foreground="Tomato"
-                                   FontSize="12"
-                                   Margin="2,4,0,0"
-                                   Visibility="Collapsed"/>
-                    </StackPanel>
+						<StackPanel Grid.Column="0">
+							<TextBlock Text="Kwota wpłaty (łącznie):"
+                                       Opacity="0.85"
+                                       Foreground="{DynamicResource App.Foreground}"/>
+							<TextBox x:Name="AmountTextBox"
+                                     MinWidth="220"
+                                     VerticalContentAlignment="Center"
+                                     TextChanged="AnyInput_TextChanged"/>
+						</StackPanel>
 
-                    <TextBlock Grid.Row="3"
+						<StackPanel Grid.Column="2">
+							<TextBlock Text="Kapitał spłacony (z salda):"
+                                       Opacity="0.85"
+                                       Foreground="{DynamicResource App.Foreground}"/>
+							<TextBox x:Name="CapitalTextBox"
+                                     MinWidth="220"
+                                     VerticalContentAlignment="Center"
+                                     TextChanged="AnyInput_TextChanged"/>
+							<TextBlock Text="(Jeśli bank pobrał odsetki za dni: wpisz mniejszą wartość kapitału)"
+                                       Opacity="0.65"
+                                       FontSize="11"
+                                       TextWrapping="Wrap"
+                                       Margin="0,4,0,0"/>
+						</StackPanel>
+					</Grid>
+
+					<TextBlock Grid.Row="4"
+                               x:Name="InlineErrorText"
+                               Text=""
+                               Foreground="Tomato"
+                               FontSize="12"
+                               Margin="2,4,0,0"
+                               Visibility="Collapsed"/>
+
+					<!-- Wybór trybu -->
+					<StackPanel Grid.Row="6">
+						<TextBlock Text="Po nadpłacie:"
+                                   FontWeight="SemiBold"
+                                   Margin="0,0,0,6"/>
+
+						<RadioButton x:Name="ModeCsvRadio"
+                                     GroupName="ModeGroup"
+                                     Content="Załącz nowy harmonogram (CSV) po nadpłacie"
+                                     IsChecked="True"
+                                     />
+
+						<RadioButton x:Name="ModeManualRadio"
+                                     GroupName="ModeGroup"
+                                     Content="Wpiszę ręcznie zmianę tzn. rata i termin"
+                                     Margin="0,4,0,0"
+                                     />
+					</StackPanel>
+
+					<!-- Panel CSV -->
+					<Border Grid.Row="8"
+                            x:Name="CsvPanel"
+                            Background="{DynamicResource App.Background}"
+                            BorderBrush="{DynamicResource Surface.Border}"
+                            BorderThickness="1"
+                            CornerRadius="10"
+                            Padding="10">
+
+						<Grid>
+							<Grid.ColumnDefinitions>
+								<ColumnDefinition Width="*"/>
+								<ColumnDefinition Width="10"/>
+								<ColumnDefinition Width="Auto"/>
+							</Grid.ColumnDefinitions>
+
+							<StackPanel Grid.Column="0">
+								<TextBlock Text="Plik harmonogramu CSV (nowy, z banku):"
+                                           Opacity="0.85"/>
+								<TextBlock x:Name="CsvPathText"
+                                           Text="Nie wybrano pliku."
+                                           Opacity="0.75"
+                                           TextWrapping="Wrap"
+                                           Margin="0,3,0,0"/>
+							</StackPanel>
+
+							<Button Grid.Column="2"
+                                    Content="Wybierz CSV"
+                                    Style="{StaticResource SecondaryButton}"
+                                    Padding="12,6"
+                                    Click="PickCsv_Click"/>
+						</Grid>
+					</Border>
+
+					<!-- Panel MANUAL -->
+					<Border Grid.Row="8"
+                            x:Name="ManualPanel"
+                            Background="{DynamicResource App.Background}"
+                            BorderBrush="{DynamicResource Surface.Border}"
+                            BorderThickness="1"
+                            CornerRadius="10"
+                            Padding="10"
+                            Visibility="Collapsed">
+
+						<Grid>
+							<Grid.RowDefinitions>
+								<RowDefinition Height="Auto"/>
+								<RowDefinition Height="10"/>
+								<RowDefinition Height="Auto"/>
+							</Grid.RowDefinitions>
+
+							<StackPanel Grid.Row="0">
+								<TextBlock Text="Co zmieniło się po nadpłacie?"
+                                           Opacity="0.85"/>
+
+								<RadioButton x:Name="ManualLowerPaymentRadio"
+                                             GroupName="ManualGroup"
+                                             Content="Zmniejszono ratę — wpiszę nową ratę"
+                                             IsChecked="True"
+                                             Margin="0,6,0,0"
+                                             />
+
+								<RadioButton x:Name="ManualShorterTermRadio"
+                                             GroupName="ManualGroup"
+                                             Content="Skrócono okres — wpiszę ile rat zostało"
+                                             Margin="0,4,0,0"
+                                             />
+							</StackPanel>
+
+							<Grid Grid.Row="2">
+								<Grid.ColumnDefinitions>
+									<ColumnDefinition Width="*"/>
+									<ColumnDefinition Width="16"/>
+									<ColumnDefinition Width="*"/>
+								</Grid.ColumnDefinitions>
+
+								<StackPanel Grid.Column="0" x:Name="ManualNewPaymentPanel">
+									<TextBlock Text="Nowa rata (PLN):" Opacity="0.85"/>
+									<TextBox x:Name="ManualNewPaymentTextBox"
+                                             MinWidth="220"
+                                             VerticalContentAlignment="Center"
+                                             TextChanged="AnyInput_TextChanged"/>
+								</StackPanel>
+
+								<StackPanel Grid.Column="2" x:Name="ManualRemainingMonthsPanel" Visibility="Collapsed">
+									<TextBlock Text="Pozostało rat (miesięcy):" Opacity="0.85"/>
+									<TextBox x:Name="ManualRemainingMonthsTextBox"
+                                             MinWidth="220"
+                                             VerticalContentAlignment="Center"
+                                             TextChanged="AnyInput_TextChanged"/>
+								</StackPanel>
+							</Grid>
+						</Grid>
+					</Border>
+
+					<!-- Hint -->
+					<TextBlock Grid.Row="10"
                                x:Name="HintText"
-                               Text="Zatwierdzenie spowoduje zapis nadpłaty w kredycie (logika pozostaje po stronie LoansPage)."
+                               Text="Uwaga: Kapitał spłacony to kwota, o którą realnie zmniejszyło się saldo kredytu."
                                Opacity="0.7"
                                TextWrapping="Wrap"
                                Foreground="{DynamicResource App.Foreground}"
-                               Margin="0,10,0,0"/>
+                               Margin="0,4,0,0"/>
 
-                    <StackPanel Grid.Row="5"
+					<!-- Buttons -->
+					<StackPanel Grid.Row="12"
                                 Orientation="Horizontal"
                                 HorizontalAlignment="Right">
-                        <Button Content="Anuluj"
+						<Button Content="Anuluj"
                                 Style="{StaticResource SecondaryButton}"
                                 IsCancel="True"
                                 Click="Cancel_Click"/>
 
-                        <Button Content="Zatwierdź"
+						<Button Content="Zatwierdź"
                                 Style="{StaticResource PrimaryButton}"
                                 Margin="8,0,0,0"
                                 IsDefault="True"
                                 Click="Ok_Click"/>
-                    </StackPanel>
-                </Grid>
-            </Border>
-        </Border>
-    </Grid>
-</Window>
+					</StackPanel>
+				</Grid>
 
+			</Border>
+		</Border>
+	</Grid>
+</Window>

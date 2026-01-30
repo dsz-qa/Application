@@ -764,6 +764,9 @@ SELECT last_insert_rowid();";
             bool hasSchedule = ColumnExists(c, "Loans", "SchedulePath");
             bool hasPayKind = ColumnExists(c, "Loans", "PaymentKind");
             bool hasPayRef = ColumnExists(c, "Loans", "PaymentRefId");
+            bool hasOvPay = ColumnExists(c, "Loans", "OverrideMonthlyPayment");
+            bool hasOvMonths = ColumnExists(c, "Loans", "OverrideRemainingMonths");
+
 
             var cols = new List<string>
     {
@@ -774,6 +777,8 @@ SELECT last_insert_rowid();";
             if (hasSchedule) cols.Add("SchedulePath");
             if (hasPayKind) cols.Add("PaymentKind");
             if (hasPayRef) cols.Add("PaymentRefId");
+            if (hasOvPay) cols.Add("OverrideMonthlyPayment");
+            if (hasOvMonths) cols.Add("OverrideRemainingMonths");
 
             using var cmd = c.CreateCommand();
             cmd.CommandText = $@"
@@ -788,11 +793,14 @@ ORDER BY Name;";
 
             // Stae ordinale dla bazowych kolumn:
             // 0 Id, 1 UserId, 2 Name, 3 Principal, 4 InterestRate, 5 StartDate, 6 TermMonths, 7 Note, 8 PaymentDay
-            int scheduleOrd = -1, payKindOrd = -1, payRefOrd = -1;
+            int scheduleOrd = -1, payKindOrd = -1, payRefOrd = -1, ovPayOrd = -1, ovMonthsOrd = -1;
 
             if (hasSchedule) scheduleOrd = r.GetOrdinal("SchedulePath");
             if (hasPayKind) payKindOrd = r.GetOrdinal("PaymentKind");
             if (hasPayRef) payRefOrd = r.GetOrdinal("PaymentRefId");
+            if (hasOvPay) ovPayOrd = r.GetOrdinal("OverrideMonthlyPayment");
+            if (hasOvMonths) ovMonthsOrd = r.GetOrdinal("OverrideRemainingMonths");
+
 
             while (r.Read())
             {
@@ -811,7 +819,10 @@ ORDER BY Name;";
                     // kompatybilne defaulty:
                     SchedulePath = null,
                     PaymentKind = Finly.Models.PaymentKind.FreeCash,
-                    PaymentRefId = null
+                    PaymentRefId = null,
+                    OverrideMonthlyPayment = null,
+                    OverrideRemainingMonths = null
+
                 };
 
                 if (hasSchedule && scheduleOrd >= 0)
@@ -819,6 +830,12 @@ ORDER BY Name;";
 
                 if (hasPayKind && payKindOrd >= 0 && !r.IsDBNull(payKindOrd))
                     m.PaymentKind = (Finly.Models.PaymentKind)r.GetInt32(payKindOrd);
+
+                if (hasOvPay && ovPayOrd >= 0 && !r.IsDBNull(ovPayOrd))
+                    m.OverrideMonthlyPayment = Convert.ToDecimal(r.GetValue(ovPayOrd));
+
+                if (hasOvMonths && ovMonthsOrd >= 0 && !r.IsDBNull(ovMonthsOrd))
+                    m.OverrideRemainingMonths = r.GetInt32(ovMonthsOrd);
 
                 if (hasPayRef && payRefOrd >= 0 && !r.IsDBNull(payRefOrd))
                     m.PaymentRefId = r.GetInt32(payRefOrd);
@@ -1198,6 +1215,8 @@ SELECT last_insert_rowid();";
             bool hasSchedule = ColumnExists(c, "Loans", "SchedulePath");
             bool hasPayKind = ColumnExists(c, "Loans", "PaymentKind");
             bool hasPayRef = ColumnExists(c, "Loans", "PaymentRefId");
+            bool hasOvPay = ColumnExists(c, "Loans", "OverrideMonthlyPayment");
+            bool hasOvMonths = ColumnExists(c, "Loans", "OverrideRemainingMonths");
 
             var setParts = new List<string>
     {
@@ -1213,6 +1232,8 @@ SELECT last_insert_rowid();";
             if (hasSchedule) setParts.Add("SchedulePath = @sp");
             if (hasPayKind) setParts.Add("PaymentKind = @pk");
             if (hasPayRef) setParts.Add("PaymentRefId = @pr");
+            if (hasOvPay) setParts.Add("OverrideMonthlyPayment = @omp");
+            if (hasOvMonths) setParts.Add("OverrideRemainingMonths = @orm");
 
             using var cmd = c.CreateCommand();
             cmd.CommandText = $@"
@@ -1233,6 +1254,8 @@ WHERE Id = @id AND UserId = @u;";
             if (hasSchedule) cmd.Parameters.AddWithValue("@sp", (object?)loan.SchedulePath ?? DBNull.Value);
             if (hasPayKind) cmd.Parameters.AddWithValue("@pk", (int)loan.PaymentKind);
             if (hasPayRef) cmd.Parameters.AddWithValue("@pr", (object?)loan.PaymentRefId ?? DBNull.Value);
+            if (hasOvPay) cmd.Parameters.AddWithValue("@omp", (object?)loan.OverrideMonthlyPayment ?? DBNull.Value);
+            if (hasOvMonths) cmd.Parameters.AddWithValue("@orm", (object?)loan.OverrideRemainingMonths ?? DBNull.Value);
 
             cmd.ExecuteNonQuery();
             RaiseDataChanged();

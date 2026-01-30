@@ -15,10 +15,6 @@ namespace Finly.Services
     /// </summary>
     public static class LoansService
     {
-        /// <summary>
-        /// Standardowa rata annuitetowa.
-        /// </summary>
-        /// 
         public sealed class LoanMonthKpi
         {
             // Suma WSZYSTKIE (paid+planned) w miesiącu
@@ -113,11 +109,7 @@ namespace Finly.Services
             return kpi;
         }
 
-
-        public static decimal CalculateMonthlyPayment(
-            decimal principal,
-            decimal annualRatePercent,
-            int termMonths)
+        public static decimal CalculateMonthlyPayment(decimal principal, decimal annualRatePercent, int termMonths)
         {
             if (principal <= 0m || termMonths <= 0)
                 return 0m;
@@ -139,11 +131,10 @@ namespace Finly.Services
         /// <summary>
         /// Rozbija pierwszą ratę na część odsetkową i kapitałową.
         /// </summary>
-        public static (decimal InterestPart, decimal PrincipalPart)
-            CalculateFirstInstallmentBreakdown(
-                decimal principal,
-                decimal annualRatePercent,
-                int termMonths)
+        public static (decimal InterestPart, decimal PrincipalPart) CalculateFirstInstallmentBreakdown(
+            decimal principal,
+            decimal annualRatePercent,
+            int termMonths)
         {
             var payment = CalculateMonthlyPayment(principal, annualRatePercent, termMonths);
             if (payment <= 0m)
@@ -185,26 +176,41 @@ namespace Finly.Services
         }
 
         /// <summary>
-        /// Kolejny termin raty – płatności danego dnia miesiąca z korektą weekendową.
+        /// Kolejny termin raty – płatności danego dnia miesiąca z korektą weekendową + nie wcześniej niż startDate.
         /// </summary>
-        public static DateTime GetNextDueDate(DateTime previousDueDate, int paymentDay)
+        public static DateTime GetNextDueDate(DateTime today, int paymentDay, DateTime startDate)
         {
-            if (paymentDay <= 0)
-                return previousDueDate.AddMonths(1);
+            today = today.Date;
+            startDate = startDate.Date;
 
-            var nextMonthFirst = new DateTime(previousDueDate.Year, previousDueDate.Month, 1).AddMonths(1);
-            var daysInNextMonth = DateTime.DaysInMonth(nextMonthFirst.Year, nextMonthFirst.Month);
-            var day = Math.Min(paymentDay, daysInNextMonth);
+            // jeśli kredyt jeszcze się nie rozpoczął, licz od startDate
+            var baseDate = today < startDate ? startDate : today;
 
-            var due = new DateTime(nextMonthFirst.Year, nextMonthFirst.Month, day);
+            int pd = paymentDay <= 0 ? baseDate.Day : paymentDay;
 
-            // weekend → na najbliższy dzień roboczy
-            if (due.DayOfWeek == DayOfWeek.Saturday)
-                due = due.AddDays(2);
-            else if (due.DayOfWeek == DayOfWeek.Sunday)
-                due = due.AddDays(1);
+            // termin w bieżącym miesiącu
+            int dim = DateTime.DaysInMonth(baseDate.Year, baseDate.Month);
+            int day = Math.Min(Math.Max(1, pd), dim);
 
-            return due;
+            var candidate = new DateTime(baseDate.Year, baseDate.Month, day);
+
+            // jeśli minęło -> następny miesiąc
+            if (candidate.Date < baseDate.Date)
+            {
+                var nextMonth = new DateTime(baseDate.Year, baseDate.Month, 1).AddMonths(1);
+                int dim2 = DateTime.DaysInMonth(nextMonth.Year, nextMonth.Month);
+                int day2 = Math.Min(Math.Max(1, pd), dim2);
+                candidate = new DateTime(nextMonth.Year, nextMonth.Month, day2);
+            }
+
+            // weekend -> poniedziałek
+            if (candidate.DayOfWeek == DayOfWeek.Saturday) candidate = candidate.AddDays(2);
+            else if (candidate.DayOfWeek == DayOfWeek.Sunday) candidate = candidate.AddDays(1);
+
+            // nie wcześniej niż start
+            if (candidate.Date < startDate.Date) candidate = startDate.Date;
+
+            return candidate.Date;
         }
     }
 
@@ -218,11 +224,7 @@ namespace Finly.Services
         /// Odsetki: kapitał * (oprocentowanie/365) * liczba dni.
         /// annualRate podajesz w % (np. 6.28).
         /// </summary>
-        public static decimal CalculateInterest(
-            decimal principal,
-            decimal annualRate,
-            DateTime from,
-            DateTime to)
+        public static decimal CalculateInterest(decimal principal, decimal annualRate, DateTime from, DateTime to)
         {
             if (to <= from || principal <= 0m || annualRate <= 0m)
                 return 0m;
@@ -243,7 +245,6 @@ namespace Finly.Services
     {
         private static readonly CultureInfo Pl = new("pl-PL");
 
-        // ======= nagłówki: ZAWSZE trzymaj je jako "ludzkie", bo i tak normalizujemy =======
         private static readonly string[] DateHeaders =
         {
             "data", "termin", "termin splaty", "termin spłaty", "due date", "duedate", "paymentdate", "data splaty", "data spłaty"
@@ -274,7 +275,6 @@ namespace Finly.Services
             "saldo", "saldo zadluzenia", "saldo zadłużenia", "saldo po spłacie", "saldo po splacie", "balance", "remaining"
         };
 
-        // ======= znormalizowane tokeny (raz, żeby FindByHeaders było spójne) =======
         private static readonly string[] DateHeadersN = DateHeaders.Select(NormalizeHeader).Where(x => !string.IsNullOrWhiteSpace(x)).Distinct().ToArray();
         private static readonly string[] NoHeadersN = NoHeaders.Select(NormalizeHeader).Where(x => !string.IsNullOrWhiteSpace(x)).Distinct().ToArray();
         private static readonly string[] PrincipalHeadersN = PrincipalHeaders.Select(NormalizeHeader).Where(x => !string.IsNullOrWhiteSpace(x)).Distinct().ToArray();
@@ -289,8 +289,6 @@ namespace Finly.Services
 
             var text = ReadAllTextRobust(path);
 
-            // UWAGA: rekordy (linie) muszą zachować cudzysłowy,
-            // bo dopiero SplitCsvRecord nimi zarządza przy delimiterach.
             var records = ReadCsvRecords(text).ToList();
             if (records.Count == 0) return Enumerable.Empty<LoanInstallmentRow>();
 
@@ -318,7 +316,6 @@ namespace Finly.Services
             int interestCol = FindByHeaders(headerMap, InterestHeadersN);
             int balanceCol = FindByHeaders(headerMap, BalanceHeadersN);
 
-            // Heurystyki, jeśli nagłówek jest “nietypowy”
             if (dateCol < 0 || totalCol < 0)
             {
                 var dataRows = rows.Skip(headerIdx + 1).Take(120).ToList();
@@ -339,7 +336,6 @@ namespace Finly.Services
             {
                 if (r.Count <= Math.Max(dateCol, totalCol)) continue;
 
-                // pomijaj podsumowania/sekcje
                 if (LooksLikeSummaryRow(r))
                     continue;
 
@@ -369,7 +365,6 @@ namespace Finly.Services
                     Remaining = bal
                 };
 
-                // Jeśli masz w modelu pole InstallmentNo, ustawimy je bez wymuszania zmian w projekcie
                 TrySetInstallmentNo(row, installmentNo);
 
                 result.Add(row);
@@ -394,13 +389,13 @@ namespace Finly.Services
                     // "" wewnątrz cudzysłowu = literalny "
                     if (inQuotes && i + 1 < text.Length && text[i + 1] == '"')
                     {
-                        sb.Append("\"\""); // zachowujemy jako 2 znaki, SplitCsvRecord zrobi z tego 1 znak
+                        sb.Append("\"\"");
                         i++;
                         continue;
                     }
 
                     inQuotes = !inQuotes;
-                    sb.Append('"'); // zachowujemy cudzysłowy w rekordzie
+                    sb.Append('"');
                     continue;
                 }
 
@@ -425,8 +420,6 @@ namespace Finly.Services
             if (!string.IsNullOrWhiteSpace(last))
                 yield return last;
         }
-
-
 
         private static char DetectDelimiter(List<string> sampleRecords)
         {
@@ -482,7 +475,7 @@ namespace Finly.Services
                     }
 
                     inQuotes = !inQuotes;
-                    continue; // omit wrapping quotes
+                    continue;
                 }
 
                 if (!inQuotes && ch == delimiter)
@@ -518,7 +511,6 @@ namespace Finly.Services
                 if (hasDate && hasTotal)
                     return i;
 
-                // heurystyka nagłówka: dużo liter, mało cyfr
                 int letterish = normalized.Count(h => h.Any(char.IsLetter));
                 int digitish = normalized.Count(h => h.Any(char.IsDigit));
                 if (cells.Count >= 3 && letterish >= 2 && digitish == 0)
@@ -543,7 +535,6 @@ namespace Finly.Services
             if (headersNormalized == null || headersNormalized.Length == 0)
                 return -1;
 
-            // exact
             foreach (var kv in headerMap)
             {
                 var h = kv.Value ?? "";
@@ -551,7 +542,6 @@ namespace Finly.Services
                     return kv.Key;
             }
 
-            // contains
             foreach (var kv in headerMap)
             {
                 var h = kv.Value ?? "";
@@ -579,7 +569,6 @@ namespace Finly.Services
 
             if (totalCol >= 0)
             {
-                // Kandydaci na money
                 var moneyCols = new List<int>();
                 for (int col = 0; col < maxCols; col++)
                 {
@@ -597,7 +586,6 @@ namespace Finly.Services
                         moneyCols.Add(col);
                 }
 
-                // Jeśli mamy >=2 kolumn money, spróbuj dobrać takie, że (principal+interest) ~ total
                 if (moneyCols.Count >= 2)
                 {
                     var best = FindBestPrincipalInterestPair(rows, totalCol, moneyCols);
@@ -633,8 +621,6 @@ namespace Finly.Services
 
         private static int DetectBestTotalMoneyColumn(List<List<string>> rows, int maxCols)
         {
-            // Wybieramy kolumnę money o najwyższej medianie wartości dodatnich,
-            // bo "Total rata" zwykle jest większa niż "odsetki".
             int bestCol = -1;
             decimal bestMedian = -1m;
 
@@ -690,7 +676,6 @@ namespace Finly.Services
                         if (!TryParseMoney(r[col2], out var m2) || m2 < 0m) continue;
 
                         checkedRows++;
-                        // tolerancja 0.05 bo banki potrafią mieć 0.01-0.02 różnic
                         if (Math.Abs((m1 + m2) - total) <= 0.05m)
                             matches++;
                     }
@@ -699,8 +684,6 @@ namespace Finly.Services
                     {
                         bestMatches = matches;
 
-                        // Heurystyka: principal zwykle >= interest (na początku bywa odwrotnie, ale rzadziej)
-                        // Bezpiecznie: wybieramy jako principal tę o większej medianie.
                         var med1 = MedianPositive(rows, col1);
                         var med2 = MedianPositive(rows, col2);
 
@@ -741,11 +724,9 @@ namespace Finly.Services
                 var n = NormalizeHeader(c);
                 if (string.IsNullOrWhiteSpace(n)) continue;
 
-                // typowe słowa podsumowań
                 if (n.Contains("suma") || n.Contains("razem") || n.Contains("podsum") || n.Contains("total"))
                     return true;
 
-                // “kapitał+odsetki razem” etc.
                 if (n.Contains("lacznie") && (n.Contains("kapital") || n.Contains("odset")))
                     return true;
             }
@@ -772,7 +753,7 @@ namespace Finly.Services
             }
             catch
             {
-                // celowo ignorujemy – kompatybilność wsteczna
+                // kompatybilność wsteczna
             }
         }
 
@@ -816,7 +797,6 @@ namespace Finly.Services
                      .Replace(" r", "", StringComparison.OrdinalIgnoreCase)
                      .Trim();
 
-            // czasami bank daje "2026-01-01T00:00:00"
             raw = raw.Replace("T", " ");
 
             var parts = raw.Split(' ', StringSplitOptions.RemoveEmptyEntries);
@@ -859,7 +839,6 @@ namespace Finly.Services
 
             if (comma >= 0 && dot >= 0)
             {
-                // np. 1.234,56
                 if (dot < comma)
                 {
                     raw = raw.Replace(".", "");
@@ -867,7 +846,6 @@ namespace Finly.Services
                 }
                 else
                 {
-                    // np. 1,234.56
                     raw = raw.Replace(",", "");
                 }
             }
@@ -894,10 +872,8 @@ namespace Finly.Services
         {
             EnsureCodePages();
 
-            // 1) BOM/UTF8/UTF16 auto-detection
             var text = ReadWithEncoding(path, Encoding.UTF8, detectBom: true);
 
-            // 2) jeśli widać krzaki, próbujemy bankowych kodowań
             if (LooksLikeMojibake(text))
             {
                 var win1250 = Encoding.GetEncoding(1250);
@@ -922,7 +898,7 @@ namespace Finly.Services
         private static bool LooksLikeMojibake(string text)
         {
             if (string.IsNullOrEmpty(text)) return true;
-            int bad = text.Count(c => c == '\uFFFD'); // replacement character
+            int bad = text.Count(c => c == '\uFFFD');
             return bad >= 5;
         }
     }

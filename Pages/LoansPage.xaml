@@ -102,8 +102,9 @@
 		<!-- ====== RÓWNE, ŁADNE PRZYCISKI NA KARCIE ====== -->
 		<Style x:Key="LoansPrimarySmallButton" TargetType="Button" BasedOn="{StaticResource PrimaryButton}">
 			<!-- równa wysokość -->
-			<Setter Property="MinHeight" Value="38"/>
-			<Setter Property="Padding" Value="12,6"/>
+			<Setter Property="MinHeight" Value="30"/>
+			<Setter Property="Padding" Value="10,4"/>
+
 			<!-- nie wymuszamy szerokości, bo grid daje równe kolumny -->
 			<Setter Property="MinWidth" Value="0"/>
 			<Setter Property="HorizontalAlignment" Value="Stretch"/>
@@ -115,6 +116,23 @@
 						<TextBlock Text="{Binding}"
                                    TextWrapping="Wrap"
                                    TextAlignment="Center"/>
+					</DataTemplate>
+				</Setter.Value>
+			</Setter>
+		</Style>
+
+
+		<Style x:Key="LoansSecondarySmallButton" TargetType="Button" BasedOn="{StaticResource SecondaryButton}">
+			<Setter Property="MinHeight" Value="30"/>
+			<Setter Property="Padding" Value="10,4"/>
+			<Setter Property="MinWidth" Value="0"/>
+			<Setter Property="HorizontalAlignment" Value="Stretch"/>
+			<Setter Property="HorizontalContentAlignment" Value="Center"/>
+			<Setter Property="VerticalContentAlignment" Value="Center"/>
+			<Setter Property="ContentTemplate">
+				<Setter.Value>
+					<DataTemplate>
+						<TextBlock Text="{Binding}" TextWrapping="Wrap" TextAlignment="Center"/>
 					</DataTemplate>
 				</Setter.Value>
 			</Setter>
@@ -295,11 +313,11 @@
                                         Tag="{Binding}"/>
 
 								<Button Grid.Row="0" Grid.Column="2"
-                                        Content="Załącz harmonogram"
-                                        Style="{StaticResource LoansPrimarySmallButton}"
-                                        Click="CardAttachSchedule_Click"
-                                        Tag="{Binding}"
-                                        ToolTip="Załącz harmonogram spłat rat kredytu"/>
+										Content="Załącz harmonogram"
+										Style="{StaticResource LoansSecondarySmallButton}"
+										Click="CardAttachSchedule_Click"
+										Tag="{Binding}"
+										ToolTip="Załącz harmonogram spłat rat kredytu"/>
 
 								<Button Grid.Row="2" Grid.Column="0"
                                         Content="Nadpłać kredyt"
@@ -308,11 +326,12 @@
                                         Tag="{Binding}"/>
 
 								<Button Grid.Row="2" Grid.Column="2"
-                                        Content="Harmonogram spłat"
-                                        Style="{StaticResource LoansPrimarySmallButton}"
-                                        Click="CardSchedule_Click"
-                                        Tag="{Binding}"
-                                        ToolTip="Harmonogram spłat rat kredytu"/>
+										Content="Harmonogram spłat"
+										Style="{StaticResource LoansSecondarySmallButton}"
+										Click="CardSchedule_Click"
+										Tag="{Binding}"
+										ToolTip="Harmonogram spłat rat kredytu"/>
+
 							</Grid>
 						</Grid>
 

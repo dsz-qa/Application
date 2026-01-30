@@ -202,8 +202,12 @@ CREATE TABLE IF NOT EXISTS Loans(
     PaymentKind  INTEGER NOT NULL DEFAULT 0,
     PaymentRefId INTEGER NULL,
 
+    OverrideMonthlyPayment NUMERIC NULL,
+    OverrideRemainingMonths INTEGER NULL,
+
     FOREIGN KEY(UserId) REFERENCES Users(Id) ON DELETE CASCADE
 );
+
 
 CREATE TABLE IF NOT EXISTS LoanSchedules(
     Id           INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -406,6 +410,8 @@ CREATE TABLE IF NOT EXISTS CompanyProfiles(
                 AddColumnIfMissing(con, tx, "Loans", "SchedulePath", "TEXT");
                 AddColumnIfMissing(con, tx, "Loans", "PaymentKind", "INTEGER", "NOT NULL DEFAULT 0");
                 AddColumnIfMissing(con, tx, "Loans", "PaymentRefId", "INTEGER");
+                AddColumnIfMissing(con, tx, "Loans", "OverrideMonthlyPayment", "NUMERIC");
+                AddColumnIfMissing(con, tx, "Loans", "OverrideRemainingMonths", "INTEGER");
 
                 // Investments
                 AddColumnIfMissing(con, tx, "Investments", "Type", "INTEGER", "NOT NULL DEFAULT 0");

@@ -54,6 +54,10 @@ namespace Finly.Models
         /// - Envelope    => EnvelopeId
         /// - FreeCash/SavedCash => null
         /// </summary>
+        /// 
+
+        public decimal? OverrideMonthlyPayment { get; set; }
+        public int? OverrideRemainingMonths { get; set; }
         public int? PaymentRefId { get; set; }
     }
 
@@ -83,5 +87,7 @@ namespace Finly.Models
         /// Pozosta³y kapita³ po operacji (jeœli wyliczasz z harmonogramu, to jest snapshot).
         /// </summary>
         public decimal RemainingPrincipal { get; set; }
+
+
     }
 }

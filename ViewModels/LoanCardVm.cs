@@ -18,6 +18,9 @@ namespace Finly.ViewModels
         private int _termMonths;
         private int _paymentDay; // 0 = unspecified
 
+        public decimal? OverrideMonthlyPayment { get; set; }
+        public int? OverrideRemainingMonths { get; set; }
+
         // ======= Snapshot z harmonogramu (CSV) =======
         private bool _hasSchedule;
 

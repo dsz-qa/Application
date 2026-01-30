@@ -106,8 +106,12 @@ namespace Finly.Pages
                     InterestRate = l.InterestRate,
                     StartDate = l.StartDate,
                     TermMonths = l.TermMonths,
-                    PaymentDay = l.PaymentDay
+                    PaymentDay = l.PaymentDay,
+
+                    OverrideMonthlyPayment = l.OverrideMonthlyPayment,
+                    OverrideRemainingMonths = l.OverrideRemainingMonths
                 });
+
             }
 
             // kafelek "Dodaj kredyt" ma być na końcu
@@ -131,48 +135,142 @@ namespace Finly.Pages
         {
             try
             {
-                // jeśli nie ma harmonogramu / nie da się odczytać -> czyścimy snapshot
-                if (!TryGetSchedule(vm.Id, showToasts: false, out _, out var schedule) || schedule == null || schedule.Count == 0)
+                var today = DateTime.Today;
+
+                // ---------- helper: next date ----------
+                DateTime? ComputeNextPaymentDateFromScheduleOrRule(List<LoanInstallmentRow>? sched)
+                {
+                    if (sched != null && sched.Count > 0)
+                    {
+                        var nextRow = sched
+                            .OrderBy(r => r.Date)
+                            .FirstOrDefault(r => r.Date.Date >= today.Date);
+
+                        if (nextRow != null)
+                            return nextRow.Date.Date;
+                    }
+
+                    // fallback: z reguły PaymentDay (spójnie z Twoim overloadem)
+                    return LoansService.GetNextDueDate(today, vm.PaymentDay, vm.StartDate).Date;
+                }
+
+                // ---------- read schedule once ----------
+                bool hasSchedule = TryGetSchedule(vm.Id, showToasts: false, out _, out var schedule)
+                                   && schedule != null
+                                   && schedule.Count > 0;
+
+                var ordered = hasSchedule
+                    ? schedule.OrderBy(r => r.Date.Date).ToList()
+                    : new List<LoanInstallmentRow>();
+
+                // ========== MANUAL OVERRIDE (A2) – priorytet nad CSV w KWOCIE/OKRESIE ==========
+                if (vm.OverrideMonthlyPayment.HasValue || vm.OverrideRemainingMonths.HasValue)
+                {
+                    // next date: preferuj CSV jeśli jest, bo bank ma realny terminarz
+                    var nextDate = ComputeNextPaymentDateFromScheduleOrRule(ordered);
+
+                    // remaining installments: jeśli overrideRemainingMonths -> to jest prawda,
+                    // inaczej jeśli mamy CSV -> policz z CSV, inaczej null (VM i tak pokaże "-")
+                    int? remainingInstallments = null;
+                    if (vm.OverrideRemainingMonths.HasValue)
+                    {
+                        remainingInstallments = vm.OverrideRemainingMonths.Value;
+                    }
+                    else if (hasSchedule)
+                    {
+                        remainingInstallments = ordered.Count(r => r.Date.Date >= today.Date);
+                    }
+
+                    // remaining principal: po nadpłacie zapisujesz vm.Principal jako nowe saldo (DB truth)
+                    decimal? remainingPrincipal = vm.Principal;
+                    if (remainingPrincipal < 0m) remainingPrincipal = 0m;
+
+                    // next payment amount:
+                    // - jeśli override raty: zawsze override
+                    // - jeśli override tylko miesięcy: spróbuj wziąć z CSV (najbliższa rata),
+                    //   a jak nie ma CSV – policz annuitet na remainingMonths
+                    decimal? nextPaymentAmount = null;
+                    decimal? nextCap = null;
+                    decimal? nextInt = null;
+
+                    if (vm.OverrideMonthlyPayment.HasValue)
+                    {
+                        nextPaymentAmount = vm.OverrideMonthlyPayment.Value;
+                    }
+                    else
+                    {
+                        if (hasSchedule)
+                        {
+                            var nextRow = ordered.FirstOrDefault(r => r.Date.Date >= today.Date);
+                            nextPaymentAmount = nextRow?.Total;
+                            nextCap = nextRow?.Principal;
+                            nextInt = nextRow?.Interest;
+                        }
+                        else if (vm.OverrideRemainingMonths.HasValue && vm.OverrideRemainingMonths.Value > 0)
+                        {
+                            nextPaymentAmount = LoansService.CalculateMonthlyPayment(
+                                principal: remainingPrincipal ?? 0m,
+                                annualRatePercent: vm.InterestRate,
+                                termMonths: vm.OverrideRemainingMonths.Value);
+                        }
+                    }
+
+                    vm.ApplyScheduleSnapshot(
+                        originalPrincipal: null,                 // manual – nie udajemy że znamy “oryginalne” z CSV
+                        remainingPrincipal: remainingPrincipal,
+                        nextPaymentAmount: nextPaymentAmount,
+                        nextPaymentDate: nextDate,
+                        remainingInstallments: remainingInstallments,
+                        nextPaymentPrincipalPart: nextCap,
+                        nextPaymentInterestPart: nextInt);
+
+                    return;
+                }
+
+                // ========== brak schedule -> czyścimy ==========
+                if (!hasSchedule)
                 {
                     vm.ClearScheduleSnapshot();
                     return;
                 }
 
-                var today = DateTime.Today;
-
-                // sort pewności (parser już sortuje, ale defensywnie)
-                var ordered = schedule.OrderBy(r => r.Date).ToList();
-
+                // ========== CSV mode (A1 / normal) ==========
                 // next installment (>= today)
-                var upcoming = ordered.Where(r => r.Date >= today).OrderBy(r => r.Date).ToList();
+                var upcoming = ordered
+                    .Where(r => r.Date.Date >= today.Date)
+                    .OrderBy(r => r.Date.Date)
+                    .ToList();
+
                 var next = upcoming.FirstOrDefault();
 
-                decimal? nextAmount = next != null ? next.Total : (decimal?)null;
-                DateTime? nextDate = next != null ? next.Date : (DateTime?)null;
+                decimal? nextAmountCsv = next?.Total;
+                DateTime? nextDateCsv = next?.Date.Date;
 
-                decimal? nextCap = next?.Principal;
-                decimal? nextInt = next?.Interest;
+                decimal? nextCapCsv = next?.Principal;
+                decimal? nextIntCsv = next?.Interest;
 
+                int? remainingInstallmentsCsv = upcoming.Count;
 
-                int? remainingInstallments = upcoming.Count;
-
-                // ORIGINAL principal: najlepsze źródło to największe Remaining (zwykle na początku harmonogramu),
-                // ale banki różnie zapisują saldo (przed/po). Bezpiecznie: max(Remaining) jeśli istnieje, inaczej vm.Principal
+                // ORIGINAL principal: max(Remaining) jeśli jest
                 decimal? originalPrincipal = null;
-                var remainingValsAll = ordered.Where(x => x.Remaining.HasValue && x.Remaining.Value >= 0m).Select(x => x.Remaining!.Value).ToList();
-                if (remainingValsAll.Count > 0)
-                    originalPrincipal = remainingValsAll.Max();
+                var remAll = ordered
+                    .Where(x => x.Remaining.HasValue && x.Remaining.Value >= 0m)
+                    .Select(x => x.Remaining!.Value)
+                    .ToList();
+
+                if (remAll.Count > 0)
+                    originalPrincipal = remAll.Max();
 
                 // REMAINING principal:
-                // 1) jeśli wiersz "next" ma Remaining -> bierzemy go
-                // 2) inaczej bierzemy ostatni Remaining z przyszłości
-                // 3) inaczej (brak Remaining) -> sum(przyszły Principal) jeśli jest
-                // 4) fallback -> vm.Principal
-                decimal? remainingPrincipal = null;
+                // 1) Remaining z next
+                // 2) pierwszy future remaining
+                // 3) suma future principal
+                // 4) fallback vm.Principal
+                decimal? remainingPrincipalCsv = null;
 
                 if (next != null && next.Remaining.HasValue && next.Remaining.Value >= 0m)
                 {
-                    remainingPrincipal = next.Remaining.Value;
+                    remainingPrincipalCsv = next.Remaining.Value;
                 }
                 else
                 {
@@ -183,45 +281,41 @@ namespace Finly.Pages
 
                     if (remFuture.Count > 0)
                     {
-                        // bierzemy wartość z najbliższego sensownego wiersza (pierwszy z Remaining)
-                        remainingPrincipal = remFuture.First();
+                        remainingPrincipalCsv = remFuture.First();
                     }
                     else
                     {
-                        // brak Remaining w ogóle -> próbujemy zsumować przyszły kapitał
                         var capFuture = upcoming
                             .Where(x => x.Principal.HasValue && x.Principal.Value >= 0m)
                             .Select(x => x.Principal!.Value)
                             .ToList();
 
                         if (capFuture.Count > 0)
-                            remainingPrincipal = capFuture.Sum();
+                            remainingPrincipalCsv = capFuture.Sum();
                     }
                 }
 
-                // jeśli nadal null, fallback do pola w DB
-                if (!remainingPrincipal.HasValue)
-                    remainingPrincipal = vm.Principal;
+                if (!remainingPrincipalCsv.HasValue)
+                    remainingPrincipalCsv = vm.Principal;
 
-                // jeśli nadal null/<=0, to chociaż nie rozwalaj %:
-                if (remainingPrincipal < 0m) remainingPrincipal = 0m;
+                if (remainingPrincipalCsv < 0m)
+                    remainingPrincipalCsv = 0m;
 
                 vm.ApplyScheduleSnapshot(
                     originalPrincipal: originalPrincipal,
-                    remainingPrincipal: remainingPrincipal,
-                    nextPaymentAmount: nextAmount,
-                    nextPaymentDate: nextDate,
-                    remainingInstallments: remainingInstallments,
-                    nextPaymentPrincipalPart: nextCap,
-                    nextPaymentInterestPart: nextInt);
-
+                    remainingPrincipal: remainingPrincipalCsv,
+                    nextPaymentAmount: nextAmountCsv,
+                    nextPaymentDate: nextDateCsv,
+                    remainingInstallments: remainingInstallmentsCsv,
+                    nextPaymentPrincipalPart: nextCapCsv,
+                    nextPaymentInterestPart: nextIntCsv);
             }
             catch
             {
-                // w razie jakiegokolwiek błędu snapshotu nie wywracamy UI
                 vm.ClearScheduleSnapshot();
             }
         }
+
 
         // ===================== SCHEDULE ATTACH (CSV) =====================
 
@@ -899,35 +993,35 @@ namespace Finly.Pages
             if (dlg.ShowDialog() != true)
                 return;
 
-            var amt = dlg.Amount;
-            if (amt <= 0m)
+            var totalPaid = dlg.Amount;
+            var capitalPart = dlg.CapitalPaid;
+            var interestPart = totalPaid - capitalPart;
+
+            if (totalPaid <= 0m || capitalPart <= 0m || capitalPart > totalPaid)
             {
-                ToastService.Error("Podaj poprawną kwotę nadpłaty.");
+                ToastService.Error("Nieprawidłowe dane nadpłaty.");
                 return;
             }
 
             try
             {
-                // nadpłata działa na "Principal" w DB (saldo),
-                // ale jeśli masz harmonogram, to on się rozjedzie dopóki go nie podmienisz/odświeżysz.
-                int paymentDay = vm.PaymentDay;
-                var today = DateTime.Today;
+                // 1) Aktualizujemy saldo kredytu WYŁĄCZNIE o kapitał
+                var newPrincipal = vm.Principal - capitalPart;
+                if (newPrincipal < 0m) newPrincipal = 0m;
 
-                var lastDue = LoansService.GetPreviousDueDate(today, paymentDay, vm.StartDate);
+                // 2) Jeśli tryb MANUAL ma zmienić ratę/okres, musimy to zapisać w LoanModel (NOWE pola w DB)
+                //    (szczegóły migracji poniżej w pkt 4)
+                decimal? overrideMonthlyPayment = null;
+                int? overrideRemainingMonths = null;
 
-                var interest = LoanMathService.CalculateInterest(
-                    vm.DisplayRemainingPrincipal, // ważne: od pozostałego salda
-                    vm.InterestRate,
-                    lastDue,
-                    today);
+                if (dlg.Mode == OverpayLoanDialog.OverpayMode.Manual)
+                {
+                    if (dlg.ManualLowerPayment && dlg.ManualNewPayment.HasValue)
+                        overrideMonthlyPayment = dlg.ManualNewPayment.Value;
 
-                if (interest < 0) interest = 0;
-
-                var principalPart = amt - interest;
-                if (principalPart < 0) principalPart = 0;
-
-                var newPrincipal = vm.Principal - principalPart; // DB principal
-                if (newPrincipal < 0) newPrincipal = 0;
+                    if (!dlg.ManualLowerPayment && dlg.ManualRemainingMonths.HasValue)
+                        overrideRemainingMonths = dlg.ManualRemainingMonths.Value;
+                }
 
                 var loanToUpdate = new LoanModel
                 {
@@ -938,12 +1032,16 @@ namespace Finly.Pages
                     InterestRate = vm.InterestRate,
                     StartDate = vm.StartDate,
                     TermMonths = vm.TermMonths,
-                    PaymentDay = vm.PaymentDay
+                    PaymentDay = vm.PaymentDay,
+
+                    // ===== NOWE: override'y (A2) =====
+                    OverrideMonthlyPayment = overrideMonthlyPayment,
+                    OverrideRemainingMonths = overrideRemainingMonths
                 };
 
                 DatabaseService.UpdateLoan(loanToUpdate);
 
-                // ✅ zapis do historii (LoanOperations) – dzięki temu “Historia spłaconych rat i nadpłat” pokaże nadpłaty
+                // 3) Historia operacji
                 try
                 {
                     DatabaseService.InsertLoanOperation(_userId, new LoanOperationModel
@@ -951,36 +1049,78 @@ namespace Finly.Pages
                         LoanId = vm.Id,
                         Date = DateTime.Today,
                         Type = LoanOperationType.Overpayment,
-                        TotalAmount = amt,
-                        CapitalPart = principalPart,
-                        InterestPart = interest,
+                        TotalAmount = totalPaid,
+                        CapitalPart = capitalPart,
+                        InterestPart = interestPart,
                         RemainingPrincipal = newPrincipal
                     });
                 }
                 catch (Exception ex)
                 {
-                    // nie psujemy nadpłaty – historia jest dodatkiem
                     System.Diagnostics.Debug.WriteLine("InsertLoanOperation failed: " + ex);
                 }
 
+                // 4) A1: CSV -> import jak “Załącz harmonogram”
+                if (dlg.Mode == OverpayLoanDialog.OverpayMode.Csv)
+                {
+                    var selectedPath = dlg.AttachedSchedulePath!;
+                    if (!File.Exists(selectedPath))
+                    {
+                        ToastService.Error("Wybrany plik CSV nie istnieje.");
+                        return;
+                    }
 
-                var newMonthly = LoansService.CalculateMonthlyPayment(
-                    newPrincipal,
-                    vm.InterestRate,
-                    vm.TermMonths);
+                    string destPath = CopyLoanScheduleToAppData(vm.Id, selectedPath);
+                    DatabaseService.SetLoanSchedulePath(vm.Id, _userId, destPath);
+                    _parsedSchedules.Remove(vm.Id);
 
-                ToastService.Success(
-                    $"Nadpłata {amt:N2} zł. Nowy kapitał: {newPrincipal:N2} zł. Szac. nowa rata: {newMonthly:N2} zł.");
+                    // po CSV nadpisujemy manual override (bank jest źródłem prawdy)
+                    try
+                    {
+                        var cleared = new LoanModel
+                        {
+                            Id = vm.Id,
+                            UserId = _userId,
+                            Name = vm.Name,
+                            Principal = newPrincipal,
+                            InterestRate = vm.InterestRate,
+                            StartDate = vm.StartDate,
+                            TermMonths = vm.TermMonths,
+                            PaymentDay = vm.PaymentDay,
+                            OverrideMonthlyPayment = null,
+                            OverrideRemainingMonths = null
+                        };
+                        DatabaseService.UpdateLoan(cleared);
+                    }
+                    catch { }
 
+                    ImportScheduleIntoDb(vm.Id, destPath);
+
+                    ToastService.Success($"Nadpłata {totalPaid:N2} zł zapisana + zaimportowano nowy harmonogram.");
+                }
+                else
+                {
+                    // A2: Manual
+                    if (overrideMonthlyPayment.HasValue)
+                        ToastService.Success($"Nadpłata {totalPaid:N2} zł zapisana. Nowa rata: {overrideMonthlyPayment.Value:N2} zł.");
+                    else if (overrideRemainingMonths.HasValue)
+                        ToastService.Success($"Nadpłata {totalPaid:N2} zł zapisana. Pozostało rat: {overrideRemainingMonths.Value}.");
+                    else
+                        ToastService.Success($"Nadpłata {totalPaid:N2} zł zapisana.");
+                }
+
+                // 5) Refresh UI
                 LoadLoans();
                 ApplyScheduleSnapshotsToLoanVms();
                 RefreshKpisAndLists();
+                DatabaseService.NotifyDataChanged();
             }
             catch (Exception ex)
             {
                 ToastService.Error("Błąd podczas nadpłaty: " + ex.Message);
             }
         }
+
 
         private void ShowPaidHistory_Click(object sender, RoutedEventArgs e)
         {
