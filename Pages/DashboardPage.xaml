@@ -55,29 +55,82 @@
         </Style>
 
         <!-- KPI -->
-        <Style x:Key="KpiValueStyle" TargetType="TextBlock">
-            <Setter Property="FontSize" Value="18"/>
-            <Setter Property="FontWeight" Value="Bold"/>
-            <Setter Property="Margin" Value="0,2,0,0"/>
-            <Setter Property="Foreground" Value="{DynamicResource App.Foreground}"/>
-        </Style>
+		<Style x:Key="KpiValueStyle" TargetType="TextBlock">
+			<Setter Property="FontSize" Value="14"/>
+			<Setter Property="FontWeight" Value="Bold"/>
+			<Setter Property="Margin" Value="0,3,0,0"/>
+			<Setter Property="Foreground" Value="{DynamicResource App.Foreground}"/>
+			<Setter Property="TextTrimming" Value="None"/>
+			<Setter Property="TextWrapping" Value="Wrap"/>
+		</Style>
 
-        <Style x:Key="KpiHeader" TargetType="TextBlock">
-            <Setter Property="FontSize" Value="20"/>
-            <Setter Property="FontWeight" Value="Bold"/>
-            <Setter Property="Foreground" Value="{DynamicResource App.Foreground}"/>
-        </Style>
 
-        <Style x:Key="KpiCard" TargetType="Border">
-            <Setter Property="Background" Value="Transparent"/>
-            <Setter Property="BorderBrush" Value="{DynamicResource Brand.Blue}"/>
-            <Setter Property="BorderThickness" Value="2"/>
-            <Setter Property="CornerRadius" Value="10"/>
-            <Setter Property="Padding" Value="12"/>
-            <Setter Property="Margin" Value="0,0,16,0"/>
-        </Style>
+		<Style x:Key="KpiHeader" TargetType="TextBlock">
+			<Setter Property="FontSize" Value="14"/>
+			<Setter Property="FontWeight" Value="Bold"/>
+			<Setter Property="Foreground" Value="{DynamicResource App.Foreground}"/>
+			<Setter Property="Opacity" Value="1"/>
+			<Setter Property="TextWrapping" Value="Wrap"/>
+			<Setter Property="TextTrimming" Value="None"/>
+		</Style>
 
-        <!-- Mini etykiety -->
+
+		<Style x:Key="KpiCard" TargetType="Border">
+			<Setter Property="Background" Value="{DynamicResource Surface.Background}"/>
+			<Setter Property="BorderBrush" Value="{DynamicResource Brand.Blue}"/>
+			<Setter Property="BorderThickness" Value="2"/>
+			<Setter Property="CornerRadius" Value="10"/>
+			<Setter Property="Padding" Value="12"/>
+			<Setter Property="Margin" Value="0,0,12,0"/>
+			<Setter Property="SnapsToDevicePixels" Value="True"/>
+			<Setter Property="UseLayoutRounding" Value="True"/>
+		</Style>
+
+		<!-- ====== JAKOŚĆ renderowania bitmap ====== -->
+		<Style TargetType="{x:Type Image}">
+			<Setter Property="RenderOptions.BitmapScalingMode" Value="HighQuality"/>
+			<Setter Property="RenderOptions.EdgeMode" Value="Unspecified"/>
+			<Setter Property="SnapsToDevicePixels" Value="True"/>
+		</Style>
+
+		<!-- =========================================================
+     TINT IKON (jak w AddExpense)
+     ========================================================= -->
+		<Style x:Key="TintIcon" TargetType="ContentControl">
+			<Setter Property="Width" Value="18"/>
+			<Setter Property="Height" Value="18"/>
+			<Setter Property="Template">
+				<Setter.Value>
+					<ControlTemplate TargetType="ContentControl">
+						<Rectangle Width="{TemplateBinding Width}"
+								   Height="{TemplateBinding Height}"
+								   SnapsToDevicePixels="True"
+								   RenderOptions.BitmapScalingMode="HighQuality"
+								   Fill="{DynamicResource Brand.Orange}">
+							<Rectangle.OpacityMask>
+								<ImageBrush Stretch="Uniform"
+											RenderOptions.BitmapScalingMode="HighQuality">
+									<ImageBrush.ImageSource>
+										<PriorityBinding>
+											<Binding RelativeSource="{RelativeSource TemplatedParent}" Path="Content"/>
+											<Binding RelativeSource="{RelativeSource TemplatedParent}" Path="Tag"/>
+										</PriorityBinding>
+									</ImageBrush.ImageSource>
+								</ImageBrush>
+							</Rectangle.OpacityMask>
+						</Rectangle>
+					</ControlTemplate>
+				</Setter.Value>
+			</Setter>
+		</Style>
+
+		<Style x:Key="TintIconKpi" TargetType="ContentControl" BasedOn="{StaticResource TintIcon}">
+			<Setter Property="Width" Value="38"/>
+			<Setter Property="Height" Value="38"/>
+		</Style>
+
+
+		<!-- Mini etykiety -->
         <Style x:Key="MiniLabel" TargetType="TextBlock">
             <Setter Property="Foreground" Value="{DynamicResource App.Foreground}"/>
             <Setter Property="Opacity" Value="0.85"/>
@@ -314,67 +367,157 @@
             </Grid.RowDefinitions>
 
             <!-- ================= KPI ================= -->
-            <Grid Grid.Row="0" Margin="0,0,0,12">
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="*"/>
-                    <ColumnDefinition Width="*"/>
-                    <ColumnDefinition Width="*"/>
-                    <ColumnDefinition Width="*"/>
-                    <ColumnDefinition Width="*"/>
-                    <ColumnDefinition Width="*"/>
-                </Grid.ColumnDefinitions>
+			<Grid Grid.Row="0" Margin="0,0,0,12">
+				<Grid.ColumnDefinitions>
+					<ColumnDefinition Width="*"/>
+					<ColumnDefinition Width="*"/>
+					<ColumnDefinition Width="*"/>
+					<ColumnDefinition Width="*"/>
+					<ColumnDefinition Width="*"/>
+					<ColumnDefinition Width="*"/>
+				</Grid.ColumnDefinitions>
 
-                <Border Grid.Column="0" Style="{StaticResource KpiCard}">
-                    <StackPanel>
-                        <TextBlock Text="Cały majątek" Style="{StaticResource KpiHeader}"/>
-                        <TextBlock x:Name="TotalWealthText" Style="{StaticResource KpiValueStyle}" Text="0,00 zł"/>
-                    </StackPanel>
-                </Border>
+				<!-- Cały majątek -->
+				<Border Grid.Column="0" Style="{StaticResource KpiCard}">
+					<Grid>
+						<Grid.ColumnDefinitions>
+							<ColumnDefinition Width="*"/>
+							<ColumnDefinition Width="56"/>
+						</Grid.ColumnDefinitions>
 
-                <Border Grid.Column="1" Style="{StaticResource KpiCard}">
-                    <StackPanel>
-                        <TextBlock Text="Konta bankowe" Style="{StaticResource KpiHeader}"/>
-                        <TextBlock x:Name="BanksText" Style="{StaticResource KpiValueStyle}" Text="0,00 zł"/>
-                    </StackPanel>
-                </Border>
+						<StackPanel Grid.Column="0">
+							<TextBlock Text="Cały majątek" Style="{StaticResource KpiHeader}"/>
+							<TextBlock x:Name="TotalWealthText"
+									   Text="0,00 zł"
+									   Style="{StaticResource KpiValueStyle}"/>
+						</StackPanel>
 
-                <Border Grid.Column="2" Style="{StaticResource KpiCard}">
-                    <StackPanel>
-                        <TextBlock Text="Wolna gotówka" Style="{StaticResource KpiHeader}"/>
-                        <TextBlock x:Name="FreeCashDashboardText" Style="{StaticResource KpiValueStyle}" Text="0,00 zł"/>
-                    </StackPanel>
-                </Border>
+						<ContentControl Grid.Column="1"
+										Style="{StaticResource TintIconKpi}"
+										Content="pack://application:,,,/Assets/Icons/majatek.png"
+										HorizontalAlignment="Center"
+										VerticalAlignment="Center"/>
+					</Grid>
+				</Border>
 
-                <Border Grid.Column="3" Style="{StaticResource KpiCard}">
-                    <StackPanel>
-                        <TextBlock Text="Gotówka odłożona" Style="{StaticResource KpiHeader}" TextWrapping="Wrap"/>
-                        <TextBlock x:Name="SavedToAllocateText" Style="{StaticResource KpiValueStyle}" Text="0,00 zł"/>
-                    </StackPanel>
-                </Border>
+				<!-- Konta bankowe -->
+				<Border Grid.Column="1" Style="{StaticResource KpiCard}">
+					<Grid>
+						<Grid.ColumnDefinitions>
+							<ColumnDefinition Width="*"/>
+							<ColumnDefinition Width="56"/>
+						</Grid.ColumnDefinitions>
 
-                <Border Grid.Column="4" Style="{StaticResource KpiCard}">
-                    <StackPanel HorizontalAlignment="Left">
-                        <TextBlock Text="Gotówka w kopertach"
-                                   Style="{StaticResource KpiHeader}"
-                                   TextWrapping="Wrap"
-                                   TextAlignment="Left"/>
-                        <TextBlock x:Name="EnvelopesDashboardText"
-                                   Style="{StaticResource KpiValueStyle}"
-                                   Text="0,00 zł"
-                                   TextWrapping="Wrap"
-                                   TextAlignment="Left"/>
-                    </StackPanel>
-                </Border>
+						<StackPanel Grid.Column="0">
+							<TextBlock Text="Konta bankowe" Style="{StaticResource KpiHeader}"/>
+							<TextBlock x:Name="BanksText"
+									   Text="0,00 zł"
+									   Style="{StaticResource KpiValueStyle}"/>
+						</StackPanel>
 
-                <Border Grid.Column="5" Style="{StaticResource KpiCard}" Margin="0">
-                    <StackPanel>
-                        <TextBlock Text="Inwestycje" Style="{StaticResource KpiHeader}"/>
-                        <TextBlock x:Name="InvestmentsText" Style="{StaticResource KpiValueStyle}" Text="0,00 zł"/>
-                    </StackPanel>
-                </Border>
-            </Grid>
+						<ContentControl Grid.Column="1"
+										Style="{StaticResource TintIconKpi}"
+										Content="pack://application:,,,/Assets/Icons/kontabankowe.png"
+										HorizontalAlignment="Center"
+										VerticalAlignment="Center"/>
+					</Grid>
+				</Border>
 
-            <!-- ================= Analizy / Alerty / Do ogarnięcia ================= -->
+				<!-- Wolna gotówka -->
+				<Border Grid.Column="2" Style="{StaticResource KpiCard}">
+					<Grid>
+						<Grid.ColumnDefinitions>
+							<ColumnDefinition Width="*"/>
+							<ColumnDefinition Width="56"/>
+						</Grid.ColumnDefinitions>
+
+						<StackPanel Grid.Column="0">
+							<TextBlock Text="Wolna gotówka" Style="{StaticResource KpiHeader}"/>
+							<TextBlock x:Name="FreeCashDashboardText"
+									   Text="0,00 zł"
+									   Style="{StaticResource KpiValueStyle}"/>
+						</StackPanel>
+
+						<ContentControl Grid.Column="1"
+										Style="{StaticResource TintIconKpi}"
+										Content="pack://application:,,,/Assets/Icons/wolnagotowka.png"
+										HorizontalAlignment="Center"
+										VerticalAlignment="Center"/>
+					</Grid>
+				</Border>
+
+				<!-- Odłożona gotówka -->
+				<Border Grid.Column="3" Style="{StaticResource KpiCard}">
+					<Grid>
+						<Grid.ColumnDefinitions>
+							<ColumnDefinition Width="*"/>
+							<ColumnDefinition Width="56"/>
+						</Grid.ColumnDefinitions>
+
+						<StackPanel Grid.Column="0">
+							<TextBlock Text="Odłożona gotówka" Style="{StaticResource KpiHeader}"/>
+							<TextBlock x:Name="SavedToAllocateText"
+									   Text="0,00 zł"
+									   Style="{StaticResource KpiValueStyle}"/>
+						</StackPanel>
+
+						<ContentControl Grid.Column="1"
+										Style="{StaticResource TintIconKpi}"
+										Content="pack://application:,,,/Assets/Icons/odlozonagotowka.png"
+										HorizontalAlignment="Center"
+										VerticalAlignment="Center"/>
+					</Grid>
+				</Border>
+
+				<!-- Koperty -->
+				<Border Grid.Column="4" Style="{StaticResource KpiCard}">
+					<Grid>
+						<Grid.ColumnDefinitions>
+							<ColumnDefinition Width="*"/>
+							<ColumnDefinition Width="56"/>
+						</Grid.ColumnDefinitions>
+
+						<StackPanel Grid.Column="0">
+							<TextBlock Text="Gotówka w kopertach" Style="{StaticResource KpiHeader}"/>
+							<TextBlock x:Name="EnvelopesDashboardText"
+									   Text="0,00 zł"
+									   Style="{StaticResource KpiValueStyle}"/>
+						</StackPanel>
+
+						<ContentControl Grid.Column="1"
+										Style="{StaticResource TintIconKpi}"
+										Content="pack://application:,,,/Assets/Icons/koperty.png"
+										HorizontalAlignment="Center"
+										VerticalAlignment="Center"/>
+					</Grid>
+				</Border>
+
+				<!-- Inwestycje -->
+				<Border Grid.Column="5" Style="{StaticResource KpiCard}" Margin="0">
+					<Grid>
+						<Grid.ColumnDefinitions>
+							<ColumnDefinition Width="*"/>
+							<ColumnDefinition Width="56"/>
+						</Grid.ColumnDefinitions>
+
+						<StackPanel Grid.Column="0">
+							<TextBlock Text="Inwestycje" Style="{StaticResource KpiHeader}"/>
+							<TextBlock x:Name="InvestmentsText"
+									   Text="0,00 zł"
+									   Style="{StaticResource KpiValueStyle}"/>
+						</StackPanel>
+
+						<ContentControl Grid.Column="1"
+										Style="{StaticResource TintIconKpi}"
+										Content="pack://application:,,,/Assets/Icons/inwestycje.png"
+										HorizontalAlignment="Center"
+										VerticalAlignment="Center"/>
+					</Grid>
+				</Border>
+			</Grid>
+
+
+			<!-- ================= Analizy / Alerty / Do ogarnięcia ================= -->
             <Grid Grid.Row="1" Margin="0,0,0,12">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*"/>
