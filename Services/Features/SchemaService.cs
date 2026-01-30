@@ -241,6 +241,25 @@ CREATE TABLE IF NOT EXISTS LoanInstallments(
     FOREIGN KEY(ScheduleId) REFERENCES LoanSchedules(Id) ON DELETE CASCADE
 );
 
+CREATE TABLE IF NOT EXISTS LoanOperations(
+    Id               INTEGER PRIMARY KEY AUTOINCREMENT,
+    UserId           INTEGER NOT NULL,
+    LoanId           INTEGER NOT NULL,
+    Date             TEXT NOT NULL,
+    Type             INTEGER NOT NULL,
+
+    TotalAmount      NUMERIC NOT NULL DEFAULT 0,
+    CapitalPart      NUMERIC NOT NULL DEFAULT 0,
+    InterestPart     NUMERIC NOT NULL DEFAULT 0,
+    RemainingPrincipal NUMERIC NOT NULL DEFAULT 0,
+
+    Note             TEXT NULL,
+
+    FOREIGN KEY(UserId) REFERENCES Users(Id) ON DELETE CASCADE,
+    FOREIGN KEY(LoanId) REFERENCES Loans(Id) ON DELETE CASCADE
+);
+
+
 CREATE TABLE IF NOT EXISTS Investments(
     Id            INTEGER PRIMARY KEY AUTOINCREMENT,
     UserId        INTEGER NOT NULL,
@@ -518,6 +537,13 @@ CREATE INDEX IF NOT EXISTS IX_LoanInstallments_Status_DueDate
 
 CREATE INDEX IF NOT EXISTS IX_LoanInstallments_Schedule
     ON LoanInstallments(UserId, ScheduleId);
+
+CREATE INDEX IF NOT EXISTS IX_LoanOperations_User_Loan_Date
+    ON LoanOperations(UserId, LoanId, Date);
+
+CREATE INDEX IF NOT EXISTS IX_LoanOperations_User_Loan_Type
+    ON LoanOperations(UserId, LoanId, Type);
+
 
 CREATE UNIQUE INDEX IF NOT EXISTS UX_Expenses_PlannedLoanInstallment
 ON Expenses(UserId, LoanInstallmentId)

@@ -1,0 +1,205 @@
+﻿<Window x:Class="Finly.Views.Dialogs.LoanPaidHistoryDialog"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:shell="clr-namespace:System.Windows.Shell;assembly=PresentationFramework"
+        xmlns:controls="clr-namespace:Finly.Views.Controls"
+        Title="Historia spłaconych"
+        WindowStartupLocation="CenterOwner"
+        SizeToContent="WidthAndHeight"
+        ResizeMode="NoResize"
+        WindowStyle="None"
+        Background="{DynamicResource App.Background}"
+        Foreground="{DynamicResource App.Foreground}"
+        Icon="/Assets/Icons/logoFinly.ico">
+
+    <shell:WindowChrome.WindowChrome>
+        <shell:WindowChrome CaptionHeight="40"
+                            ResizeBorderThickness="0"
+                            CornerRadius="0"
+                            UseAeroCaptionButtons="False"/>
+    </shell:WindowChrome.WindowChrome>
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="40"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- ===== TitleBar ===== -->
+        <Grid Grid.Row="0"
+              Background="{DynamicResource TitleBar.Background}"
+              MouseLeftButtonDown="TitleBar_MouseLeftButtonDown">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition/>
+                <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
+
+            <TextBlock x:Name="TitleText"
+                       Text="Historia spłaconych rat i nadpłat"
+                       VerticalAlignment="Center"
+                       Margin="12,0,0,0"
+                       Foreground="{DynamicResource App.Foreground}"
+                       FontSize="13"
+                       shell:WindowChrome.IsHitTestVisibleInChrome="True"/>
+
+            <StackPanel Grid.Column="1" Orientation="Horizontal">
+                <Button Width="46" Height="32" Padding="0"
+                        Background="Transparent"
+                        BorderBrush="{x:Null}"
+                        Foreground="{DynamicResource App.Foreground}"
+                        Cursor="Hand"
+                        FocusVisualStyle="{x:Null}"
+                        shell:WindowChrome.IsHitTestVisibleInChrome="True"
+                        Click="Close_Click">
+                    <TextBlock Text="✕" FontSize="12"
+                               HorizontalAlignment="Center"
+                               VerticalAlignment="Center"/>
+                </Button>
+            </StackPanel>
+        </Grid>
+
+        <!-- ===== Content ===== -->
+        <Border Grid.Row="1"
+                Margin="14"
+                Padding="16"
+                Background="{DynamicResource App.Background}"
+                BorderBrush="{DynamicResource Surface.Border}"
+                BorderThickness="1"
+                CornerRadius="12"
+                MinWidth="760">
+
+            <Border Padding="16"
+                    Background="{DynamicResource Surface.Background}"
+                    BorderBrush="{DynamicResource Surface.Border}"
+                    BorderThickness="1"
+                    CornerRadius="10">
+
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="10"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="10"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+
+                    <!-- ===== Header + podsumowania ===== -->
+                    <StackPanel Grid.Row="0">
+                        <TextBlock x:Name="HeaderText"
+                                   Text="Historia spłaconych"
+                                   FontSize="18"
+                                   FontWeight="Bold"
+                                   Foreground="{DynamicResource App.Foreground}"/>
+
+                        <TextBlock x:Name="SubText"
+                                   Text=""
+                                   Opacity="0.75"
+                                   Foreground="{DynamicResource App.Foreground}"/>
+
+                        <TextBlock x:Name="SummaryText"
+                                   Text=""
+                                   Margin="0,6,0,0"
+                                   Opacity="0.85"
+                                   Foreground="{DynamicResource App.Foreground}"/>
+                    </StackPanel>
+
+                    <!-- ===== Box: tabela ===== -->
+                    <Border Grid.Row="2"
+                            Background="{DynamicResource App.Background}"
+                            BorderBrush="{DynamicResource Surface.Border}"
+                            BorderThickness="1"
+                            CornerRadius="10"
+                            Padding="10"
+                            Height="430">
+
+                        <Grid>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="8"/>
+                                <RowDefinition Height="*"/>
+                            </Grid.RowDefinitions>
+
+                            <StackPanel Grid.Row="0" Orientation="Horizontal">
+                                <TextBlock Text="Widok:"
+                                           Opacity="0.75"
+                                           Foreground="{DynamicResource App.Foreground}"/>
+                                <TextBlock x:Name="TopLineText"
+                                           Margin="8,0,0,0"
+                                           FontWeight="Bold"
+                                           Foreground="{DynamicResource App.Foreground}"/>
+                            </StackPanel>
+
+                            <controls:MiniTableControl x:Name="RowsMiniTable"
+                                                       Grid.Row="2"
+                                                       VerticalScrollBarVisibility="Auto"
+                                                       HorizontalScrollBarVisibility="Disabled">
+
+                                <!-- Header -->
+                                <controls:MiniTableControl.HeaderTemplate>
+                                    <DataTemplate>
+                                        <Border Style="{StaticResource MiniTableHeaderBorder}">
+                                            <Grid>
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="110"/>
+                                                    <ColumnDefinition Width="70"/>
+                                                    <ColumnDefinition Width="120"/>
+                                                    <ColumnDefinition Width="160"/>
+                                                    <ColumnDefinition Width="160"/>
+                                                    <ColumnDefinition Width="190"/>
+                                                    <ColumnDefinition Width="200"/>
+                                                </Grid.ColumnDefinitions>
+
+                                                <TextBlock Grid.Column="0" Text="Typ" Style="{StaticResource MiniTableHeaderText}"/>
+                                                <TextBlock Grid.Column="1" Text="Nr" Style="{StaticResource MiniTableHeaderText}"/>
+                                                <TextBlock Grid.Column="2" Text="Data" Style="{StaticResource MiniTableHeaderText}"/>
+                                                <TextBlock Grid.Column="3" Text="Kapitał (PLN)" Style="{StaticResource MiniTableHeaderText}"/>
+                                                <TextBlock Grid.Column="4" Text="Odsetki (PLN)" Style="{StaticResource MiniTableHeaderText}"/>
+                                                <TextBlock Grid.Column="5" Text="Kwota łącznie (PLN)" Style="{StaticResource MiniTableHeaderText}"/>
+                                                <TextBlock Grid.Column="6" Text="Saldo po (PLN)" Style="{StaticResource MiniTableHeaderText}"/>
+                                            </Grid>
+                                        </Border>
+                                    </DataTemplate>
+                                </controls:MiniTableControl.HeaderTemplate>
+
+                                <!-- Row -->
+                                <controls:MiniTableControl.RowTemplate>
+                                    <DataTemplate>
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="110"/>
+                                                <ColumnDefinition Width="70"/>
+                                                <ColumnDefinition Width="120"/>
+                                                <ColumnDefinition Width="160"/>
+                                                <ColumnDefinition Width="160"/>
+                                                <ColumnDefinition Width="190"/>
+                                                <ColumnDefinition Width="200"/>
+                                            </Grid.ColumnDefinitions>
+
+                                            <TextBlock Grid.Column="0" Text="{Binding Type}" Style="{StaticResource MiniTableCellText}"/>
+                                            <TextBlock Grid.Column="1" Text="{Binding No}" Style="{StaticResource MiniTableCellText}"/>
+                                            <TextBlock Grid.Column="2" Text="{Binding Date}" Style="{StaticResource MiniTableCellText}"/>
+                                            <TextBlock Grid.Column="3" Text="{Binding Principal}" Style="{StaticResource MiniTableCellText}"/>
+                                            <TextBlock Grid.Column="4" Text="{Binding Interest}" Style="{StaticResource MiniTableCellText}"/>
+                                            <TextBlock Grid.Column="5" Text="{Binding Total}" Style="{StaticResource MiniTableCellText}"/>
+                                            <TextBlock Grid.Column="6" Text="{Binding Remaining}" Style="{StaticResource MiniTableCellText}"/>
+                                        </Grid>
+                                    </DataTemplate>
+                                </controls:MiniTableControl.RowTemplate>
+
+                            </controls:MiniTableControl>
+                        </Grid>
+                    </Border>
+
+                    <StackPanel Grid.Row="4"
+                                Orientation="Horizontal"
+                                HorizontalAlignment="Right">
+                        <Button Content="Zamknij"
+                                Style="{StaticResource SecondaryButton}"
+                                IsCancel="True"
+                                Click="Close_Click"/>
+                    </StackPanel>
+                </Grid>
+            </Border>
+        </Border>
+    </Grid>
+</Window>

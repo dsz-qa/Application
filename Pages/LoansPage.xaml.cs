@@ -943,6 +943,27 @@ namespace Finly.Pages
 
                 DatabaseService.UpdateLoan(loanToUpdate);
 
+                // ✅ zapis do historii (LoanOperations) – dzięki temu “Historia spłaconych rat i nadpłat” pokaże nadpłaty
+                try
+                {
+                    DatabaseService.InsertLoanOperation(_userId, new LoanOperationModel
+                    {
+                        LoanId = vm.Id,
+                        Date = DateTime.Today,
+                        Type = LoanOperationType.Overpayment,
+                        TotalAmount = amt,
+                        CapitalPart = principalPart,
+                        InterestPart = interest,
+                        RemainingPrincipal = newPrincipal
+                    });
+                }
+                catch (Exception ex)
+                {
+                    // nie psujemy nadpłaty – historia jest dodatkiem
+                    System.Diagnostics.Debug.WriteLine("InsertLoanOperation failed: " + ex);
+                }
+
+
                 var newMonthly = LoansService.CalculateMonthlyPayment(
                     newPrincipal,
                     vm.InterestRate,
@@ -961,13 +982,50 @@ namespace Finly.Pages
             }
         }
 
-        private void ShowSimDialog_Click(object sender, RoutedEventArgs e)
+        private void ShowPaidHistory_Click(object sender, RoutedEventArgs e)
         {
-            if ((sender as FrameworkElement)?.Tag is not LoanCardVm)
+            if ((sender as FrameworkElement)?.Tag is not LoanCardVm vm)
                 return;
 
-            ToastService.Error("Symulacja nadpłaty nie jest jeszcze zaimplementowana.");
+            // harmonogram jest najlepszy do logiki “kolejna rata to nr 4 => zapłacone 2 i 3”
+            List<LoanInstallmentRow> schedule = new();
+            bool hasSchedule = TryGetSchedule(vm.Id, showToasts: false, out _, out schedule) && schedule.Count > 0;
+
+            var paidFromSchedule = new List<LoanInstallmentRow>();
+
+            if (hasSchedule)
+            {
+                var ordered = schedule.OrderBy(x => x.Date).ToList();
+                var next = ordered.Where(x => x.Date.Date >= DateTime.Today.Date).OrderBy(x => x.Date).FirstOrDefault();
+
+                int? nextNo = next?.InstallmentNo;
+
+                if (nextNo.HasValue && nextNo.Value > 0)
+                {
+                    paidFromSchedule = ordered
+                        .Where(x => x.InstallmentNo.HasValue && x.InstallmentNo.Value > 0 && x.InstallmentNo.Value < nextNo.Value)
+                        .OrderBy(x => x.Date)
+                        .ToList();
+                }
+                else
+                {
+                    // fallback: “zapłacone” = daty w przeszłości
+                    paidFromSchedule = ordered.Where(x => x.Date.Date < DateTime.Today.Date).OrderBy(x => x.Date).ToList();
+                }
+            }
+
+            var dlg = new Finly.Views.Dialogs.LoanPaidHistoryDialog(
+                loanName: vm.Name,
+                paidScheduleRows: paidFromSchedule,
+                userId: _userId,
+                loanId: vm.Id)
+            {
+                Owner = GetOwnerWindow()
+            };
+
+            dlg.ShowDialog();
         }
+
 
         private void CardSchedule_Click(object sender, RoutedEventArgs e)
         {

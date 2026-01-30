@@ -284,11 +284,12 @@
                                         MinWidth="170">
 
 								<StackPanel Orientation="Horizontal" Margin="0,0,0,8">
-									<Button Content="Symulacja nadpłaty"
-                                            Style="{StaticResource LoansPrimarySmallButton}"
-                                            Margin="0,0,8,0"
-                                            Click="ShowSimDialog_Click"
-                                            Tag="{Binding}"/>
+									<Button Content="Historia spłaconych rat i nadpłat"
+											Style="{StaticResource LoansPrimarySmallButton}"
+											Margin="0,0,8,0"
+											Click="ShowPaidHistory_Click"
+											Tag="{Binding}"/>
+
 
 									<Button Height="30"
                                             Padding="12,0"

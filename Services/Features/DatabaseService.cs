@@ -880,6 +880,51 @@ ORDER BY date(DueDate) ASC, InstallmentNo ASC;";
             return list;
         }
 
+        public static List<LoanInstallmentDb> GetPaidInstallmentsByLoan(int userId, int loanId)
+        {
+            var list = new List<LoanInstallmentDb>();
+            if (userId <= 0 || loanId <= 0) return list;
+
+            using var c = OpenAndEnsureSchema();
+            if (!TableExists(c, "LoanInstallments")) return list;
+
+            using var cmd = c.CreateCommand();
+            cmd.CommandText = @"
+SELECT Id, UserId, LoanId, ScheduleId, InstallmentNo, DueDate, TotalAmount,
+       PrincipalAmount, InterestAmount, RemainingBalance,
+       Status, PaidAt, PaymentKind, PaymentRefId
+FROM LoanInstallments
+WHERE UserId=@u AND LoanId=@l AND Status=1
+ORDER BY date(DueDate) ASC, InstallmentNo ASC;";
+            cmd.Parameters.AddWithValue("@u", userId);
+            cmd.Parameters.AddWithValue("@l", loanId);
+
+            using var r = cmd.ExecuteReader();
+            while (r.Read())
+            {
+                list.Add(new LoanInstallmentDb
+                {
+                    Id = r.IsDBNull(0) ? 0 : r.GetInt32(0),
+                    UserId = r.IsDBNull(1) ? userId : r.GetInt32(1),
+                    LoanId = r.IsDBNull(2) ? loanId : r.GetInt32(2),
+                    ScheduleId = r.IsDBNull(3) ? 0 : r.GetInt32(3),
+                    InstallmentNo = r.IsDBNull(4) ? 0 : r.GetInt32(4),
+                    DueDate = GetDate(r, 5),
+                    TotalAmount = r.IsDBNull(6) ? 0m : Convert.ToDecimal(r.GetValue(6)),
+                    PrincipalAmount = r.IsDBNull(7) ? null : Convert.ToDecimal(r.GetValue(7)),
+                    InterestAmount = r.IsDBNull(8) ? null : Convert.ToDecimal(r.GetValue(8)),
+                    RemainingBalance = r.IsDBNull(9) ? null : Convert.ToDecimal(r.GetValue(9)),
+                    Status = r.IsDBNull(10) ? 0 : r.GetInt32(10),
+                    PaidAt = r.IsDBNull(11) ? null : GetDate(r, 11),
+                    PaymentKind = r.IsDBNull(12) ? 0 : r.GetInt32(12),
+                    PaymentRefId = r.IsDBNull(13) ? null : r.GetInt32(13)
+                });
+            }
+
+            return list;
+        }
+
+
         public static void ProcessDuePlannedTransactions(int userId, DateTime upToDate)
         {
             if (userId <= 0) return;
@@ -3950,6 +3995,74 @@ VALUES(
             }
         }
 
+        public static int InsertLoanOperation(int userId, LoanOperationModel op)
+        {
+            if (userId <= 0) throw new ArgumentException(nameof(userId));
+            if (op == null) throw new ArgumentNullException(nameof(op));
+            if (op.LoanId <= 0) throw new ArgumentException("Nieprawid³owy LoanId.");
+
+            using var c = OpenAndEnsureSchema();
+            if (!TableExists(c, "LoanOperations"))
+                throw new InvalidOperationException("Brak tabeli LoanOperations (sprawdŸ SchemaService).");
+
+            using var cmd = c.CreateCommand();
+            cmd.CommandText = @"
+INSERT INTO LoanOperations(UserId, LoanId, Date, Type, TotalAmount, CapitalPart, InterestPart, RemainingPrincipal, Note)
+VALUES (@u, @l, @d, @t, @tot, @cap, @int, @rem, @n);
+SELECT last_insert_rowid();";
+
+            cmd.Parameters.AddWithValue("@u", userId);
+            cmd.Parameters.AddWithValue("@l", op.LoanId);
+            cmd.Parameters.AddWithValue("@d", op.Date.ToString("yyyy-MM-dd"));
+            cmd.Parameters.AddWithValue("@t", (int)op.Type);
+            cmd.Parameters.AddWithValue("@tot", op.TotalAmount);
+            cmd.Parameters.AddWithValue("@cap", op.CapitalPart);
+            cmd.Parameters.AddWithValue("@int", op.InterestPart);
+            cmd.Parameters.AddWithValue("@rem", op.RemainingPrincipal);
+            cmd.Parameters.AddWithValue("@n", (object?)null ?? DBNull.Value);
+
+            var id = Convert.ToInt32(cmd.ExecuteScalar() ?? 0);
+            RaiseDataChanged();
+            return id;
+        }
+
+        public static List<LoanOperationModel> GetLoanOperations(int userId, int loanId)
+        {
+            var list = new List<LoanOperationModel>();
+            if (userId <= 0 || loanId <= 0) return list;
+
+            using var c = OpenAndEnsureSchema();
+            if (!TableExists(c, "LoanOperations")) return list;
+
+            using var cmd = c.CreateCommand();
+            cmd.CommandText = @"
+SELECT Id, LoanId, Date, Type, TotalAmount, CapitalPart, InterestPart, RemainingPrincipal
+FROM LoanOperations
+WHERE UserId=@u AND LoanId=@l
+ORDER BY date(Date) ASC, Id ASC;";
+            cmd.Parameters.AddWithValue("@u", userId);
+            cmd.Parameters.AddWithValue("@l", loanId);
+
+            using var r = cmd.ExecuteReader();
+            while (r.Read())
+            {
+                var m = new LoanOperationModel
+                {
+                    Id = r.IsDBNull(0) ? 0 : r.GetInt32(0),
+                    LoanId = r.IsDBNull(1) ? loanId : r.GetInt32(1),
+                    Date = GetDate(r, 2),
+                    Type = r.IsDBNull(3) ? LoanOperationType.Installment : (LoanOperationType)r.GetInt32(3),
+                    TotalAmount = r.IsDBNull(4) ? 0m : Convert.ToDecimal(r.GetValue(4)),
+                    CapitalPart = r.IsDBNull(5) ? 0m : Convert.ToDecimal(r.GetValue(5)),
+                    InterestPart = r.IsDBNull(6) ? 0m : Convert.ToDecimal(r.GetValue(6)),
+                    RemainingPrincipal = r.IsDBNull(7) ? 0m : Convert.ToDecimal(r.GetValue(7))
+                };
+
+                list.Add(m);
+            }
+
+            return list;
+        }
 
         public static (int planned, int paid) GetLoanInstallmentsStatusCounts(int userId, int loanId)
         {
