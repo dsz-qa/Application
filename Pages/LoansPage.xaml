@@ -369,22 +369,24 @@
 			<Grid.RowDefinitions>
 				<RowDefinition Height="Auto"/>
 				<RowDefinition Height="Auto"/>
-				<RowDefinition Height="Auto"/>
 				<RowDefinition Height="*"/>
 			</Grid.RowDefinitions>
 
-			<!-- KPI: 2x2 (zgodnie z prośbą o “pod spodem”) -->
+			<!-- ================= KPI: czerwone + pomarańczowe ================= -->
 			<Grid Grid.Row="0">
 				<Grid.RowDefinitions>
 					<RowDefinition Height="Auto"/>
 					<RowDefinition Height="Auto"/>
 				</Grid.RowDefinitions>
+
+				<!-- 3 kolumny, bo na dole chcemy 3 kafle -->
 				<Grid.ColumnDefinitions>
+					<ColumnDefinition Width="*"/>
 					<ColumnDefinition Width="*"/>
 					<ColumnDefinition Width="*"/>
 				</Grid.ColumnDefinitions>
 
-				<!-- (0,0) Kredyty zaciągnięte na kwotę: (dawniej Pozostały kapitał...) -->
+				<!-- (0,0) Kredyty zaciągnięte na kwotę -->
 				<Border Grid.Row="0" Grid.Column="0"
                         Style="{StaticResource RedAccentCard}"
                         Margin="0,0,16,16">
@@ -397,10 +399,10 @@
 					</StackPanel>
 				</Border>
 
-				<!-- (0,1) Całkowity koszt wszystkich kredytów -> przeniesiony na górę, czerwona ramka -->
+				<!-- (0,1) Całkowity koszt wszystkich kredytów -->
 				<Border Grid.Row="0" Grid.Column="1"
                         Style="{StaticResource RedAccentCard}"
-                        Margin="0,0,0,16">
+                        Margin="0,0,16,16">
 					<StackPanel>
 						<TextBlock Text="Całkowity koszt wszystkich kredytów (kapitał + odsetki)"
                                    Style="{StaticResource CardHeader}"/>
@@ -410,7 +412,14 @@
 					</StackPanel>
 				</Border>
 
-				<!-- (1,0) Miesięczny koszt rat kredytów -> POD spodem, pomarańczowa ramka -->
+				<!-- (0,2) puste miejsce / oddech -->
+				<Border Grid.Row="0" Grid.Column="2"
+                        Background="Transparent"
+                        Margin="0,0,0,16"/>
+
+				<!-- =================== ORANGE ROW: 3 kafle w jednym rzędzie =================== -->
+
+				<!-- (1,0) Miesięczny koszt rat kredytów -->
 				<Border Grid.Row="1" Grid.Column="0"
                         Style="{StaticResource OrangeAccentCard}"
                         Margin="0,0,16,16">
@@ -422,23 +431,20 @@
                                    Text="0,00 zł"
                                    Style="{StaticResource KpiValueStyle}"
                                    FontSize="18"/>
+
+						<!-- ✅ NOWE: status raty (ten sam mechanizm co niżej) -->
+						<TextBlock x:Name="MonthlyLoansPaidStatus"
+                                   Text=""
+                                   Opacity="0.75"
+                                   Margin="0,4,0,0"
+                                   TextWrapping="Wrap"/>
 					</StackPanel>
 				</Border>
 
-				<!-- (1,1) puste miejsce (zostawiamy dla oddechu / przyszłych KPI) -->
+				<!-- (1,1) Kapitał w tym miesiącu -->
 				<Border Grid.Row="1" Grid.Column="1"
-                        Background="Transparent"
-                        Margin="0,0,0,16"/>
-			</Grid>
-
-			<!-- Analizy (bez “Całkowity koszt…”, bo jest u góry) -->
-			<Grid Grid.Row="1">
-				<Grid.ColumnDefinitions>
-					<ColumnDefinition Width="*"/>
-					<ColumnDefinition Width="*"/>
-				</Grid.ColumnDefinitions>
-
-				<Border Grid.Column="0" Style="{StaticResource OrangeAccentCard}">
+                        Style="{StaticResource OrangeAccentCard}"
+                        Margin="0,0,16,16">
 					<StackPanel>
 						<TextBlock Text="Kapitał w tym miesiącu ze wszystkich kredytów"
                                    Style="{StaticResource CardHeader}"
@@ -450,11 +456,15 @@
 						<TextBlock x:Name="Analysis1PaidStatus"
                                    Text=""
                                    Opacity="0.75"
-                                   Margin="0,4,0,0"/>
+                                   Margin="0,4,0,0"
+                                   TextWrapping="Wrap"/>
 					</StackPanel>
 				</Border>
 
-				<Border Grid.Column="1" Style="{StaticResource OrangeAccentCard}" Margin="0,0,0,16">
+				<!-- (1,2) Odsetki w tym miesiącu -->
+				<Border Grid.Row="1" Grid.Column="2"
+                        Style="{StaticResource OrangeAccentCard}"
+                        Margin="0,0,0,16">
 					<StackPanel>
 						<TextBlock Text="Odsetki w tym miesiącu ze wszystkich kredytów"
                                    Style="{StaticResource CardHeader}"
@@ -466,13 +476,14 @@
 						<TextBlock x:Name="Analysis2PaidStatus"
                                    Text=""
                                    Opacity="0.75"
-                                   Margin="0,4,0,0"/>
+                                   Margin="0,4,0,0"
+                                   TextWrapping="Wrap"/>
 					</StackPanel>
 				</Border>
 			</Grid>
 
-			<!-- Separator + napis -->
-			<StackPanel Grid.Row="2" Margin="0,0,0,12">
+			<!-- ================= Separator + tytuł ================= -->
+			<StackPanel Grid.Row="1" Margin="0,0,0,12">
 				<Separator Height="1"
                            Background="{DynamicResource Surface.Border}"
                            Opacity="0.8"
@@ -496,8 +507,8 @@
 				</StackPanel>
 			</StackPanel>
 
-			<!-- Karty -->
-			<ItemsControl Grid.Row="3" x:Name="LoansGrid">
+			<!-- ================= Karty ================= -->
+			<ItemsControl Grid.Row="2" x:Name="LoansGrid">
 				<ItemsControl.ItemsPanel>
 					<ItemsPanelTemplate>
 						<WrapPanel IsItemsHost="True"/>
