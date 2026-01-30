@@ -404,7 +404,7 @@
                         Style="{StaticResource RedAccentCard}"
                         Margin="0,0,16,16">
 					<StackPanel>
-						<TextBlock Text="Całkowity koszt wszystkich kredytów (kapitał + odsetki)"
+						<TextBlock Text="Całkowity koszt wszystkich kredytów"
                                    Style="{StaticResource CardHeader}"/>
 						<TextBlock x:Name="Analysis3Value"
                                    Text="—"
@@ -424,7 +424,7 @@
                         Style="{StaticResource OrangeAccentCard}"
                         Margin="0,0,16,16">
 					<StackPanel>
-						<TextBlock Text="Miesięczny koszt rat kredytów"
+						<TextBlock Text="Miesięczny koszt rat wszystkich kredytów"
                                    Style="{StaticResource CardHeader}"
                                    FontSize="14"/>
 						<TextBlock x:Name="MonthlyLoansTileAmount"

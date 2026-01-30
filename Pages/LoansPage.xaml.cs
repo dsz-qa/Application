@@ -673,8 +673,10 @@ namespace Finly.Pages
                     statusText = $"Najbliższa rata: {globalNextDue.Value:dd.MM.yyyy}";
             }
 
+            if (FindName("MonthlyLoansPaidStatus") is TextBlock tm) tm.Text = statusText;
             if (FindName("Analysis1PaidStatus") is TextBlock t1) t1.Text = statusText;
             if (FindName("Analysis2PaidStatus") is TextBlock t2) t2.Text = statusText;
+
         }
 
         private static DateTime GetDueDateForMonth(LoanCardVm vm, int year, int month)
