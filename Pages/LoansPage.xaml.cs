@@ -503,67 +503,106 @@ namespace Finly.Pages
             return (true, paid, overdue, due);
         }
 
-
-
-
         private void RefreshKpisAndLists()
         {
             var loans = _loans.OfType<LoanCardVm>().ToList();
 
+            // Snapshoty muszą być policzone zanim policzymy KPI / analizy
             ApplyScheduleSnapshotsToLoanVms();
             UpdateKpiTiles();
 
+            // domyślnie wyczyść A1/A2/A3
             SetAnalysisText("—", "—", "—");
 
             if (!loans.Any())
+            {
+                if (FindName("Analysis1PaidStatus") is TextBlock s1) s1.Text = "";
+                if (FindName("Analysis2PaidStatus") is TextBlock s2) s2.Text = "";
                 return;
+            }
 
             var today = DateTime.Today;
-            var (mFrom, mTo) = GetMonthRangeInclusive(today);
+            var (fromM, toM) = GetMonthRange(today);
 
             decimal capitalThisMonth = 0m;
             decimal interestThisMonth = 0m;
 
-            // A3: koszt całkowity od dziś do końca (u Ciebie już było)
+            // A3: koszt całkowity od dziś do końca
             decimal totalCostAllLoans = 0m;
 
-            // Status globalny (jeśli chcesz jeden napis dla całej strony)
-            // Status globalny
-            bool anyOverdue = false;
-            bool allPaid = true;
-            bool anyInstallmentsThisMonth = false;
-            DateTime? nearestDue = null;
+            // Status “tego miesiąca” (kalendarzowo, jak chcesz)
+            var dueDatesThisMonth = new List<DateTime>();
+
+            // Najbliższa rata (fallback gdyby w tym miesiącu nic nie było)
+            DateTime? globalNextDue = null;
 
             foreach (var vm in loans)
             {
-                // ✅ KPI miesiąca z jednego źródła prawdy
-                var kpi = LoansService.GetLoanMonthKpi(_userId, vm.Id, today);
+                // ====== MIESIĄC: kapitał / odsetki — zawsze TEN MIESIĄC ======
+                var monthDbRows = DatabaseService.GetInstallmentsByDueDate(_userId, vm.Id, fromM, toM)
+                                 ?? new List<DatabaseService.LoanInstallmentDb>();
 
+                bool hasSchedule = TryGetSchedule(vm.Id, showToasts: false, out _, out var sched) && sched.Count > 0;
 
-                if (kpi.PlannedCount + kpi.PaidCount > 0)
-                    anyInstallmentsThisMonth = true;
-
-                capitalThisMonth += kpi.Principal;
-                interestThisMonth += kpi.Interest;
-
-                if (kpi.HasOverdue)
-                    anyOverdue = true;
-
-                // allPaid: jeśli istnieją raty w miesiącu i żadna nie jest planned (Status=0)
-                if ((kpi.PlannedCount + kpi.PaidCount) > 0 && kpi.PlannedCount > 0)
-                    allPaid = false;
-
-                // nearestDue: najbliższy termin NIEOPŁACONEJ raty (z KPI)
-                if (kpi.NextDue != null)
+                if (monthDbRows.Count > 0)
                 {
-                    if (nearestDue == null || kpi.NextDue.Value.Date < nearestDue.Value.Date)
-                        nearestDue = kpi.NextDue.Value.Date;
+                    // Preferuj DB (source of truth), ale jeśli brakuje Principal/Interest – uzupełnij z CSV
+                    foreach (var inst in monthDbRows)
+                    {
+                        var p = inst.PrincipalAmount;
+                        var i = inst.InterestAmount;
+
+                        if ((!p.HasValue || !i.HasValue) && hasSchedule)
+                        {
+                            LoanInstallmentRow? srow = null;
+
+                            if (inst.InstallmentNo > 0)
+                                srow = sched.FirstOrDefault(x => x.InstallmentNo == inst.InstallmentNo);
+
+                            if (srow == null)
+                                srow = sched.FirstOrDefault(x => x.Date.Date == inst.DueDate.Date);
+
+                            if (!p.HasValue) p = srow?.Principal;
+                            if (!i.HasValue) i = srow?.Interest;
+                        }
+
+                        capitalThisMonth += p ?? 0m;
+                        interestThisMonth += i ?? 0m;
+
+                        if (inst.DueDate != DateTime.MinValue)
+                            dueDatesThisMonth.Add(inst.DueDate.Date);
+                    }
+                }
+                else
+                {
+                    // Jeśli DB nie ma rat w tym miesiącu (np. nie zsynchronizowano) – bierz z harmonogramu CSV
+                    if (hasSchedule)
+                    {
+                        var schedMonth = sched.Where(r => r.Date.Date >= fromM && r.Date.Date <= toM).ToList();
+                        foreach (var r in schedMonth)
+                        {
+                            capitalThisMonth += r.Principal ?? 0m;
+                            interestThisMonth += r.Interest ?? 0m;
+                            dueDatesThisMonth.Add(r.Date.Date);
+                        }
+                    }
+                    else
+                    {
+                        // Totalny fallback: wylicz termin po PaymentDay (to tylko do statusu, nie do kwot)
+                        // Tylko jeśli kredyt realnie jeszcze trwa
+                        if (GetRemainingMonths(vm) > 0)
+                        {
+                            var due = GetDueDateForMonth(vm, today.Year, today.Month);
+                            if (due >= fromM && due <= toM)
+                                dueDatesThisMonth.Add(due);
+                        }
+                    }
                 }
 
-                // A3 - koszt całkowity od dziś do końca (Twoja logika – zostawiam)
-                if (TryGetSchedule(vm.Id, showToasts: false, out _, out var schedule) && schedule.Count > 0)
+                // ====== A3: koszt całkowity od dziś do końca ======
+                if (hasSchedule)
                 {
-                    totalCostAllLoans += schedule.Where(r => r.Date >= today).Sum(r => r.Total);
+                    totalCostAllLoans += sched.Where(r => r.Date >= today).Sum(r => r.Total);
                 }
                 else
                 {
@@ -574,8 +613,31 @@ namespace Finly.Pages
                         totalCostAllLoans += monthly * monthsLeft;
                     }
                 }
-            }
 
+                // ====== globalNextDue fallback (gdyby w tym miesiącu nie było rat) ======
+                var futureDb = DatabaseService.GetInstallmentsByDueDate(_userId, vm.Id, today, today.AddYears(50))
+                              ?? new List<DatabaseService.LoanInstallmentDb>();
+
+                var nextAny = futureDb
+                    .Where(x => x.DueDate != DateTime.MinValue && x.DueDate.Date >= today.Date)
+                    .OrderBy(x => x.DueDate.Date)
+                    .FirstOrDefault();
+
+                if (nextAny != null)
+                {
+                    if (!globalNextDue.HasValue || nextAny.DueDate.Date < globalNextDue.Value)
+                        globalNextDue = nextAny.DueDate.Date;
+                }
+                else if (hasSchedule)
+                {
+                    var nextFromCsv = sched.Where(r => r.Date >= today).OrderBy(r => r.Date).FirstOrDefault();
+                    if (nextFromCsv != null)
+                    {
+                        if (!globalNextDue.HasValue || nextFromCsv.Date.Date < globalNextDue.Value)
+                            globalNextDue = nextFromCsv.Date.Date;
+                    }
+                }
+            }
 
             SetAnalysisText(
                 $"{capitalThisMonth:N2} zł",
@@ -583,22 +645,37 @@ namespace Finly.Pages
                 $"{totalCostAllLoans:N2} zł"
             );
 
-            // Status tekst – tylko jeśli w ogóle istnieją raty w tym miesiącu
+            // ====== STATUS (dokładnie jak chcesz) ======
             string statusText = "";
-            if (anyInstallmentsThisMonth)
+
+            if (dueDatesThisMonth.Count > 0)
             {
-                if (anyOverdue) statusText = "⚠ Zaległe raty w tym miesiącu";
-                else if (allPaid) statusText = "✓ Zapłacone w tym miesiącu";
-                else if (nearestDue != null) statusText = $"Do zapłaty dnia {nearestDue:dd.MM}";
+                // Jeżeli jest jeszcze termin w tym miesiącu przed nami (lub dziś) → pokaż “zejdą dnia …”
+                var upcomingInMonth = dueDatesThisMonth
+                    .Where(d => d >= today.Date)
+                    .OrderBy(d => d)
+                    .FirstOrDefault();
+
+                if (upcomingInMonth != default)
+                {
+                    statusText = $"Raty kredytu zejdą dnia {upcomingInMonth:dd.MM.yyyy}";
+                }
+                else
+                {
+                    // wszystkie terminy w tym miesiącu są już za nami
+                    statusText = "✓ Raty w tym miesiącu zostały już zapłacone";
+                }
+            }
+            else
+            {
+                // brak rat w tym miesiącu -> pokaż najbliższą ratę
+                if (globalNextDue.HasValue)
+                    statusText = $"Najbliższa rata: {globalNextDue.Value:dd.MM.yyyy}";
             }
 
             if (FindName("Analysis1PaidStatus") is TextBlock t1) t1.Text = statusText;
             if (FindName("Analysis2PaidStatus") is TextBlock t2) t2.Text = statusText;
         }
-     
-
-
-
 
         private static DateTime GetDueDateForMonth(LoanCardVm vm, int year, int month)
         {
@@ -622,18 +699,16 @@ namespace Finly.Pages
         private void UpdateKpiTiles()
         {
             var loans = _loans.OfType<LoanCardVm>().ToList();
-            var (_, monthlySum, _, _) = CalculatePortfolioStats(loans);
+            var (totalDebt, monthlySum, _, _) = CalculatePortfolioStats(loans);
 
-            // Przyznana kwota = “oryginalny kapitał” z harmonogramu jeśli jest, inaczej Principal z DB
-            decimal grantedSum = loans.Sum(x => x.DisplayOriginalPrincipal);
-
+            // ✅ spójność: kafelek u góry pokazuje to samo źródło co karty (pozostały kapitał z harmonogramu jeśli jest)
             if (FindName("TotalLoansTileAmount") is TextBlock tbTotal)
-                tbTotal.Text = grantedSum.ToString("N2") + " zł";
+                tbTotal.Text = totalDebt.ToString("N2") + " zł";
 
             if (FindName("MonthlyLoansTileAmount") is TextBlock tbMonthly)
                 tbMonthly.Text = monthlySum.ToString("N2") + " zł";
-
         }
+
 
         private void SetAnalysisText(string a1, string a2, string a3)
         {

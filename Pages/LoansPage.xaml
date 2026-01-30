@@ -12,42 +12,42 @@
              TextOptions.TextFormattingMode="Display"
              TextOptions.TextRenderingMode="ClearType">
 
-    <UserControl.Resources>
+	<UserControl.Resources>
 
-        <!-- ========== STYLE jak GoalsPage (Card / AccentCard / KPI) ========== -->
+		<!-- ========== STYLE jak GoalsPage (Card / AccentCard / KPI) ========== -->
 
-        <Style x:Key="Card" TargetType="Border">
-            <Setter Property="Background"      Value="{DynamicResource Surface.Background}"/>
-            <Setter Property="BorderBrush"     Value="{DynamicResource Surface.Border}"/>
-            <Setter Property="BorderThickness" Value="1"/>
-            <Setter Property="CornerRadius"    Value="10"/>
-            <Setter Property="Padding"         Value="12"/>
-            <Setter Property="Margin"          Value="0,0,16,16"/>
-        </Style>
+		<Style x:Key="Card" TargetType="Border">
+			<Setter Property="Background"      Value="{DynamicResource Surface.Background}"/>
+			<Setter Property="BorderBrush"     Value="{DynamicResource Surface.Border}"/>
+			<Setter Property="BorderThickness" Value="1"/>
+			<Setter Property="CornerRadius"    Value="10"/>
+			<Setter Property="Padding"         Value="12"/>
+			<Setter Property="Margin"          Value="0,0,16,16"/>
+		</Style>
 
-        <Style x:Key="RedAccentCard" TargetType="Border" BasedOn="{StaticResource Card}">
-            <Setter Property="BorderBrush"     Value="{DynamicResource Brand.Red}"/>
-            <Setter Property="BorderThickness" Value="2"/>
-        </Style>
+		<Style x:Key="RedAccentCard" TargetType="Border" BasedOn="{StaticResource Card}">
+			<Setter Property="BorderBrush"     Value="{DynamicResource Brand.Red}"/>
+			<Setter Property="BorderThickness" Value="2"/>
+		</Style>
 
-        <Style x:Key="OrangeAccentCard" TargetType="Border" BasedOn="{StaticResource Card}">
-            <Setter Property="BorderBrush"     Value="{DynamicResource Brand.Orange}"/>
-            <Setter Property="BorderThickness" Value="2"/>
-        </Style>
+		<Style x:Key="OrangeAccentCard" TargetType="Border" BasedOn="{StaticResource Card}">
+			<Setter Property="BorderBrush"     Value="{DynamicResource Brand.Orange}"/>
+			<Setter Property="BorderThickness" Value="2"/>
+		</Style>
 
-        <Style x:Key="CardHeader" TargetType="TextBlock">
-            <Setter Property="FontSize"   Value="18"/>
-            <Setter Property="FontWeight" Value="Bold"/>
-            <Setter Property="Foreground" Value="{DynamicResource App.Foreground}"/>
-            <Setter Property="Opacity"    Value="0.9"/>
-        </Style>
+		<Style x:Key="CardHeader" TargetType="TextBlock">
+			<Setter Property="FontSize"   Value="18"/>
+			<Setter Property="FontWeight" Value="Bold"/>
+			<Setter Property="Foreground" Value="{DynamicResource App.Foreground}"/>
+			<Setter Property="Opacity"    Value="0.9"/>
+		</Style>
 
-        <Style x:Key="KpiValueStyle" TargetType="TextBlock">
-            <Setter Property="FontSize"   Value="24"/>
-            <Setter Property="FontWeight" Value="Bold"/>
-            <Setter Property="Margin"     Value="0,4,0,0"/>
-            <Setter Property="Foreground" Value="{DynamicResource App.Foreground}"/>
-        </Style>
+		<Style x:Key="KpiValueStyle" TargetType="TextBlock">
+			<Setter Property="FontSize"   Value="24"/>
+			<Setter Property="FontWeight" Value="Bold"/>
+			<Setter Property="Margin"     Value="0,4,0,0"/>
+			<Setter Property="Foreground" Value="{DynamicResource App.Foreground}"/>
+		</Style>
 
 		<Style x:Key="LoanCardBorder" TargetType="Border" BasedOn="{StaticResource Card}">
 			<Setter Property="BorderBrush"     Value="{DynamicResource Surface.Border}"/>
@@ -58,10 +58,9 @@
 			<Setter Property="MaxWidth"        Value="420"/>
 		</Style>
 
-
 		<!-- =========================================================
-     TINT IKON - działa gdy ustawisz Content LUB Tag (pack://...)
-     ========================================================= -->
+         TINT IKON - działa gdy ustawisz Content LUB Tag (pack://...)
+         ========================================================= -->
 		<Style x:Key="TintIcon" TargetType="ContentControl">
 			<Setter Property="Width" Value="18"/>
 			<Setter Property="Height" Value="18"/>
@@ -69,13 +68,13 @@
 				<Setter.Value>
 					<ControlTemplate TargetType="ContentControl">
 						<Rectangle Width="{TemplateBinding Width}"
-								   Height="{TemplateBinding Height}"
-								   SnapsToDevicePixels="True"
-								   RenderOptions.BitmapScalingMode="HighQuality"
-								   Fill="{DynamicResource Brand.Orange}">
+                                   Height="{TemplateBinding Height}"
+                                   SnapsToDevicePixels="True"
+                                   RenderOptions.BitmapScalingMode="HighQuality"
+                                   Fill="{DynamicResource Brand.Orange}">
 							<Rectangle.OpacityMask>
 								<ImageBrush Stretch="Uniform"
-											RenderOptions.BitmapScalingMode="HighQuality">
+                                            RenderOptions.BitmapScalingMode="HighQuality">
 									<ImageBrush.ImageSource>
 										<PriorityBinding>
 											<Binding RelativeSource="{RelativeSource TemplatedParent}" Path="Content"/>
@@ -95,379 +94,417 @@
 			<Setter Property="Height" Value="38"/>
 		</Style>
 
-
 		<!-- IMPORTANT: Add tile ma być tej samej wielkości co LoanCard -->
-        <Style x:Key="AddTileBorder" TargetType="Border" BasedOn="{StaticResource LoanCardBorder}">
-            <Setter Property="Cursor" Value="Hand"/>
-        </Style>
+		<Style x:Key="AddTileBorder" TargetType="Border" BasedOn="{StaticResource LoanCardBorder}">
+			<Setter Property="Cursor" Value="Hand"/>
+		</Style>
 
-        <Style x:Key="LoansPrimarySmallButton" TargetType="Button" BasedOn="{StaticResource PrimaryButton}">
-            <Setter Property="MinHeight" Value="30"/>
-            <Setter Property="Padding" Value="12,4"/>
-            <Setter Property="MinWidth" Value="120"/>
-            <Setter Property="HorizontalContentAlignment" Value="Center"/>
-            <Setter Property="VerticalContentAlignment" Value="Center"/>
-            <Setter Property="ContentTemplate">
-                <Setter.Value>
-                    <DataTemplate>
-                        <TextBlock Text="{Binding}" TextWrapping="Wrap" TextAlignment="Center"/>
-                    </DataTemplate>
-                </Setter.Value>
-            </Setter>
-        </Style>
+		<Style x:Key="LoansPrimarySmallButton" TargetType="Button" BasedOn="{StaticResource PrimaryButton}">
+			<Setter Property="MinHeight" Value="30"/>
+			<Setter Property="Padding" Value="12,4"/>
+			<Setter Property="MinWidth" Value="120"/>
+			<Setter Property="HorizontalContentAlignment" Value="Center"/>
+			<Setter Property="VerticalContentAlignment" Value="Center"/>
+			<Setter Property="ContentTemplate">
+				<Setter.Value>
+					<DataTemplate>
+						<TextBlock Text="{Binding}" TextWrapping="Wrap" TextAlignment="Center"/>
+					</DataTemplate>
+				</Setter.Value>
+			</Setter>
+		</Style>
 
-        <Style x:Key="LoansPrimarySmallButtonNoWrap" TargetType="Button" BasedOn="{StaticResource LoansPrimarySmallButton}">
-            <Setter Property="MinWidth" Value="150"/>
-            <Setter Property="ContentTemplate">
-                <Setter.Value>
-                    <DataTemplate>
-                        <TextBlock Text="{Binding}" TextWrapping="NoWrap" TextAlignment="Center"/>
-                    </DataTemplate>
-                </Setter.Value>
-            </Setter>
-        </Style>
+		<Style x:Key="LoansPrimarySmallButtonNoWrap" TargetType="Button" BasedOn="{StaticResource LoansPrimarySmallButton}">
+			<Setter Property="MinWidth" Value="150"/>
+			<Setter Property="ContentTemplate">
+				<Setter.Value>
+					<DataTemplate>
+						<TextBlock Text="{Binding}" TextWrapping="NoWrap" TextAlignment="Center"/>
+					</DataTemplate>
+				</Setter.Value>
+			</Setter>
+		</Style>
 
-        <!-- ===================== TEMPLATES ===================== -->
+		<!-- ===================== TEMPLATES ===================== -->
 
-        <DataTemplate DataType="{x:Type vm:AddLoanTile}">
-            <Border Style="{StaticResource AddTileBorder}"
+		<DataTemplate DataType="{x:Type vm:AddLoanTile}">
+			<Border Style="{StaticResource AddTileBorder}"
                     MouseLeftButtonUp="AddLoanCard_Click">
-                <Grid>
-                    <Border Margin="10"
+				<Grid>
+					<Border Margin="10"
                             BorderThickness="1"
                             CornerRadius="8"
                             BorderBrush="{DynamicResource Surface.Border}"/>
-                    <StackPanel HorizontalAlignment="Center"
+					<StackPanel HorizontalAlignment="Center"
                                 VerticalAlignment="Center"
                                 Margin="0,16,0,16">
-                        <TextBlock Text="+"
+						<TextBlock Text="+"
                                    FontSize="28"
                                    FontWeight="Bold"
                                    HorizontalAlignment="Center"
                                    Foreground="{DynamicResource App.Foreground}"/>
-                        <TextBlock Text="Dodaj kredyt"
+						<TextBlock Text="Dodaj kredyt"
                                    Margin="0,6,0,0"
                                    FontSize="13"
                                    FontWeight="SemiBold"
                                    Foreground="{DynamicResource App.Foreground}"
                                    HorizontalAlignment="Center"/>
-                    </StackPanel>
-                </Grid>
-            </Border>
-        </DataTemplate>
+					</StackPanel>
+				</Grid>
+			</Border>
+		</DataTemplate>
 
-        <!-- KARTA KREDYTU -->
-        <DataTemplate DataType="{x:Type vm:LoanCardVm}">
-            <Border Style="{StaticResource LoanCardBorder}">
-                <Grid>
-                    <Grid.RowDefinitions>
-                        <RowDefinition Height="Auto"/>
-                        <RowDefinition Height="Auto"/>
-                        <RowDefinition Height="Auto"/>
-                    </Grid.RowDefinitions>
+		<!-- KARTA KREDYTU -->
+		<DataTemplate DataType="{x:Type vm:LoanCardVm}">
+			<Border Style="{StaticResource LoanCardBorder}">
+				<Grid>
+					<Grid.RowDefinitions>
+						<RowDefinition Height="Auto"/>
+						<RowDefinition Height="Auto"/>
+						<RowDefinition Height="Auto"/>
+					</Grid.RowDefinitions>
 
-                    <!-- Header -->
-                    <StackPanel Grid.Row="0" Orientation="Horizontal" VerticalAlignment="Center">
-                        <TextBlock Text="🏠" FontSize="32" Margin="0,0,8,0" VerticalAlignment="Center"/>
-                        <TextBlock Text="{Binding Name}"
+					<!-- Header -->
+					<StackPanel Grid.Row="0" Orientation="Horizontal" VerticalAlignment="Center">
+						<TextBlock Text="🏠" FontSize="32" Margin="0,0,8,0" VerticalAlignment="Center"/>
+						<TextBlock Text="{Binding Name}"
                                    FontWeight="Bold"
                                    Foreground="{DynamicResource App.Foreground}"
                                    VerticalAlignment="Center"/>
-                    </StackPanel>
+					</StackPanel>
 
-                    <!-- Middle -->
-                    <StackPanel Grid.Row="1" Margin="0,8,0,8">
-                        <TextBlock Text="Pozostało:" Foreground="Gray" FontSize="12"/>
+					<!-- Middle -->
+					<StackPanel Grid.Row="1" Margin="0,8,0,8">
+						<TextBlock Text="Pozostało:" Foreground="Gray" FontSize="12"/>
 						<TextBlock Text="{Binding RemainingPrincipalStr}"
-								   FontSize="20"
-								   FontWeight="Bold"
-								   Foreground="OrangeRed"/>
-
+                                   FontSize="20"
+                                   FontWeight="Bold"
+                                   Foreground="OrangeRed"/>
 
 						<!-- Oprocentowanie + DATA kolejnej raty (bez kwoty) -->
-                        <StackPanel Orientation="Horizontal" Margin="0,6,0,0" HorizontalAlignment="Left">
-                            <TextBlock Text="Oprocentowanie:" Foreground="Gray" FontSize="11" Margin="0,0,6,0"/>
-                            <TextBlock Text="{Binding InterestRate, StringFormat={}{0:N2}%}"
+						<StackPanel Orientation="Horizontal" Margin="0,6,0,0" HorizontalAlignment="Left">
+							<TextBlock Text="Oprocentowanie:" Foreground="Gray" FontSize="11" Margin="0,0,6,0"/>
+							<TextBlock Text="{Binding InterestRate, StringFormat={}{0:N2}%}"
                                        FontSize="12"
                                        Foreground="{DynamicResource App.Foreground}"
                                        Margin="0,0,12,0"/>
 
-                            <TextBlock Text="Data kolejnej raty:" Foreground="Gray" FontSize="11" Margin="0,0,6,0"/>
-                            <TextBlock Text="{Binding NextPaymentDateStr}"
+							<TextBlock Text="Data kolejnej raty:" Foreground="Gray" FontSize="11" Margin="0,0,6,0"/>
+							<TextBlock Text="{Binding NextPaymentDateStr}"
                                        FontSize="12"
                                        Foreground="{DynamicResource App.Foreground}"/>
-                        </StackPanel>
+						</StackPanel>
 
-                        <ProgressBar Value="{Binding PercentPaidClamped, Mode=OneWay}"
+						<ProgressBar Value="{Binding PercentPaidClamped, Mode=OneWay}"
                                      Maximum="100"
                                      Height="12"
                                      Margin="0,8,0,0"/>
 
-                        <!-- Następna rata + Kapitał w racie + Odsetki w racie -->
-                        <Grid Margin="0,8,0,0">
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="*"/>
-                                <ColumnDefinition Width="*"/>
-                                <ColumnDefinition Width="*"/>
-                            </Grid.ColumnDefinitions>
+						<!-- Następna rata + Kapitał w racie + Odsetki w racie -->
+						<Grid Margin="0,8,0,0">
+							<Grid.ColumnDefinitions>
+								<ColumnDefinition Width="*"/>
+								<ColumnDefinition Width="*"/>
+								<ColumnDefinition Width="*"/>
+							</Grid.ColumnDefinitions>
 
-                            <StackPanel Grid.Column="0">
-                                <TextBlock Text="Następna rata:" Foreground="Gray" FontSize="11"/>
-                                <TextBlock Text="{Binding NextPaymentStr}"
+							<StackPanel Grid.Column="0">
+								<TextBlock Text="Następna rata:" Foreground="Gray" FontSize="11"/>
+								<TextBlock Text="{Binding NextPaymentStr}"
                                            FontSize="12"
                                            Foreground="{DynamicResource App.Foreground}"/>
-                            </StackPanel>
+							</StackPanel>
 
-                            <StackPanel Grid.Column="1">
-                                <TextBlock Text="Kapitał w racie:" Foreground="Gray" FontSize="11"/>
-                                <TextBlock Text="{Binding NextPaymentPrincipalStr}"
+							<StackPanel Grid.Column="1">
+								<TextBlock Text="Kapitał w racie:" Foreground="Gray" FontSize="11"/>
+								<TextBlock Text="{Binding NextPaymentPrincipalStr}"
                                            FontSize="12"
                                            Foreground="{DynamicResource App.Foreground}"/>
-                            </StackPanel>
+							</StackPanel>
 
-                            <StackPanel Grid.Column="2">
-                                <TextBlock Text="Odsetki w racie:" Foreground="Gray" FontSize="11"/>
-                                <TextBlock Text="{Binding NextPaymentInterestStr}"
+							<StackPanel Grid.Column="2">
+								<TextBlock Text="Odsetki w racie:" Foreground="Gray" FontSize="11"/>
+								<TextBlock Text="{Binding NextPaymentInterestStr}"
                                            FontSize="12"
                                            Foreground="{DynamicResource App.Foreground}"/>
-                            </StackPanel>
-                        </Grid>
+							</StackPanel>
+						</Grid>
 
-                        <!-- Do końca -->
-                        <Grid Margin="0,8,0,0">
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="*"/>
-                                <ColumnDefinition Width="*"/>
-                            </Grid.ColumnDefinitions>
+						<!-- Do końca -->
+						<Grid Margin="0,8,0,0">
+							<Grid.ColumnDefinitions>
+								<ColumnDefinition Width="*"/>
+								<ColumnDefinition Width="*"/>
+							</Grid.ColumnDefinitions>
 
-                            <StackPanel Grid.Column="0">
-                                <TextBlock Text="Do końca:" Foreground="Gray" FontSize="11"/>
-                                <TextBlock Text="{Binding RemainingTermStr}"
+							<StackPanel Grid.Column="0">
+								<TextBlock Text="Do końca:" Foreground="Gray" FontSize="11"/>
+								<TextBlock Text="{Binding RemainingTermStr}"
                                            FontSize="12"
                                            Foreground="{DynamicResource App.Foreground}"/>
-                            </StackPanel>
-                        </Grid>
-                    </StackPanel>
+							</StackPanel>
+						</Grid>
+					</StackPanel>
 
-                    <!-- Bottom actions -->
-                    <Grid Grid.Row="2" Margin="0,6,0,0">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*"/>
-                            <ColumnDefinition Width="Auto"/>
-                        </Grid.ColumnDefinitions>
+					<!-- Bottom actions + confirm -->
+					<Grid Grid.Row="2" Margin="0,6,0,0">
+						<Grid.RowDefinitions>
+							<RowDefinition Height="Auto"/>
+							<RowDefinition Height="Auto"/>
+						</Grid.RowDefinitions>
 
-                        <!-- LEFT -->
-                        <StackPanel Grid.Column="0">
-                            <StackPanel Orientation="Horizontal">
-                                <Button Width="36" Height="36"
-                                        Margin="0,0,8,0"
-                                        Click="EditLoan_Click"
-                                        Tag="{Binding}"
-                                        ToolTip="Edytuj kredyt"
-                                        Style="{StaticResource EditIconButton}"/>
+						<Grid Grid.Row="0">
+							<Grid.ColumnDefinitions>
+								<ColumnDefinition Width="*"/>
+								<ColumnDefinition Width="Auto"/>
+							</Grid.ColumnDefinitions>
 
-                                <Button Width="36" Height="36"
-                                        Click="DeleteLoan_Click"
-                                        Tag="{Binding}"
-                                        ToolTip="Usuń kredyt"
-                                        Style="{StaticResource DeleteIconButton}"/>
-                            </StackPanel>
+							<!-- LEFT -->
+							<StackPanel Grid.Column="0">
+								<StackPanel Orientation="Horizontal">
+									<Button Width="36" Height="36"
+                                            Margin="0,0,8,0"
+                                            Click="EditLoan_Click"
+                                            Tag="{Binding}"
+                                            ToolTip="Edytuj kredyt"
+                                            Style="{StaticResource EditIconButton}"/>
 
-                            <Border x:Name="DeleteConfirmPanel"
-                                    Background="Transparent"
-                                    Visibility="Collapsed"
-                                    Margin="0,8,0,0">
-                                <StackPanel>
-                                    <TextBlock Text="Czy na pewno chcesz usunąć ten kredyt?"
-                                               Foreground="OrangeRed"
-                                               FontWeight="Bold"
-                                               Margin="0,0,0,6"/>
-                                    <StackPanel Orientation="Horizontal">
-                                        <Button Content="Tak"
-                                                Width="80"
-                                                Margin="0,0,8,0"
-                                                Click="ConfirmDeleteLoan_Click"
-                                                Tag="{Binding}"/>
-                                        <Button Content="Nie"
-                                                Width="80"
-                                                Click="DeleteCancel_Click"/>
-                                    </StackPanel>
-                                </StackPanel>
-                            </Border>
-                        </StackPanel>
+									<Button Width="36" Height="36"
+                                            Click="DeleteLoan_Click"
+                                            Tag="{Binding}"
+                                            ToolTip="Usuń kredyt"
+                                            Style="{StaticResource DeleteIconButton}"/>
+								</StackPanel>
+							</StackPanel>
 
-                        <!-- RIGHT -->
-                        <StackPanel Grid.Column="1"
-                                    Margin="12,0,0,0"
-                                    VerticalAlignment="Top"
-                                    MinWidth="170">
+							<!-- RIGHT -->
+							<StackPanel Grid.Column="1"
+                                        Margin="12,0,0,0"
+                                        VerticalAlignment="Top"
+                                        MinWidth="170">
 
-                            <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
-                                <Button Content="Symulacja nadpłaty"
-                                        Style="{StaticResource LoansPrimarySmallButton}"
-                                        Margin="0,0,8,0"
-                                        Click="ShowSimDialog_Click"
-                                        Tag="{Binding}"/>
+								<StackPanel Orientation="Horizontal" Margin="0,0,0,8">
+									<Button Content="Symulacja nadpłaty"
+                                            Style="{StaticResource LoansPrimarySmallButton}"
+                                            Margin="0,0,8,0"
+                                            Click="ShowSimDialog_Click"
+                                            Tag="{Binding}"/>
 
-                                <Button Height="30"
-                                        Padding="12,0"
-                                        Click="CardAttachSchedule_Click"
-                                        Tag="{Binding}"
-                                        ToolTip="Załącz harmonogram spłat rat kredytu">
-                                    <TextBlock Text="Załącz harmonogram"/>
-                                </Button>
-                            </StackPanel>
+									<Button Height="30"
+                                            Padding="12,0"
+                                            Click="CardAttachSchedule_Click"
+                                            Tag="{Binding}"
+                                            ToolTip="Załącz harmonogram spłat rat kredytu">
+										<TextBlock Text="Załącz harmonogram"/>
+									</Button>
+								</StackPanel>
 
-                            <StackPanel Orientation="Horizontal">
-                                <Button Content="Nadpłać kredyt"
-                                        Style="{StaticResource LoansPrimarySmallButtonNoWrap}"
-                                        Margin="0,0,8,0"
-                                        Click="CardOverpay_Click"
-                                        Tag="{Binding}"/>
+								<StackPanel Orientation="Horizontal">
+									<Button Content="Nadpłać kredyt"
+                                            Style="{StaticResource LoansPrimarySmallButtonNoWrap}"
+                                            Margin="0,0,8,0"
+                                            Click="CardOverpay_Click"
+                                            Tag="{Binding}"/>
 
-                                <Button Height="30"
-                                        Padding="12,0"
-                                        Click="CardSchedule_Click"
-                                        Tag="{Binding}"
-                                        ToolTip="Harmonogram spłat rat kredytu">
-                                    <TextBlock Text="Harmonogram spłat"/>
-                                </Button>
-                            </StackPanel>
-                        </StackPanel>
-                    </Grid>
-                </Grid>
-            </Border>
-        </DataTemplate>
+									<Button Height="30"
+                                            Padding="12,0"
+                                            Click="CardSchedule_Click"
+                                            Tag="{Binding}"
+                                            ToolTip="Harmonogram spłat rat kredytu">
+										<TextBlock Text="Harmonogram spłat"/>
+									</Button>
+								</StackPanel>
+							</StackPanel>
+						</Grid>
 
-    </UserControl.Resources>
+						<!-- CONFIRM (pełna szerokość, zawsze klikalne) -->
+						<Border x:Name="DeleteConfirmPanel"
+                                Grid.Row="1"
+                                Margin="0,10,0,0"
+                                Padding="10"
+                                CornerRadius="8"
+                                Background="{DynamicResource Surface.Background}"
+                                BorderBrush="{DynamicResource Brand.Red}"
+                                BorderThickness="1.5"
+                                Visibility="Collapsed">
+							<Grid>
+								<Grid.ColumnDefinitions>
+									<ColumnDefinition Width="*"/>
+									<ColumnDefinition Width="Auto"/>
+								</Grid.ColumnDefinitions>
 
-    <ScrollViewer VerticalScrollBarVisibility="Auto"
+								<TextBlock Grid.Column="0"
+                                           Text="Czy na pewno chcesz usunąć ten kredyt?"
+                                           Foreground="OrangeRed"
+                                           FontWeight="Bold"
+                                           VerticalAlignment="Center"
+                                           TextWrapping="Wrap"
+                                           Margin="0,0,12,0"/>
+
+								<StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Right">
+									<Button Content="Tak"
+                                            MinWidth="88"
+                                            Padding="12,6"
+                                            Margin="0,0,8,0"
+                                            Click="ConfirmDeleteLoan_Click"
+                                            Tag="{Binding}"/>
+									<Button Content="Nie"
+                                            MinWidth="88"
+                                            Padding="12,6"
+                                            Click="DeleteCancel_Click"/>
+								</StackPanel>
+							</Grid>
+						</Border>
+					</Grid>
+				</Grid>
+			</Border>
+		</DataTemplate>
+
+	</UserControl.Resources>
+
+	<ScrollViewer VerticalScrollBarVisibility="Auto"
                   HorizontalScrollBarVisibility="Disabled"
                   Background="Transparent">
-        <Grid Margin="24">
-            <Grid.RowDefinitions>
-                <RowDefinition Height="Auto"/>
-                <RowDefinition Height="Auto"/>
-                <RowDefinition Height="Auto"/>
-                <RowDefinition Height="*"/>
-            </Grid.RowDefinitions>
+		<Grid Margin="24">
+			<Grid.RowDefinitions>
+				<RowDefinition Height="Auto"/>
+				<RowDefinition Height="Auto"/>
+				<RowDefinition Height="Auto"/>
+				<RowDefinition Height="*"/>
+			</Grid.RowDefinitions>
 
-            <!-- KPI -->
-            <Grid Grid.Row="0">
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="*"/>
-                    <ColumnDefinition Width="*"/>
-                </Grid.ColumnDefinitions>
+			<!-- KPI: 2x2 (zgodnie z prośbą o “pod spodem”) -->
+			<Grid Grid.Row="0">
+				<Grid.RowDefinitions>
+					<RowDefinition Height="Auto"/>
+					<RowDefinition Height="Auto"/>
+				</Grid.RowDefinitions>
+				<Grid.ColumnDefinitions>
+					<ColumnDefinition Width="*"/>
+					<ColumnDefinition Width="*"/>
+				</Grid.ColumnDefinitions>
 
-                <Border Grid.Column="0" Style="{StaticResource RedAccentCard}" Margin="0,0,16,16">
-                    <StackPanel>
-                        <TextBlock Text="Przyznana kwota wszystkich kredytów"
+				<!-- (0,0) Kredyty zaciągnięte na kwotę: (dawniej Pozostały kapitał...) -->
+				<Border Grid.Row="0" Grid.Column="0"
+                        Style="{StaticResource RedAccentCard}"
+                        Margin="0,0,16,16">
+					<StackPanel>
+						<TextBlock Text="Kredyty zaciągnięte na kwotę:"
                                    Style="{StaticResource CardHeader}"/>
-                        <TextBlock x:Name="TotalLoansTileAmount"
+						<TextBlock x:Name="TotalLoansTileAmount"
                                    Text="0,00 zł"
                                    Style="{StaticResource KpiValueStyle}"/>
-                    </StackPanel>
-                </Border>
+					</StackPanel>
+				</Border>
 
-                <Border Grid.Column="1" Style="{StaticResource RedAccentCard}" Margin="0,0,0,16">
-                    <StackPanel>
-                        <TextBlock Text="Miesięczny koszt rat kredytów"
+				<!-- (0,1) Całkowity koszt wszystkich kredytów -> przeniesiony na górę, czerwona ramka -->
+				<Border Grid.Row="0" Grid.Column="1"
+                        Style="{StaticResource RedAccentCard}"
+                        Margin="0,0,0,16">
+					<StackPanel>
+						<TextBlock Text="Całkowity koszt wszystkich kredytów (kapitał + odsetki)"
                                    Style="{StaticResource CardHeader}"/>
-                        <TextBlock x:Name="MonthlyLoansTileAmount"
-                                   Text="0,00 zł"
+						<TextBlock x:Name="Analysis3Value"
+                                   Text="—"
                                    Style="{StaticResource KpiValueStyle}"/>
-                    </StackPanel>
-                </Border>
-            </Grid>
+					</StackPanel>
+				</Border>
 
-            <!-- Analizy -->
-            <Grid Grid.Row="1">
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="*"/>
-                    <ColumnDefinition Width="*"/>
-                    <ColumnDefinition Width="*"/>
-                </Grid.ColumnDefinitions>
-
-                <Border Grid.Column="0" Style="{StaticResource OrangeAccentCard}">
-                    <StackPanel>
-                        <TextBlock Text="Kapitał w tym miesiącu ze wszystkich kredytów"
+				<!-- (1,0) Miesięczny koszt rat kredytów -> POD spodem, pomarańczowa ramka -->
+				<Border Grid.Row="1" Grid.Column="0"
+                        Style="{StaticResource OrangeAccentCard}"
+                        Margin="0,0,16,16">
+					<StackPanel>
+						<TextBlock Text="Miesięczny koszt rat kredytów"
                                    Style="{StaticResource CardHeader}"
                                    FontSize="14"/>
-                        <TextBlock x:Name="Analysis1Value"
+						<TextBlock x:Name="MonthlyLoansTileAmount"
+                                   Text="0,00 zł"
+                                   Style="{StaticResource KpiValueStyle}"
+                                   FontSize="18"/>
+					</StackPanel>
+				</Border>
+
+				<!-- (1,1) puste miejsce (zostawiamy dla oddechu / przyszłych KPI) -->
+				<Border Grid.Row="1" Grid.Column="1"
+                        Background="Transparent"
+                        Margin="0,0,0,16"/>
+			</Grid>
+
+			<!-- Analizy (bez “Całkowity koszt…”, bo jest u góry) -->
+			<Grid Grid.Row="1">
+				<Grid.ColumnDefinitions>
+					<ColumnDefinition Width="*"/>
+					<ColumnDefinition Width="*"/>
+				</Grid.ColumnDefinitions>
+
+				<Border Grid.Column="0" Style="{StaticResource OrangeAccentCard}">
+					<StackPanel>
+						<TextBlock Text="Kapitał w tym miesiącu ze wszystkich kredytów"
+                                   Style="{StaticResource CardHeader}"
+                                   FontSize="14"/>
+						<TextBlock x:Name="Analysis1Value"
                                    Text="—"
                                    Style="{StaticResource KpiValueStyle}"
                                    FontSize="18"/>
-                        <TextBlock x:Name="Analysis1PaidStatus"
+						<TextBlock x:Name="Analysis1PaidStatus"
                                    Text=""
                                    Opacity="0.75"
                                    Margin="0,4,0,0"/>
-                    </StackPanel>
-                </Border>
+					</StackPanel>
+				</Border>
 
-                <Border Grid.Column="1" Style="{StaticResource OrangeAccentCard}">
-                    <StackPanel>
-                        <TextBlock Text="Odsetki w tym miesiącu ze wszystkich kredytów"
+				<Border Grid.Column="1" Style="{StaticResource OrangeAccentCard}" Margin="0,0,0,16">
+					<StackPanel>
+						<TextBlock Text="Odsetki w tym miesiącu ze wszystkich kredytów"
                                    Style="{StaticResource CardHeader}"
                                    FontSize="14"/>
-                        <TextBlock x:Name="Analysis2Value"
+						<TextBlock x:Name="Analysis2Value"
                                    Text="—"
                                    Style="{StaticResource KpiValueStyle}"
                                    FontSize="18"/>
-                        <TextBlock x:Name="Analysis2PaidStatus"
+						<TextBlock x:Name="Analysis2PaidStatus"
                                    Text=""
                                    Opacity="0.75"
                                    Margin="0,4,0,0"/>
-                    </StackPanel>
-                </Border>
+					</StackPanel>
+				</Border>
+			</Grid>
 
-                <Border Grid.Column="2" Style="{StaticResource OrangeAccentCard}" Margin="0,0,0,16">
-                    <StackPanel>
-                        <TextBlock Text="Całkowity koszt wszystkich kredytów (kapitał + odsetki)"
-                                   Style="{StaticResource CardHeader}"
-                                   FontSize="14"/>
-                        <TextBlock x:Name="Analysis3Value"
-                                   Text="—"
-                                   Style="{StaticResource KpiValueStyle}"
-                                   FontSize="18"/>
-                    </StackPanel>
-                </Border>
-            </Grid>
-
-            <!-- Separator + napis -->
-            <StackPanel Grid.Row="2" Margin="0,0,0,12">
-                <Separator Height="1"
+			<!-- Separator + napis -->
+			<StackPanel Grid.Row="2" Margin="0,0,0,12">
+				<Separator Height="1"
                            Background="{DynamicResource Surface.Border}"
                            Opacity="0.8"
                            Margin="0,0,0,8"/>
 				<StackPanel Orientation="Horizontal" Margin="0,4,0,0">
 					<Rectangle Width="30"
-							   Height="30"
-							   Margin="0,0,12,0"
-							   VerticalAlignment="Center"
-							   Fill="{DynamicResource Brand.Orange}">
+                               Height="30"
+                               Margin="0,0,12,0"
+                               VerticalAlignment="Center"
+                               Fill="{DynamicResource Brand.Orange}">
 						<Rectangle.OpacityMask>
 							<ImageBrush Stretch="Uniform" ImageSource="/Assets/Icons/kredyty.png"/>
 						</Rectangle.OpacityMask>
 					</Rectangle>
 
 					<TextBlock Text="Kredyty"
-							   FontSize="24"
-							   FontWeight="Bold"
-							   Foreground="{DynamicResource App.Foreground}"
-							   VerticalAlignment="Center"/>
+                               FontSize="24"
+                               FontWeight="Bold"
+                               Foreground="{DynamicResource App.Foreground}"
+                               VerticalAlignment="Center"/>
 				</StackPanel>
-
 			</StackPanel>
 
-            <!-- Karty -->
-            <ItemsControl Grid.Row="3" x:Name="LoansGrid">
-                <ItemsControl.ItemsPanel>
-                    <ItemsPanelTemplate>
-                        <WrapPanel IsItemsHost="True"/>
-                    </ItemsPanelTemplate>
-                </ItemsControl.ItemsPanel>
-            </ItemsControl>
+			<!-- Karty -->
+			<ItemsControl Grid.Row="3" x:Name="LoansGrid">
+				<ItemsControl.ItemsPanel>
+					<ItemsPanelTemplate>
+						<WrapPanel IsItemsHost="True"/>
+					</ItemsPanelTemplate>
+				</ItemsControl.ItemsPanel>
+			</ItemsControl>
 
-        </Grid>
-    </ScrollViewer>
+		</Grid>
+	</ScrollViewer>
 </UserControl>

@@ -21,13 +21,32 @@ namespace Finly.Services
         /// 
         public sealed class LoanMonthKpi
         {
-            public decimal Principal { get; set; }
-            public decimal Interest { get; set; }
-            public decimal Total { get; set; }
+            // Suma WSZYSTKIE (paid+planned) w miesiącu
+            public decimal TotalAll { get; set; }
+            public decimal PrincipalAll { get; set; }
+            public decimal InterestAll { get; set; }
+
+            // Suma DO ZAPŁATY (Status=0)
+            public decimal TotalPlanned { get; set; }
+            public decimal PrincipalPlanned { get; set; }
+            public decimal InterestPlanned { get; set; }
+
+            // Suma JUŻ ZAPŁACONE (Status=1)
+            public decimal TotalPaid { get; set; }
+            public decimal PrincipalPaid { get; set; }
+            public decimal InterestPaid { get; set; }
+
             public int PlannedCount { get; set; }
             public int PaidCount { get; set; }
+
+            // Najbliższy termin NIEOPŁACONEJ raty (globalnie od dziś)
             public DateTime? NextDue { get; set; }
-            public bool HasOverdue { get; set; }
+
+            // Zaległość w miesiącu (Status=0 i DueDate < today)
+            public bool HasOverdueInMonth { get; set; }
+
+            // Najwcześniejszy termin raty w miesiącu (do tekstu “do zapłaty dnia ...”)
+            public DateTime? MonthDueDate { get; set; }
         }
 
         public static LoanMonthKpi GetLoanMonthKpi(int userId, int loanId, DateTime month)
@@ -40,26 +59,60 @@ namespace Finly.Services
 
             var kpi = new LoanMonthKpi();
 
+            // Miesięczny “DueDate” do komunikatu (najwcześniejsza rata w miesiącu)
+            var monthDue = rows
+                .Where(x => x.DueDate != DateTime.MinValue)
+                .OrderBy(x => x.DueDate)
+                .Select(x => (DateTime?)x.DueDate.Date)
+                .FirstOrDefault();
+
+            kpi.MonthDueDate = monthDue;
+
             foreach (var r in rows)
             {
-                kpi.Total += r.TotalAmount;
-                kpi.Principal += r.PrincipalAmount ?? 0m;
-                kpi.Interest += r.InterestAmount ?? 0m;
+                var total = r.TotalAmount;
+                var principal = r.PrincipalAmount ?? 0m;
+                var interest = r.InterestAmount ?? 0m;
 
-                if (r.Status == 1) kpi.PaidCount++;
-                else if (r.Status == 0) kpi.PlannedCount++;
+                kpi.TotalAll += total;
+                kpi.PrincipalAll += principal;
+                kpi.InterestAll += interest;
+
+                if (r.Status == 1)
+                {
+                    kpi.PaidCount++;
+                    kpi.TotalPaid += total;
+                    kpi.PrincipalPaid += principal;
+                    kpi.InterestPaid += interest;
+                }
+                else // 0 = planned
+                {
+                    kpi.PlannedCount++;
+                    kpi.TotalPlanned += total;
+                    kpi.PrincipalPlanned += principal;
+                    kpi.InterestPlanned += interest;
+                }
             }
 
-            var next = DatabaseService.GetInstallmentsByDueDate(userId, loanId, DateTime.Today, DateTime.Today.AddYears(50))
-                .Where(x => x.Status == 0 && x.DueDate >= DateTime.Today)
+            var today = DateTime.Today;
+
+            // Zaległość w miesiącu: rata w tym miesiącu, termin minął i nadal planned
+            kpi.HasOverdueInMonth = rows.Any(x =>
+                x.Status == 0 &&
+                x.DueDate != DateTime.MinValue &&
+                x.DueDate.Date < today);
+
+            // Najbliższa NIEOPŁACONA rata od dziś (dowolny miesiąc)
+            var next = DatabaseService.GetInstallmentsByDueDate(userId, loanId, today, today.AddYears(50))
+                .Where(x => x.Status == 0 && x.DueDate != DateTime.MinValue && x.DueDate.Date >= today)
                 .OrderBy(x => x.DueDate)
                 .FirstOrDefault();
 
             kpi.NextDue = next?.DueDate.Date;
-            kpi.HasOverdue = rows.Any(x => x.Status == 0 && x.DueDate.Date < DateTime.Today);
 
             return kpi;
         }
+
 
         public static decimal CalculateMonthlyPayment(
             decimal principal,
