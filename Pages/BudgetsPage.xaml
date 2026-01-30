@@ -340,14 +340,34 @@
                 </Border>
             </Grid>
 
-            <TextBlock Grid.Row="1"
-                       Text="Budżety"
-                       FontSize="24"
-                       FontWeight="Bold"
-                       Foreground="{DynamicResource App.Foreground}"
-                       Margin="0,12,0,12"/>
+			<StackPanel Grid.Row="1" Margin="0,12,0,12">
+				<Separator Height="1"
+						   Background="{DynamicResource Surface.Border}"
+						   Opacity="0.8"
+						   Margin="0,0,0,8"/>
 
-            <Grid Grid.Row="2" Background="Transparent">
+				<StackPanel Orientation="Horizontal" Margin="0,4,0,0">
+					<Rectangle Width="30"
+							   Height="30"
+							   Margin="0,0,12,0"
+							   VerticalAlignment="Center"
+							   Fill="{DynamicResource Brand.Orange}">
+						<Rectangle.OpacityMask>
+							<ImageBrush Stretch="Uniform" ImageSource="/Assets/Icons/budzety.png"/>
+						</Rectangle.OpacityMask>
+					
+					</Rectangle>
+
+					<TextBlock Text="Budżety"
+							   FontSize="24"
+							   FontWeight="Bold"
+							   Foreground="{DynamicResource App.Foreground}"
+							   VerticalAlignment="Center"/>
+				</StackPanel>
+			</StackPanel>
+
+
+			<Grid Grid.Row="2" Background="Transparent">
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto"/>
                     <RowDefinition Height="*"/>

@@ -402,13 +402,26 @@
                                            Opacity="0.8"
                                            Margin="0,0,0,10"/>
 
-                                <TextBlock Text="Inwestycje"
-                                           FontSize="24"
-                                           FontWeight="Bold"
-                                           Foreground="{DynamicResource App.Foreground}"
-                                           Margin="0,4,0,12"/>
+								<StackPanel Orientation="Horizontal" Margin="0,4,0,12">
+									<Rectangle Width="30"
+											   Height="30"
+											   Margin="0,0,12,0"
+											   VerticalAlignment="Center"
+											   Fill="{DynamicResource Brand.Orange}">
+										<Rectangle.OpacityMask>
+											<ImageBrush Stretch="Uniform" ImageSource="/Assets/Icons/inwestycje.png"/>
+										</Rectangle.OpacityMask>
+									</Rectangle>
 
-                                <TextBlock x:Name="InvestmentsErrorText"
+									<TextBlock Text="Inwestycje"
+											   FontSize="24"
+											   FontWeight="Bold"
+											   Foreground="{DynamicResource App.Foreground}"
+											   VerticalAlignment="Center"/>
+								</StackPanel>
+
+
+								<TextBlock x:Name="InvestmentsErrorText"
                                            Visibility="Collapsed"
                                            Foreground="OrangeRed"
                                            Margin="0,0,0,8"

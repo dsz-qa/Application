@@ -49,16 +49,54 @@
             <Setter Property="Foreground" Value="{DynamicResource App.Foreground}"/>
         </Style>
 
-        <Style x:Key="LoanCardBorder" TargetType="Border" BasedOn="{StaticResource Card}">
-            <Setter Property="BorderBrush"     Value="{DynamicResource Brand.Red}"/>
-            <Setter Property="BorderThickness" Value="2"/>
-            <Setter Property="Margin"          Value="0,0,16,16"/>
-            <Setter Property="Padding"         Value="12"/>
-            <Setter Property="MinWidth"        Value="420"/>
-            <Setter Property="MaxWidth"        Value="420"/>
-        </Style>
+		<Style x:Key="LoanCardBorder" TargetType="Border" BasedOn="{StaticResource Card}">
+			<Setter Property="BorderBrush"     Value="{DynamicResource Surface.Border}"/>
+			<Setter Property="BorderThickness" Value="1"/>
+			<Setter Property="Margin"          Value="0,0,16,16"/>
+			<Setter Property="Padding"         Value="12"/>
+			<Setter Property="MinWidth"        Value="420"/>
+			<Setter Property="MaxWidth"        Value="420"/>
+		</Style>
 
-        <!-- IMPORTANT: Add tile ma być tej samej wielkości co LoanCard -->
+
+		<!-- =========================================================
+     TINT IKON - działa gdy ustawisz Content LUB Tag (pack://...)
+     ========================================================= -->
+		<Style x:Key="TintIcon" TargetType="ContentControl">
+			<Setter Property="Width" Value="18"/>
+			<Setter Property="Height" Value="18"/>
+			<Setter Property="Template">
+				<Setter.Value>
+					<ControlTemplate TargetType="ContentControl">
+						<Rectangle Width="{TemplateBinding Width}"
+								   Height="{TemplateBinding Height}"
+								   SnapsToDevicePixels="True"
+								   RenderOptions.BitmapScalingMode="HighQuality"
+								   Fill="{DynamicResource Brand.Orange}">
+							<Rectangle.OpacityMask>
+								<ImageBrush Stretch="Uniform"
+											RenderOptions.BitmapScalingMode="HighQuality">
+									<ImageBrush.ImageSource>
+										<PriorityBinding>
+											<Binding RelativeSource="{RelativeSource TemplatedParent}" Path="Content"/>
+											<Binding RelativeSource="{RelativeSource TemplatedParent}" Path="Tag"/>
+										</PriorityBinding>
+									</ImageBrush.ImageSource>
+								</ImageBrush>
+							</Rectangle.OpacityMask>
+						</Rectangle>
+					</ControlTemplate>
+				</Setter.Value>
+			</Setter>
+		</Style>
+
+		<Style x:Key="TintIconKpi" TargetType="ContentControl" BasedOn="{StaticResource TintIcon}">
+			<Setter Property="Width" Value="38"/>
+			<Setter Property="Height" Value="38"/>
+		</Style>
+
+
+		<!-- IMPORTANT: Add tile ma być tej samej wielkości co LoanCard -->
         <Style x:Key="AddTileBorder" TargetType="Border" BasedOn="{StaticResource LoanCardBorder}">
             <Setter Property="Cursor" Value="Hand"/>
         </Style>
@@ -401,12 +439,25 @@
                            Background="{DynamicResource Surface.Border}"
                            Opacity="0.8"
                            Margin="0,0,0,8"/>
-                <TextBlock Text="Kredyty"
-                           FontSize="24"
-                           FontWeight="Bold"
-                           Foreground="{DynamicResource App.Foreground}"
-                           Margin="0,4,0,0"/>
-            </StackPanel>
+				<StackPanel Orientation="Horizontal" Margin="0,4,0,0">
+					<Rectangle Width="30"
+							   Height="30"
+							   Margin="0,0,12,0"
+							   VerticalAlignment="Center"
+							   Fill="{DynamicResource Brand.Orange}">
+						<Rectangle.OpacityMask>
+							<ImageBrush Stretch="Uniform" ImageSource="/Assets/Icons/kredyty.png"/>
+						</Rectangle.OpacityMask>
+					</Rectangle>
+
+					<TextBlock Text="Kredyty"
+							   FontSize="24"
+							   FontWeight="Bold"
+							   Foreground="{DynamicResource App.Foreground}"
+							   VerticalAlignment="Center"/>
+				</StackPanel>
+
+			</StackPanel>
 
             <!-- Karty -->
             <ItemsControl Grid.Row="3" x:Name="LoansGrid">

@@ -221,13 +221,26 @@
                            Opacity="0.8"
                            Margin="0,0,0,8"/>
 
-                <TextBlock Text="Cele"
-                           FontSize="24"
-                           FontWeight="Bold"
-                           Foreground="{DynamicResource App.Foreground}"
-                           Margin="0,4,0,12"/>
+				<StackPanel Orientation="Horizontal" Margin="0,4,0,12">
+					<Rectangle Width="30"
+							   Height="30"
+							   Margin="0,0,12,0"
+							   VerticalAlignment="Center"
+							   Fill="{DynamicResource Brand.Orange}">
+						<Rectangle.OpacityMask>
+							<ImageBrush Stretch="Uniform" ImageSource="/Assets/Icons/cele.png"/>
+						</Rectangle.OpacityMask>
+					</Rectangle>
 
-                <!-- STABILNE DnD: ListBox daje kontenery ListBoxItem -->
+					<TextBlock Text="Cele"
+							   FontSize="24"
+							   FontWeight="Bold"
+							   Foreground="{DynamicResource App.Foreground}"
+							   VerticalAlignment="Center"/>
+				</StackPanel>
+
+
+				<!-- STABILNE DnD: ListBox daje kontenery ListBoxItem -->
                 <ListBox x:Name="GoalsList"
                          Margin="0,8,0,0"
                          AllowDrop="True"

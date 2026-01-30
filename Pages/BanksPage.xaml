@@ -11,16 +11,18 @@
 
     <UserControl.Resources>
         <!-- =====  Kafelek banku =====  -->
-        <Style x:Key="Card" TargetType="Border">
-            <Setter Property="Background" Value="Transparent"/>
-            <Setter Property="BorderBrush" Value="{DynamicResource Surface.Border}"/>
-            <Setter Property="BorderThickness" Value="1"/>
-            <Setter Property="CornerRadius" Value="10"/>
-            <Setter Property="Padding" Value="12"/>
-            <Setter Property="Margin" Value="0,12,0,0"/>
-        </Style>
+		<Style x:Key="Card" TargetType="Border">
+			<Setter Property="Background"      Value="{DynamicResource Surface.Background}"/>
+			<Setter Property="BorderBrush"     Value="{DynamicResource Surface.Border}"/>
+			<Setter Property="BorderThickness" Value="1"/>
+			<Setter Property="CornerRadius"    Value="10"/>
+			<Setter Property="Padding"         Value="12"/>
+			<Setter Property="Margin"          Value="0,12,16,0"/>
+		</Style>
 
-        <!-- =====  KPI =====  -->
+
+
+		<!-- =====  KPI =====  -->
         <Style x:Key="AccentCard" TargetType="Border" BasedOn="{StaticResource Card}">
             <Setter Property="BorderBrush" Value="{DynamicResource Brand.Blue}"/>
             <Setter Property="BorderThickness" Value="1.5"/>
@@ -44,10 +46,10 @@
 
         <!-- ===== Kafel konta bankowego ===== -->
         <DataTemplate DataType="{x:Type local:BankAccountVm}">
-            <Border Style="{StaticResource Card}"
-                    Margin="0,0,16,16"
-                    Width="300">
-                <Grid>
+			<Border Style="{StaticResource Card}"
+					Width="340">
+
+				<Grid>
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto"/>
                         <RowDefinition Height="Auto"/>
@@ -202,34 +204,38 @@
         </DataTemplate>
 
         <!-- ===== KAFEL „DODAJ KONTO” ===== -->
-        <DataTemplate DataType="{x:Type local:AddAccountTile}">
-            <Border Style="{StaticResource Card}"
-                    Margin="0,0,16,16"
-                    Width="260"
-                    Cursor="Hand"
-                    HorizontalAlignment="Left"
-                    MouseLeftButtonUp="AddAccountCard_Click">
-                <Grid>
-                    <StackPanel HorizontalAlignment="Center"
-                                VerticalAlignment="Center"
-                                Margin="0,16,0,16">
-                        <TextBlock Text="+"
-                                   FontSize="28"
-                                   FontWeight="Bold"
-                                   HorizontalAlignment="Center"
-                                   Foreground="{DynamicResource App.Foreground}"/>
-                        <TextBlock Text="Dodaj konto"
-                                   Margin="0,6,0,0"
-                                   FontSize="13"
-                                   FontWeight="SemiBold"
-                                   Foreground="{DynamicResource App.Foreground}"
-                                   HorizontalAlignment="Center"/>
-                    </StackPanel>
-                </Grid>
-            </Border>
-        </DataTemplate>
+		<DataTemplate DataType="{x:Type local:AddAccountTile}">
+			<Border Style="{StaticResource Card}"
+					Width="260"
+					Cursor="Hand"
+					MouseLeftButtonUp="AddAccountCard_Click">
+				<Grid>
+					<Border Margin="10"
+							BorderThickness="1"
+							CornerRadius="8"
+							BorderBrush="{DynamicResource Surface.Border}"/>
 
-    </UserControl.Resources>
+					<StackPanel HorizontalAlignment="Center"
+								VerticalAlignment="Center"
+								Margin="0,16,0,16">
+						<TextBlock Text="+"
+								   FontSize="28"
+								   FontWeight="Bold"
+								   HorizontalAlignment="Center"
+								   Foreground="{DynamicResource App.Foreground}"/>
+						<TextBlock Text="Dodaj konto"
+								   Margin="0,6,0,0"
+								   FontSize="13"
+								   FontWeight="SemiBold"
+								   Foreground="{DynamicResource App.Foreground}"
+								   HorizontalAlignment="Center"/>
+					</StackPanel>
+				</Grid>
+			</Border>
+		</DataTemplate>
+
+
+	</UserControl.Resources>
 
     <ScrollViewer VerticalScrollBarVisibility="Auto">
         <Grid Margin="24">
@@ -264,13 +270,28 @@
                            Background="{DynamicResource Surface.Border}"
                            Opacity="0.8"/>
 
-                <TextBlock Text="Konta bankowe"
-                           FontSize="24"
-                           FontWeight="Bold"
-                           Foreground="{DynamicResource App.Foreground}"
-                           Margin="0,4,0,12"/>
+				<StackPanel Orientation="Horizontal" Margin="0,4,0,12">
+					<Rectangle Width="30"
+							   Height="30"
+							   Margin="0,0,12,0"
+							   VerticalAlignment="Center"
+							   Fill="#F57C00">
+						<Rectangle.OpacityMask>
+							<ImageBrush Stretch="Uniform"
+										ImageSource="/Assets/Icons/kontabankowe.png"/>
+						</Rectangle.OpacityMask>
+					</Rectangle>
 
-                <!-- ===== Lista kafelków ===== -->
+					<TextBlock Text="Konta bankowe"
+							   FontSize="24"
+							   FontWeight="Bold"
+							   Foreground="{DynamicResource App.Foreground}"
+							   VerticalAlignment="Center"/>
+				</StackPanel>
+
+
+
+				<!-- ===== Lista kafelków ===== -->
                 <ListBox x:Name="AccountsList"
          Margin="0,8,0,0"
          Background="Transparent"
