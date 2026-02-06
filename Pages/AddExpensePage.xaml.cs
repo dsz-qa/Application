@@ -969,10 +969,23 @@ namespace Finly.Pages
                     break;
 
                 case "cash_saved":
-                    eModel.PaymentKind = PaymentKind.SavedCash;
-                    eModel.PaymentRefId = null;
-                    eModel.Account = "Odłożona gotówka";
-                    break;
+                    {
+                        var snap = DatabaseService.GetMoneySnapshot(_uid);
+                        if (amount > snap.SavedUnallocated)
+                        {
+                            ToastService.Info(
+                                $"Nie masz wolnych środków w „Odłożonej gotówce”. Dostępne: {snap.SavedUnallocated:N2} zł. " +
+                                "Wybierz kopertę albo zmniejsz przydział kopert."
+                            );
+                            return;
+                        }
+
+                        eModel.PaymentKind = PaymentKind.SavedCash;
+                        eModel.PaymentRefId = null;
+                        eModel.Account = "Odłożona gotówka";
+                        break;
+                    }
+
 
                 case "envelope":
                     {

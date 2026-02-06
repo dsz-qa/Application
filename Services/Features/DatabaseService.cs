@@ -206,22 +206,37 @@ LIMIT 1;";
             else if (TableExists(c, "Incomes")) table = "Incomes";
             if (table == null) return null;
 
+            bool hasPaymentKind = ColumnExists(c, table, "PaymentKind");
+            bool hasCategoryId = ColumnExists(c, table, "CategoryId");
+            bool hasIsPlanned = ColumnExists(c, table, "IsPlanned");
+            bool hasSource = ColumnExists(c, table, "Source");
+            bool hasDesc = ColumnExists(c, table, "Description");
+
             using var cmd = c.CreateCommand();
             cmd.CommandText = $@"
-SELECT Date, Amount, Source, CategoryId, Description, IsPlanned, PaymentKind
+SELECT
+    Date,
+    Amount,
+    {(hasSource ? "Source" : "NULL")}       AS Source,
+    {(hasCategoryId ? "CategoryId" : "NULL")} AS CategoryId,
+    {(hasDesc ? "Description" : "NULL")}   AS Description,
+    {(hasIsPlanned ? "IsPlanned" : "0")}   AS IsPlanned,
+    {(hasPaymentKind ? "PaymentKind" : "0")} AS PaymentKind
 FROM {table}
 WHERE UserId = @u
-ORDER BY Date DESC, Id DESC
+ORDER BY date(Date) DESC, Id DESC
 LIMIT 1;";
             cmd.Parameters.AddWithValue("@u", userId);
 
             using var r = cmd.ExecuteReader();
             if (!r.Read()) return null;
 
-            var pkInt = Convert.ToInt32(ScalarOrNull(r, "PaymentKind") ?? 0);
+            // PaymentKind: w starych DB go nie ma -> dostaniesz 0 (FreeCash)
+            int pkInt = Convert.ToInt32(ScalarOrNull(r, "PaymentKind") ?? 0);
 
-            object? catObj = ScalarOrNull(r, "CategoryId");
+            // CategoryId: null / 0 / brak kolumny -> null
             int? catId = null;
+            var catObj = ScalarOrNull(r, "CategoryId");
             if (catObj != null && catObj != DBNull.Value)
             {
                 var tmp = Convert.ToInt32(catObj);
@@ -236,9 +251,10 @@ LIMIT 1;";
                 CategoryId = catId,
                 Description = ScalarOrNull(r, "Description")?.ToString(),
                 IsPlanned = Convert.ToInt32(ScalarOrNull(r, "IsPlanned") ?? 0) == 1,
-                PaymentKind = (PaymentKind)pkInt
+                PaymentKind = Enum.IsDefined(typeof(PaymentKind), pkInt) ? (PaymentKind)pkInt : PaymentKind.FreeCash
             };
         }
+
 
         // ===================== API: GetCategoryNameById =====================
 
@@ -2982,10 +2998,41 @@ WHERE Id=@id;";
             using var con = OpenAndEnsureSchema();
             using var cmd = con.CreateCommand();
 
+            bool hasLegacyKinds =
+                ColumnExists(con, "Transfers", "FromKind") &&
+                ColumnExists(con, "Transfers", "ToKind");
+
+            bool hasPk =
+                ColumnExists(con, "Transfers", "FromPaymentKind") &&
+                ColumnExists(con, "Transfers", "ToPaymentKind");
+
+            // Effective: jeœli jest FromPaymentKind -> u¿ywamy go; jeœli nie -> legacy FromKind
+            // Dla Kind (string) przy PaymentKind mo¿esz w UI mapowaæ enum->tekst.
             var sb = new StringBuilder(@"
-SELECT Id, UserId, Date, Amount, Description, FromKind, FromRefId, ToKind, ToRefId, IsPlanned
+SELECT
+    Id, UserId, Date, Amount, Description,
+");
+
+            // EffectiveFromPaymentKind / EffectiveFromPaymentRefId
+            sb.Append(hasPk
+                ? "FromPaymentKind AS EffectiveFromPaymentKind, FromPaymentRefId AS EffectiveFromPaymentRefId,"
+                : "NULL AS EffectiveFromPaymentKind, NULL AS EffectiveFromPaymentRefId,");
+
+            // EffectiveToPaymentKind / EffectiveToPaymentRefId
+            sb.Append(hasPk
+                ? "ToPaymentKind AS EffectiveToPaymentKind, ToPaymentRefId AS EffectiveToPaymentRefId,"
+                : "NULL AS EffectiveToPaymentKind, NULL AS EffectiveToPaymentRefId,");
+
+            // Legacy (opcjonalnie, ale warto zostawiæ do zgodnoœci / debug)
+            sb.Append(hasLegacyKinds
+                ? "FromKind, FromRefId, ToKind, ToRefId,"
+                : "NULL AS FromKind, NULL AS FromRefId, NULL AS ToKind, NULL AS ToRefId,");
+
+            sb.Append(@"
+    IsPlanned
 FROM Transfers
-WHERE UserId=@u");
+WHERE UserId=@u
+");
 
             cmd.Parameters.AddWithValue("@u", userId);
 
@@ -3010,6 +3057,8 @@ WHERE UserId=@u");
             return dt;
         }
 
+
+
         public static int InsertTransfer(
             int userId,
             DateTime date,
@@ -3024,90 +3073,27 @@ WHERE UserId=@u");
             if (userId <= 0) throw new ArgumentException("Brak userId.", nameof(userId));
             if (amount <= 0m) throw new ArgumentException("Kwota musi byæ dodatnia.", nameof(amount));
 
-            using var con = GetConnection();
-            EnsureTables();
+            static string KindFromPk(int pk) => ((PaymentKind)pk) switch
+            {
+                PaymentKind.FreeCash => "freecash",
+                PaymentKind.SavedCash => "savedcash",
+                PaymentKind.Envelope => "envelope",
+                PaymentKind.BankAccount => "bank",
+                _ => throw new InvalidOperationException($"Nieobs³ugiwany PaymentKind={pk}.")
+            };
 
-            using var tx = con.BeginTransaction();
-
-            // 1) zapis w Transfers
-            int transferId = InsertTransferRow(
-                con, tx,
-                userId, amount, date, description,
-                fromPaymentKind, fromPaymentRefId,
-                toPaymentKind, toPaymentRefId,
-                isPlanned
+            return LedgerService.TransferAny(
+                userId: userId,
+                amount: amount,
+                date: date,
+                description: description,
+                fromKind: KindFromPk(fromPaymentKind),
+                fromRefId: fromPaymentRefId,
+                toKind: KindFromPk(toPaymentKind),
+                toRefId: toPaymentRefId,
+                isPlanned: isPlanned
             );
-
-            // 2) ksiêgowanie tylko dla nie-planned
-            if (!isPlanned)
-            {
-                LedgerService.ApplyTransferEffect(
-                    con, tx,
-                    userId, amount,
-                    fromPaymentKind, fromPaymentRefId,
-                    toPaymentKind, toPaymentRefId
-                );
-            }
-
-            tx.Commit();
-            NotifyDataChanged();
-            return transferId;
         }
-
-
-        private static int InsertTransferRow(
-            SqliteConnection con, SqliteTransaction tx,
-            int userId, decimal amount, DateTime date, string? description,
-            int fromPaymentKind, int? fromPaymentRefId,
-            int toPaymentKind, int? toPaymentRefId,
-            bool isPlanned)
-        {
-            // Upewnij siê, ¿e masz tabelê Transfers (jeœli ju¿ masz w SchemaService – OK; jeœli nie, dodaj tam)
-            using (var cmd0 = con.CreateCommand())
-            {
-                cmd0.Transaction = tx;
-                cmd0.CommandText = @"
-CREATE TABLE IF NOT EXISTS Transfers(
-    Id INTEGER PRIMARY KEY AUTOINCREMENT,
-    UserId INTEGER NOT NULL,
-    Amount NUMERIC NOT NULL,
-    Date TEXT NOT NULL,
-    Description TEXT NULL,
-    FromPaymentKind INTEGER NOT NULL,
-    FromPaymentRefId INTEGER NULL,
-    ToPaymentKind INTEGER NOT NULL,
-    ToPaymentRefId INTEGER NULL,
-    IsPlanned INTEGER NOT NULL DEFAULT 0
-);";
-                cmd0.ExecuteNonQuery();
-            }
-
-            using var cmd = con.CreateCommand();
-            cmd.Transaction = tx;
-            cmd.CommandText = @"
-INSERT INTO Transfers(UserId, Amount, Date, Description,
-                      FromPaymentKind, FromPaymentRefId,
-                      ToPaymentKind, ToPaymentRefId, IsPlanned)
-VALUES(@u,@a,@d,@desc,@fpk,@fpr,@tpk,@tpr,@p);
-SELECT last_insert_rowid();";
-
-            cmd.Parameters.AddWithValue("@u", userId);
-            cmd.Parameters.AddWithValue("@a", amount);
-            cmd.Parameters.AddWithValue("@d", date.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture));
-            cmd.Parameters.AddWithValue("@desc", (object?)description ?? DBNull.Value);
-
-            cmd.Parameters.AddWithValue("@fpk", fromPaymentKind);
-            cmd.Parameters.AddWithValue("@fpr", (object?)fromPaymentRefId ?? DBNull.Value);
-
-            cmd.Parameters.AddWithValue("@tpk", toPaymentKind);
-            cmd.Parameters.AddWithValue("@tpr", (object?)toPaymentRefId ?? DBNull.Value);
-
-            cmd.Parameters.AddWithValue("@p", isPlanned ? 1 : 0);
-
-            var obj = cmd.ExecuteScalar();
-            return Convert.ToInt32(obj);
-        }
-
 
         internal static void InsertTransferRaw_NoLedger(
             SqliteConnection con,

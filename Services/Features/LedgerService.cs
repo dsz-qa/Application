@@ -609,9 +609,24 @@ SET Amount = SavedCash.Amount + excluded.Amount,
                     break;
 
                 case PaymentKind.SavedCash:
-                    SubSaved(c, tx, userId, amount);
-                    SubCash(c, tx, userId, amount);
-                    break;
+                    {
+                        // Odłożona gotówka do wydania = SavedCash - suma alokacji kopert
+                        var saved = GetSavedCash(c, tx, userId);
+                        var allocatedSum = GetEnvelopesAllocatedSum(c, tx, userId);
+                        var unallocated = saved - allocatedSum;
+
+                        if (amount > unallocated)
+                            throw new InvalidOperationException(
+                                $"Brak wolnych środków w „Odłożonej gotówce”. Dostępne do wydania: {unallocated.ToString("N2", CultureInfo.CurrentCulture)} zł. " +
+                                "Wybierz kopertę albo zmniejsz przydział kopert."
+                            );
+
+                        SubSaved(c, tx, userId, amount);
+                        SubCash(c, tx, userId, amount);
+                        break;
+                    }
+
+
 
                 case PaymentKind.BankAccount:
                     if (!paymentRefId.HasValue) throw new InvalidOperationException("Brak PaymentRefId dla konta bankowego.");
