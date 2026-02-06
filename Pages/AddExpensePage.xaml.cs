@@ -1172,7 +1172,13 @@ namespace Finly.Pages
             var from = TransferFromBox.SelectedItem as TransferItem;
             var to = TransferToBox.SelectedItem as TransferItem;
 
-            if (from == null || to == null || from.Key == to.Key)
+            if (from == null || to == null)
+            {
+                ToastService.Info("Wybierz konto źródłowe i docelowe.");
+                return;
+            }
+
+            if (from.Key == to.Key)
             {
                 ToastService.Info("Wybierz różne konta źródłowe i docelowe.");
                 return;
@@ -1182,121 +1188,59 @@ namespace Finly.Pages
 
             try
             {
-                bool handled = false;
-
-                if (!handled &&
-                    from.Kind == TransferItemKind.BankAccount &&
-                    to.Kind == TransferItemKind.BankAccount &&
-                    from.BankAccountId is int accFrom &&
-                    to.BankAccountId is int accTo)
+                // 1) mapowanie TransferItem -> PaymentKind + RefId (spójne z Expense/Income)
+                static (PaymentKind kind, int? refId) Map(TransferItem it)
                 {
-                    TransactionsFacadeService.TransferBankToBank(_uid, accFrom, accTo, amount);
-                    handled = true;
+                    return it.Kind switch
+                    {
+                        TransferItemKind.FreeCash => (PaymentKind.FreeCash, null),
+                        TransferItemKind.SavedCash => (PaymentKind.SavedCash, null),
+                        TransferItemKind.BankAccount => (PaymentKind.BankAccount, it.BankAccountId),
+                        TransferItemKind.Envelope => (PaymentKind.Envelope, it.EnvelopeId),
+                        _ => throw new InvalidOperationException("Nieznany typ transferu (źródło/cel).")
+                    };
                 }
 
-                if (!handled &&
-                    from.Kind == TransferItemKind.BankAccount &&
-                    to.Kind == TransferItemKind.FreeCash &&
-                    from.BankAccountId is int accFromBankToFree)
-                {
-                    TransactionsFacadeService.TransferBankToFreeCash(_uid, accFromBankToFree, amount);
-                    handled = true;
-                }
+                var (fromKind, fromRefId) = Map(from);
+                var (toKind, toRefId) = Map(to);
 
-                if (!handled &&
-                    from.Kind == TransferItemKind.FreeCash &&
-                    to.Kind == TransferItemKind.BankAccount &&
-                    to.BankAccountId is int accToFreeToBank)
+                // 2) walidacje RefId dla typów wymagających identyfikatora
+                if (fromKind == PaymentKind.BankAccount && !fromRefId.HasValue)
                 {
-                    TransactionsFacadeService.TransferFreeCashToBank(_uid, accToFreeToBank, amount);
-                    handled = true;
-                }
-
-                if (!handled &&
-                    from.Kind == TransferItemKind.FreeCash &&
-                    to.Kind == TransferItemKind.SavedCash)
-                {
-                    TransactionsFacadeService.TransferFreeToSaved(_uid, amount);
-                    handled = true;
-                }
-
-                if (!handled &&
-                    from.Kind == TransferItemKind.SavedCash &&
-                    to.Kind == TransferItemKind.FreeCash)
-                {
-                    TransactionsFacadeService.TransferSavedToFree(_uid, amount);
-                    handled = true;
-                }
-
-                if (!handled &&
-                    from.Kind == TransferItemKind.SavedCash &&
-                    to.Kind == TransferItemKind.BankAccount &&
-                    to.BankAccountId is int accToSavedToBank)
-                {
-                    TransactionsFacadeService.TransferSavedToBank(_uid, accToSavedToBank, amount);
-                    handled = true;
-                }
-
-                if (!handled &&
-                    from.Kind == TransferItemKind.BankAccount &&
-                    to.Kind == TransferItemKind.SavedCash &&
-                    from.BankAccountId is int accFromBankToSaved)
-                {
-                    TransactionsFacadeService.TransferBankToSaved(_uid, accFromBankToSaved, amount);
-                    handled = true;
-                }
-
-                if (!handled &&
-                    from.Kind == TransferItemKind.Envelope &&
-                    to.Kind == TransferItemKind.Envelope &&
-                    from.EnvelopeId is int envFrom &&
-                    to.EnvelopeId is int envTo)
-                {
-                    TransactionsFacadeService.TransferEnvelopeToEnvelope(_uid, envFrom, envTo, amount);
-                    handled = true;
-                }
-
-                if (!handled &&
-                    from.Kind == TransferItemKind.SavedCash &&
-                    to.Kind == TransferItemKind.Envelope &&
-                    to.EnvelopeId is int envToFromSaved)
-                {
-                    TransactionsFacadeService.TransferSavedToEnvelope(_uid, envToFromSaved, amount);
-                    handled = true;
-                }
-
-                if (!handled &&
-                    from.Kind == TransferItemKind.Envelope &&
-                    to.Kind == TransferItemKind.SavedCash &&
-                    from.EnvelopeId is int envFromToSaved)
-                {
-                    TransactionsFacadeService.TransferEnvelopeToSaved(_uid, envFromToSaved, amount);
-                    handled = true;
-                }
-
-                if (!handled &&
-                    from.Kind == TransferItemKind.FreeCash &&
-                    to.Kind == TransferItemKind.Envelope &&
-                    to.EnvelopeId is int envToFromFree)
-                {
-                    TransactionsFacadeService.TransferFreeToEnvelope(_uid, envToFromFree, amount);
-                    handled = true;
-                }
-
-                if (!handled &&
-                    from.Kind == TransferItemKind.Envelope &&
-                    to.Kind == TransferItemKind.FreeCash &&
-                    from.EnvelopeId is int envFromToFree)
-                {
-                    TransactionsFacadeService.TransferEnvelopeToFree(_uid, envFromToFree, amount);
-                    handled = true;
-                }
-
-                if (!handled)
-                {
-                    ToastService.Info("Ten rodzaj transferu nie jest jeszcze obsługiwany.");
+                    ToastService.Info("Wybierz konto bankowe (źródło).");
                     return;
                 }
+
+                if (toKind == PaymentKind.BankAccount && !toRefId.HasValue)
+                {
+                    ToastService.Info("Wybierz konto bankowe (cel).");
+                    return;
+                }
+
+                if (fromKind == PaymentKind.Envelope && !fromRefId.HasValue)
+                {
+                    ToastService.Info("Wybierz kopertę (źródło).");
+                    return;
+                }
+
+                if (toKind == PaymentKind.Envelope && !toRefId.HasValue)
+                {
+                    ToastService.Info("Wybierz kopertę (cel).");
+                    return;
+                }
+
+                // 3) Jedna bramka: zapis + księgowanie w tej samej transakcji (jak expense/income)
+                DatabaseService.InsertTransfer(
+                    userId: _uid,
+                    date: date,
+                    amount: amount,
+                    fromPaymentKind: (int)fromKind,
+                    fromPaymentRefId: fromRefId,
+                    toPaymentKind: (int)toKind,
+                    toPaymentRefId: toRefId,
+                    description: desc,
+                    isPlanned: false
+                );
 
                 ToastService.Success("Zapisano transfer.");
 
@@ -1317,6 +1261,7 @@ namespace Finly.Pages
                 ToastService.Error("Nie udało się zapisać transferu.\n" + ex.Message);
             }
         }
+
 
         // ================= POMOCNICZE (BUDŻETY) =================
 

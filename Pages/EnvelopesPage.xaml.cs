@@ -24,11 +24,12 @@ namespace Finly.Pages
         // kolekcja kart (koperty + kafelek Dodaj)
         private readonly ObservableCollection<object> _cards = new();
 
-        // aktualna "Odłożona gotówka" w bazie (SavedCash)
-        private decimal _savedTotal = 0m;
-
         // pilnujemy subskrypcji, żeby nie dublować eventów przy ponownym wejściu na stronę
         private bool _isSubscribed;
+
+        // drag&drop
+        private Point _dragStartPoint;
+        private object? _dragItem;
 
         public EnvelopesPage()
         {
@@ -40,8 +41,64 @@ namespace Finly.Pages
             Unloaded += EnvelopesPage_Unloaded;
         }
 
-        private Point _dragStartPoint;
-        private object? _dragItem;
+        public EnvelopesPage(int userId) : this()
+        {
+            _userId = userId;
+        }
+
+        // ===================== LIFECYCLE =====================
+
+        private void EnvelopesPage_Loaded(object sender, RoutedEventArgs e)
+        {
+            EnsureUserId();
+            if (_userId <= 0) return;
+
+            EnsureSubscriptions();
+            LoadAll();
+        }
+
+        private void EnvelopesPage_Unloaded(object sender, RoutedEventArgs e)
+        {
+            RemoveSubscriptions();
+        }
+
+        private void EnsureUserId()
+        {
+            if (_userId > 0) return;
+            _userId = UserService.GetCurrentUserId();
+        }
+
+        private void EnsureSubscriptions()
+        {
+            if (_isSubscribed) return;
+
+            DatabaseService.DataChanged += DatabaseService_DataChanged;
+            _isSubscribed = true;
+        }
+
+        private void RemoveSubscriptions()
+        {
+            if (!_isSubscribed) return;
+
+            try { DatabaseService.DataChanged -= DatabaseService_DataChanged; }
+            catch { /* ignore */ }
+
+            _isSubscribed = false;
+        }
+
+        private void DatabaseService_DataChanged(object? sender, EventArgs e)
+        {
+            // event może wpaść z innego wątku -> zawsze wracamy na UI thread
+            if (!IsLoaded) return;
+
+            Dispatcher.Invoke(() =>
+            {
+                if (!IsLoaded) return;
+                LoadAll();
+            });
+        }
+
+        // ===================== DRAG & DROP =====================
 
         private void EnvelopesCards_PreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
         {
@@ -100,13 +157,11 @@ namespace Finly.Pages
             var envelopeItems = _cards.OfType<DataRowView>().ToList();
             int oldIndex = envelopeItems.IndexOf(source);
             int newIndex = envelopeItems.IndexOf(target);
-
             if (oldIndex < 0 || newIndex < 0) return;
 
             // faktyczny indeks w _cards (uwzględnia AddEnvelopeTile na końcu)
             int oldIndexInCards = _cards.IndexOf(source);
             int newIndexInCards = _cards.IndexOf(target);
-
             if (oldIndexInCards < 0 || newIndexInCards < 0) return;
 
             // przeniesienie w UI
@@ -121,48 +176,11 @@ namespace Finly.Pages
                     .ToList();
 
                 DatabaseService.SaveEnvelopesOrder(_userId, orderedIds);
-                // nie musisz LoadAll() – UI już przestawione,
-                // a DB order będzie użyty przy kolejnym wejściu/odświeżeniu.
             }
             catch (Exception ex)
             {
                 ToastService.Error("Nie udało się zapisać kolejności kopert: " + ex.Message);
             }
-        }
-
-        public EnvelopesPage(int userId) : this()
-        {
-            _userId = userId;
-        }
-
-        private void EnvelopesPage_Loaded(object sender, RoutedEventArgs e)
-        {
-            if (_userId <= 0)
-                _userId = UserService.GetCurrentUserId();
-
-            if (_userId <= 0)
-                return;
-
-            EnsureSubscriptions();
-            LoadAll();
-        }
-
-        private void EnsureSubscriptions()
-        {
-            if (_isSubscribed) return;
-
-            DatabaseService.DataChanged += DatabaseService_DataChanged;
-            _isSubscribed = true;
-        }
-
-        private void RemoveSubscriptions()
-        {
-            if (!_isSubscribed) return;
-
-            try { DatabaseService.DataChanged -= DatabaseService_DataChanged; }
-            catch { /* ignore */ }
-
-            _isSubscribed = false;
         }
 
         // ===================== LOAD =====================
@@ -171,9 +189,10 @@ namespace Finly.Pages
         {
             try
             {
-                // Snapshoty
-                _savedTotal = DatabaseService.GetSavedCash(_userId);
-                var cashOnHandTotal = DatabaseService.GetCashOnHand(_userId);
+                if (_userId <= 0) return;
+
+                // ✅ JEDNO ŹRÓDŁO PRAWDY – identyczne jak w AddExpensePage
+                var snap = DatabaseService.GetMoneySnapshot(_userId);
 
                 // Koperty
                 _dt = DatabaseService.GetEnvelopesTable(_userId);
@@ -186,10 +205,8 @@ namespace Finly.Pages
                         var target = SafeDec(r["Target"]);
                         var alloc = SafeDec(r["Allocated"]);
 
-                        // Remaining
                         r["Remaining"] = target - alloc;
 
-                        // Cel/Opis/Termin z NOTE
                         SplitNote(r["Note"]?.ToString(), out var goal, out var description, out var deadline);
 
                         r["GoalText"] = string.IsNullOrWhiteSpace(goal) ? "Brak" : goal;
@@ -228,29 +245,28 @@ namespace Finly.Pages
                 }
                 _cards.Add(new AddEnvelopeTile());
 
-                // ===== AGREGATY =====
+                // ===== KPI =====
+                // 1) gotówka w kopertach (suma allocated w tabeli kopert)
                 var allocatedSum = _dt?.AsEnumerable().Sum(r => SafeDec(r["Allocated"])) ?? 0m;
 
-                // Wolna gotówka = CashOnHand - SavedCash (SavedCash jest częścią CashOnHand)
-                var freeCash = cashOnHandTotal - _savedTotal;
-                if (freeCash < 0m) freeCash = 0m;
+                // 2) wolna gotówka -> snap.Cash
+                var freeCash = snap.Cash;
 
-                // Do rozdysponowania w SavedCash po odjęciu alokacji kopert
-                var distributable = _savedTotal - allocatedSum;
+                // 3) odłożona gotówka (do przydzielenia) -> snap.SavedUnallocated
+                //    UWAGA: jeśli chcesz pokazywać "odłożona razem" zamiast "do przydzielenia",
+                //    to trzeba dodać pole w snapshot albo osobną metodę.
+                var savedToAllocate = snap.SavedUnallocated;
 
                 TotalEnvelopesText.Text = allocatedSum.ToString("N2", CultureInfo.CurrentCulture) + " zł";
                 SavedCashText.Text = freeCash.ToString("N2", CultureInfo.CurrentCulture) + " zł";
 
-                EnvelopesSumText.Text = distributable.ToString("N2", CultureInfo.CurrentCulture) + " zł";
-                EnvelopesSumText.Foreground = distributable < 0m
+                EnvelopesSumText.Text = savedToAllocate.ToString("N2", CultureInfo.CurrentCulture) + " zł";
+                EnvelopesSumText.Foreground = savedToAllocate < 0m
                     ? Brushes.IndianRed
                     : TryFindResource("App.Foreground") as Brush ?? Foreground;
 
-                // Opcjonalny tekst "Brak przypisanej gotówki"
                 if (UnassignedText != null)
-                {
-                    UnassignedText.Visibility = distributable > 0m ? Visibility.Visible : Visibility.Collapsed;
-                }
+                    UnassignedText.Visibility = savedToAllocate > 0m ? Visibility.Visible : Visibility.Collapsed;
             }
             catch (Exception ex)
             {
@@ -260,8 +276,6 @@ namespace Finly.Pages
 
         private static void EnsureComputedColumns(DataTable dt)
         {
-            // Uwaga: GetEnvelopesTable zwraca tylko kolumny z SELECT-a,
-            // więc dodajemy "wyliczane" kolumny do bindowania w XAML.
             if (!dt.Columns.Contains("Remaining"))
                 dt.Columns.Add("Remaining", typeof(decimal));
 
@@ -300,16 +314,11 @@ namespace Finly.Pages
         {
             try
             {
-                var dlg = new EnvelopeEditDialog
-                {
-                    Owner = Window.GetWindow(this)
-                };
-
+                var dlg = new EnvelopeEditDialog { Owner = Window.GetWindow(this) };
                 dlg.SetMode(EnvelopeEditDialog.DialogMode.Add);
                 dlg.LoadForAdd();
 
-                if (dlg.ShowDialog() != true)
-                    return;
+                if (dlg.ShowDialog() != true) return;
 
                 SaveEnvelopeFromDialog(dlg.Result);
             }
@@ -328,16 +337,11 @@ namespace Finly.Pages
                 var allocated = SafeDec(row["Allocated"]);
                 var note = row["Note"]?.ToString() ?? "";
 
-                var dlg = new EnvelopeEditDialog
-                {
-                    Owner = Window.GetWindow(this)
-                };
-
+                var dlg = new EnvelopeEditDialog { Owner = Window.GetWindow(this) };
                 dlg.SetMode(EnvelopeEditDialog.DialogMode.Edit);
                 dlg.LoadForEdit(id, name, target, allocated, note);
 
-                if (dlg.ShowDialog() != true)
-                    return;
+                if (dlg.ShowDialog() != true) return;
 
                 SaveEnvelopeFromDialog(dlg.Result);
             }
@@ -349,7 +353,6 @@ namespace Finly.Pages
 
         private void SaveEnvelopeFromDialog(EnvelopeEditDialog.EnvelopeEditResult r)
         {
-            // Walidacja środków w "Odłożonej gotówce"
             if (!ValidateAllocationAgainstSavedCash(_userId, r.EditingId, r.Allocated, out var fundsMsg))
             {
                 ToastService.Info(fundsMsg);
@@ -372,7 +375,6 @@ namespace Finly.Pages
                     ToastService.Success("Dodano kopertę.");
                 }
 
-                // Cel tylko gdy warunki spełnione
                 if (r.ShouldCreateGoal && r.Deadline.HasValue)
                 {
                     DatabaseService.UpdateEnvelopeGoal(
@@ -467,16 +469,10 @@ namespace Finly.Pages
         {
             if (to <= from) return 0;
             int months = (to.Year - from.Year) * 12 + (to.Month - from.Month);
-
-            // jeśli termin ma dzień większy niż "from", doliczamy rozpoczęty miesiąc
             if (to.Day > from.Day) months++;
             return months;
         }
 
-        /// <summary>
-        /// Note:
-        /// "Cel: ....\nOpis: ....\nTermin: RRRR-MM-DD"
-        /// </summary>
         private static void SplitNote(string? note, out string goal, out string description, out DateTime? deadline)
         {
             goal = string.Empty;
@@ -517,7 +513,6 @@ namespace Finly.Pages
                 }
                 else
                 {
-                    // fallback: jeśli ktoś wpisał "po prostu tekst"
                     if (string.IsNullOrEmpty(goal))
                         goal = line;
                     else if (string.IsNullOrEmpty(description))
@@ -590,6 +585,9 @@ namespace Finly.Pages
                 return false;
             }
 
+            // UWAGA: tu zostawiamy Twoją logikę walidacji "alokacji kopert" względem odłożonej gotówki.
+            // Jeśli "SavedCash" w DB to "odłożona gotówka razem", OK.
+            // Jeśli nie – trzeba to też przepiąć na snapshot (wtedy potrzebujemy pola SavedTotal).
             var savedTotal = DatabaseService.GetSavedCash(userId);
 
             var dt = DatabaseService.GetEnvelopesTable(userId);
@@ -622,23 +620,6 @@ namespace Finly.Pages
             }
 
             return true;
-        }
-
-        // ===================== cleanup =====================
-
-        private void EnvelopesPage_Unloaded(object sender, RoutedEventArgs e)
-        {
-            Loaded -= EnvelopesPage_Loaded;
-            Unloaded -= EnvelopesPage_Unloaded;
-
-            RemoveSubscriptions();
-        }
-
-        private void DatabaseService_DataChanged(object? sender, EventArgs e)
-        {
-            // jeśli kontrolka już “znika”, nie ma sensu odświeżać
-            if (!IsLoaded) return;
-            LoadAll();
         }
     }
 }

@@ -173,18 +173,28 @@ CREATE TABLE IF NOT EXISTS Expenses(
 );
 
 CREATE TABLE IF NOT EXISTS Transfers(
-    Id          INTEGER PRIMARY KEY AUTOINCREMENT,
-    UserId      INTEGER NOT NULL,
-    Amount      NUMERIC NOT NULL,
-    Date        TEXT NOT NULL,
-    Description TEXT NULL,
-    FromKind    TEXT NOT NULL,
-    FromRefId   INTEGER NULL,
-    ToKind      TEXT NOT NULL,
-    ToRefId     INTEGER NULL,
-    IsPlanned   INTEGER NOT NULL DEFAULT 0,
+    Id               INTEGER PRIMARY KEY AUTOINCREMENT,
+    UserId            INTEGER NOT NULL,
+    Amount            NUMERIC NOT NULL,
+    Date              TEXT NOT NULL,
+    Description       TEXT NULL,
+
+    -- nowy, docelowy zapis (spójny z Expenses/Incomes)
+    FromPaymentKind   INTEGER NOT NULL DEFAULT 0,
+    FromPaymentRefId  INTEGER NULL,
+    ToPaymentKind     INTEGER NOT NULL DEFAULT 0,
+    ToPaymentRefId    INTEGER NULL,
+
+    -- legacy (zostawiamy dla wstecznej kompatybilności / istniejących danych)
+    FromKind          TEXT NULL,
+    FromRefId         INTEGER NULL,
+    ToKind            TEXT NULL,
+    ToRefId           INTEGER NULL,
+
+    IsPlanned         INTEGER NOT NULL DEFAULT 0,
     FOREIGN KEY(UserId) REFERENCES Users(Id) ON DELETE CASCADE
 );
+
 
 CREATE TABLE IF NOT EXISTS Loans(
     Id           INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -399,6 +409,24 @@ CREATE TABLE IF NOT EXISTS CompanyProfiles(
                 AddColumnIfMissing(con, tx, "Expenses", "PaymentRefId", "INTEGER");
                 AddColumnIfMissing(con, tx, "Expenses", "LoanId", "INTEGER");
                 AddColumnIfMissing(con, tx, "Expenses", "LoanInstallmentId", "INTEGER");
+
+                // Transfers
+                AddColumnIfMissing(con, tx, "Transfers", "FromPaymentKind", "INTEGER", "NOT NULL DEFAULT 0");
+                AddColumnIfMissing(con, tx, "Transfers", "FromPaymentRefId", "INTEGER");
+                AddColumnIfMissing(con, tx, "Transfers", "ToPaymentKind", "INTEGER", "NOT NULL DEFAULT 0");
+                AddColumnIfMissing(con, tx, "Transfers", "ToPaymentRefId", "INTEGER");
+                // Transfers (NOWE KOLUMNY - wymagane przez UI/DB)
+                AddColumnIfMissing(con, tx, "Transfers", "FromPaymentKind", "INTEGER", "NOT NULL DEFAULT 0");
+                AddColumnIfMissing(con, tx, "Transfers", "FromPaymentRefId", "INTEGER");
+                AddColumnIfMissing(con, tx, "Transfers", "ToPaymentKind", "INTEGER", "NOT NULL DEFAULT 0");
+                AddColumnIfMissing(con, tx, "Transfers", "ToPaymentRefId", "INTEGER");
+
+                // Transfers (legacy - jeśli stara baza nie miała tych kolumn)
+                AddColumnIfMissing(con, tx, "Transfers", "FromKind", "TEXT");
+                AddColumnIfMissing(con, tx, "Transfers", "FromRefId", "INTEGER");
+                AddColumnIfMissing(con, tx, "Transfers", "ToKind", "TEXT");
+                AddColumnIfMissing(con, tx, "Transfers", "ToRefId", "INTEGER");
+
 
                 // Loans (tu był killer: DEFAULT (date('now')))
                 AddColumnIfMissing(con, tx, "Loans", "Principal", "NUMERIC", "NOT NULL DEFAULT 0");

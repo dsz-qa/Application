@@ -74,10 +74,56 @@ CREATE TABLE IF NOT EXISTS Transfers(
 
             using var cmd = c.CreateCommand();
             cmd.Transaction = tx;
-            cmd.CommandText = @"
+            bool hasPk = DatabaseService.ColumnExists(c, "Transfers", "FromPaymentKind")
+                      && DatabaseService.ColumnExists(c, "Transfers", "ToPaymentKind");
+
+            if (hasPk)
+            {
+                // Mapowanie string-kind -> PaymentKind (Twoje stałe KIND_*)
+                int MapPk(string k) => NormKind(k) switch
+                {
+                    KIND_FREE => (int)PaymentKind.FreeCash,
+                    KIND_SAVED => (int)PaymentKind.SavedCash,
+                    KIND_ENV => (int)PaymentKind.Envelope,
+                    KIND_BANK => (int)PaymentKind.BankAccount,
+                    KIND_LEGACY_CASH => (int)PaymentKind.FreeCash,
+                    _ => throw new InvalidOperationException($"Nieznany kind: '{k}'.")
+                };
+
+                var fromPk = MapPk(fromKind);
+                var toPk = MapPk(toKind);
+
+                cmd.CommandText = @"
+INSERT INTO Transfers(
+    UserId, Amount, Date, Description,
+    FromPaymentKind, FromPaymentRefId,
+    ToPaymentKind, ToPaymentRefId,
+    FromKind, FromRefId, ToKind, ToRefId,
+    IsPlanned
+)
+VALUES(
+    @u,@a,@d,@desc,
+    @fpk,@fpr,
+    @tpk,@tpr,
+    @fk,@fr,@tk,@tr,
+    @p
+);
+SELECT last_insert_rowid();";
+
+                cmd.Parameters.AddWithValue("@fpk", fromPk);
+                cmd.Parameters.AddWithValue("@fpr", (object?)fromRefId ?? DBNull.Value);
+                cmd.Parameters.AddWithValue("@tpk", toPk);
+                cmd.Parameters.AddWithValue("@tpr", (object?)toRefId ?? DBNull.Value);
+            }
+            else
+            {
+                // stara baza – tylko legacy kolumny
+                cmd.CommandText = @"
 INSERT INTO Transfers(UserId, Amount, Date, Description, FromKind, FromRefId, ToKind, ToRefId, IsPlanned)
 VALUES(@u,@a,@d,@desc,@fk,@fr,@tk,@tr,@p);
 SELECT last_insert_rowid();";
+            }
+
 
             cmd.Parameters.AddWithValue("@u", userId);
             cmd.Parameters.AddWithValue("@a", amount);
@@ -181,6 +227,16 @@ SET Amount = CashOnHand.Amount + excluded.Amount,
             cmd.Parameters.AddWithValue("@a", amount);
             cmd.ExecuteNonQuery();
         }
+
+        private static decimal GetEnvelopesAllocatedSum(SqliteConnection c, SqliteTransaction tx, int userId)
+        {
+            using var cmd = c.CreateCommand();
+            cmd.Transaction = tx;
+            cmd.CommandText = "SELECT COALESCE(SUM(Allocated),0) FROM Envelopes WHERE UserId=@u;";
+            cmd.Parameters.AddWithValue("@u", userId);
+            return Convert.ToDecimal(cmd.ExecuteScalar() ?? 0m);
+        }
+
 
         private static decimal GetSavedCash(SqliteConnection c, SqliteTransaction tx, int userId)
         {
@@ -305,6 +361,37 @@ SET Amount = SavedCash.Amount + excluded.Amount,
         // ============================================================
         //  TRANSFER EFFECT – RDZEŃ (WSZYSTKIE KOMBINACJE)
         // ============================================================
+        public static void ApplyTransferEffect(
+    SqliteConnection c, SqliteTransaction tx,
+    int userId, decimal amount,
+    int fromPaymentKind, int? fromPaymentRefId,
+    int toPaymentKind, int? toPaymentRefId)
+        {
+            EnsureNonNegative(amount, nameof(amount));
+
+            if (!Enum.IsDefined(typeof(PaymentKind), fromPaymentKind))
+                throw new InvalidOperationException($"Nieznany PaymentKind FROM={fromPaymentKind}.");
+
+            if (!Enum.IsDefined(typeof(PaymentKind), toPaymentKind))
+                throw new InvalidOperationException($"Nieznany PaymentKind TO={toPaymentKind}.");
+
+            string KindFromPk(int pk) => ((PaymentKind)pk) switch
+            {
+                PaymentKind.FreeCash => KIND_FREE,
+                PaymentKind.SavedCash => KIND_SAVED,
+                PaymentKind.Envelope => KIND_ENV,
+                PaymentKind.BankAccount => KIND_BANK,
+                _ => throw new InvalidOperationException($"Nieobsługiwany PaymentKind={pk}.")
+            };
+
+            // Mapujemy PaymentKind -> string kind i lecimy JEDNĄ logiką (Twoją, z Free/Saved/Envelope)
+            ApplyTransferEffect(
+                c, tx,
+                userId,
+                KindFromPk(fromPaymentKind), fromPaymentRefId,
+                KindFromPk(toPaymentKind), toPaymentRefId,
+                amount);
+        }
 
         private static void ApplyTransferEffect(
             SqliteConnection c, SqliteTransaction tx,
@@ -315,6 +402,11 @@ SET Amount = SavedCash.Amount + excluded.Amount,
         {
             fromKind = NormKind(fromKind);
             toKind = NormKind(toKind);
+
+            // ✅ KLUCZ: legacy "cash" traktujemy jak "freecash"
+            if (fromKind == KIND_LEGACY_CASH) fromKind = KIND_FREE;
+            if (toKind == KIND_LEGACY_CASH) toKind = KIND_FREE;
+
 
             if (fromKind == toKind && fromRefId == toRefId) return;
 
@@ -378,6 +470,40 @@ SET Amount = SavedCash.Amount + excluded.Amount,
 
                 SubEnvelopeAllocated(c, tx, userId, fromRefId.Value, amount);
                 SubSaved(c, tx, userId, amount); // free wzrośnie, bo saved maleje
+                return;
+            }
+
+            // 7) Envelope -> Bank (REALNY wypływ gotówki do banku)
+            if (fromKind == KIND_ENV && toKind == KIND_BANK)
+            {
+                if (!fromRefId.HasValue) throw new InvalidOperationException("Brak FromRefId dla envelope.");
+                if (!toRefId.HasValue) throw new InvalidOperationException("Brak ToRefId dla bank.");
+
+                // zdejmujemy z koperty
+                SubEnvelopeAllocated(c, tx, userId, fromRefId.Value, amount);
+
+                // bo koperty siedzą w saved cash (i w total cash)
+                SubSaved(c, tx, userId, amount);
+                SubCash(c, tx, userId, amount);
+
+                // dodajemy na konto bankowe
+                AddBank(c, tx, userId, toRefId.Value, amount);
+                return;
+            }
+
+            // 8) Bank -> Envelope (REALNY wpływ gotówki z banku do koperty)
+            if (fromKind == KIND_BANK && toKind == KIND_ENV)
+            {
+                if (!fromRefId.HasValue) throw new InvalidOperationException("Brak FromRefId dla bank.");
+                if (!toRefId.HasValue) throw new InvalidOperationException("Brak ToRefId dla envelope.");
+
+                // zdejmujemy z banku
+                SubBank(c, tx, userId, fromRefId.Value, amount);
+
+                // gotówka rośnie (i saved rośnie, bo koperta = saved+allocated)
+                AddCash(c, tx, userId, amount);
+                AddSaved(c, tx, userId, amount);
+                AddEnvelopeAllocated(c, tx, userId, toRefId.Value, amount);
                 return;
             }
 
@@ -459,6 +585,8 @@ SET Amount = SavedCash.Amount + excluded.Amount,
             int? paymentRefId)
         {
             EnsureNonNegative(amount, nameof(amount));
+            EnsureRow(c, tx, "CashOnHand", userId);
+            EnsureRow(c, tx, "SavedCash", userId);
 
             decimal GetFree()
             {
@@ -557,6 +685,9 @@ SET Amount = SavedCash.Amount + excluded.Amount,
             int? paymentRefId)
         {
             EnsureNonNegative(amount, nameof(amount));
+            EnsureRow(c, tx, "CashOnHand", userId);
+            EnsureRow(c, tx, "SavedCash", userId);
+
 
             if (!Enum.IsDefined(typeof(PaymentKind), paymentKind))
                 throw new InvalidOperationException($"Nieznany PaymentKind={paymentKind}.");
@@ -602,11 +733,7 @@ SET Amount = SavedCash.Amount + excluded.Amount,
         {
             EnsureNonNegative(amount, nameof(amount));
 
-            if (!Enum.IsDefined(typeof(PaymentKind), paymentKind))
-                throw new InvalidOperationException($"Nieznany PaymentKind={paymentKind}.");
-
             var pk = (PaymentKind)paymentKind;
-
             switch (pk)
             {
                 case PaymentKind.FreeCash:
@@ -614,26 +741,94 @@ SET Amount = SavedCash.Amount + excluded.Amount,
                     break;
 
                 case PaymentKind.SavedCash:
+                    // saved to subset gotówki
                     SubSaved(c, tx, userId, amount);
                     SubCash(c, tx, userId, amount);
                     break;
 
                 case PaymentKind.BankAccount:
-                    if (!paymentRefId.HasValue) throw new InvalidOperationException("Brak PaymentRefId dla konta bankowego.");
+                    if (!paymentRefId.HasValue)
+                        throw new InvalidOperationException("Brak PaymentRefId dla konta bankowego przy cofaniu przychodu.");
                     SubBank(c, tx, userId, paymentRefId.Value, amount);
                     break;
 
-                case PaymentKind.Envelope:
-                    if (!paymentRefId.HasValue) throw new InvalidOperationException("Brak PaymentRefId dla koperty.");
-                    SubEnvelopeAllocated(c, tx, userId, paymentRefId.Value, amount);
-                    SubSaved(c, tx, userId, amount);
-                    SubCash(c, tx, userId, amount);
-                    break;
-
                 default:
-                    throw new InvalidOperationException($"Nieobsługiwany PaymentKind={paymentKind}.");
+                    throw new InvalidOperationException($"Nieobsługiwany PaymentKind={paymentKind} dla przychodu.");
+            }
+
+            // ✅ KLUCZ: po cofnięciu przychodu stabilizujemy relacje:
+            // Saved <= CashOnHand oraz EnvelopesAllocated <= Saved
+            NormalizeCashSavedEnvelope(c, tx, userId);
+        }
+
+        private static void NormalizeCashSavedEnvelope(SqliteConnection c, SqliteTransaction tx, int userId)
+        {
+            // 1) saved nie może być większe niż cashOnHand
+            var cash = GetCashOnHand(c, tx, userId);
+            var saved = GetSavedCash(c, tx, userId);
+
+            if (saved > cash)
+            {
+                var diff = saved - cash;
+
+                // najpierw zdejmujemy z kopert (bo koperty są częścią saved)
+                ReduceEnvelopeAllocationsBy(c, tx, userId, diff);
+
+                // po zdjęciu z kopert może się zmienić suma allocated, ale saved nadal trzeba zbić do cash
+                saved = GetSavedCash(c, tx, userId);
+                if (saved > cash)
+                {
+                    var still = saved - cash;
+                    // bezpiecznie: jeśli still > 0, to znaczy, że “odłożona” gotówka istnieje bez pokrycia w cash
+                    SubSaved(c, tx, userId, still);
+                }
+            }
+
+            // 2) suma kopert nie może być większa niż saved
+            saved = GetSavedCash(c, tx, userId);
+            var allocated = GetEnvelopesAllocatedSum(c, tx, userId);
+
+            if (allocated > saved)
+            {
+                var diff = allocated - saved;
+                ReduceEnvelopeAllocationsBy(c, tx, userId, diff);
             }
         }
+
+        private static void ReduceEnvelopeAllocationsBy(SqliteConnection c, SqliteTransaction tx, int userId, decimal amountToReduce)
+        {
+            EnsureNonNegative(amountToReduce, nameof(amountToReduce));
+            if (amountToReduce <= 0m) return;
+
+            // Pobieramy koperty z największą alokacją – z nich zdejmujemy najpierw
+            using var cmd = c.CreateCommand();
+            cmd.Transaction = tx;
+            cmd.CommandText = @"
+SELECT Id, Allocated
+FROM Envelopes
+WHERE UserId=@u
+ORDER BY Allocated DESC, Id ASC;";
+            cmd.Parameters.AddWithValue("@u", userId);
+
+            using var r = cmd.ExecuteReader();
+
+            var remaining = amountToReduce;
+
+            while (r.Read() && remaining > 0m)
+            {
+                var envId = Convert.ToInt32(r.GetValue(0));
+                var allocated = r.IsDBNull(1) ? 0m : Convert.ToDecimal(r.GetValue(1));
+                if (allocated <= 0m) continue;
+
+                var take = allocated >= remaining ? remaining : allocated;
+
+                // odejmujemy z koperty
+                SubEnvelopeAllocated(c, tx, userId, envId, take);
+
+                remaining -= take;
+            }
+        }
+
 
         // =========================
         //  Spend* (zgodne z TransactionsFacadeService)
@@ -784,37 +979,140 @@ SET Amount = SavedCash.Amount + excluded.Amount,
 
         private static bool TryDeleteTransferInternal(SqliteConnection c, SqliteTransaction tx, int id)
         {
-            if (!DatabaseService.TableExists(c, "Transfers")) return false;
+            if (!DatabaseService.TableExists(c, "Transfers"))
+                return false;
+
+            bool hasPlanned = DatabaseService.ColumnExists(c, "Transfers", "IsPlanned");
+
+            bool hasPkCols =
+                DatabaseService.ColumnExists(c, "Transfers", "FromPaymentKind") &&
+                DatabaseService.ColumnExists(c, "Transfers", "ToPaymentKind");
+
+            // legacy kolumny mogą istnieć albo nie
+            bool hasLegacyCols =
+                DatabaseService.ColumnExists(c, "Transfers", "FromKind") &&
+                DatabaseService.ColumnExists(c, "Transfers", "ToKind");
 
             using var get = c.CreateCommand();
             get.Transaction = tx;
 
-            bool hasPlanned = DatabaseService.ColumnExists(c, "Transfers", "IsPlanned");
+            // Ujednolicamy SELECT tak, żeby zawsze mieć te same indeksy pól w readerze.
+            // Kolejność:
+            // 0 UserId
+            // 1 Amount
+            // 2 FromPaymentKind (int)
+            // 3 FromPaymentRefId (int?)
+            // 4 ToPaymentKind (int)
+            // 5 ToPaymentRefId (int?)
+            // 6 FromKind (text)
+            // 7 FromRefId (int?)
+            // 8 ToKind (text)
+            // 9 ToRefId (int?)
+            // 10 IsPlanned (int)
+            if (hasPkCols)
+            {
+                get.CommandText = $@"
+SELECT
+    UserId,
+    Amount,
 
-            get.CommandText = hasPlanned
-                ? @"SELECT UserId, Amount, FromKind, FromRefId, ToKind, ToRefId, IsPlanned
-                    FROM Transfers WHERE Id=@id LIMIT 1;"
-                : @"SELECT UserId, Amount, FromKind, FromRefId, ToKind, ToRefId, 0 as IsPlanned
-                    FROM Transfers WHERE Id=@id LIMIT 1;";
+    FromPaymentKind,
+    FromPaymentRefId,
+    ToPaymentKind,
+    ToPaymentRefId,
+
+    {(hasLegacyCols ? "FromKind" : "NULL")}  as FromKind,
+    {(hasLegacyCols ? "FromRefId" : "NULL")} as FromRefId,
+    {(hasLegacyCols ? "ToKind" : "NULL")}    as ToKind,
+    {(hasLegacyCols ? "ToRefId" : "NULL")}   as ToRefId,
+
+    {(hasPlanned ? "IsPlanned" : "0")} as IsPlanned
+FROM Transfers
+WHERE Id=@id
+LIMIT 1;";
+            }
+            else
+            {
+                // stary transfer bez PaymentKind/RefId
+                get.CommandText = $@"
+SELECT
+    UserId,
+    Amount,
+
+    0 as FromPaymentKind,
+    NULL as FromPaymentRefId,
+    0 as ToPaymentKind,
+    NULL as ToPaymentRefId,
+
+    {(hasLegacyCols ? "FromKind" : "NULL")}  as FromKind,
+    {(hasLegacyCols ? "FromRefId" : "NULL")} as FromRefId,
+    {(hasLegacyCols ? "ToKind" : "NULL")}    as ToKind,
+    {(hasLegacyCols ? "ToRefId" : "NULL")}   as ToRefId,
+
+    {(hasPlanned ? "IsPlanned" : "0")} as IsPlanned
+FROM Transfers
+WHERE Id=@id
+LIMIT 1;";
+            }
 
             get.Parameters.AddWithValue("@id", id);
 
             using var r = get.ExecuteReader();
-            if (!r.Read()) return false;
+            if (!r.Read())
+                return false;
 
-            var userId = r.GetInt32(0);
-            var amount = Convert.ToDecimal(r.GetValue(1));
-            var fromKind = r.IsDBNull(2) ? "" : r.GetString(2);
-            var fromRef = r.IsDBNull(3) ? (int?)null : r.GetInt32(3);
-            var toKind = r.IsDBNull(4) ? "" : r.GetString(4);
-            var toRef = r.IsDBNull(5) ? (int?)null : r.GetInt32(5);
-            var isPlanned = !r.IsDBNull(6) && Convert.ToInt32(r.GetValue(6)) == 1;
+            int userId = r.GetInt32(0);
+            decimal amount = Convert.ToDecimal(r.GetValue(1));
+
+            int fromPk = Convert.ToInt32(r.GetValue(2));
+            int? fromPkRef = r.IsDBNull(3) ? (int?)null : Convert.ToInt32(r.GetValue(3));
+
+            int toPk = Convert.ToInt32(r.GetValue(4));
+            int? toPkRef = r.IsDBNull(5) ? (int?)null : Convert.ToInt32(r.GetValue(5));
+
+            string fromKindLegacy = r.IsDBNull(6) ? "" : (r.GetString(6) ?? "");
+            int? fromRefLegacy = r.IsDBNull(7) ? (int?)null : Convert.ToInt32(r.GetValue(7));
+
+            string toKindLegacy = r.IsDBNull(8) ? "" : (r.GetString(8) ?? "");
+            int? toRefLegacy = r.IsDBNull(9) ? (int?)null : Convert.ToInt32(r.GetValue(9));
+
+            bool isPlanned = !r.IsDBNull(10) && Convert.ToInt32(r.GetValue(10)) == 1;
+
+            // 1) Najpierw próbujemy użyć legacy (jeśli jest sensowne), bo ApplyTransferEffect u Ciebie działa na "kind string".
+            // 2) Jeśli legacy puste, mapujemy PaymentKind -> string kind używany przez księgowanie transferów.
+            static string MapPaymentKindToLegacy(int pk)
+            {
+                return ((PaymentKind)pk) switch
+                {
+                    PaymentKind.FreeCash => "freecash",
+                    PaymentKind.SavedCash => "savedcash",
+                    PaymentKind.BankAccount => "bank",
+                    PaymentKind.Envelope => "envelope",
+                    _ => "freecash"
+                };
+            }
+
+
+            string fromKind = !string.IsNullOrWhiteSpace(fromKindLegacy) ? fromKindLegacy : MapPaymentKindToLegacy(fromPk);
+            int? fromRef = fromRefLegacy ?? fromPkRef;
+
+            string toKind = !string.IsNullOrWhiteSpace(toKindLegacy) ? toKindLegacy : MapPaymentKindToLegacy(toPk);
+            int? toRef = toRefLegacy ?? toPkRef;
 
             if (!isPlanned)
             {
-                // reverse = To -> From
-                ApplyTransferEffect(c, tx, userId, toKind, toRef, fromKind, fromRef, amount);
+                if (hasPkCols)
+                {
+                    // reverse = TO -> FROM (PaymentKind)
+                    ApplyTransferEffect(c, tx, userId, amount, toPk, toPkRef, fromPk, fromPkRef);
+                }
+                else
+                {
+                    // reverse = TO -> FROM (legacy string-kind)
+                    ApplyTransferEffect(c, tx, userId, toKind, toRef, fromKind, fromRef, amount);
+                }
             }
+
 
             using var del = c.CreateCommand();
             del.Transaction = tx;
@@ -824,6 +1122,8 @@ SET Amount = SavedCash.Amount + excluded.Amount,
 
             return true;
         }
+
+
 
         private static void DeleteTransferInternal(SqliteConnection c, SqliteTransaction tx, int id)
         {
@@ -891,7 +1191,6 @@ LIMIT 1;";
             using var get = c.CreateCommand();
             get.Transaction = tx;
 
-            // UWAGA: dodajemy Source do odczytu, bo to pozwala ustalić gdzie był przychód
             get.CommandText = $@"
 SELECT UserId,
        Amount,
@@ -907,27 +1206,124 @@ LIMIT 1;";
             using var r = get.ExecuteReader();
             if (!r.Read()) return false;
 
-            var userId = Convert.ToInt32(r.GetValue(0));
-            var amount = Math.Abs(Convert.ToDecimal(r.GetValue(1)));
-            var isPlanned = Convert.ToInt32(r.GetValue(2)) == 1;
+            int userId = Convert.ToInt32(r.GetValue(0));
+            decimal amount = Math.Abs(Convert.ToDecimal(r.GetValue(1)));
+            bool isPlanned = Convert.ToInt32(r.GetValue(2)) == 1;
 
             int pk = Convert.ToInt32(r.GetValue(3));
             int? pr = r.IsDBNull(4) ? (int?)null : Convert.ToInt32(r.GetValue(4));
             string source = r.IsDBNull(5) ? "" : (r.GetString(5) ?? "");
 
-            // planned -> nie odwracamy sald
+            // 1) Zaplanowane -> nie odwracamy sald
             if (!isPlanned)
             {
-                // Jeżeli PaymentKind jest niepewny (brak kolumny albo 0), spróbujmy go ustalić z Source.
-                // To jest krytyczne, bo inaczej kasowanie przychodu z banku próbuje zdjąć gotówkę z portfela.
-                if (!hasPk || pk == 0)
+                // ───────────── normalizacja / walidacja pk/pr ─────────────
+                bool pkDefined = Enum.IsDefined(typeof(PaymentKind), pk);
+                bool pkIsNoneOrInvalid = (!hasPk) || (!pkDefined) || pk == 0;
+
+                bool pkNeedsRef = pk == (int)PaymentKind.BankAccount || pk == (int)PaymentKind.Envelope;
+                bool pkRefMismatch = pkNeedsRef && !pr.HasValue;
+
+                // Source bywa: "Wolna gotówka", "Odłożona gotówka", "Konto: mBank", "Konto bankowe: mBank", "Koperta: Jedzenie"
+                string s = (source ?? "").Trim();
+
+                bool sourceHintsBank =
+                    !string.IsNullOrWhiteSpace(s) &&
+                    (s.StartsWith("Konto:", StringComparison.OrdinalIgnoreCase) ||
+                     s.StartsWith("Konto bankowe:", StringComparison.OrdinalIgnoreCase) ||
+                     s.StartsWith("Konto", StringComparison.OrdinalIgnoreCase)); // ostatnie jako broad-match
+
+                bool sourceHintsEnv =
+                    !string.IsNullOrWhiteSpace(s) &&
+                    (s.StartsWith("Koperta:", StringComparison.OrdinalIgnoreCase) ||
+                     s.StartsWith("Koperta", StringComparison.OrdinalIgnoreCase));
+
+                bool pkLooksCashButSourceIsSpecific =
+                    (pk == 0 ||
+                     pk == (int)PaymentKind.FreeCash ||
+                     pk == (int)PaymentKind.SavedCash) && (sourceHintsBank || sourceHintsEnv);
+
+                bool needInference = pkIsNoneOrInvalid || pkRefMismatch || pkLooksCashButSourceIsSpecific;
+
+                if (needInference)
                 {
-                    InferIncomeDestinationFromSource(c, tx, userId, source, out pk, out pr);
+                    // 2) Najpierw próbuj z Source (to jest najbardziej wiarygodne),
+                    //    a jak się nie da, to fallbackuj po PaymentRefId w tabelach.
+                    try
+                    {
+                        InferIncomeDestinationFromSource(c, tx, userId, s, out pk, out pr);
+                    }
+                    catch
+                    {
+                        // fallback: jeśli pr istnieje, sprawdź czy to bank albo koperta
+                        if (pr.HasValue)
+                        {
+                            // bank?
+                            if (DatabaseService.TableExists(c, "BankAccounts") &&
+                                DatabaseService.ColumnExists(c, "BankAccounts", "Id"))
+                            {
+                                using var chk = c.CreateCommand();
+                                chk.Transaction = tx;
+                                chk.CommandText = "SELECT 1 FROM BankAccounts WHERE UserId=@u AND Id=@id LIMIT 1;";
+                                chk.Parameters.AddWithValue("@u", userId);
+                                chk.Parameters.AddWithValue("@id", pr.Value);
+                                var exists = chk.ExecuteScalar();
+                                if (exists != null)
+                                {
+                                    pk = (int)PaymentKind.BankAccount;
+                                }
+                            }
+
+                            // koperta? (tylko jeśli nie ustawiliśmy banku)
+                            if (pk != (int)PaymentKind.BankAccount &&
+                                DatabaseService.TableExists(c, "Envelopes") &&
+                                DatabaseService.ColumnExists(c, "Envelopes", "Id"))
+                            {
+                                using var chk = c.CreateCommand();
+                                chk.Transaction = tx;
+                                chk.CommandText = "SELECT 1 FROM Envelopes WHERE UserId=@u AND Id=@id LIMIT 1;";
+                                chk.Parameters.AddWithValue("@u", userId);
+                                chk.Parameters.AddWithValue("@id", pr.Value);
+                                var exists = chk.ExecuteScalar();
+                                if (exists != null)
+                                {
+                                    pk = (int)PaymentKind.Envelope;
+                                }
+                            }
+
+                            // jeśli nadal nie wiemy co to jest — traktuj jak wolną gotówkę i wyczyść RefId
+                            if (pk != (int)PaymentKind.BankAccount && pk != (int)PaymentKind.Envelope)
+                            {
+                                pk = (int)PaymentKind.FreeCash;
+                                pr = null;
+                            }
+                        }
+                        else
+                        {
+                            // brak RefId -> nie ma sensu zgadywać bank/koperty
+                            // Source nie zadziałał => safest: wolna gotówka
+                            pk = (int)PaymentKind.FreeCash;
+                            pr = null;
+                        }
+                    }
+                }
+
+                // 3) Ostateczna walidacja (żeby nie wywalić księgowania)
+                if (pk == (int)PaymentKind.BankAccount || pk == (int)PaymentKind.Envelope)
+                {
+                    if (!pr.HasValue)
+                    {
+                        // tu już NIE próbujemy “wymyślać” — jeśli brak RefId,
+                        // to cofnięcie zrobiłoby syf. Najbezpieczniej przerwać.
+                        throw new InvalidOperationException(
+                            $"Nie można odwrócić przychodu {id}: PaymentKind wymaga PaymentRefId, ale RefId jest NULL (Source='{source}').");
+                    }
                 }
 
                 RevertIncomeEffect(c, tx, userId, amount, pk, pr);
             }
 
+            // 4) usuń rekord
             using var del = c.CreateCommand();
             del.Transaction = tx;
             del.CommandText = "DELETE FROM Incomes WHERE Id=@id;";
@@ -936,6 +1332,9 @@ LIMIT 1;";
 
             return true;
         }
+
+
+
 
         private static void InferIncomeDestinationFromSource(
             SqliteConnection c,
@@ -1057,6 +1456,23 @@ LIMIT 1;";
         }
 
 
+        private static void EnsureRow(SqliteConnection con, SqliteTransaction tx, string table, int userId)
+        {
+            // Minimalna wersja: zakłada kolumny UserId, Amount, a UpdatedAt może istnieć lub nie
+            bool hasUpdatedAt = DatabaseService.ColumnExists(con, table, "UpdatedAt");
+
+            using var cmd = con.CreateCommand();
+            cmd.Transaction = tx;
+
+            cmd.CommandText = hasUpdatedAt
+                ? $@"INSERT OR IGNORE INTO {table}(UserId, Amount, UpdatedAt) VALUES(@u, 0, CURRENT_TIMESTAMP);"
+                : $@"INSERT OR IGNORE INTO {table}(UserId, Amount) VALUES(@u, 0);";
+
+            cmd.Parameters.AddWithValue("@u", userId);
+            cmd.ExecuteNonQuery();
+        }
+
+        // Minimalna wersja: zakłada kolumny UserId, Amount, a UpdatedAt może istnieć lub nie
         /// <summary>
         /// Publiczne API usuwania przychodu.
         /// Spójne z resztą LedgerService: transakcja + odwrócenie efektu tylko jeśli nie-planned.

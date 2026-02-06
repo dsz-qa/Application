@@ -3010,7 +3010,108 @@ WHERE UserId=@u");
             return dt;
         }
 
+        public static int InsertTransfer(
+            int userId,
+            DateTime date,
+            decimal amount,
+            int fromPaymentKind,
+            int? fromPaymentRefId,
+            int toPaymentKind,
+            int? toPaymentRefId,
+            string? description,
+            bool isPlanned)
+        {
+            if (userId <= 0) throw new ArgumentException("Brak userId.", nameof(userId));
+            if (amount <= 0m) throw new ArgumentException("Kwota musi byæ dodatnia.", nameof(amount));
+
+            using var con = GetConnection();
+            EnsureTables();
+
+            using var tx = con.BeginTransaction();
+
+            // 1) zapis w Transfers
+            int transferId = InsertTransferRow(
+                con, tx,
+                userId, amount, date, description,
+                fromPaymentKind, fromPaymentRefId,
+                toPaymentKind, toPaymentRefId,
+                isPlanned
+            );
+
+            // 2) ksiêgowanie tylko dla nie-planned
+            if (!isPlanned)
+            {
+                LedgerService.ApplyTransferEffect(
+                    con, tx,
+                    userId, amount,
+                    fromPaymentKind, fromPaymentRefId,
+                    toPaymentKind, toPaymentRefId
+                );
+            }
+
+            tx.Commit();
+            NotifyDataChanged();
+            return transferId;
+        }
+
+
+        private static int InsertTransferRow(
+            SqliteConnection con, SqliteTransaction tx,
+            int userId, decimal amount, DateTime date, string? description,
+            int fromPaymentKind, int? fromPaymentRefId,
+            int toPaymentKind, int? toPaymentRefId,
+            bool isPlanned)
+        {
+            // Upewnij siê, ¿e masz tabelê Transfers (jeœli ju¿ masz w SchemaService – OK; jeœli nie, dodaj tam)
+            using (var cmd0 = con.CreateCommand())
+            {
+                cmd0.Transaction = tx;
+                cmd0.CommandText = @"
+CREATE TABLE IF NOT EXISTS Transfers(
+    Id INTEGER PRIMARY KEY AUTOINCREMENT,
+    UserId INTEGER NOT NULL,
+    Amount NUMERIC NOT NULL,
+    Date TEXT NOT NULL,
+    Description TEXT NULL,
+    FromPaymentKind INTEGER NOT NULL,
+    FromPaymentRefId INTEGER NULL,
+    ToPaymentKind INTEGER NOT NULL,
+    ToPaymentRefId INTEGER NULL,
+    IsPlanned INTEGER NOT NULL DEFAULT 0
+);";
+                cmd0.ExecuteNonQuery();
+            }
+
+            using var cmd = con.CreateCommand();
+            cmd.Transaction = tx;
+            cmd.CommandText = @"
+INSERT INTO Transfers(UserId, Amount, Date, Description,
+                      FromPaymentKind, FromPaymentRefId,
+                      ToPaymentKind, ToPaymentRefId, IsPlanned)
+VALUES(@u,@a,@d,@desc,@fpk,@fpr,@tpk,@tpr,@p);
+SELECT last_insert_rowid();";
+
+            cmd.Parameters.AddWithValue("@u", userId);
+            cmd.Parameters.AddWithValue("@a", amount);
+            cmd.Parameters.AddWithValue("@d", date.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture));
+            cmd.Parameters.AddWithValue("@desc", (object?)description ?? DBNull.Value);
+
+            cmd.Parameters.AddWithValue("@fpk", fromPaymentKind);
+            cmd.Parameters.AddWithValue("@fpr", (object?)fromPaymentRefId ?? DBNull.Value);
+
+            cmd.Parameters.AddWithValue("@tpk", toPaymentKind);
+            cmd.Parameters.AddWithValue("@tpr", (object?)toPaymentRefId ?? DBNull.Value);
+
+            cmd.Parameters.AddWithValue("@p", isPlanned ? 1 : 0);
+
+            var obj = cmd.ExecuteScalar();
+            return Convert.ToInt32(obj);
+        }
+
+
         internal static void InsertTransferRaw_NoLedger(
+            SqliteConnection con,
+            SqliteTransaction tx,
             int userId,
             DateTime date,
             decimal amount,
@@ -3018,11 +3119,11 @@ WHERE UserId=@u");
             int? fromRefId,
             string toKind,
             int? toRefId,
-            string? description = null,
-            bool isPlanned = false)
+            string? description,
+            bool isPlanned)
         {
-            using var con = OpenAndEnsureSchema();
             using var cmd = con.CreateCommand();
+            cmd.Transaction = tx;
             cmd.CommandText = @"
 INSERT INTO Transfers(UserId, Date, Amount, Description, FromKind, FromRefId, ToKind, ToRefId, IsPlanned)
 VALUES (@u,@d,@a,@desc,@fk,@fr,@tk,@tr,@p);";
@@ -3035,10 +3136,9 @@ VALUES (@u,@d,@a,@desc,@fk,@fr,@tk,@tr,@p);";
             cmd.Parameters.AddWithValue("@tk", toKind);
             cmd.Parameters.AddWithValue("@tr", (object?)toRefId ?? DBNull.Value);
             cmd.Parameters.AddWithValue("@p", isPlanned ? 1 : 0);
-
             cmd.ExecuteNonQuery();
-            RaiseDataChanged();
         }
+
 
         // =========================================================
         // ========================= INCOMES ========================
@@ -3266,11 +3366,41 @@ SELECT last_insert_rowid();";
         }
 
 
-        public static void DeleteIncome(int id)
+        public static void DeleteIncome(int id, int userId)
         {
-            if (id <= 0) return;
-            TransactionsFacadeService.DeleteTransaction(id);
+            if (id <= 0 || userId <= 0) return;
+
+            using var con = OpenAndEnsureSchema();
+            using var tx = con.BeginTransaction();
+
+            var old = ReadIncomeLedgerInfo(con, tx, id);
+            if (old == null) return;
+
+            // cofamy wp³yw TYLKO jeœli by³ zrealizowany
+            if (!old.IsPlanned)
+            {
+                LedgerService.RevertIncomeEffect(
+                    con, tx,
+                    old.UserId,
+                    Math.Abs(old.Amount),
+                    old.PaymentKind,
+                    old.PaymentRefId
+                );
+            }
+
+            using (var cmd = con.CreateCommand())
+            {
+                cmd.Transaction = tx;
+                cmd.CommandText = "DELETE FROM Incomes WHERE Id=@id AND UserId=@u;";
+                cmd.Parameters.AddWithValue("@id", id);
+                cmd.Parameters.AddWithValue("@u", userId);
+                cmd.ExecuteNonQuery();
+            }
+
+            tx.Commit();
+            RaiseDataChanged();
         }
+
 
         // =========================================================
         // ====================== CHART DTOs ========================
