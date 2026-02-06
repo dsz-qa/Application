@@ -423,7 +423,8 @@ namespace Finly.ViewModels
             try
             {
                 foreach (var env in DatabaseService.GetEnvelopesNames(UserId) ?? new List<string>())
-                    Accounts.Add(new AccountFilterItem { Name = $"Koperta: {env}", IsSelected = true });
+                    Accounts.Add(new AccountFilterItem { Name = NormalizeEnvelopeLabel(env), IsSelected = true });
+
             }
             catch { }
 
@@ -576,6 +577,24 @@ namespace Finly.ViewModels
 
         // ------------------ WYŚWIETLANIE KONT ------------------
 
+        private static string NormalizeEnvelopeLabel(string envName)
+        {
+            var s = (envName ?? string.Empty).Trim();
+            if (string.IsNullOrWhiteSpace(s)) return "Koperta";
+
+            // jeśli już jest "Koperta:" -> zostaw
+            if (s.StartsWith("Koperta:", StringComparison.CurrentCultureIgnoreCase))
+                return "Koperta: " + s.Substring("Koperta:".Length).Trim();
+
+            // jeśli user nazwał kopertę "Koperta Beata" -> zrób z tego "Koperta: Beata"
+            if (s.StartsWith("Koperta ", StringComparison.CurrentCultureIgnoreCase))
+                return "Koperta: " + s.Substring("Koperta ".Length).Trim();
+
+            // normalnie: "Beata" -> "Koperta: Beata"
+            return "Koperta: " + s;
+        }
+
+
         private string ResolvePaymentDisplay(int paymentKind, int? paymentRefId, int? fallbackAccountId = null)
         {
             // 0 FreeCash, 1 SavedCash, 2 BankAccount, 3 Envelope
@@ -588,7 +607,8 @@ namespace Finly.ViewModels
                     return acc;
 
                 if (_envelopeNameById.TryGetValue(paymentRefId.Value, out var env))
-                    return $"Koperta: {env}";
+                    return NormalizeEnvelopeLabel(env);
+
             }
 
             if (paymentKind == 2)
@@ -605,7 +625,8 @@ namespace Finly.ViewModels
             if (paymentKind == 3)
             {
                 if (paymentRefId.HasValue && _envelopeNameById.TryGetValue(paymentRefId.Value, out var env2))
-                    return $"Koperta: {env2}";
+                    return NormalizeEnvelopeLabel(env2);
+
 
                 return "Koperta";
             }
@@ -620,7 +641,10 @@ namespace Finly.ViewModels
             return k switch
             {
                 "bank" => (id.HasValue && _accountNameById.TryGetValue(id.Value, out var acc)) ? acc : "Konto bankowe",
-                "envelope" => (id.HasValue && _envelopeNameById.TryGetValue(id.Value, out var env)) ? $"Koperta: {env}" : "Koperta",
+                "envelope" => (id.HasValue && _envelopeNameById.TryGetValue(id.Value, out var env))
+                ? NormalizeEnvelopeLabel(env)
+                : "Koperta",
+
                 "freecash" => "Wolna gotówka",
                 "cash" => "Wolna gotówka",
                 "savedcash" => "Odłożona gotówka",
@@ -793,27 +817,48 @@ namespace Finly.ViewModels
                 r["IsPlanned"] != DBNull.Value &&
                 Convert.ToInt32(r["IsPlanned"]) == 1;
 
-            string fromKind = r.Table.Columns.Contains("FromKind") ? (r["FromKind"]?.ToString() ?? "") : "";
-            string toKind = r.Table.Columns.Contains("ToKind") ? (r["ToKind"]?.ToString() ?? "") : "";
+            // 1) NEW schema (preferred): Effective*PaymentKind/RefId
+            bool hasEff =
+                r.Table.Columns.Contains("EffectiveFromPaymentKind") &&
+                r.Table.Columns.Contains("EffectiveToPaymentKind");
 
-            int? fromRef = null;
-            try
+            string fromName;
+            string toName;
+
+            if (hasEff && r["EffectiveFromPaymentKind"] != DBNull.Value && r["EffectiveToPaymentKind"] != DBNull.Value)
             {
-                if (r.Table.Columns.Contains("FromRefId") && r["FromRefId"] != DBNull.Value)
-                    fromRef = Convert.ToInt32(r["FromRefId"]);
-            }
-            catch { }
+                int fromPk = Convert.ToInt32(r["EffectiveFromPaymentKind"]);
+                int toPk = Convert.ToInt32(r["EffectiveToPaymentKind"]);
 
-            int? toRef = null;
-            try
+                int? fromPr = r.Table.Columns.Contains("EffectiveFromPaymentRefId") && r["EffectiveFromPaymentRefId"] != DBNull.Value
+                    ? (int?)Convert.ToInt32(r["EffectiveFromPaymentRefId"])
+                    : null;
+
+                int? toPr = r.Table.Columns.Contains("EffectiveToPaymentRefId") && r["EffectiveToPaymentRefId"] != DBNull.Value
+                    ? (int?)Convert.ToInt32(r["EffectiveToPaymentRefId"])
+                    : null;
+
+                // ResolvePaymentDisplay masz już gotowe (0/1/2/3)
+                fromName = ResolvePaymentDisplay(fromPk, fromPr);
+                toName = ResolvePaymentDisplay(toPk, toPr);
+            }
+            else
             {
-                if (r.Table.Columns.Contains("ToRefId") && r["ToRefId"] != DBNull.Value)
-                    toRef = Convert.ToInt32(r["ToRefId"]);
-            }
-            catch { }
+                // 2) LEGACY fallback: FromKind/ToKind + RefId
+                string fromKind = r.Table.Columns.Contains("FromKind") ? (r["FromKind"]?.ToString() ?? "") : "";
+                string toKind = r.Table.Columns.Contains("ToKind") ? (r["ToKind"]?.ToString() ?? "") : "";
 
-            string fromName = ResolveAccountDisplay(fromKind, fromRef);
-            string toName = ResolveAccountDisplay(toKind, toRef);
+                int? fromRef = (r.Table.Columns.Contains("FromRefId") && r["FromRefId"] != DBNull.Value)
+                    ? (int?)Convert.ToInt32(r["FromRefId"])
+                    : null;
+
+                int? toRef = (r.Table.Columns.Contains("ToRefId") && r["ToRefId"] != DBNull.Value)
+                    ? (int?)Convert.ToInt32(r["ToRefId"])
+                    : null;
+
+                fromName = ResolveAccountDisplay(fromKind, fromRef);
+                toName = ResolveAccountDisplay(toKind, toRef);
+            }
 
             AllTransactions.Add(new TransactionCardVm
             {
@@ -835,6 +880,7 @@ namespace Finly.ViewModels
                 EditDate = date
             });
         }
+
 
 
 
