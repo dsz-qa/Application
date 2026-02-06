@@ -415,11 +415,6 @@ CREATE TABLE IF NOT EXISTS CompanyProfiles(
                 AddColumnIfMissing(con, tx, "Transfers", "FromPaymentRefId", "INTEGER");
                 AddColumnIfMissing(con, tx, "Transfers", "ToPaymentKind", "INTEGER", "NOT NULL DEFAULT 0");
                 AddColumnIfMissing(con, tx, "Transfers", "ToPaymentRefId", "INTEGER");
-                // Transfers (NOWE KOLUMNY - wymagane przez UI/DB)
-                AddColumnIfMissing(con, tx, "Transfers", "FromPaymentKind", "INTEGER", "NOT NULL DEFAULT 0");
-                AddColumnIfMissing(con, tx, "Transfers", "FromPaymentRefId", "INTEGER");
-                AddColumnIfMissing(con, tx, "Transfers", "ToPaymentKind", "INTEGER", "NOT NULL DEFAULT 0");
-                AddColumnIfMissing(con, tx, "Transfers", "ToPaymentRefId", "INTEGER");
 
                 // Transfers (legacy - jeśli stara baza nie miała tych kolumn)
                 AddColumnIfMissing(con, tx, "Transfers", "FromKind", "TEXT");
@@ -731,16 +726,24 @@ WHERE ""{column}"" IS NULL;";
 
         private static void Ensure_BankAccounts_ConnectionId_Nullable_And_FK(SqliteConnection c)
         {
-            // Jeśli ConnectionId już jest NULLABLE – OK
-            if (!ColumnIsNotNull(c, "BankAccounts", "ConnectionId")) return;
+            if (c == null) throw new ArgumentNullException(nameof(c));
 
-            using var t = c.BeginTransaction();
+            // Jeśli ConnectionId już jest NULLABLE – OK (albo tabela/kolumna nie istnieje -> nic nie robimy)
+            // Uwaga: ColumnIsNotNull zwróci false, gdy nie znajdzie kolumny – i wtedy też wyjdziemy.
+            if (!ColumnIsNotNull(c, "BankAccounts", "ConnectionId"))
+                return;
+
+            using var tx = c.BeginTransaction();
             using var cmd = c.CreateCommand();
-            cmd.Transaction = t;
+            cmd.Transaction = tx;
 
+            // SQLite: przebudowy tabel z FK najbezpieczniej robić z foreign_keys=OFF w tej samej transakcji
             cmd.CommandText = "PRAGMA foreign_keys=OFF;";
             cmd.ExecuteNonQuery();
 
+            // (Opcjonalnie) WAL/busy_timeout masz ustawione wcześniej w Ensure(), więc tu nie musisz.
+
+            // 1) Tworzymy nową tabelę z docelowym ConnectionId NULL + FK ON DELETE SET NULL
             cmd.CommandText = @"
 CREATE TABLE IF NOT EXISTS BankAccounts_new(
     Id           INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -758,26 +761,42 @@ CREATE TABLE IF NOT EXISTS BankAccounts_new(
 );";
             cmd.ExecuteNonQuery();
 
+            // 2) Przenosimy dane (COALESCE dla SortOrder – gdyby stare rekordy miały NULL)
             cmd.CommandText = @"
 INSERT INTO BankAccounts_new (Id, ConnectionId, UserId, BankName, AccountName, Iban, Currency, Balance, SortOrder, LastSync)
-SELECT Id, ConnectionId, UserId,
+SELECT Id,
+       ConnectionId,
+       UserId,
        BankName,
-       AccountName, Iban, Currency, Balance,
+       AccountName,
+       Iban,
+       Currency,
+       Balance,
        COALESCE(SortOrder, 0),
        LastSync
 FROM BankAccounts;";
             cmd.ExecuteNonQuery();
 
+            // 3) Podmieniamy tabelę
             cmd.CommandText = "DROP TABLE BankAccounts;";
             cmd.ExecuteNonQuery();
 
             cmd.CommandText = "ALTER TABLE BankAccounts_new RENAME TO BankAccounts;";
             cmd.ExecuteNonQuery();
 
+            // 4) Włączamy FK z powrotem
             cmd.CommandText = "PRAGMA foreign_keys=ON;";
             cmd.ExecuteNonQuery();
 
-            t.Commit();
+            // (Opcjonalnie, ale polecam w dev) szybka walidacja spójności FK po rebuildzie
+            // Jeśli chcesz: odkomentuj i ewentualnie loguj wyniki.
+            // cmd.CommandText = "PRAGMA foreign_key_check;";
+            // using var r = cmd.ExecuteReader();
+            // if (r.Read())
+            //     throw new InvalidOperationException("FK check failed after BankAccounts rebuild.");
+
+            tx.Commit();
         }
+
     }
 }

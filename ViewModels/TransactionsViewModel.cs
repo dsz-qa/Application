@@ -1,5 +1,6 @@
 ﻿using Finly.Models;
 using Finly.Services.Features;
+using Finly.Services.SpecificPages;
 using Microsoft.Data.Sqlite;
 using System;
 using System.Collections.Generic;
@@ -708,6 +709,17 @@ namespace Finly.ViewModels
                     ? (int?)Convert.ToInt32(r["PaymentRefId"])
                     : null;
 
+            // === BUDŻET ===
+            int? budgetId =
+                r.Table.Columns.Contains("BudgetId") && r["BudgetId"] != DBNull.Value
+                    ? (int?)Convert.ToInt32(r["BudgetId"])
+                    : null;
+
+            string? budgetName =
+                r.Table.Columns.Contains("BudgetName") && r["BudgetName"] != DBNull.Value
+                    ? r["BudgetName"]?.ToString()
+                    : null;
+
             string fromName = ResolvePaymentDisplay(pk, pr, fallbackAccountId: accountId);
 
             AllTransactions.Add(new TransactionCardVm
@@ -728,11 +740,16 @@ namespace Finly.ViewModels
                 PaymentKind = pk,
                 PaymentRefId = pr,
 
+                // === BUDŻET w VM ===
+                BudgetId = budgetId,
+                BudgetName = budgetName,
+
                 SelectedCategory = string.IsNullOrWhiteSpace(catName) ? "(brak)" : catName,
                 EditDescription = desc,
                 EditDate = date
             });
         }
+
 
         private void AddIncomeRow(DataRow r)
         {
@@ -763,6 +780,17 @@ namespace Finly.ViewModels
             string? sourceTxt =
                 (r.Table.Columns.Contains("Source") && r["Source"] != DBNull.Value)
                     ? (r["Source"]?.ToString())
+                    : null;
+
+            // === BUDŻET ===
+            int? budgetId =
+                r.Table.Columns.Contains("BudgetId") && r["BudgetId"] != DBNull.Value
+                    ? (int?)Convert.ToInt32(r["BudgetId"])
+                    : null;
+
+            string? budgetName =
+                r.Table.Columns.Contains("BudgetName") && r["BudgetName"] != DBNull.Value
+                    ? r["BudgetName"]?.ToString()
                     : null;
 
             string toName = ResolvePaymentDisplay(pk, pr, fallbackAccountId: null);
@@ -799,11 +827,16 @@ namespace Finly.ViewModels
                 PaymentKind = pk,
                 PaymentRefId = pr,
 
+                // === BUDŻET w VM ===
+                BudgetId = budgetId,
+                BudgetName = budgetName,
+
                 SelectedCategory = string.IsNullOrWhiteSpace(catName) ? "Przychód" : catName,
                 EditDescription = desc,
                 EditDate = date
             });
         }
+
 
         private void AddTransferRow(DataRow r)
         {
@@ -1117,49 +1150,143 @@ namespace Finly.ViewModels
 
         public void StartEdit(TransactionCardVm vm)
         {
-            if (vm == null) return;
+            if (vm is null) return;
 
-            // Transferów nie edytujesz inline (tak jak masz w UI)
+            // 1) Nie edytujemy inline transferów i rekordów read-only (np. raty harmonogramu)
             if (vm.Kind == TransactionKind.Transfer) return;
-
-            // Raty (harmonogram) read-only
             if (vm.IsReadOnly) return;
 
-            // Ustaw pola edycyjne z aktualnych wartości
+            // 2) Zamknij ewentualną edycję na innych kartach (jedna edycja na raz)
+            foreach (var t in AllTransactions)
+            {
+                if (!ReferenceEquals(t, vm) && t.IsEditing)
+                {
+                    t.IsEditing = false;
+                    t.IsDeleteConfirmationVisible = false;
+                }
+            }
+
+            // 3) Ukryj potwierdzenie usuwania na edytowanej karcie
+            vm.IsDeleteConfirmationVisible = false;
+
+            // 4) Wypełnij pola edycji (opis/kategoria/data)
             vm.EditDescription = vm.Description ?? string.Empty;
-            vm.SelectedCategory = string.IsNullOrWhiteSpace(vm.CategoryName) ? "(brak)" : vm.CategoryName;
 
-            // EditDate: próbuj z DateDisplay
-            if (TryParseDateDisplay(vm.DateDisplay, out var d))
-                vm.EditDate = d;
+            var cat = (vm.CategoryName ?? string.Empty).Trim();
+            if (string.IsNullOrWhiteSpace(cat))
+                cat = "(brak)";
+
+            // Income: jeśli UI traktuje brak kategorii jako "Przychód"
+            if (vm.Kind == TransactionKind.Income &&
+                cat.Equals("(brak)", StringComparison.CurrentCultureIgnoreCase))
+            {
+                cat = "Przychód";
+            }
+
+            vm.SelectedCategory = cat;
+
+            // Data do edycji: z DateDisplay -> fallback Today
+            DateTime editDate;
+            if (TryParseDateDisplay(vm.DateDisplay, out var parsed))
+                editDate = parsed.Date;
             else
-                vm.EditDate = DateTime.Today;
+                editDate = DateTime.Today;
 
+            vm.EditDate = editDate;
+
+            // 5) Budżety pod datę:
+            //    - czyścimy i ładujemy na świeżo
+            //    - ustawiamy SelectedBudget zgodnie z BudgetId
+            //    UWAGA: robimy to PRZED IsEditing = true, żeby ComboBox dostał gotowe źródło i selection.
+            try
+            {
+                LoadBudgetsForVmDate(vm, editDate);
+            }
+            catch
+            {
+                // Best-effort: jeśli coś padnie, zostaw przynajmniej "(brak budżetu)"
+                vm.AvailableBudgetsForDate.Clear();
+                var none = new Budget { Id = 0, Name = "(brak budżetu)", StartDate = editDate, EndDate = editDate };
+                vm.AvailableBudgetsForDate.Add(none);
+                vm.SelectedBudget = none;
+            }
+
+            // 6) Start edycji na końcu (po zasileniu danych do edycji)
             vm.IsEditing = true;
         }
+
+
 
         public void SaveEdit(TransactionCardVm vm)
         {
             if (vm == null) return;
-            if (vm.Kind == TransactionKind.Transfer) { vm.IsEditing = false; return; }
-            if (vm.IsReadOnly) { vm.IsEditing = false; return; }
+
+            // Transferów nie zapisujesz inline
+            if (vm.Kind == TransactionKind.Transfer)
+            {
+                vm.IsEditing = false;
+                return;
+            }
+
+            // Read-only (np. raty harmonogramu)
+            if (vm.IsReadOnly)
+            {
+                vm.IsEditing = false;
+                return;
+            }
 
             var newDesc = (vm.EditDescription ?? string.Empty).Trim();
-            var newCat = (vm.SelectedCategory ?? string.Empty).Trim();
-            var newDate = vm.EditDate ?? DateTime.Today;
+            var newCatRaw = (vm.SelectedCategory ?? string.Empty).Trim();
+            var newDate = (vm.EditDate ?? DateTime.Today).Date;
 
-            if (string.IsNullOrWhiteSpace(newCat))
-                newCat = "(brak)";
+            if (string.IsNullOrWhiteSpace(newCatRaw))
+                newCatRaw = "(brak)";
+
+            // Income: "(brak)" traktujemy jak "Przychód" w UI
+            var uiCat = newCatRaw;
+            if (vm.Kind == TransactionKind.Income &&
+                uiCat.Equals("(brak)", StringComparison.CurrentCultureIgnoreCase))
+            {
+                uiCat = "Przychód";
+            }
+
+            // BudgetId z comboboxa (0 => null)
+            int? newBudgetId = null;
+            if (vm.SelectedBudget != null && vm.SelectedBudget.Id > 0)
+                newBudgetId = vm.SelectedBudget.Id;
+
+            // CategoryId do DB:
+            // - Expense: "(brak)" => null/0 (zależnie od schematu)
+            // - Income: "Przychód" lub "(brak)" => null/0 (domyślne)
+            int? newCategoryId = null;
 
             try
             {
-                using var c = DatabaseService.GetConnection();
+                bool treatAsNoCategory =
+                    newCatRaw.Equals("(brak)", StringComparison.CurrentCultureIgnoreCase) ||
+                    (vm.Kind == TransactionKind.Income && uiCat.Equals("Przychód", StringComparison.CurrentCultureIgnoreCase));
+
+                if (!treatAsNoCategory)
+                {
+                    var createdId = DatabaseService.GetOrCreateCategoryId(UserId, newCatRaw);
+                    if (createdId > 0) newCategoryId = createdId;
+                }
+            }
+            catch
+            {
+                newCategoryId = null; // best-effort
+            }
+
+            try
+            {
+                using var con = DatabaseService.GetConnection();
+                con.Open();
                 DatabaseService.EnsureTables();
 
-                bool HasColumn(string table, string col)
+                bool ColumnExists(string table, string col)
                 {
-                    using var cmd = c.CreateCommand();
-                    cmd.CommandText = $"PRAGMA table_info({table});";
+                    using var cmd = con.CreateCommand();
+                    cmd.CommandText = $"PRAGMA table_info('{table}');";
                     using var r = cmd.ExecuteReader();
                     while (r.Read())
                     {
@@ -1170,114 +1297,117 @@ namespace Finly.ViewModels
                     return false;
                 }
 
-                int categoryId = 0;
-                try
-                {
-                    // Twój helper już istnieje w AddExpensePage, ale tu robimy to “centralnie”.
-                    // Jeśli nie masz GetOrCreateCategoryId - to dodaj albo zamień na GetCategoryId.
-                    categoryId = DatabaseService.GetOrCreateCategoryId(UserId, newCat);
-                }
-                catch
-                {
-                    categoryId = 0;
-                }
-
                 if (vm.Kind == TransactionKind.Expense)
                 {
-                    var hasCatId = HasColumn("Expenses", "CategoryId");
-                    var hasCatName = HasColumn("Expenses", "CategoryName");
+                    var hasCatId = ColumnExists("Expenses", "CategoryId");
+                    var hasCatName = ColumnExists("Expenses", "CategoryName");
+                    var hasBudgetId = ColumnExists("Expenses", "BudgetId");
 
-                    using var cmd = c.CreateCommand();
-                    if (hasCatId)
-                    {
-                        cmd.CommandText = @"
-UPDATE Expenses
-SET Date = @d,
-    Description = @desc,
-    CategoryId = @catId
-WHERE Id = @id;";
-                        cmd.Parameters.AddWithValue("@catId", categoryId);
-                    }
-                    else if (hasCatName)
-                    {
-                        cmd.CommandText = @"
-UPDATE Expenses
-SET Date = @d,
-    Description = @desc,
-    CategoryName = @cat
-WHERE Id = @id;";
-                        cmd.Parameters.AddWithValue("@cat", newCat);
-                    }
-                    else
-                    {
-                        cmd.CommandText = @"
-UPDATE Expenses
-SET Date = @d,
-    Description = @desc
-WHERE Id = @id;";
-                    }
+                    using var cmd = con.CreateCommand();
+
+                    // budujemy UPDATE dynamicznie pod schemat
+                    var sets = new List<string>
+            {
+                "Date = @d",
+                "Description = @desc"
+            };
+
+                    if (hasCatId) sets.Add("CategoryId = @catId");
+                    else if (hasCatName) sets.Add("CategoryName = @catName");
+
+                    if (hasBudgetId) sets.Add("BudgetId = @bid");
+
+                    cmd.CommandText = $"UPDATE Expenses SET {string.Join(", ", sets)} WHERE Id = @id;";
 
                     cmd.Parameters.AddWithValue("@d", newDate.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture));
                     cmd.Parameters.AddWithValue("@desc", newDesc);
                     cmd.Parameters.AddWithValue("@id", vm.Id);
+
+                    if (hasCatId)
+                        cmd.Parameters.AddWithValue("@catId", newCategoryId.HasValue ? (object)newCategoryId.Value : DBNull.Value);
+                    else if (hasCatName)
+                        cmd.Parameters.AddWithValue("@catName", uiCat);
+
+                    if (hasBudgetId)
+                        cmd.Parameters.AddWithValue("@bid", newBudgetId.HasValue ? (object)newBudgetId.Value : DBNull.Value);
+
                     cmd.ExecuteNonQuery();
                 }
                 else if (vm.Kind == TransactionKind.Income)
                 {
-                    var hasCatId = HasColumn("Incomes", "CategoryId");
-                    var hasCatName = HasColumn("Incomes", "CategoryName");
+                    var hasCatId = ColumnExists("Incomes", "CategoryId");
+                    var hasCatName = ColumnExists("Incomes", "CategoryName");
+                    var hasBudgetId = ColumnExists("Incomes", "BudgetId");
 
-                    using var cmd = c.CreateCommand();
-                    if (hasCatId)
-                    {
-                        cmd.CommandText = @"
-UPDATE Incomes
-SET Date = @d,
-    Description = @desc,
-    CategoryId = @catId
-WHERE Id = @id;";
-                        cmd.Parameters.AddWithValue("@catId", categoryId == 0 ? (object)DBNull.Value : categoryId);
-                    }
-                    else if (hasCatName)
-                    {
-                        cmd.CommandText = @"
-UPDATE Incomes
-SET Date = @d,
-    Description = @desc,
-    CategoryName = @cat
-WHERE Id = @id;";
-                        cmd.Parameters.AddWithValue("@cat", newCat);
-                    }
-                    else
-                    {
-                        cmd.CommandText = @"
-UPDATE Incomes
-SET Date = @d,
-    Description = @desc
-WHERE Id = @id;";
-                    }
+                    using var cmd = con.CreateCommand();
+
+                    var sets = new List<string>
+            {
+                "Date = @d",
+                "Description = @desc"
+            };
+
+                    if (hasCatId) sets.Add("CategoryId = @catId");
+                    else if (hasCatName) sets.Add("CategoryName = @catName");
+
+                    if (hasBudgetId) sets.Add("BudgetId = @bid");
+
+                    cmd.CommandText = $"UPDATE Incomes SET {string.Join(", ", sets)} WHERE Id = @id;";
 
                     cmd.Parameters.AddWithValue("@d", newDate.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture));
                     cmd.Parameters.AddWithValue("@desc", newDesc);
                     cmd.Parameters.AddWithValue("@id", vm.Id);
+
+                    if (hasCatId)
+                        cmd.Parameters.AddWithValue("@catId", newCategoryId.HasValue ? (object)newCategoryId.Value : DBNull.Value);
+                    else if (hasCatName)
+                        cmd.Parameters.AddWithValue("@catName", uiCat);
+
+                    if (hasBudgetId)
+                        cmd.Parameters.AddWithValue("@bid", newBudgetId.HasValue ? (object)newBudgetId.Value : DBNull.Value);
+
                     cmd.ExecuteNonQuery();
                 }
             }
             catch
             {
-                // best-effort: nawet jak DB odmówi (schemat/kolumny), UI i tak zaktualizujemy poniżej
+                // best-effort: nawet jak DB odmówi, UI zaktualizujemy poniżej
             }
 
-            // UI update
+            // === UI update ===
             vm.Description = newDesc;
-            vm.CategoryName = (vm.Kind == TransactionKind.Income && newCat == "(brak)") ? "Przychód" : newCat;
+            vm.CategoryName = uiCat;
             vm.DateDisplay = newDate.ToString("dd-MM-yyyy", CultureInfo.CurrentCulture);
+            vm.IsFuture = newDate > DateTime.Today;
+
+            vm.BudgetId = newBudgetId;
+            vm.BudgetName = (newBudgetId.HasValue && vm.SelectedBudget != null && vm.SelectedBudget.Id == newBudgetId.Value)
+                ? vm.SelectedBudget.Name
+                : null;
+
             vm.IsEditing = false;
+            vm.IsDeleteConfirmationVisible = false;
+
+            // Jeśli user wpisał nową kategorię – dołóż do list edycji/filtrów
+            void EnsureInAvailable(string name)
+            {
+                if (string.IsNullOrWhiteSpace(name)) return;
+                if (!AvailableCategories.Any(x => string.Equals(x, name, StringComparison.CurrentCultureIgnoreCase)))
+                    AvailableCategories.Add(name);
+            }
+
+            void EnsureInFilters(string name)
+            {
+                if (string.IsNullOrWhiteSpace(name)) return;
+                if (!Categories.Any(x => string.Equals(x.Name, name, StringComparison.CurrentCultureIgnoreCase)))
+                    Categories.Add(new CategoryFilterItem { Name = name, IsSelected = true });
+            }
+
+            EnsureInAvailable(uiCat);
+            EnsureInFilters(uiCat);
 
             ApplyFilters();
         }
-
-
 
 
         // ------------------ TYPY POMOCNICZE ------------------
@@ -1330,6 +1460,35 @@ WHERE Id = @id;";
             public bool IsSelected { get => _isSelected; set { _isSelected = value; Raise(); } }
         }
 
+        private void LoadBudgetsForVmDate(TransactionCardVm vm, DateTime date)
+        {
+            vm.AvailableBudgetsForDate.Clear();
+
+            // „Brak” na górze (pozwala odpiąć budżet)
+            // UWAGA: SelectedBudget = null też działa, ale wtedy ComboBox bywa nieczytelny.
+            // Jeśli wolisz null — usuń ten element i ustaw SelectedBudget = null.
+            var none = new Budget { Id = 0, Name = "(brak budżetu)", StartDate = date, EndDate = date };
+            vm.AvailableBudgetsForDate.Add(none);
+
+            try
+            {
+                var budgets = BudgetService.GetBudgetsForUser(UserId, from: date.Date, to: date.Date);
+                foreach (var b in budgets)
+                    vm.AvailableBudgetsForDate.Add(b);
+            }
+            catch
+            {
+                // zostaje samo "(brak budżetu)"
+            }
+
+            // Ustaw aktualnie przypisany
+            if (vm.BudgetId.HasValue && vm.BudgetId.Value > 0)
+                vm.SelectedBudget = vm.AvailableBudgetsForDate.FirstOrDefault(x => x.Id == vm.BudgetId.Value) ?? none;
+            else
+                vm.SelectedBudget = none;
+        }
+
+
         public class TransactionCardVm : INotifyPropertyChanged
         {
             public event PropertyChangedEventHandler? PropertyChanged;
@@ -1342,6 +1501,26 @@ WHERE Id = @id;";
             public string CategoryName { get => _categoryName; set { _categoryName = value; Raise(); } }
 
             private string _description = "";
+
+            public ObservableCollection<Budget> AvailableBudgetsForDate { get; } = new();
+
+            private Budget? _selectedBudget;
+            public Budget? SelectedBudget
+            {
+                get => _selectedBudget;
+                set
+                {
+                    if (ReferenceEquals(_selectedBudget, value)) return;
+                    _selectedBudget = value;
+                    Raise(); // zamiast OnPropertyChanged()
+                }
+            }
+
+
+            // Przyda się do read-mode (opcjonalnie)
+            public int? BudgetId { get; set; }
+            public string? BudgetName { get; set; }
+
             public string Description { get => _description; set { _description = value; Raise(); } }
 
             private string _dateDisplay = "";

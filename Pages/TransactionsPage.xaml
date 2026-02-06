@@ -597,17 +597,52 @@
                                                FontWeight="SemiBold"
                                                Foreground="{DynamicResource App.Foreground}"
                                                VerticalAlignment="Center"/>
+                                    <ComboBox Grid.Column="1"
+          Width="260"
+          Height="28"
+          ItemsSource="{Binding AvailableBudgetsForDate}"
+          SelectedItem="{Binding SelectedBudget, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+          DisplayMemberPath="Name"
+          SelectedValuePath="Id"
+          IsEditable="False"
+          MaxDropDownHeight="240"/>
+
+                                </Grid>
+
+                                <!-- BUDŻET -->
+                                <Grid Margin="0,0,0,6">
+                                    <Grid.Style>
+                                        <Style TargetType="Grid">
+                                            <Setter Property="Visibility" Value="Visible"/>
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding IsTransfer}" Value="True">
+                                                    <Setter Property="Visibility" Value="Collapsed"/>
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </Grid.Style>
+
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="110"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+
+                                    <TextBlock Grid.Column="0"
+               Text="Budżet:"
+               FontWeight="SemiBold"
+               Foreground="{DynamicResource App.Foreground}"
+               VerticalAlignment="Center"/>
 
                                     <ComboBox Grid.Column="1"
-                                              Width="260"
-                                              Height="28"
-                                              HorizontalAlignment="Left"
-                                              ItemsSource="{Binding DataContext.AvailableCategories, RelativeSource={RelativeSource AncestorType=UserControl}}"
-                                              SelectedItem="{Binding SelectedCategory, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                                              IsEditable="False"
-                                              MaxDropDownHeight="240"
-                                              HorizontalContentAlignment="Left"/>
+              Width="260"
+              Height="28"
+              HorizontalAlignment="Left"
+              ItemsSource="{Binding AvailableBudgetsForDate}"
+              SelectedItem="{Binding SelectedBudget, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+              IsEditable="False"
+              MaxDropDownHeight="240"/>
                                 </Grid>
+
 
                                 <!-- OPIS -->
                                 <Grid Margin="0,0,0,0">

@@ -110,6 +110,39 @@ namespace Finly.Services.Features
             }
         }
 
+        public static void UpdateExpenseBudget(int userId, int expenseId, int? budgetId)
+        {
+            using var con = GetConnection();
+            using var cmd = con.CreateCommand();
+            cmd.CommandText = @"
+UPDATE Expenses
+SET BudgetId = @bid
+WHERE Id = @id AND UserId = @uid;";
+            cmd.Parameters.AddWithValue("@uid", userId);
+            cmd.Parameters.AddWithValue("@id", expenseId);
+            cmd.Parameters.AddWithValue("@bid", (object?)budgetId ?? DBNull.Value);
+            cmd.ExecuteNonQuery();
+
+            NotifyDataChanged();
+        }
+
+        public static void UpdateIncomeBudget(int userId, int incomeId, int? budgetId)
+        {
+            using var con = GetConnection();
+            using var cmd = con.CreateCommand();
+            cmd.CommandText = @"
+UPDATE Incomes
+SET BudgetId = @bid
+WHERE Id = @id AND UserId = @uid;";
+            cmd.Parameters.AddWithValue("@uid", userId);
+            cmd.Parameters.AddWithValue("@id", incomeId);
+            cmd.Parameters.AddWithValue("@bid", (object?)budgetId ?? DBNull.Value);
+            cmd.ExecuteNonQuery();
+
+            NotifyDataChanged();
+        }
+
+
         private static DateTime ReadDate(object? value)
         {
             if (value == null || value == DBNull.Value) return DateTime.Today;
@@ -2556,6 +2589,8 @@ WHERE Id=@id AND UserId=@u;";
 
             bool hasPk = ColumnExists(con, "Expenses", "PaymentKind");
             bool hasPr = ColumnExists(con, "Expenses", "PaymentRefId");
+            bool hasBudgetId = ColumnExists(con, "Expenses", "BudgetId");
+
 
             var sb = new StringBuilder(@"
 SELECT 
@@ -2569,10 +2604,14 @@ SELECT
     " + (hasAccountId ? "e.AccountId" : "NULL") + @" AS AccountId,
     e.IsPlanned,
     " + (hasPk ? "e.PaymentKind" : "0") + @" AS PaymentKind,
-    " + (hasPr ? "e.PaymentRefId" : "NULL") + @" AS PaymentRefId
+    " + (hasPr ? "e.PaymentRefId" : "NULL") + @" AS PaymentRefId,
+    " + (hasBudgetId ? "e.BudgetId" : "NULL") + @" AS BudgetId,
+    " + (hasBudgetId ? "b.Name" : "NULL") + @" AS BudgetName
 FROM Expenses e
 LEFT JOIN Categories c ON c.Id = e.CategoryId
+" + (hasBudgetId ? "LEFT JOIN Budgets b ON b.Id = e.BudgetId" : "") + @"
 WHERE e.UserId = @uid");
+
 
 
             cmd.Parameters.AddWithValue("@uid", userId);
@@ -3137,15 +3176,21 @@ VALUES (@u,@d,@a,@desc,@fk,@fr,@tk,@tr,@p);";
 
             bool hasPk = ColumnExists(con, "Incomes", "PaymentKind");
             bool hasPr = ColumnExists(con, "Incomes", "PaymentRefId");
+            bool hasBudgetId = ColumnExists(con, "Incomes", "BudgetId");
+
 
             var sb = new StringBuilder(@"
 SELECT i.Id, i.UserId, i.Date, i.Amount, i.Description, i.Source, i.CategoryId,
        c.Name AS CategoryName, i.IsPlanned,
        " + (hasPk ? "i.PaymentKind" : "0") + @" AS PaymentKind,
-       " + (hasPr ? "i.PaymentRefId" : "NULL") + @" AS PaymentRefId
+       " + (hasPr ? "i.PaymentRefId" : "NULL") + @" AS PaymentRefId,
+       " + (hasBudgetId ? "i.BudgetId" : "NULL") + @" AS BudgetId,
+       " + (hasBudgetId ? "b.Name" : "NULL") + @" AS BudgetName
 FROM Incomes i
 LEFT JOIN Categories c ON c.Id = i.CategoryId
+" + (hasBudgetId ? "LEFT JOIN Budgets b ON b.Id = i.BudgetId" : "") + @"
 WHERE i.UserId=@u");
+
 
             cmd.Parameters.AddWithValue("@u", userId);
 
