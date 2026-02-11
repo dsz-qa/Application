@@ -645,15 +645,16 @@
                     <!-- Donuty -->
                     <Border Grid.Row="1" Grid.Column="0" Style="{StaticResource DonutCard}" Margin="0,0,8,0">
                         <StackPanel>
-                            <TextBlock Text="Źródła przychodu — bieżący okres" Style="{StaticResource CardHeader}" Margin="0,0,0,8"/>
-                            <controls:DonutChartControl x:Name="IncomeDonut" Height="320" Title="Źródła przychodu"/>
+                            <TextBlock Text="Przychody wg kategorii — bieżący okres" Style="{StaticResource CardHeader}" Margin="0,0,0,8"/>
+                            <controls:DonutChartControl x:Name="IncomeDonut" Height="320" Title="Przychody według kategorii"/>
+
                         </StackPanel>
                     </Border>
 
                     <Border Grid.Row="1" Grid.Column="1" Style="{StaticResource DonutCard}" Margin="8,0,0,0">
                         <StackPanel>
                             <TextBlock Text="Wydatki wg kategorii — bieżący okres" Style="{StaticResource CardHeader}" Margin="0,0,0,8"/>
-                            <controls:DonutChartControl x:Name="ExpenseDonut" Height="320" Title="Wydatki wg kategorii"/>
+                            <controls:DonutChartControl x:Name="ExpenseDonut" Height="320" Title="Wydatki według kategorii"/>
                         </StackPanel>
                     </Border>
 

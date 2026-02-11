@@ -316,6 +316,24 @@
                                     <StackPanel Orientation="Horizontal">
                                         <Image Width="20" Height="20"
                                                Margin="0,0,8,0"
+                                               Source="pack://application:,,,/Assets/Banks/xtblogo.png"/>
+                                        <TextBlock Text="XTB"/>
+                                    </StackPanel>
+                                </ComboBoxItem>
+
+                                <ComboBoxItem>
+                                    <StackPanel Orientation="Horizontal">
+                                        <Image Width="20" Height="20"
+                                               Margin="0,0,8,0"
+                                               Source="pack://application:,,,/Assets/Banks/edenredlogo.jpg"/>
+                                        <TextBlock Text="Edenred"/>
+                                    </StackPanel>
+                                </ComboBoxItem>
+
+                                <ComboBoxItem>
+                                    <StackPanel Orientation="Horizontal">
+                                        <Image Width="20" Height="20"
+                                               Margin="0,0,8,0"
                                                Source="pack://application:,,,/Assets/Banks/innybank.png"/>
                                         <TextBlock Text="Inny bank"/>
                                     </StackPanel>

@@ -3454,8 +3454,11 @@ SELECT last_insert_rowid();";
 SELECT COALESCE(c.Name,'(brak)') AS Name, IFNULL(SUM(e.Amount),0) AS Total
 FROM Expenses e
 LEFT JOIN Categories c ON c.Id = e.CategoryId
-WHERE e.UserId=@u AND date(e.Date) BETWEEN date(@f) AND date(@t)
+WHERE e.UserId=@u
+  AND (e.IsPlanned = 0 OR e.IsPlanned IS NULL)
+  AND date(e.Date) BETWEEN date(@f) AND date(@t)
 GROUP BY c.Name;";
+
                 cmd.Parameters.AddWithValue("@u", userId);
                 cmd.Parameters.AddWithValue("@f", from.ToString("yyyy-MM-dd"));
                 cmd.Parameters.AddWithValue("@t", to.ToString("yyyy-MM-dd"));
@@ -3472,33 +3475,49 @@ GROUP BY c.Name;";
             return list;
         }
 
-        public static List<CategoryAmountDto> GetIncomeBySourceSafe(int userId, DateTime from, DateTime to)
+        public static List<CategoryAmountDto> GetIncomeByCategorySafe(int userId, DateTime from, DateTime to)
         {
-            var list = new List<CategoryAmountDto>();
             try
             {
-                using var c = OpenAndEnsureSchema();
-                using var cmd = c.CreateCommand();
+                using var con = GetConnection();
+                EnsureTables();
+
+                using var cmd = con.CreateCommand();
                 cmd.CommandText = @"
-SELECT COALESCE(i.Source,'Przychody') AS Name, IFNULL(SUM(i.Amount),0) AS Total
+SELECT
+  COALESCE(c.Name, '(brak kategorii)') AS Name,
+  SUM(ABS(i.Amount)) AS Amount
 FROM Incomes i
-WHERE i.UserId=@u AND date(i.Date) BETWEEN date(@f) AND date(@t)
-GROUP BY i.Source;";
+LEFT JOIN Categories c ON c.Id = i.CategoryId
+WHERE i.UserId=@u
+  AND IFNULL(i.IsPlanned,0)=0
+  AND date(i.Date) >= date(@from)
+  AND date(i.Date) <= date(@to)
+GROUP BY COALESCE(c.Name, '(brak kategorii)')
+ORDER BY Amount DESC;";
+
                 cmd.Parameters.AddWithValue("@u", userId);
-                cmd.Parameters.AddWithValue("@f", from.ToString("yyyy-MM-dd"));
-                cmd.Parameters.AddWithValue("@t", to.ToString("yyyy-MM-dd"));
+                cmd.Parameters.AddWithValue("@from", from.Date.ToString("yyyy-MM-dd"));
+                cmd.Parameters.AddWithValue("@to", to.Date.ToString("yyyy-MM-dd"));
 
                 using var r = cmd.ExecuteReader();
+                var list = new List<CategoryAmountDto>();
                 while (r.Read())
                 {
-                    var name = r.IsDBNull(0) ? "Przychody" : r.GetString(0);
-                    var amount = r.IsDBNull(1) ? 0m : Convert.ToDecimal(r.GetValue(1));
-                    list.Add(new CategoryAmountDto { Name = name, Amount = Math.Abs(amount) });
+                    list.Add(new CategoryAmountDto
+                    {
+                        Name = r["Name"]?.ToString() ?? "(brak kategorii)",
+                        Amount = r["Amount"] == DBNull.Value ? 0m : Convert.ToDecimal(r["Amount"])
+                    });
                 }
+                return list;
             }
-            catch { }
-            return list;
+            catch
+            {
+                return new List<CategoryAmountDto>();
+            }
         }
+
 
 
         // =========================================================

@@ -21,6 +21,7 @@ namespace Finly.Helpers.Converters
             if (bankName.Contains("alior")) return "pack://application:,,,/Assets/Banks/aliorbanklogo.png";
             if (bankName.Contains("millennium") || bankName.Contains("milenium")) return "pack://application:,,,/Assets/Banks/milleniumlogo.png";
             if (bankName.Contains("xtb")) return "pack://application:,,,/Assets/Banks/xtblogo.png";
+            if (bankName.Contains("edenred")) return "pack://application:,,,/Assets/Banks/edenredlogo.jpg";
 
             return "pack://application:,,,/Assets/Banks/innybank.png";
         }

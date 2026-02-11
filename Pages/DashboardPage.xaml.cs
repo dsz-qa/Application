@@ -202,6 +202,39 @@ namespace Finly.Pages
             }
         }
 
+        private (DateTime PrevStart, DateTime PrevEnd) GetPreviousComparableRange(DateTime start, DateTime end)
+        {
+            start = start.Date;
+            end = end.Date;
+            if (start > end) (start, end) = (end, start);
+
+            switch (_mode)
+            {
+                case DateRangeMode.Day:
+                    var y = start.AddDays(-1);
+                    return (y, y);
+
+                case DateRangeMode.Week:
+                    return (start.AddDays(-7), end.AddDays(-7));
+
+                case DateRangeMode.Month:
+                    return (start.AddMonths(-1), end.AddMonths(-1));
+
+                case DateRangeMode.Quarter:
+                    return (start.AddMonths(-3), end.AddMonths(-3));
+
+                case DateRangeMode.Year:
+                    return (start.AddYears(-1), end.AddYears(-1));
+
+                case DateRangeMode.Custom:
+                default:
+                    var len = (end - start).Days + 1;
+                    var prevEnd = start.AddDays(-1);
+                    var prevStart = prevEnd.AddDays(-(len - 1));
+                    return (prevStart, prevEnd);
+            }
+        }
+
         private void PeriodBar_RangeChanged(object? sender, EventArgs e) => ReloadForPeriodBar(sender);
         private void PeriodBar_SearchClicked(object? sender, EventArgs e) => ReloadForPeriodBar(sender);
 
@@ -210,7 +243,8 @@ namespace Finly.Pages
             ApplyPreset(DateRangeMode.Month, DateTime.Today);
 
             _vm.LoadTransactions(_startDate, _endDate);
-            _vm.GenerateInsights(_startDate, _endDate);
+            var (ps, pe) = GetPreviousComparableRange(_startDate, _endDate);
+            _vm.GenerateInsights(_startDate, _endDate, ps, pe);
             _vm.GenerateAlerts(_startDate, _endDate);
             _vm.GenerateForecast(_startDate, _endDate);
             _vm.RefreshCharts(_startDate, _endDate);
@@ -229,7 +263,8 @@ namespace Finly.Pages
                 _endDate = pb.EndDate;
 
                 _vm.LoadTransactions(_startDate, _endDate);
-                _vm.GenerateInsights(_startDate, _endDate);
+                var (ps, pe) = GetPreviousComparableRange(_startDate, _endDate);
+                _vm.GenerateInsights(_startDate, _endDate, ps, pe);
                 _vm.GenerateAlerts(_startDate, _endDate);
                 _vm.GenerateForecast(_startDate, _endDate);
                 _vm.RefreshCharts(_startDate, _endDate);
@@ -264,11 +299,13 @@ namespace Finly.Pages
             if (start > end) (start, end) = (end, start);
 
             var expenses = DatabaseService.GetSpendingByCategorySafe(_uid, start, end);
-            var incomes = DatabaseService.GetIncomeBySourceSafe(_uid, start, end);
+            var incomes = DatabaseService.GetIncomeByCategorySafe(_uid, start, end);
+
 
             // VM data
             _vm.LoadTransactions(start, end);
-            _vm.GenerateInsights(start, end);
+            var (ps, pe) = GetPreviousComparableRange(start, end);
+            _vm.GenerateInsights(start, end, ps, pe);
             _vm.GenerateAlerts(start, end);
             _vm.GenerateForecast(start, end);
             _vm.RefreshCharts(start, end);

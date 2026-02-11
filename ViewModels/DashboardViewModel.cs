@@ -238,8 +238,9 @@ namespace Finly.ViewModels
 
                 if (incSeries.Length == 0)
                 {
-                    var inc = DatabaseService.GetIncomeBySourceSafe(_userId, start, end)
-                              ?? new System.Collections.Generic.List<DatabaseService.CategoryAmountDto>();
+                    var inc = DatabaseService.GetIncomeByCategorySafe(_userId, start, end)
+                              ?? new List<DatabaseService.CategoryAmountDto>();
+
 
                     incSeries = inc.Select((x, i) => new PieSeries<double>
                     {
@@ -567,9 +568,11 @@ SELECT e.Id, e.Date, e.Amount, e.Description, e.CategoryId, e.AccountId, c.Name 
 FROM Expenses e
 LEFT JOIN Categories c ON c.Id = e.CategoryId
 WHERE e.UserId = @u
+  AND IFNULL(e.IsPlanned,0)=0
   AND date(e.Date) >= date(@from)
   AND date(e.Date) <= date(@to)
 ORDER BY date(e.Date) DESC, e.Id DESC;";
+
 
                 cmd.Parameters.AddWithValue("@u", userId);
                 cmd.Parameters.AddWithValue("@from", start.Date.ToString("yyyy-MM-dd"));
@@ -595,9 +598,11 @@ SELECT i.Id, i.Date, i.Amount, i.Description, i.Source, i.CategoryId, c.Name AS 
 FROM Incomes i
 LEFT JOIN Categories c ON c.Id = i.CategoryId
 WHERE i.UserId = @u
+  AND IFNULL(i.IsPlanned,0)=0
   AND date(i.Date) >= date(@from)
   AND date(i.Date) <= date(@to)
 ORDER BY date(i.Date) DESC, i.Id DESC;";
+
 
                 cmd.Parameters.AddWithValue("@u", userId);
                 cmd.Parameters.AddWithValue("@from", start.Date.ToString("yyyy-MM-dd"));
@@ -610,40 +615,63 @@ ORDER BY date(i.Date) DESC, i.Id DESC;";
             return dt;
         }
 
-        public void GenerateInsights(DateTime start, DateTime end)
+        public void GenerateInsights(DateTime start, DateTime end, DateTime prevStart, DateTime prevEnd)
         {
             Insights.Clear();
 
             try
             {
-                // Wydatki w tym i poprzednim okresie – do porównania (to zostaje wydatkami)
-                var thisExp = ToRows(DatabaseService.GetExpenses(_userId, start, end));
-                var prevExp = ToRows(DatabaseService.GetExpenses(_userId, start.AddMonths(-1), end.AddMonths(-1)));
+                // wydatki: ten okres vs poprzedni porównywalny
+                var thisExp = ToRows(LoadExpensesRaw(_userId, start, end));
+                var prevExp = ToRows(LoadExpensesRaw(_userId, prevStart, prevEnd));
+
 
                 decimal sumThis = Sum(thisExp);
                 decimal sumPrev = Sum(prevExp);
 
                 if (sumPrev > 0m)
                 {
-                    var diffPct = (double)((sumPrev - sumThis) / sumPrev * 100m);
+                    var diffPct = (double)((sumThis - sumPrev) / sumPrev * 100m);
                     Insights.Add($"W tym okresie wydajesz {diffPct:+0;-0;0}% względem poprzedniego.");
                 }
                 else
                 {
-                    Insights.Add("Brak danych do porównania z poprzednim okresem.");
+                    if (sumThis > 0m)
+                        Insights.Add("W tym okresie wydajesz więcej niż w poprzednim (w poprzednim brak wydatków).");
+                    else
+                        Insights.Add("Brak danych do porównania z poprzednim okresem.");
                 }
 
-                // Największy wydatek (tylko wydatki)
-                var top = thisExp
-                    .Select(r => Math.Abs(SafeDecimal(r, "Amount")))
-                    .DefaultIfEmpty(0m)
-                    .Max();
 
-                if (top > 0m)
-                    Insights.Add($"Największy wydatek w tym okresie to {top.ToString("N2", CultureInfo.CurrentCulture)} zł.");
+                // największy wydatek: kwota + kategoria + opis
+                DataRow? topRow = null;
+                decimal topAmt = 0m;
 
-                // POPRAWKA: liczba transakcji = przychody + wydatki (nieplanowane)
-                // Używamy raw-ów z VM, bo to jest dokładnie zakres z periodbara.
+                foreach (var r in thisExp)
+                {
+                    var a = Math.Abs(SafeDecimal(r, "Amount"));
+                    if (a > topAmt)
+                    {
+                        topAmt = a;
+                        topRow = r;
+                    }
+                }
+
+                if (topRow != null && topAmt > 0m)
+                {
+                    var cat = SafeString(topRow, "CategoryName");
+                    if (string.IsNullOrWhiteSpace(cat)) cat = "(brak kategorii)";
+
+                    var desc = SafeString(topRow, "Description");
+                    if (string.IsNullOrWhiteSpace(desc)) desc = "(brak opisu)";
+
+                    // lekkie zabezpieczenie długości, żeby UI nie robił ściany tekstu
+                    if (desc.Length > 80) desc = desc.Substring(0, 80) + "…";
+
+                    Insights.Add($"Największy wydatek w tym okresie to {topAmt:N2} zł — {cat} — {desc}.");
+                }
+
+                // liczba transakcji = przychody + wydatki (zakres z periodbara)
                 var expRaw = ToRows(LoadExpensesRaw(_userId, start, end));
                 var incRaw = ToRows(LoadIncomesRaw(_userId, start, end));
 
@@ -655,6 +683,7 @@ ORDER BY date(i.Date) DESC, i.Id DESC;";
                 Insights.Add("Nie udało się wygenerować insightów.");
             }
         }
+
 
 
         public void GenerateAlerts(DateTime start, DateTime end)
@@ -702,7 +731,7 @@ ORDER BY date(i.Date) DESC, i.Id DESC;";
         {
             try
             {
-                var rows = ToRows(DatabaseService.GetExpenses(_userId, start, end));
+                var rows = ToRows(LoadExpensesRaw(_userId, start, end));
                 var days = Math.Max(1, (end.Date - start.Date).Days + 1);
                 var spent = Sum(rows);
                 var avgPerDay = spent / days;

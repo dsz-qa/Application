@@ -674,7 +674,8 @@ namespace Finly.Pages
                 return "pack://application:,,,/Assets/Banks/milleniumlogo.png";
             if (text.Contains("xtb"))
                 return "pack://application:,,,/Assets/Banks/xtblogo.png";
-
+            if (text.Contains("edenred"))
+                return "pack://application:,,,/Assets/Banks/edenredlogo.jpg";
 
             return "pack://application:,,,/Assets/Banks/innybank.png";
         }
