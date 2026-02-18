@@ -1395,9 +1395,10 @@ namespace Finly.Pages
                 userId: _userId,
                 loanId: loanId,
                 scheduleId: scheduleId,
-                newRows: dbRows,
-                today: DateTime.Today
+                rows: dbRows,
+                from: DateTime.Today
             );
+
 
 
 

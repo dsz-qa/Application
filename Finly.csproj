@@ -21,6 +21,7 @@
 	<ItemGroup>
 	  <None Remove="Assets\Banks\aliorbanklogo.png" />
 	  <None Remove="Assets\Banks\creditagricolelogo.png" />
+	  <None Remove="Assets\Banks\edenredlogo.jpg" />
 	  <None Remove="Assets\Banks\inglogo.png" />
 	  <None Remove="Assets\Banks\innybank.png" />
 	  <None Remove="Assets\Banks\mbanklogo.jpg" />
@@ -64,6 +65,7 @@
 	<ItemGroup>
 	  <Resource Include="Assets\Banks\aliorbanklogo.png" />
 	  <Resource Include="Assets\Banks\creditagricolelogo.png" />
+	  <Resource Include="Assets\Banks\edenredlogo.jpg" />
 	  <Resource Include="Assets\Banks\inglogo.png" />
 	  <Resource Include="Assets\Banks\innybank.png" />
 	  <Resource Include="Assets\Banks\mbanklogo.jpg" />

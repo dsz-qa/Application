@@ -1513,6 +1513,90 @@ LIMIT 1;";
             tx.Commit(); // nic do usunięcia
         }
 
+        public static void RealizePlannedExpense(int userId, int expenseId, DateTime realizedDate)
+        {
+            if (userId <= 0 || expenseId <= 0) return;
+
+            using var c = DatabaseService.GetConnection();
+            DatabaseService.EnsureTables();
+            using var tx = c.BeginTransaction();
+
+            // 1) Pobierz dane wydatku (minimalny zestaw pól)
+            using var get = c.CreateCommand();
+            get.Transaction = tx;
+
+            bool hasLoanInstallment = DatabaseService.ColumnExists(c, "Expenses", "LoanInstallmentId");
+
+            get.CommandText = $@"
+SELECT
+    UserId,
+    Amount,
+    IsPlanned,
+    PaymentKind,
+    PaymentRefId,
+    {(hasLoanInstallment ? "LoanInstallmentId" : "NULL")} as LoanInstallmentId
+FROM Expenses
+WHERE Id=@id AND UserId=@u
+LIMIT 1;";
+            get.Parameters.AddWithValue("@id", expenseId);
+            get.Parameters.AddWithValue("@u", userId);
+
+            using var r = get.ExecuteReader();
+            if (!r.Read()) { tx.Commit(); return; }
+
+            var uid = Convert.ToInt32(r.GetValue(0));
+            var amount = Convert.ToDecimal(r.GetValue(1));
+            var isPlanned = Convert.ToInt32(r.GetValue(2)) == 1;
+            var pk = Convert.ToInt32(r.GetValue(3));
+            var pr = r.IsDBNull(4) ? (int?)null : Convert.ToInt32(r.GetValue(4));
+            var loanInstallmentId = r.IsDBNull(5) ? (int?)null : Convert.ToInt32(r.GetValue(5));
+
+            if (!isPlanned) { tx.Commit(); return; } // już zrealizowane
+
+            // 2) Zmień planned -> realized (data)
+            using (var upd = c.CreateCommand())
+            {
+                upd.Transaction = tx;
+                upd.CommandText = @"
+UPDATE Expenses
+SET IsPlanned=0,
+    Date=@d
+WHERE Id=@id AND UserId=@u;";
+                upd.Parameters.AddWithValue("@d", realizedDate.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture));
+                upd.Parameters.AddWithValue("@id", expenseId);
+                upd.Parameters.AddWithValue("@u", userId);
+                upd.ExecuteNonQuery();
+            }
+
+            // 3) Zaksięguj saldo (TO było brakujące)
+            ApplyExpenseEffect(c, tx, uid, amount, pk, pr);
+
+            // 4) Jeśli to rata – oznacz LoanInstallments jako Paid (w tej samej transakcji)
+            if (loanInstallmentId.HasValue && loanInstallmentId.Value > 0
+                && DatabaseService.TableExists(c, "LoanInstallments"))
+            {
+                using var li = c.CreateCommand();
+                li.Transaction = tx;
+                li.CommandText = @"
+UPDATE LoanInstallments
+SET Status=1,
+    PaidAt=@paidAt,
+    PaymentKind=@pk,
+    PaymentRefId=@pr
+WHERE UserId=@u AND Id=@iid;";
+                li.Parameters.AddWithValue("@paidAt", realizedDate.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture));
+                li.Parameters.AddWithValue("@pk", pk);
+                li.Parameters.AddWithValue("@pr", (object?)pr ?? DBNull.Value);
+                li.Parameters.AddWithValue("@u", userId);
+                li.Parameters.AddWithValue("@iid", loanInstallmentId.Value);
+                li.ExecuteNonQuery();
+            }
+
+            tx.Commit();
+            DatabaseService.NotifyDataChanged();
+        }
+
+
         private static void DeleteIncomeInternal(SqliteConnection c, SqliteTransaction tx, int id)
         {
             if (!TryDeleteIncomeInternal(c, tx, id))

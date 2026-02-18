@@ -47,22 +47,22 @@ namespace Finly.Services
 
         public static LoanMonthKpi GetLoanMonthKpi(int userId, int loanId, DateTime month)
         {
+            var kpi = new LoanMonthKpi();
+            if (userId <= 0 || loanId <= 0) return kpi;
+
             var from = new DateTime(month.Year, month.Month, 1);
             var to = from.AddMonths(1).AddDays(-1);
 
             var rows = DatabaseService.GetInstallmentsByDueDate(userId, loanId, from, to)
                        ?? new List<DatabaseService.LoanInstallmentDb>();
 
-            var kpi = new LoanMonthKpi();
-
             // Miesięczny “DueDate” do komunikatu (najwcześniejsza rata w miesiącu)
-            var monthDue = rows
-                .Where(x => x.DueDate != DateTime.MinValue)
-                .OrderBy(x => x.DueDate)
-                .Select(x => (DateTime?)x.DueDate.Date)
+            kpi.MonthDueDate = rows
+                .Select(x => x.DueDate)
+                .Where(d => d != DateTime.MinValue)
+                .OrderBy(d => d)
+                .Select(d => (DateTime?)d.Date)
                 .FirstOrDefault();
-
-            kpi.MonthDueDate = monthDue;
 
             foreach (var r in rows)
             {
@@ -74,7 +74,7 @@ namespace Finly.Services
                 kpi.PrincipalAll += principal;
                 kpi.InterestAll += interest;
 
-                if (r.Status == 1)
+                if (r.Status == 1) // paid
                 {
                     kpi.PaidCount++;
                     kpi.TotalPaid += total;
@@ -99,15 +99,19 @@ namespace Finly.Services
                 x.DueDate.Date < today);
 
             // Najbliższa NIEOPŁACONA rata od dziś (dowolny miesiąc)
-            var next = DatabaseService.GetInstallmentsByDueDate(userId, loanId, today, today.AddYears(50))
+            var futureRows = DatabaseService
+                .GetInstallmentsByDueDate(userId, loanId, today, today.AddYears(50))
+                ?? new List<DatabaseService.LoanInstallmentDb>();
+
+            kpi.NextDue = futureRows
                 .Where(x => x.Status == 0 && x.DueDate != DateTime.MinValue && x.DueDate.Date >= today)
                 .OrderBy(x => x.DueDate)
+                .Select(x => (DateTime?)x.DueDate.Date)
                 .FirstOrDefault();
-
-            kpi.NextDue = next?.DueDate.Date;
 
             return kpi;
         }
+
 
         public static decimal CalculateMonthlyPayment(decimal principal, decimal annualRatePercent, int termMonths)
         {

@@ -378,10 +378,47 @@ namespace Finly.ViewModels
 
         // ------------------ LOOKUP ------------------
 
+        // DODAJ w TransactionsViewModel (pole w klasie)
+        private bool _lookupEventsHooked;
+
+        // DODAJ w TransactionsViewModel (handlery w klasie)
+        private void Categories_CollectionChanged(object? sender, System.Collections.Specialized.NotifyCollectionChangedEventArgs e)
+        {
+            if (e.NewItems != null)
+            {
+                foreach (CategoryFilterItem ci in e.NewItems)
+                    ci.PropertyChanged += (_, __) => ApplyFilters();
+            }
+
+            ApplyFilters();
+        }
+
+        private void Accounts_CollectionChanged(object? sender, System.Collections.Specialized.NotifyCollectionChangedEventArgs e)
+        {
+            if (e.NewItems != null)
+            {
+                foreach (AccountFilterItem ai in e.NewItems)
+                    ai.PropertyChanged += (_, __) => ApplyFilters();
+            }
+
+            ApplyFilters();
+        }
+
+        // PODMIEŃ CAŁĄ METODĘ LoadLookupData() na tę:
         private void LoadLookupData()
         {
-            Categories.Clear();
+            // Hook CollectionChanged TYLKO RAZ (żeby nie dublować eventów po ReloadAll/Initialize)
+            if (!_lookupEventsHooked)
+            {
+                Categories.CollectionChanged += Categories_CollectionChanged;
+                Accounts.CollectionChanged += Accounts_CollectionChanged;
+                _lookupEventsHooked = true;
+            }
 
+            Categories.Clear();
+            Accounts.Clear();
+
+            // ============ CATEGORIES ============
             try
             {
                 foreach (var c in DatabaseService.GetCategoriesByUser(UserId) ?? new List<string>())
@@ -400,49 +437,44 @@ namespace Finly.ViewModels
             EnsureCat("Transfer");
             EnsureCat("Kredyt");
 
-            // Podpinamy zmiany IsSelected
+            // item.PropertyChanged (po Clear() mamy nowe obiekty, więc dopinamy na nowo)
             foreach (var ci in Categories)
                 ci.PropertyChanged += (_, __) => ApplyFilters();
 
-            Categories.CollectionChanged += (_, e) =>
+            // ============ ACCOUNTS ============
+            void EnsureAccount(string name)
             {
-                if (e.NewItems != null)
-                    foreach (CategoryFilterItem ci in e.NewItems)
-                        ci.PropertyChanged += (_, __) => ApplyFilters();
-                ApplyFilters();
-            };
-
-            Accounts.Clear();
+                if (!Accounts.Any(x => string.Equals(x.Name, name, StringComparison.CurrentCultureIgnoreCase)))
+                    Accounts.Add(new AccountFilterItem { Name = name, IsSelected = true });
+            }
 
             try
             {
                 foreach (var a in DatabaseService.GetAccounts(UserId) ?? new List<BankAccountModel>())
-                    Accounts.Add(new AccountFilterItem { Name = a.AccountName, IsSelected = true });
+                    EnsureAccount(a.AccountName);
             }
             catch { }
 
             try
             {
                 foreach (var env in DatabaseService.GetEnvelopesNames(UserId) ?? new List<string>())
-                    Accounts.Add(new AccountFilterItem { Name = NormalizeEnvelopeLabel(env), IsSelected = true });
-
+                    EnsureAccount(NormalizeEnvelopeLabel(env));
             }
             catch { }
 
-            Accounts.Add(new AccountFilterItem { Name = "Wolna gotówka", IsSelected = true });
-            Accounts.Add(new AccountFilterItem { Name = "Odłożona gotówka", IsSelected = true });
+            // cash always
+            EnsureAccount("Wolna gotówka");
+            EnsureAccount("Odłożona gotówka");
+
+            // KLUCZOWE: fallbacki z ResolvePaymentDisplay()
+            EnsureAccount("Konto bankowe");
+            EnsureAccount("Koperta");
 
             foreach (var ai in Accounts)
                 ai.PropertyChanged += (_, __) => ApplyFilters();
-
-            Accounts.CollectionChanged += (_, e) =>
-            {
-                if (e.NewItems != null)
-                    foreach (AccountFilterItem ai in e.NewItems)
-                        ai.PropertyChanged += (_, __) => ApplyFilters();
-                ApplyFilters();
-            };
         }
+
+
 
         private void LoadAvailableLists()
         {
@@ -555,7 +587,14 @@ namespace Finly.ViewModels
             dt = default;
             if (string.IsNullOrWhiteSpace(s)) return false;
 
-            var formats = new[] { "yyyy-MM-dd", "dd-MM-yyyy", "yyyy/MM/dd", "dd/MM/yyyy" };
+            var formats = new[]
+            {
+        "yyyy-MM-dd",
+        "dd-MM-yyyy",
+        "yyyy/MM/dd",
+        "dd/MM/yyyy",
+        "dd.MM.yyyy"   // <<< DODANE
+    };
 
             if (DateTime.TryParseExact(s.Trim(), formats, CultureInfo.InvariantCulture, DateTimeStyles.None, out dt))
                 return true;
@@ -563,6 +602,7 @@ namespace Finly.ViewModels
             return DateTime.TryParse(s, CultureInfo.CurrentCulture, DateTimeStyles.None, out dt)
                 || DateTime.TryParse(s, CultureInfo.InvariantCulture, DateTimeStyles.None, out dt);
         }
+
 
         private DateTime ParseDate(object? raw)
         {
@@ -942,12 +982,16 @@ namespace Finly.ViewModels
                 var to = Normalize(t.ToAccountName ?? "");
                 return set.Contains(from) || set.Contains(to) || MatchesCash(from) || MatchesCash(to);
             }
-            else
-            {
-                var n = Normalize(t.AccountName);
-                return set.Contains(n) || MatchesCash(n);
-            }
+
+            // Expense/Income: jeśli AccountName puste, weź From/To
+            var n = Normalize(t.AccountName);
+            if (string.IsNullOrWhiteSpace(n))
+                n = Normalize(t.FromAccountName ?? t.ToAccountName ?? "");
+
+            return set.Contains(n) || MatchesCash(n);
         }
+
+
 
         private decimal ParseAmountInternal(string amountStr)
         {

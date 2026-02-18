@@ -4,11 +4,11 @@ using Finly.Services.SpecificPages;
 using Finly.Views;
 using QuestPDF.Infrastructure;
 using System;
+using System.Data;
+using System.Diagnostics;
 using System.IO;
-using System.Linq;
 using System.Threading.Tasks;
 using System.Windows;
-using System.Windows.Threading;
 
 namespace Finly
 {
@@ -22,21 +22,37 @@ namespace Finly
 
         private void Application_Startup(object sender, StartupEventArgs e)
         {
-            // 0) Globalna odporność na wyjątki (zanim cokolwiek wystartuje)
             HookGlobalExceptionHandlers();
 
-            // 1) QuestPDF – licencja
             QuestPDF.Settings.License = LicenseType.Community;
 
             // 2) Baza danych
             try
             {
                 DatabaseService.EnsureTables();
+
+#if DEBUG
+                Debug.WriteLine("=== Finly DB CHECK scan START ===");
+                try
+                {
+                    using var con = DatabaseService.GetConnection();
+                    if (con.State != ConnectionState.Open)
+                        con.Open();
+
+                    DbDebugTools.PrintTablesWithTypeCheck(con);
+                }
+                catch (Exception exDbg)
+                {
+                    LogException("DbDebugTools.PrintTablesWithTypeCheck", exDbg);
+                    Debug.WriteLine("DB CHECK scan ERROR: " + exDbg);
+                }
+                Debug.WriteLine("=== Finly DB CHECK scan END ===");
+#endif
             }
             catch (Exception ex)
             {
                 LogException("DatabaseService.EnsureTables", ex);
-                // Nie kontynuujemy, bo aplikacja bez bazy nie ma sensu.
+
                 MessageBox.Show(
                     "Nie udało się zainicjalizować bazy danych.\n\n" + ex.Message,
                     "Finly – błąd uruchomienia",
@@ -55,7 +71,6 @@ namespace Finly
             catch (Exception ex)
             {
                 LogException("ThemeService.Initialize", ex);
-                // Motyw nie jest krytyczny – lecimy dalej.
             }
 
             // 4) Toast settings
@@ -89,20 +104,15 @@ namespace Finly
 
         private static void HookGlobalExceptionHandlers()
         {
-            // UI thread (WPF Dispatcher)
             Current.DispatcherUnhandledException += (_, args) =>
             {
                 if (IsLiveChartsCompositionTickerCrash(args.Exception))
                 {
                     args.Handled = true;
                     LogException("LiveCharts CompositionTargetTicker (handled)", args.Exception);
-
                     return;
                 }
 
-
-                // 2) Inne wyjątki – log + kontrolowane domknięcie (lub możesz args.Handled=true i działać dalej,
-                // ale to bywa ryzykowne, bo UI może zostać w niespójnym stanie).
                 LogException("DispatcherUnhandledException", args.Exception);
 
                 try
@@ -116,27 +126,21 @@ namespace Finly
                 }
                 catch { }
 
-                // Domyślnie: nie “łykać” wszystkiego, bo możesz ukryć realne problemy.
-                // Jeśli chcesz, żeby NIE zamykało aplikacji, ustaw args.Handled=true.
                 args.Handled = false;
             };
 
-            // Background Task exceptions
             TaskScheduler.UnobservedTaskException += (_, args) =>
             {
                 LogException("UnobservedTaskException", args.Exception);
                 args.SetObserved();
             };
 
-            // Non-UI thread exceptions (AppDomain)
             AppDomain.CurrentDomain.UnhandledException += (_, args) =>
             {
                 if (args.ExceptionObject is Exception ex)
                     LogException("AppDomain.UnhandledException", ex);
                 else
                     LogText("AppDomain.UnhandledException", "Unknown exception object: " + args.ExceptionObject);
-
-                // Tu już zwykle i tak proces leci, ale log zostaje.
             };
         }
 
@@ -146,7 +150,6 @@ namespace Finly
                 SettingsService.LastUserId is int uid &&
                 uid > 0)
             {
-                // Ustaw aktualnego użytkownika
                 UserService.CurrentUserId = uid;
                 UserService.CurrentUserEmail = UserService.GetEmail(uid);
 
@@ -169,17 +172,13 @@ namespace Finly
 
         private static bool IsLiveChartsCompositionTickerCrash(Exception ex)
         {
-            // Najczęściej to NullReferenceException w CompositionTargetTicker
-            // Weryfikujemy po stack trace / typach, żeby nie połknąć “prawdziwych” nulli z Twojego kodu.
             if (ex is not NullReferenceException) return false;
 
             var st = ex.StackTrace ?? string.Empty;
 
-            // Dwie najczęstsze ścieżki w LiveChartsCore.SkiaSharpView.WPF
-            // (nie opieramy się na 1 stringu – wersje pakietów potrafią minimalnie zmieniać)
             return st.Contains("LiveChartsCore.SkiaSharpView.WPF.Rendering.CompositionTargetTicker", StringComparison.OrdinalIgnoreCase)
-                || st.Contains("CompositionTargetTicker", StringComparison.OrdinalIgnoreCase)
-                && st.Contains("LiveChartsCore", StringComparison.OrdinalIgnoreCase);
+                || (st.Contains("CompositionTargetTicker", StringComparison.OrdinalIgnoreCase)
+                    && st.Contains("LiveChartsCore", StringComparison.OrdinalIgnoreCase));
         }
 
         private static void LogException(string where, Exception ex)
@@ -199,10 +198,7 @@ namespace Finly
 
                 File.AppendAllText(CrashLogPath, msg);
             }
-            catch
-            {
-                // Nie pozwalamy, by logowanie powodowało kolejne wyjątki.
-            }
+            catch { }
         }
 
         private static void LogText(string where, string text)
@@ -222,4 +218,3 @@ namespace Finly
         }
     }
 }
-

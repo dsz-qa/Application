@@ -189,9 +189,8 @@ SET Amount    = excluded.Amount,
                 return;
 
             exp.IsPlanned = false;
-            exp.Date = realizedDate;
+            exp.Date = realizedDate.Date; // ważne: ucinamy czas
 
-            // Stabilnie: zapis przez DatabaseService (zależnie od Twojego projektu)
             DatabaseService.UpdateExpense(exp);
 
             // HOOK: oznacz ratę jako PAID
@@ -208,6 +207,7 @@ SET Amount    = excluded.Amount,
 
             DatabaseService.NotifyDataChanged();
         }
+
 
         // =========================
         //  Extra kombinacje Any
