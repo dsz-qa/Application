@@ -4,6 +4,7 @@ using Finly.Views.Dialogs;
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
+using System.ComponentModel;
 using System.Globalization;
 using System.Linq;
 using System.Windows;
@@ -13,17 +14,121 @@ using System.Windows.Media;
 
 namespace Finly.Pages
 {
-    public class GoalVm
+    public class GoalVm : INotifyPropertyChanged
     {
-        public int EnvelopeId { get; set; }
-        public string EnvelopeName { get; set; } = "";
-        public string GoalTitle { get; set; } = "";
-        public decimal TargetAmount { get; set; }
-        public decimal CurrentAmount { get; set; }
-        public DateTime? DueDate { get; set; }
-        public string Description { get; set; } = "";
+        public event PropertyChangedEventHandler? PropertyChanged;
 
+        private void OnPropertyChanged(string name)
+            => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
 
+        private int _envelopeId;
+        public int EnvelopeId
+        {
+            get => _envelopeId;
+            set
+            {
+                if (_envelopeId == value) return;
+                _envelopeId = value;
+                OnPropertyChanged(nameof(EnvelopeId));
+            }
+        }
+
+        private string _envelopeName = "";
+        public string EnvelopeName
+        {
+            get => _envelopeName;
+            set
+            {
+                value ??= "";
+                if (_envelopeName == value) return;
+                _envelopeName = value;
+                OnPropertyChanged(nameof(EnvelopeName));
+                OnPropertyChanged(nameof(Name));
+            }
+        }
+
+        private string _goalTitle = "";
+        public string GoalTitle
+        {
+            get => _goalTitle;
+            set
+            {
+                value ??= "";
+                if (_goalTitle == value) return;
+                _goalTitle = value;
+                OnPropertyChanged(nameof(GoalTitle));
+            }
+        }
+
+        private decimal _targetAmount;
+        public decimal TargetAmount
+        {
+            get => _targetAmount;
+            set
+            {
+                if (_targetAmount == value) return;
+                _targetAmount = value;
+                OnPropertyChanged(nameof(TargetAmount));
+                OnPropertyChanged(nameof(Remaining));
+                OnPropertyChanged(nameof(CompletionPercent));
+                OnPropertyChanged(nameof(MonthlyNeeded));
+            }
+        }
+
+        private decimal _currentAmount;
+        public decimal CurrentAmount
+        {
+            get => _currentAmount;
+            set
+            {
+                if (_currentAmount == value) return;
+                _currentAmount = value;
+                OnPropertyChanged(nameof(CurrentAmount));
+                OnPropertyChanged(nameof(Remaining));
+                OnPropertyChanged(nameof(CompletionPercent));
+                OnPropertyChanged(nameof(MonthlyNeeded));
+            }
+        }
+
+        private DateTime? _dueDate;
+        public DateTime? DueDate
+        {
+            get => _dueDate;
+            set
+            {
+                if (_dueDate == value) return;
+                _dueDate = value;
+                OnPropertyChanged(nameof(DueDate));
+                OnPropertyChanged(nameof(MonthsLeft));
+                OnPropertyChanged(nameof(MonthlyNeeded));
+            }
+        }
+
+        private string _description = "";
+        public string Description
+        {
+            get => _description;
+            set
+            {
+                value ??= "";
+                if (_description == value) return;
+                _description = value;
+                OnPropertyChanged(nameof(Description));
+            }
+        }
+
+        // ✅ zaznaczenie celu (domyślnie: true)
+        private bool _isSelected = true;
+        public bool IsSelected
+        {
+            get => _isSelected;
+            set
+            {
+                if (_isSelected == value) return;
+                _isSelected = value;
+                OnPropertyChanged(nameof(IsSelected));
+            }
+        }
 
         // BACKWARD COMPAT
         public string Name
@@ -83,9 +188,9 @@ namespace Finly.Pages
         private readonly ObservableCollection<GoalVm> _goals = new();
         private readonly ObservableCollection<object> _items = new();
 
-
         private Point _dragStartPoint;
         private object? _dragItem;
+        private bool _isDragging;
 
         private int _uid => UserService.GetCurrentUserId();
 
@@ -95,17 +200,38 @@ namespace Finly.Pages
 
             GoalsList.ItemsSource = _items;
             Loaded += GoalsPage_Loaded;
+            Unloaded += GoalsPage_Unloaded;
         }
-
-
 
         private void GoalsPage_Loaded(object sender, RoutedEventArgs e)
         {
             LoadGoals();
         }
 
+        private void GoalsPage_Unloaded(object sender, RoutedEventArgs e)
+        {
+            // odpinamy eventy, żeby nie trzymać VM-ów przy życiu
+            foreach (var g in _goals)
+                g.PropertyChanged -= GoalVm_PropertyChanged;
+        }
+
+        private void GoalVm_PropertyChanged(object? sender, PropertyChangedEventArgs e)
+        {
+            if (e.PropertyName == nameof(GoalVm.IsSelected) ||
+                e.PropertyName == nameof(GoalVm.TargetAmount) ||
+                e.PropertyName == nameof(GoalVm.CurrentAmount) ||
+                e.PropertyName == nameof(GoalVm.DueDate))
+            {
+                RefreshKpis();
+            }
+        }
+
         private void LoadGoals()
         {
+            // odepnij stare VM-y (bezpiecznie)
+            foreach (var g in _goals)
+                g.PropertyChanged -= GoalVm_PropertyChanged;
+
             _goals.Clear();
 
             var list = DatabaseService.GetEnvelopeGoals(_uid);
@@ -113,7 +239,7 @@ namespace Finly.Pages
             {
                 var (goalTitle, description) = SplitGoalText(g.GoalText, g.Name);
 
-                _goals.Add(new GoalVm
+                var vm = new GoalVm
                 {
                     EnvelopeId = g.EnvelopeId,
                     EnvelopeName = g.Name,
@@ -121,13 +247,21 @@ namespace Finly.Pages
                     TargetAmount = g.Target,
                     CurrentAmount = g.Allocated,
                     DueDate = g.Deadline,
-                    Description = string.IsNullOrWhiteSpace(description) ? "Brak" : description
-                });
+                    Description = string.IsNullOrWhiteSpace(description) ? "Brak" : description,
+
+                    // ✅ domyślnie zaznaczone
+                    IsSelected = true
+                };
+
+                vm.PropertyChanged += GoalVm_PropertyChanged;
+
+                _goals.Add(vm);
             }
 
             RebuildItems();
             RefreshKpis();
         }
+
         private static T? FindAncestor<T>(DependencyObject? current) where T : DependencyObject
         {
             while (current != null)
@@ -152,7 +286,6 @@ namespace Finly.Pages
 
             return item;
         }
-
 
         private void GoalsList_PreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
         {
@@ -186,11 +319,14 @@ namespace Finly.Pages
 
             try
             {
+                _isDragging = true;
+
                 var data = new DataObject(typeof(GoalVm), vm);
                 DragDrop.DoDragDrop(GoalsList, data, DragDropEffects.Move);
             }
             finally
             {
+                _isDragging = false;
                 _dragItem = null;
             }
         }
@@ -215,7 +351,7 @@ namespace Finly.Pages
             _goals.Move(oldIndex, newIndex);
             RebuildItems();
 
-            PersistOrder(); // DOCZELOWO: zapis do bazy
+            PersistOrder();
         }
 
         private void PersistOrder()
@@ -227,14 +363,9 @@ namespace Finly.Pages
             }
             catch (Exception ex)
             {
-                // Nie blokuj UI – tylko info
                 ToastService.Error("Nie udało się zapisać kolejności celów: " + ex.Message);
             }
         }
-
-
-
-
 
         private void RebuildItems()
         {
@@ -248,13 +379,33 @@ namespace Finly.Pages
 
         private void RefreshKpis()
         {
-            var totalTarget = _goals.Sum(g => g.TargetAmount);
-            var totalSaved = _goals.Sum(g => g.CurrentAmount);
-            var totalMonthly = _goals.Sum(g => g.MonthlyNeeded);
+            // ✅ KPI liczone tylko z zaznaczonych
+            var selected = _goals.Where(g => g.IsSelected).ToList();
+
+            var totalTarget = selected.Sum(g => g.TargetAmount);
+            var totalSaved = selected.Sum(g => g.CurrentAmount);
+            var totalMonthly = selected.Sum(g => g.MonthlyNeeded);
 
             TotalGoalsAmountText.Text = totalTarget.ToString("N2") + " zł";
             TotalGoalsSavedText.Text = totalSaved.ToString("N2") + " zł";
             TotalMonthlyNeededText.Text = totalMonthly.ToString("N2") + " zł";
+        }
+
+        // ✅ klik w kartę celu (nie w buttony) przełącza zaznaczenie
+        private void GoalCard_MouseLeftButtonUp(object sender, MouseButtonEventArgs e)
+        {
+            if (_isDragging) return;
+            if (e.ChangedButton != MouseButton.Left) return;
+
+            if (FindAncestor<Button>(e.OriginalSource as DependencyObject) != null)
+                return;
+
+            if (sender is Border b && b.DataContext is GoalVm vm)
+            {
+                vm.IsSelected = !vm.IsSelected;
+                // RefreshKpis() też poleci z PropertyChanged, ale tu może zostać
+                RefreshKpis();
+            }
         }
 
         // NOTE: "Cel: ...\nOpis: ...\nTermin: ..."
@@ -310,7 +461,8 @@ namespace Finly.Pages
             if (!string.IsNullOrEmpty(goalTitle))
                 parts.Add($"Cel: {goalTitle}");
 
-            if (!string.IsNullOrEmpty(description))
+            // jeśli pusty opis, nie dokładaj śmieciowego "Opis:"
+            if (!string.IsNullOrWhiteSpace(description) && !string.Equals(description.Trim(), "Brak", StringComparison.OrdinalIgnoreCase))
             {
                 var desc = description.Trim();
                 if (!desc.StartsWith("Opis:", StringComparison.OrdinalIgnoreCase))
@@ -429,31 +581,28 @@ namespace Finly.Pages
 
                 if (r.EditingEnvelopeId.HasValue)
                 {
+                    // EDIT: pracujemy na istniejącej kopercie
                     envelopeId = r.EditingEnvelopeId.Value;
                 }
                 else
                 {
+                    // ADD: jeśli istnieje koperta o tej nazwie -> użyj jej, inaczej utwórz
                     var existingId = DatabaseService.GetEnvelopeIdByName(_uid, goalTitleTrim);
                     if (existingId.HasValue)
-                    {
                         envelopeId = existingId.Value;
-                    }
                     else
-                    {
                         envelopeId = DatabaseService.InsertEnvelope(_uid, goalTitleTrim, r.TargetAmount, r.CurrentAmount, note);
-                    }
                 }
 
-                // KLUCZOWA ZMIANA:
-                // Aktualizujemy Goal i jednocześnie Name koperty (żeby KopertyPage pokazywała nową nazwę).
+                // ✅ KLUCZOWA NAPRAWA BUGA:
+                // NIE zmieniamy nazwy koperty przy zapisie celu.
                 DatabaseService.UpdateEnvelopeGoal(
                     _uid,
                     envelopeId,
                     r.TargetAmount,
                     r.CurrentAmount,
                     r.DueDate.Value,
-                    note,
-                    newEnvelopeName: goalTitleTrim
+                    note
                 );
 
                 ToastService.Success(r.EditingEnvelopeId.HasValue ? "Cel zaktualizowany." : "Cel dodany.");
@@ -464,7 +613,6 @@ namespace Finly.Pages
                 ToastService.Error("Nie udało się zapisać celu: " + ex.Message);
             }
         }
-
 
         // ========= Delete (bez zmian) =========
 
@@ -496,6 +644,8 @@ namespace Finly.Pages
             try
             {
                 DatabaseService.ClearEnvelopeGoal(_uid, vm.EnvelopeId);
+
+                vm.PropertyChanged -= GoalVm_PropertyChanged;
 
                 _goals.Remove(vm);
                 RebuildItems();

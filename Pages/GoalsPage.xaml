@@ -24,6 +24,16 @@
             <Setter Property="Margin"          Value="0,12,16,0"/>
         </Style>
 
+        <Style x:Key="SelectableGoalCard" TargetType="Border" BasedOn="{StaticResource Card}">
+            <Setter Property="Cursor" Value="Hand"/>
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding IsSelected}" Value="True">
+                    <Setter Property="BorderBrush" Value="{DynamicResource Brand.Orange}"/>
+                    <Setter Property="BorderThickness" Value="2"/>
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+
         <Style x:Key="AccentCard" TargetType="Border" BasedOn="{StaticResource Card}">
             <Setter Property="BorderBrush"     Value="{DynamicResource Brand.Blue}"/>
             <Setter Property="BorderThickness" Value="2"/>
@@ -46,7 +56,9 @@
 
         <!-- KARTA CELU (z paskiem postępu) -->
         <DataTemplate DataType="{x:Type local:GoalVm}">
-            <Border Style="{StaticResource Card}" Width="340">
+            <Border Style="{StaticResource SelectableGoalCard}"
+        Width="340"
+        MouseLeftButtonUp="GoalCard_MouseLeftButtonUp">
                 <StackPanel>
 
                     <StackPanel Orientation="Horizontal" Margin="0,0,0,6" Background="Transparent">
