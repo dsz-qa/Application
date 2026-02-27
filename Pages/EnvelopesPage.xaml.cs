@@ -2,6 +2,7 @@
 using Finly.Services.Features;
 using Finly.Views.Dialogs;
 using System;
+using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Data;
 using System.Globalization;
@@ -30,6 +31,16 @@ namespace Finly.Pages
         // drag&drop
         private Point _dragStartPoint;
         private object? _dragItem;
+        private bool _isDragging;
+
+        // KPI cache (żeby klik selekcji nie robił ponownego odczytu z DB)
+        private decimal _kpiFreeCash;
+        private decimal _kpiSavedToAllocate;
+
+        // selekcja (persist w RAM w ramach życia strony)
+        private bool _selectionCustomized;
+        private readonly HashSet<int> _selectedEnvelopeIds = new();
+        private readonly HashSet<int> _knownEnvelopeIds = new();
 
         public EnvelopesPage()
         {
@@ -98,18 +109,84 @@ namespace Finly.Pages
             });
         }
 
+        // ===================== CLICK SELECTION (jak Cele) =====================
+
+        private void EnvelopeCard_MouseLeftButtonUp(object sender, MouseButtonEventArgs e)
+        {
+            if (_isDragging) return;
+            if (e.ChangedButton != MouseButton.Left) return;
+
+            // klik w przyciski nie ma przełączać zaznaczenia
+            if (FindVisualParent<Button>(e.OriginalSource as DependencyObject) != null)
+                return;
+
+            if (sender is not Border b) return;
+            if (b.DataContext is not DataRowView drv) return;
+            if (_dt == null) return;
+
+            var row = drv.Row;
+            if (!_dt.Columns.Contains("IsSelected")) return;
+
+            var id = SafeInt(row["Id"]);
+            if (id <= 0) return;
+
+            // pierwsza interakcja: zainicjalizuj set zaznaczeń z obecnego stanu
+            if (!_selectionCustomized)
+            {
+                InitializeSelectionFromDt();
+                _selectionCustomized = true;
+            }
+
+            var cur = SafeBool(row["IsSelected"], defaultValue: true);
+            var next = !cur;
+
+            drv["IsSelected"] = next;
+
+            // aktualizuj pamięć selekcji
+            if (next) _selectedEnvelopeIds.Add(id);
+            else _selectedEnvelopeIds.Remove(id);
+
+            _knownEnvelopeIds.Add(id);
+
+            RefreshKpis();
+        }
+
+        private void InitializeSelectionFromDt()
+        {
+            _selectedEnvelopeIds.Clear();
+            _knownEnvelopeIds.Clear();
+
+            if (_dt == null) return;
+            if (!_dt.Columns.Contains("IsSelected")) return;
+
+            foreach (DataRow r in _dt.Rows)
+            {
+                var id = SafeInt(r["Id"]);
+                if (id <= 0) continue;
+
+                _knownEnvelopeIds.Add(id);
+
+                var isSel = SafeBool(r["IsSelected"], defaultValue: true);
+                if (isSel) _selectedEnvelopeIds.Add(id);
+            }
+        }
+
         // ===================== DRAG & DROP =====================
 
         private void EnvelopesCards_PreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
         {
+            _dragItem = null;
+
+            // klik na button (Edytuj/Usuń) nie startuje drag&drop
+            if (FindVisualParent<Button>(e.OriginalSource as DependencyObject) != null)
+                return;
+
             _dragStartPoint = e.GetPosition(null);
 
             // bierzemy element spod kursora
             var lbi = FindVisualParent<ListBoxItem>(e.OriginalSource as DependencyObject);
             if (lbi?.DataContext is DataRowView)
                 _dragItem = lbi.DataContext;     // tylko koperty
-            else
-                _dragItem = null;                // kafelek "Dodaj" albo coś innego
         }
 
         private void EnvelopesCards_MouseMove(object sender, MouseEventArgs e)
@@ -124,7 +201,16 @@ namespace Finly.Pages
                 Math.Abs(diff.Y) < SystemParameters.MinimumVerticalDragDistance)
                 return;
 
-            DragDrop.DoDragDrop(EnvelopesCards, _dragItem, DragDropEffects.Move);
+            try
+            {
+                _isDragging = true;
+                DragDrop.DoDragDrop(EnvelopesCards, _dragItem, DragDropEffects.Move);
+            }
+            finally
+            {
+                _isDragging = false;
+                _dragItem = null;
+            }
         }
 
         private void EnvelopesCards_DragOver(object sender, DragEventArgs e)
@@ -193,6 +279,8 @@ namespace Finly.Pages
 
                 // ✅ JEDNO ŹRÓDŁO PRAWDY – identyczne jak w AddExpensePage
                 var snap = DatabaseService.GetMoneySnapshot(_userId);
+                _kpiFreeCash = snap.Cash;
+                _kpiSavedToAllocate = snap.SavedUnallocated;
 
                 // Koperty
                 _dt = DatabaseService.GetEnvelopesTable(_userId);
@@ -200,8 +288,15 @@ namespace Finly.Pages
                 {
                     EnsureComputedColumns(_dt);
 
+                    // zachowaj listę znanych ID (do wykrycia "nowych" kopert, gdy selekcja była custom)
+                    var prevKnown = new HashSet<int>(_knownEnvelopeIds);
+                    _knownEnvelopeIds.Clear();
+
                     foreach (DataRow r in _dt.Rows)
                     {
+                        var id = SafeInt(r["Id"]);
+                        if (id > 0) _knownEnvelopeIds.Add(id);
+
                         var target = SafeDec(r["Target"]);
                         var alloc = SafeDec(r["Allocated"]);
 
@@ -233,7 +328,43 @@ namespace Finly.Pages
                             r["Deadline"] = "Brak";
                             r["MonthlyRequired"] = 0m;
                         }
+
+                        // ✅ selekcja (domyślnie true / jak Cele)
+                        if (_dt.Columns.Contains("IsSelected"))
+                        {
+                            bool selected;
+
+                            if (!_selectionCustomized)
+                            {
+                                selected = true; // default: wszystko zaznaczone
+                            }
+                            else
+                            {
+                                // jeśli koperta była wcześniej znana i nie ma jej w selected set => była odznaczona
+                                // jeśli jest nowa (id nie był wcześniej znany) => zaznacz ją domyślnie
+                                bool wasKnown = id > 0 && prevKnown.Contains(id);
+
+                                if (id > 0 && _selectedEnvelopeIds.Contains(id))
+                                {
+                                    selected = true;
+                                }
+                                else if (id > 0 && !wasKnown)
+                                {
+                                    selected = true;
+                                    _selectedEnvelopeIds.Add(id);
+                                }
+                                else
+                                {
+                                    selected = false;
+                                }
+                            }
+
+                            r["IsSelected"] = selected;
+                        }
                     }
+
+                    // jeśli nie było custom selekcji — nie napełniamy setów (aż do pierwszego kliknięcia)
+                    // ale jeśli jest custom, upewnij się, że set "known" jest aktualny
                 }
 
                 // Karty UI
@@ -245,28 +376,7 @@ namespace Finly.Pages
                 }
                 _cards.Add(new AddEnvelopeTile());
 
-                // ===== KPI =====
-                // 1) gotówka w kopertach (suma allocated w tabeli kopert)
-                var allocatedSum = _dt?.AsEnumerable().Sum(r => SafeDec(r["Allocated"])) ?? 0m;
-
-                // 2) wolna gotówka -> snap.Cash
-                var freeCash = snap.Cash;
-
-                // 3) odłożona gotówka (do przydzielenia) -> snap.SavedUnallocated
-                //    UWAGA: jeśli chcesz pokazywać "odłożona razem" zamiast "do przydzielenia",
-                //    to trzeba dodać pole w snapshot albo osobną metodę.
-                var savedToAllocate = snap.SavedUnallocated;
-
-                TotalEnvelopesText.Text = allocatedSum.ToString("N2", CultureInfo.CurrentCulture) + " zł";
-                SavedCashText.Text = freeCash.ToString("N2", CultureInfo.CurrentCulture) + " zł";
-
-                EnvelopesSumText.Text = savedToAllocate.ToString("N2", CultureInfo.CurrentCulture) + " zł";
-                EnvelopesSumText.Foreground = savedToAllocate < 0m
-                    ? Brushes.IndianRed
-                    : TryFindResource("App.Foreground") as Brush ?? Foreground;
-
-                if (UnassignedText != null)
-                    UnassignedText.Visibility = savedToAllocate > 0m ? Visibility.Visible : Visibility.Collapsed;
+                RefreshKpis();
             }
             catch (Exception ex)
             {
@@ -290,6 +400,43 @@ namespace Finly.Pages
 
             if (!dt.Columns.Contains("MonthlyRequired"))
                 dt.Columns.Add("MonthlyRequired", typeof(decimal));
+
+            // ✅ selekcja (dla obramowania i KPI jak w celach)
+            if (!dt.Columns.Contains("IsSelected"))
+            {
+                var col = dt.Columns.Add("IsSelected", typeof(bool));
+                col.DefaultValue = true;
+            }
+        }
+
+        private void RefreshKpis()
+        {
+            // KPI #1: suma Allocated tylko z zaznaczonych kopert
+            decimal allocatedSelected = 0m;
+
+            if (_dt != null && _dt.Columns.Contains("IsSelected"))
+            {
+                allocatedSelected = _dt.AsEnumerable()
+                    .Where(r => SafeBool(r["IsSelected"], defaultValue: true))
+                    .Sum(r => SafeDec(r["Allocated"]));
+            }
+            else if (_dt != null)
+            {
+                allocatedSelected = _dt.AsEnumerable().Sum(r => SafeDec(r["Allocated"]));
+            }
+
+            TotalEnvelopesText.Text = allocatedSelected.ToString("N2", CultureInfo.CurrentCulture) + " zł";
+
+            // KPI #2 i #3 globalne (jak było)
+            SavedCashText.Text = _kpiFreeCash.ToString("N2", CultureInfo.CurrentCulture) + " zł";
+
+            EnvelopesSumText.Text = _kpiSavedToAllocate.ToString("N2", CultureInfo.CurrentCulture) + " zł";
+            EnvelopesSumText.Foreground = _kpiSavedToAllocate < 0m
+                ? Brushes.IndianRed
+                : TryFindResource("App.Foreground") as Brush ?? Foreground;
+
+            if (UnassignedText != null)
+                UnassignedText.Visibility = _kpiSavedToAllocate > 0m ? Visibility.Visible : Visibility.Collapsed;
         }
 
         // ===================== UI: Add/Edit dialog =====================
@@ -429,6 +576,11 @@ namespace Finly.Pages
             try
             {
                 DatabaseService.DeleteEnvelope(id);
+
+                // usuń z pamięci selekcji
+                _selectedEnvelopeIds.Remove(id);
+                _knownEnvelopeIds.Remove(id);
+
                 ToastService.Success("Kopertę usunięto.");
                 LoadAll();
             }
@@ -462,6 +614,25 @@ namespace Finly.Pages
             {
                 try { return Convert.ToDecimal(o, CultureInfo.InvariantCulture); }
                 catch { return 0m; }
+            }
+        }
+
+        private static bool SafeBool(object? o, bool defaultValue = false)
+        {
+            if (o == null || o == DBNull.Value) return defaultValue;
+            if (o is bool b) return b;
+            try { return Convert.ToBoolean(o, CultureInfo.InvariantCulture); }
+            catch { return defaultValue; }
+        }
+
+        private static int SafeInt(object? o)
+        {
+            if (o == null || o == DBNull.Value) return 0;
+            try { return Convert.ToInt32(o, CultureInfo.InvariantCulture); }
+            catch
+            {
+                try { return Convert.ToInt32(o, CultureInfo.CurrentCulture); }
+                catch { return 0; }
             }
         }
 
@@ -585,9 +756,6 @@ namespace Finly.Pages
                 return false;
             }
 
-            // UWAGA: tu zostawiamy Twoją logikę walidacji "alokacji kopert" względem odłożonej gotówki.
-            // Jeśli "SavedCash" w DB to "odłożona gotówka razem", OK.
-            // Jeśli nie – trzeba to też przepiąć na snapshot (wtedy potrzebujemy pola SavedTotal).
             var savedTotal = DatabaseService.GetSavedCash(userId);
 
             var dt = DatabaseService.GetEnvelopesTable(userId);
