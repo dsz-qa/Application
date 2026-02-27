@@ -14,14 +14,14 @@
 
     <UserControl.Resources>
 
-        <!-- Style jak w BanksPage -->
+        <!-- Style wspólne -->
         <Style x:Key="Card" TargetType="Border">
-            <Setter Property="Background"      Value="{DynamicResource Surface.Background}"/>
-            <Setter Property="BorderBrush"     Value="{DynamicResource Surface.Border}"/>
+            <Setter Property="Background" Value="{DynamicResource Surface.Background}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource Surface.Border}"/>
             <Setter Property="BorderThickness" Value="1"/>
-            <Setter Property="CornerRadius"    Value="10"/>
-            <Setter Property="Padding"         Value="12"/>
-            <Setter Property="Margin"          Value="0,12,16,0"/>
+            <Setter Property="CornerRadius" Value="10"/>
+            <Setter Property="Padding" Value="12"/>
+            <Setter Property="Margin" Value="0,12,16,0"/>
         </Style>
 
         <Style x:Key="SelectableGoalCard" TargetType="Border" BasedOn="{StaticResource Card}">
@@ -35,34 +35,39 @@
         </Style>
 
         <Style x:Key="AccentCard" TargetType="Border" BasedOn="{StaticResource Card}">
-            <Setter Property="BorderBrush"     Value="{DynamicResource Brand.Blue}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource Brand.Blue}"/>
             <Setter Property="BorderThickness" Value="2"/>
-            <Setter Property="Margin"          Value="0,16,16,0"/>
+            <Setter Property="Margin" Value="0,16,16,0"/>
         </Style>
 
         <Style x:Key="CardHeader" TargetType="TextBlock">
-            <Setter Property="FontSize"   Value="13"/>
+            <Setter Property="FontSize" Value="13"/>
             <Setter Property="FontWeight" Value="SemiBold"/>
             <Setter Property="Foreground" Value="{DynamicResource App.Foreground}"/>
-            <Setter Property="Opacity"    Value="0.9"/>
+            <Setter Property="Opacity" Value="0.9"/>
         </Style>
 
         <Style x:Key="KpiValueStyle" TargetType="TextBlock">
-            <Setter Property="FontSize"   Value="20"/>
+            <Setter Property="FontSize" Value="20"/>
             <Setter Property="FontWeight" Value="Bold"/>
-            <Setter Property="Margin"     Value="0,4,0,0"/>
+            <Setter Property="Margin" Value="0,4,0,0"/>
             <Setter Property="Foreground" Value="{DynamicResource App.Foreground}"/>
         </Style>
 
-        <!-- KARTA CELU (z paskiem postępu) -->
+        <!-- ===== KARTA CELU ===== -->
         <DataTemplate DataType="{x:Type local:GoalVm}">
             <Border Style="{StaticResource SelectableGoalCard}"
-        Width="340"
-        MouseLeftButtonUp="GoalCard_MouseLeftButtonUp">
+                    Width="340"
+                    MouseLeftButtonUp="GoalCard_MouseLeftButtonUp">
                 <StackPanel>
 
+                    <!-- Nagłówek -->
                     <StackPanel Orientation="Horizontal" Margin="0,0,0,6" Background="Transparent">
-                        <Rectangle Width="24" Height="24" Margin="0,0,8,0" VerticalAlignment="Top" Fill="{DynamicResource Brand.Orange}">
+                        <Rectangle Width="24"
+                                   Height="24"
+                                   Margin="0,0,8,0"
+                                   VerticalAlignment="Top"
+                                   Fill="{DynamicResource Brand.Orange}">
                             <Rectangle.OpacityMask>
                                 <ImageBrush Stretch="Uniform" ImageSource="/Assets/Icons/cele.png"/>
                             </Rectangle.OpacityMask>
@@ -79,18 +84,37 @@
                         </TextBlock>
                     </StackPanel>
 
-                    <TextBlock Text="Docelowa kwota" FontWeight="Bold" Foreground="{DynamicResource App.Foreground}" Opacity="0.9"/>
-                    <TextBlock Text="{Binding TargetAmount, StringFormat={}{0:N2} zł}" Margin="0,2,0,6" Foreground="{DynamicResource App.Foreground}"/>
+                    <TextBlock Text="Docelowa kwota"
+                               FontWeight="Bold"
+                               Foreground="{DynamicResource App.Foreground}"
+                               Opacity="0.9"/>
+                    <TextBlock Text="{Binding TargetAmount, StringFormat={}{0:N2} zł}"
+                               Margin="0,2,0,6"
+                               Foreground="{DynamicResource App.Foreground}"/>
 
-                    <TextBlock Text="Już odłożone" FontWeight="Bold" Foreground="{DynamicResource App.Foreground}" Opacity="0.9"/>
-                    <TextBlock Text="{Binding CurrentAmount, StringFormat={}{0:N2} zł}" Margin="0,2,0,6" Foreground="{DynamicResource App.Foreground}"/>
+                    <TextBlock Text="Już odłożone"
+                               FontWeight="Bold"
+                               Foreground="{DynamicResource App.Foreground}"
+                               Opacity="0.9"/>
+                    <TextBlock Text="{Binding CurrentAmount, StringFormat={}{0:N2} zł}"
+                               Margin="0,2,0,6"
+                               Foreground="{DynamicResource App.Foreground}"/>
 
-                    <TextBlock Text="Do celu pozostało" FontWeight="Bold" Foreground="{DynamicResource App.Foreground}" Opacity="0.9"/>
-                    <TextBlock Text="{Binding Remaining, StringFormat={}{0:N2} zł}" Margin="0,2,0,6" Foreground="{DynamicResource App.Foreground}"/>
+                    <TextBlock Text="Do celu pozostało"
+                               FontWeight="Bold"
+                               Foreground="{DynamicResource App.Foreground}"
+                               Opacity="0.9"/>
+                    <TextBlock Text="{Binding Remaining, StringFormat={}{0:N2} zł}"
+                               Margin="0,2,0,6"
+                               Foreground="{DynamicResource App.Foreground}"/>
 
-                    <TextBlock Text="Zrealizowano" FontWeight="Bold" Foreground="{DynamicResource App.Foreground}" Opacity="0.9"/>
+                    <TextBlock Text="Zrealizowano"
+                               FontWeight="Bold"
+                               Foreground="{DynamicResource App.Foreground}"
+                               Opacity="0.9"/>
                     <StackPanel Margin="0,2,0,6">
-                        <TextBlock Text="{Binding CompletionPercent, StringFormat={}{0:N0}%}" Foreground="{DynamicResource App.Foreground}"/>
+                        <TextBlock Text="{Binding CompletionPercent, StringFormat={}{0:N0}%}"
+                                   Foreground="{DynamicResource App.Foreground}"/>
                         <ProgressBar Height="6"
                                      Margin="0,4,0,0"
                                      Minimum="0"
@@ -98,25 +122,43 @@
                                      Value="{Binding CompletionPercent, Mode=OneWay}"/>
                     </StackPanel>
 
-                    <TextBlock Text="Miesięcznie musisz odkładać" FontWeight="Bold" Foreground="{DynamicResource App.Foreground}" Opacity="0.9"/>
-                    <TextBlock Text="{Binding MonthlyNeeded, StringFormat={}{0:N2} zł}" Margin="0,2,0,6" Foreground="{DynamicResource App.Foreground}"/>
+                    <TextBlock Text="Miesięcznie musisz odkładać"
+                               FontWeight="Bold"
+                               Foreground="{DynamicResource App.Foreground}"
+                               Opacity="0.9"/>
+                    <TextBlock Text="{Binding MonthlyNeeded, StringFormat={}{0:N2} zł}"
+                               Margin="0,2,0,6"
+                               Foreground="{DynamicResource App.Foreground}"/>
 
-                    <TextBlock Text="Termin osiągnięcia celu" FontWeight="Bold" Foreground="{DynamicResource App.Foreground}" Opacity="0.9"/>
+                    <TextBlock Text="Termin osiągnięcia celu"
+                               FontWeight="Bold"
+                               Foreground="{DynamicResource App.Foreground}"
+                               Opacity="0.9"/>
                     <TextBlock Margin="0,2,0,6"
                                Foreground="{DynamicResource App.Foreground}"
                                Text="{Binding DueDate, StringFormat={}{0:dd.MM.yyyy}, TargetNullValue=Brak terminu}"/>
 
-                    <TextBlock Text="Opis" FontWeight="Bold" Foreground="{DynamicResource App.Foreground}" Opacity="0.9"/>
+                    <TextBlock Text="Opis"
+                               FontWeight="Bold"
+                               Foreground="{DynamicResource App.Foreground}"
+                               Opacity="0.9"/>
                     <TextBlock Text="{Binding Description}"
                                Margin="0,2,0,4"
                                TextWrapping="Wrap"
                                Foreground="{DynamicResource App.Foreground}"/>
 
-                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,10,0,0">
-                        <Button Click="EditGoal_Click" Style="{StaticResource EditIconButton}" Margin="0,0,8,0"/>
-                        <Button Click="DeleteGoal_Click" Style="{StaticResource DeleteIconButton}"/>
+                    <!-- Przyciski -->
+                    <StackPanel Orientation="Horizontal"
+                                HorizontalAlignment="Right"
+                                Margin="0,10,0,0">
+                        <Button Click="EditGoal_Click"
+                                Style="{StaticResource EditIconButton}"
+                                Margin="0,0,8,0"/>
+                        <Button Click="DeleteGoal_Click"
+                                Style="{StaticResource DeleteIconButton}"/>
                     </StackPanel>
 
+                    <!-- Panel potwierdzenia usunięcia -->
                     <StackPanel x:Name="GoalDeleteConfirmPanel"
                                 Orientation="Vertical"
                                 Margin="0,6,0,0"
@@ -124,7 +166,9 @@
                         <TextBlock Text="Czy na pewno chcesz usunąć ten cel?"
                                    FontSize="12"
                                    Foreground="{DynamicResource App.Foreground}"
-                                   Margin="0,0,0,4"/>
+                                   Margin="0,0,0,4"
+                                   TextWrapping="Wrap"/>
+
                         <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
                             <Button Content="Tak"
                                     Margin="0,0,8,0"
@@ -142,7 +186,7 @@
             </Border>
         </DataTemplate>
 
-        <!-- KAFEL „DODAJ CEL” -->
+        <!-- ===== KAFEL „DODAJ CEL” ===== -->
         <DataTemplate DataType="{x:Type local:AddGoalTile}">
             <Border Style="{StaticResource Card}"
                     Width="260"
@@ -153,6 +197,7 @@
                             BorderThickness="1"
                             CornerRadius="8"
                             BorderBrush="{DynamicResource Surface.Border}"/>
+
                     <StackPanel HorizontalAlignment="Center"
                                 VerticalAlignment="Center"
                                 Margin="0,16,0,16">
@@ -174,11 +219,13 @@
 
     </UserControl.Resources>
 
-    <ScrollViewer VerticalScrollBarVisibility="Auto">
-        <Grid Margin="24">
+    <!-- CAŁA STRONA -->
+    <ScrollViewer VerticalScrollBarVisibility="Auto"
+                  HorizontalScrollBarVisibility="Disabled">
+        <Grid Margin="24,24,24,60">
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto"/>
-                <RowDefinition Height="*"/>
+                <RowDefinition Height="Auto"/>
             </Grid.RowDefinitions>
 
             <!-- KPI -->
@@ -194,10 +241,12 @@
                         <TextBlock Text="Cele – łączna kwota do uzbierania"
                                    Style="{StaticResource CardHeader}"
                                    FontSize="18"
-                                   FontWeight="Bold"/>
+                                   FontWeight="Bold"
+                                   TextWrapping="Wrap"/>
                         <TextBlock x:Name="TotalGoalsAmountText"
                                    Style="{StaticResource KpiValueStyle}"
-                                   FontSize="24"/>
+                                   FontSize="24"
+                                   Text="0,00 zł"/>
                     </StackPanel>
                 </Border>
 
@@ -206,22 +255,27 @@
                         <TextBlock Text="Już odłożone na cele"
                                    Style="{StaticResource CardHeader}"
                                    FontSize="18"
-                                   FontWeight="Bold"/>
+                                   FontWeight="Bold"
+                                   TextWrapping="Wrap"/>
                         <TextBlock x:Name="TotalGoalsSavedText"
                                    Style="{StaticResource KpiValueStyle}"
-                                   FontSize="24"/>
+                                   FontSize="24"
+                                   Text="0,00 zł"/>
                     </StackPanel>
                 </Border>
 
-                <Border Grid.Column="2" Style="{StaticResource AccentCard}">
+                <!-- ostatni kafelek bez prawego marginesu AccentCard -->
+                <Border Grid.Column="2" Style="{StaticResource AccentCard}" Margin="0,16,0,0">
                     <StackPanel>
                         <TextBlock Text="Łącznie miesięcznie trzeba odkładać"
                                    Style="{StaticResource CardHeader}"
                                    FontSize="18"
-                                   FontWeight="Bold"/>
+                                   FontWeight="Bold"
+                                   TextWrapping="Wrap"/>
                         <TextBlock x:Name="TotalMonthlyNeededText"
                                    Style="{StaticResource KpiValueStyle}"
-                                   FontSize="24"/>
+                                   FontSize="24"
+                                   Text="0,00 zł"/>
                     </StackPanel>
                 </Border>
             </Grid>
@@ -233,63 +287,67 @@
                            Opacity="0.8"
                            Margin="0,0,0,8"/>
 
-				<StackPanel Orientation="Horizontal" Margin="0,4,0,12">
-					<Rectangle Width="30"
-							   Height="30"
-							   Margin="0,0,12,0"
-							   VerticalAlignment="Center"
-							   Fill="{DynamicResource Brand.Orange}">
-						<Rectangle.OpacityMask>
-							<ImageBrush Stretch="Uniform" ImageSource="/Assets/Icons/cele.png"/>
-						</Rectangle.OpacityMask>
-					</Rectangle>
+                <!-- Nagłówek sekcji -->
+                <StackPanel Orientation="Horizontal" Margin="0,4,0,12">
+                    <Rectangle Width="30"
+                               Height="30"
+                               Margin="0,0,12,0"
+                               VerticalAlignment="Center"
+                               Fill="{DynamicResource Brand.Orange}">
+                        <Rectangle.OpacityMask>
+                            <ImageBrush Stretch="Uniform" ImageSource="/Assets/Icons/cele.png"/>
+                        </Rectangle.OpacityMask>
+                    </Rectangle>
 
-					<TextBlock Text="Cele"
-							   FontSize="24"
-							   FontWeight="Bold"
-							   Foreground="{DynamicResource App.Foreground}"
-							   VerticalAlignment="Center"/>
-				</StackPanel>
+                    <TextBlock Text="Cele"
+                               FontSize="24"
+                               FontWeight="Bold"
+                               Foreground="{DynamicResource App.Foreground}"
+                               VerticalAlignment="Center"/>
+                </StackPanel>
 
-
-				<!-- STABILNE DnD: ListBox daje kontenery ListBoxItem -->
                 <ListBox x:Name="GoalsList"
                          Margin="0,8,0,0"
-                         AllowDrop="True"
                          Background="Transparent"
                          BorderThickness="0"
                          Padding="0"
+                         AllowDrop="True"
                          PreviewMouseLeftButtonDown="GoalsList_PreviewMouseLeftButtonDown"
                          PreviewMouseMove="GoalsList_PreviewMouseMove"
-                         Drop="GoalsList_Drop">
+                         Drop="GoalsList_Drop"
+                         ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                         ScrollViewer.VerticalScrollBarVisibility="Disabled">
 
-                    <ListBox.ItemsPanel>
-                        <ItemsPanelTemplate>
-                            <WrapPanel HorizontalAlignment="Stretch"/>
-                        </ItemsPanelTemplate>
-                    </ListBox.ItemsPanel>
-
-                    <!-- usuwa “listboxowy” wygląd i zaznaczenia -->
                     <ListBox.ItemContainerStyle>
-                        <Style TargetType="ListBoxItem">
+                        <Style TargetType="{x:Type ListBoxItem}">
                             <Setter Property="Padding" Value="0"/>
                             <Setter Property="Margin" Value="0"/>
                             <Setter Property="Background" Value="Transparent"/>
                             <Setter Property="BorderThickness" Value="0"/>
-                            <Setter Property="Focusable" Value="False"/>
                             <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
                             <Setter Property="VerticalContentAlignment" Value="Top"/>
+                            <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
+                            <Setter Property="IsHitTestVisible" Value="True"/>
                             <Setter Property="Template">
                                 <Setter.Value>
-                                    <ControlTemplate TargetType="ListBoxItem">
+                                    <ControlTemplate TargetType="{x:Type ListBoxItem}">
                                         <ContentPresenter/>
                                     </ControlTemplate>
                                 </Setter.Value>
                             </Setter>
                         </Style>
                     </ListBox.ItemContainerStyle>
-                </ListBox>
 
+                    <ListBox.ItemsPanel>
+                        <ItemsPanelTemplate>
+                            <!-- klucz: IsItemsHost + brak nieskończonej szerokości => Wrap działa -->
+                            <WrapPanel Orientation="Horizontal"
+                                       HorizontalAlignment="Left"
+                                       IsItemsHost="True"/>
+                        </ItemsPanelTemplate>
+                    </ListBox.ItemsPanel>
+
+                </ListBox>
             </StackPanel>
 
         </Grid>
