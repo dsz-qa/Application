@@ -1,17 +1,26 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Globalization;
+using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
-using Finly.Pages; // BudgetRow
+using Finly.Pages;
 using Finly.Helpers.Converters;
 
 namespace Finly.Views.Dialogs
 {
     public partial class EditBudgetDialog : Window
     {
+        private sealed class BudgetCopyCandidateItem
+        {
+            public BudgetRow Source { get; set; } = new BudgetRow();
+            public string DisplayText { get; set; } = string.Empty;
+        }
+
         public BudgetDialogViewModel Budget { get; private set; }
 
+        private readonly List<BudgetCopyCandidateItem> _copyCandidates = new();
         private bool _isEditMode;
         private bool _isCustomRange;
 
@@ -28,21 +37,66 @@ namespace Finly.Views.Dialogs
             Budget = new BudgetDialogViewModel();
             DataContext = Budget;
 
-            // domyślnie: dodawanie
             SetMode(BudgetDialogMode.Add);
+            Loaded += EditBudgetDialog_Loaded;
+        }
 
-            Loaded += (_, __) =>
+        public void SetCopyCandidates(IEnumerable<BudgetRow>? budgets)
+        {
+            _copyCandidates.Clear();
+
+            var today = DateTime.Today;
+
+            if (budgets != null)
             {
-                Budget.StartDate ??= DateTime.Today;
+                _copyCandidates.AddRange(
+                    budgets
+                        .Where(b => b != null && b.StartDate.Date <= today)
+                        .OrderByDescending(b => b.EndDate)
+                        .ThenByDescending(b => b.StartDate)
+                        .ThenBy(b => b.Name)
+                        .Select(b => new BudgetCopyCandidateItem
+                        {
+                            Source = b,
+                            DisplayText = $"{b.Name} | {b.TypeDisplay} | {b.Period} | {b.PlannedAmount:N2} zł"
+                        }));
+            }
 
+            if (CopyBudgetCombo != null)
+            {
+                CopyBudgetCombo.ItemsSource = _copyCandidates;
+                CopyBudgetCombo.DisplayMemberPath = nameof(BudgetCopyCandidateItem.DisplayText);
+                CopyBudgetCombo.SelectedIndex = -1;
+            }
+
+            RefreshCopyPanelVisibility();
+        }
+
+        private void EditBudgetDialog_Loaded(object sender, RoutedEventArgs e)
+        {
+            Budget.StartDate ??= DateTime.Today;
+            Budget.Type = NormalizeBudgetType(Budget.Type);
+
+            EnsurePeriodComboSelectedFromType();
+            RefreshCopyPanelVisibility();
+            HideInlineError();
+
+            if (Budget.Type == "Custom")
+            {
+                _isCustomRange = true;
+                CustomRangePanel.Visibility = Visibility.Visible;
+
+                if (Budget.EndDate == null && Budget.StartDate != null)
+                    Budget.EndDate = Budget.StartDate.Value.Date;
+            }
+            else
+            {
                 _isCustomRange = false;
                 CustomRangePanel.Visibility = Visibility.Collapsed;
-
-                HideInlineError();
-
                 RecalcEndDateIfNeeded();
-                EnsurePlannedTextFromVm();
-            };
+            }
+
+            EnsurePlannedTextFromVm();
         }
 
         public void SetMode(BudgetDialogMode mode)
@@ -50,75 +104,159 @@ namespace Finly.Views.Dialogs
             _isEditMode = mode == BudgetDialogMode.Edit;
 
             if (HeaderTitleText != null)
-                HeaderTitleText.Text = mode == BudgetDialogMode.Add ? "Dodawanie budżetu" : "Edycja budżetu";
+                HeaderTitleText.Text = _isEditMode ? "Edycja budżetu" : "Dodawanie budżetu";
 
             if (HeaderSubtitleText != null)
             {
-                HeaderSubtitleText.Text = mode == BudgetDialogMode.Add
-                    ? "Ustaw okres i kwotę, a następnie zapisz budżet."
-                    : "Zmień dane budżetu, a następnie zapisz zmiany.";
+                HeaderSubtitleText.Text = _isEditMode
+                    ? "Zmień dane budżetu, a następnie zapisz zmiany."
+                    : "Ustaw okres i kwotę albo skopiuj poprzedni budżet.";
             }
+
+            RefreshCopyPanelVisibility();
         }
 
         public void LoadBudget(BudgetRow row)
         {
             if (row == null) throw new ArgumentNullException(nameof(row));
 
-            // przełącz w tryb edycji (nagłówek + opis)
             SetMode(BudgetDialogMode.Edit);
 
             Budget.Name = row.Name;
-
-            var start = row.StartDate.Date;
-            var end = row.EndDate.Date;
-
-            var days = (end - start).Days;
-
-            bool looksWeekly = days == 6;
-            bool looksMonthly = end == new DateTime(start.Year, start.Month, 1).AddMonths(1).AddDays(-1);
-            bool looksYearly = end == new DateTime(start.Year, 12, 31);
-
-            var rawType = (row.Type ?? "").Trim();
-
-            bool isExplicitCustom =
-                rawType.Equals("Custom", StringComparison.OrdinalIgnoreCase) ||
-                rawType.Equals("Inny", StringComparison.OrdinalIgnoreCase);
-
-            bool isImplicitCustom = !looksWeekly && !looksMonthly && !looksYearly;
-
-            if (isExplicitCustom || isImplicitCustom)
-            {
-                Budget.Type = "Custom";
-                Budget.StartDate = start;
-                Budget.EndDate = end;
-
-                _isCustomRange = true;
-                CustomRangePanel.Visibility = Visibility.Visible;
-
-                Budget.PlannedAmount = row.PlannedAmount;
-
-                HideInlineError();
-                EnsurePlannedTextFromVm();
-                return;
-            }
-
-            Budget.Type = looksWeekly ? "Weekly"
-                        : looksYearly ? "Yearly"
-                        : "Monthly";
-
-            Budget.StartDate = start;
-            Budget.EndDate = null; // wyliczamy automatycznie
             Budget.PlannedAmount = row.PlannedAmount;
 
-            _isCustomRange = false;
-            CustomRangePanel.Visibility = Visibility.Collapsed;
+            var normalizedType = InferBudgetType(row);
 
+            Budget.Type = normalizedType;
+            Budget.StartDate = row.StartDate.Date;
+
+            if (normalizedType == "Custom")
+            {
+                Budget.EndDate = row.EndDate.Date;
+                _isCustomRange = true;
+                CustomRangePanel.Visibility = Visibility.Visible;
+            }
+            else
+            {
+                Budget.EndDate = null;
+                _isCustomRange = false;
+                CustomRangePanel.Visibility = Visibility.Collapsed;
+                RecalcEndDateIfNeeded();
+            }
+
+            EnsurePeriodComboSelectedFromType();
             HideInlineError();
-            RecalcEndDateIfNeeded();
             EnsurePlannedTextFromVm();
         }
 
-        // ======= TitleBar =======
+        private static string NormalizeBudgetType(string? type)
+        {
+            var value = (type ?? string.Empty).Trim();
+
+            if (value.Equals("Weekly", StringComparison.OrdinalIgnoreCase) ||
+                value.Equals("Tygodniowy", StringComparison.OrdinalIgnoreCase))
+                return "Weekly";
+
+            if (value.Equals("Monthly", StringComparison.OrdinalIgnoreCase) ||
+                value.Equals("Miesięczny", StringComparison.OrdinalIgnoreCase))
+                return "Monthly";
+
+            if (value.Equals("Yearly", StringComparison.OrdinalIgnoreCase) ||
+                value.Equals("Roczny", StringComparison.OrdinalIgnoreCase))
+                return "Yearly";
+
+            if (value.Equals("Custom", StringComparison.OrdinalIgnoreCase) ||
+                value.Equals("Inny", StringComparison.OrdinalIgnoreCase))
+                return "Custom";
+
+            return "Monthly";
+        }
+
+        private static string InferBudgetType(BudgetRow row)
+        {
+            var rawType = NormalizeBudgetType(row.Type);
+
+            if (rawType != "Custom")
+                return rawType;
+
+            var start = row.StartDate.Date;
+            var end = row.EndDate.Date;
+            var days = (end - start).Days;
+
+            var looksWeekly = days == 6;
+            var looksMonthly = start.Day == 1 &&
+                               end == new DateTime(start.Year, start.Month, 1).AddMonths(1).AddDays(-1);
+            var looksYearly = start.Month == 1 &&
+                              start.Day == 1 &&
+                              end == new DateTime(start.Year, 12, 31);
+
+            if (looksWeekly) return "Weekly";
+            if (looksMonthly) return "Monthly";
+            if (looksYearly) return "Yearly";
+
+            return "Custom";
+        }
+
+        private void RefreshCopyPanelVisibility()
+        {
+            if (CopyBudgetPanel == null)
+                return;
+
+            CopyBudgetPanel.Visibility = !_isEditMode && _copyCandidates.Count > 0
+                ? Visibility.Visible
+                : Visibility.Collapsed;
+        }
+
+        private void EnsurePeriodComboSelectedFromType()
+        {
+            if (PeriodCombo == null)
+                return;
+
+            PeriodCombo.SelectedValue = NormalizeBudgetType(Budget.Type);
+        }
+
+        private void CopyBudgetCombo_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            if (_isEditMode)
+                return;
+
+            if (CopyBudgetCombo.SelectedItem is not BudgetCopyCandidateItem item || item.Source == null)
+                return;
+
+            ApplyCopyCandidate(item.Source);
+        }
+
+        private void ApplyCopyCandidate(BudgetRow source)
+        {
+            var normalizedType = InferBudgetType(source);
+            var nextStart = source.EndDate.Date.AddDays(1);
+
+            Budget.Name = source.Name;
+            Budget.PlannedAmount = source.PlannedAmount;
+            Budget.Type = normalizedType;
+            Budget.StartDate = nextStart;
+
+            if (normalizedType == "Custom")
+            {
+                var spanDays = Math.Max(0, (source.EndDate.Date - source.StartDate.Date).Days);
+                Budget.EndDate = nextStart.AddDays(spanDays);
+
+                _isCustomRange = true;
+                CustomRangePanel.Visibility = Visibility.Visible;
+            }
+            else
+            {
+                Budget.EndDate = null;
+
+                _isCustomRange = false;
+                CustomRangePanel.Visibility = Visibility.Collapsed;
+                RecalcEndDateIfNeeded();
+            }
+
+            EnsurePeriodComboSelectedFromType();
+            HideInlineError();
+            EnsurePlannedTextFromVm();
+        }
 
         private void TitleBar_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
         {
@@ -131,8 +269,6 @@ namespace Finly.Views.Dialogs
             DialogResult = false;
             Close();
         }
-
-        // ======= Inline validation =======
 
         private void NameTextBox_TextChanged(object sender, TextChangedEventArgs e)
         {
@@ -160,18 +296,17 @@ namespace Finly.Views.Dialogs
             }
         }
 
-        // ===================== OKRES =====================
-
         private void PeriodCombo_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
             HideInlineError();
 
-            if (PeriodCombo.SelectedItem is ComboBoxItem item && item.Tag is string tag && tag == "Custom")
+            var selectedType = NormalizeBudgetType(PeriodCombo.SelectedValue as string ?? Budget.Type);
+            Budget.Type = selectedType;
+
+            if (selectedType == "Custom")
             {
                 _isCustomRange = true;
                 CustomRangePanel.Visibility = Visibility.Visible;
-
-                Budget.Type = "Custom";
 
                 if (Budget.EndDate == null && Budget.StartDate != null)
                     Budget.EndDate = Budget.StartDate.Value.Date;
@@ -194,7 +329,8 @@ namespace Finly.Views.Dialogs
                 if (Budget.StartDate != null && Budget.EndDate == null)
                     Budget.EndDate = Budget.StartDate.Value.Date;
 
-                if (Budget.StartDate != null && Budget.EndDate != null &&
+                if (Budget.StartDate != null &&
+                    Budget.EndDate != null &&
                     Budget.EndDate.Value.Date < Budget.StartDate.Value.Date)
                 {
                     Budget.EndDate = Budget.StartDate.Value.Date;
@@ -212,23 +348,17 @@ namespace Finly.Views.Dialogs
             if (Budget.StartDate == null) return;
 
             var start = Budget.StartDate.Value.Date;
-            var t = (Budget.Type ?? "Monthly").Trim();
+            var type = NormalizeBudgetType(Budget.Type);
 
-            if (t.Equals("Custom", StringComparison.OrdinalIgnoreCase))
-                return;
-
-            Budget.EndDate = t switch
+            Budget.Type = type;
+            Budget.EndDate = type switch
             {
                 "Weekly" => start.AddDays(6),
                 "Monthly" => new DateTime(start.Year, start.Month, 1).AddMonths(1).AddDays(-1),
                 "Yearly" => new DateTime(start.Year, 12, 31),
-                "OneTime" => start,
-                "Rollover" => new DateTime(start.Year, start.Month, 1).AddMonths(1).AddDays(-1),
                 _ => new DateTime(start.Year, start.Month, 1).AddMonths(1).AddDays(-1)
             };
         }
-
-        // ===================== KWOTA =====================
 
         private void EnsurePlannedTextFromVm()
         {
@@ -253,17 +383,20 @@ namespace Finly.Views.Dialogs
             HideInlineError();
 
             var tb = (TextBox)sender;
-            var t = (tb.Text ?? string.Empty).Trim();
+            var text = (tb.Text ?? string.Empty).Trim();
 
-            t = t.Replace(" ", "").Replace("\u00A0", "").Replace("\u202F", "").Replace("'", "");
+            text = text.Replace(" ", "")
+                       .Replace("\u00A0", "")
+                       .Replace("\u202F", "")
+                       .Replace("'", "");
 
-            if (t.EndsWith(",00", StringComparison.Ordinal) || t.EndsWith(".00", StringComparison.Ordinal))
-                t = t.Substring(0, t.Length - 3);
+            if (text.EndsWith(",00", StringComparison.Ordinal) || text.EndsWith(".00", StringComparison.Ordinal))
+                text = text[..^3];
 
-            if (t == "0" || t == "0," || t == "0." || string.IsNullOrWhiteSpace(t))
+            if (text == "0" || text == "0," || text == "0." || string.IsNullOrWhiteSpace(text))
                 tb.Clear();
             else
-                tb.Text = t;
+                tb.Text = text;
 
             tb.SelectAll();
         }
@@ -286,20 +419,18 @@ namespace Finly.Views.Dialogs
                 return;
             }
 
-            if (FlexibleDecimalConverter.TryParseFlexibleDecimal(raw, out var val))
+            if (FlexibleDecimalConverter.TryParseFlexibleDecimal(raw, out var value))
             {
-                val = Math.Round(val, 2, MidpointRounding.AwayFromZero);
+                value = Math.Round(value, 2, MidpointRounding.AwayFromZero);
 
-                Budget.PlannedAmount = val;
-                PlannedAmountTextBox.Text = val.ToString("0.00", CultureInfo.CurrentCulture);
+                Budget.PlannedAmount = value;
+                PlannedAmountTextBox.Text = value.ToString("0.00", CultureInfo.CurrentCulture);
                 return;
             }
 
             Budget.PlannedAmount = 0m;
             PlannedAmountTextBox.Text = 0m.ToString("0.00", CultureInfo.CurrentCulture);
         }
-
-        // ===================== ZAPIS =====================
 
         private void Ok_Click(object sender, RoutedEventArgs e)
         {
@@ -340,6 +471,7 @@ namespace Finly.Views.Dialogs
             else
             {
                 RecalcEndDateIfNeeded();
+                vm.Type = NormalizeBudgetType(vm.Type);
             }
 
             if (vm.PlannedAmount < 0)

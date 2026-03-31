@@ -40,7 +40,9 @@
                        shell:WindowChrome.IsHitTestVisibleInChrome="True"/>
 
             <StackPanel Grid.Column="1" Orientation="Horizontal">
-                <Button Width="46" Height="32" Padding="0"
+                <Button Width="46"
+                        Height="32"
+                        Padding="0"
                         Background="Transparent"
                         BorderBrush="{x:Null}"
                         Foreground="{DynamicResource App.Foreground}"
@@ -48,7 +50,8 @@
                         FocusVisualStyle="{x:Null}"
                         shell:WindowChrome.IsHitTestVisibleInChrome="True"
                         Click="Close_Click">
-                    <TextBlock Text="✕" FontSize="12"
+                    <TextBlock Text="✕"
+                               FontSize="12"
                                HorizontalAlignment="Center"
                                VerticalAlignment="Center"/>
                 </Button>
@@ -62,7 +65,7 @@
                 BorderBrush="{DynamicResource Surface.Border}"
                 BorderThickness="1"
                 CornerRadius="12"
-                MinWidth="560">
+                MinWidth="620">
 
             <Border Padding="16"
                     Background="{DynamicResource Surface.Background}"
@@ -79,6 +82,7 @@
                         <RowDefinition Height="Auto"/>
                         <RowDefinition Height="Auto"/>
                         <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
                         <RowDefinition Height="18"/>
                         <RowDefinition Height="Auto"/>
                     </Grid.RowDefinitions>
@@ -88,7 +92,9 @@
                         <ColumnDefinition Width="*"/>
                     </Grid.ColumnDefinitions>
 
-                    <Grid Grid.Row="0" Grid.ColumnSpan="2" Margin="0,0,0,6">
+                    <Grid Grid.Row="0"
+                          Grid.ColumnSpan="2"
+                          Margin="0,0,0,6">
                         <StackPanel>
                             <TextBlock x:Name="HeaderTitleText"
                                        Text="Dodawanie budżetu"
@@ -102,12 +108,42 @@
                         </StackPanel>
                     </Grid>
 
-                    <TextBlock Grid.Row="2" Grid.Column="0"
+                    <Grid x:Name="CopyBudgetPanel"
+                          Grid.Row="2"
+                          Grid.ColumnSpan="2"
+                          Margin="0,0,0,4"
+                          Visibility="Collapsed">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="180"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+
+                        <TextBlock Grid.Column="0"
+                                   Text="Skopiuj z budżetu:"
+                                   VerticalAlignment="Center"
+                                   Margin="0,0,10,0"/>
+
+                        <StackPanel Grid.Column="1">
+                            <ComboBox x:Name="CopyBudgetCombo"
+                                      MinWidth="300"
+                                      SelectionChanged="CopyBudgetCombo_SelectionChanged"
+                                      ToolTip="Wybierz wcześniejszy budżet, aby skopiować nazwę, kwotę i ustawić kolejny okres."/>
+
+                            <TextBlock Text="Po wyborze formularz uzupełni nazwę, kwotę i zaproponuje następny okres."
+                                       Foreground="{DynamicResource App.Foreground}"
+                                       Opacity="0.75"
+                                       Margin="2,4,0,0"
+                                       TextWrapping="Wrap"/>
+                        </StackPanel>
+                    </Grid>
+
+                    <TextBlock Grid.Row="3"
+                               Grid.Column="0"
                                Text="Nazwa budżetu:"
                                VerticalAlignment="Center"
                                Margin="0,0,10,0"/>
 
-                    <StackPanel Grid.Row="2" Grid.Column="1">
+                    <StackPanel Grid.Row="3" Grid.Column="1">
                         <TextBox x:Name="NameTextBox"
                                  MinWidth="300"
                                  Text="{Binding Name, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
@@ -121,36 +157,41 @@
                                    Visibility="Collapsed"/>
                     </StackPanel>
 
-                    <TextBlock Grid.Row="3" Grid.Column="0"
+                    <TextBlock Grid.Row="4"
+                               Grid.Column="0"
                                Text="Okres:"
                                VerticalAlignment="Center"
                                Margin="0,8,10,0"/>
 
                     <ComboBox x:Name="PeriodCombo"
-                              Grid.Row="3" Grid.Column="1"
+                              Grid.Row="4"
+                              Grid.Column="1"
                               Margin="0,8,0,0"
                               SelectedValuePath="Tag"
                               SelectedValue="{Binding Type, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                               SelectionChanged="PeriodCombo_SelectionChanged">
-                        <ComboBoxItem Content="Tygodniowy" Tag="Weekly" />
-                        <ComboBoxItem Content="Miesięczny" Tag="Monthly" />
-                        <ComboBoxItem Content="Roczny" Tag="Yearly" />
-                        <ComboBoxItem Content="Inny okres (ręcznie)" Tag="Custom" />
+                        <ComboBoxItem Content="Tygodniowy" Tag="Weekly"/>
+                        <ComboBoxItem Content="Miesięczny" Tag="Monthly"/>
+                        <ComboBoxItem Content="Roczny" Tag="Yearly"/>
+                        <ComboBoxItem Content="Inny okres (ręcznie)" Tag="Custom"/>
                     </ComboBox>
 
-                    <TextBlock Grid.Row="4" Grid.Column="0"
+                    <TextBlock Grid.Row="5"
+                               Grid.Column="0"
                                Text="Data startu:"
                                VerticalAlignment="Center"
                                Margin="0,10,10,0"/>
 
                     <DatePicker x:Name="StartDatePicker"
-                                Grid.Row="4" Grid.Column="1"
+                                Grid.Row="5"
+                                Grid.Column="1"
                                 Margin="0,10,0,0"
                                 SelectedDate="{Binding StartDate, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                                 SelectedDateChanged="StartDatePicker_SelectedDateChanged"/>
 
                     <StackPanel x:Name="CustomRangePanel"
-                                Grid.Row="5" Grid.Column="0"
+                                Grid.Row="6"
+                                Grid.Column="0"
                                 Grid.ColumnSpan="2"
                                 Visibility="Collapsed"
                                 Margin="0,10,0,0">
@@ -171,20 +212,22 @@
                         </Grid>
                     </StackPanel>
 
-                    <TextBlock Grid.Row="6" Grid.Column="0"
+                    <TextBlock Grid.Row="7"
+                               Grid.Column="0"
                                Text="Kwota planowana:"
                                VerticalAlignment="Center"
                                Margin="0,10,10,0"/>
 
                     <TextBox x:Name="PlannedAmountTextBox"
-                             Grid.Row="6" Grid.Column="1"
+                             Grid.Row="7"
+                             Grid.Column="1"
                              Margin="0,10,0,0"
                              PreviewMouseLeftButtonDown="PlannedAmount_PreviewMouseLeftButtonDown"
                              GotFocus="PlannedAmount_GotFocus"
                              LostFocus="PlannedAmount_LostFocus"
                              VerticalContentAlignment="Center"/>
 
-                    <StackPanel Grid.Row="8"
+                    <StackPanel Grid.Row="9"
                                 Grid.ColumnSpan="2"
                                 Orientation="Horizontal"
                                 HorizontalAlignment="Right">

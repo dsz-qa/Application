@@ -669,6 +669,11 @@
                                 <TabItem Header="Budżety aktualne"
              Tag="Current"
              Style="{StaticResource BudgetStatusTabItemStyle}"/>
+
+                                <TabItem Header="Budżety przyszłe"
+             Tag="Future"
+             Style="{StaticResource BudgetStatusTabItemStyle}"/>
+
                                 <TabItem Header="Budżety zarchiwizowane"
              Tag="Archived"
              Style="{StaticResource BudgetStatusTabItemStyle}"/>

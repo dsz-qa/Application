@@ -39,23 +39,60 @@ namespace Finly.Pages
         private enum BudgetListScope
         {
             Current,
+            Future,
             Archived
         }
 
         private BudgetListScope _budgetListScope = BudgetListScope.Current;
 
-        private static bool IsArchivedBudget(BudgetRow row)
+        private static BudgetListScope GetBudgetListScope(DateTime startDate, DateTime endDate)
         {
-            if (row == null) return false;
-            return row.EndDate.Date < DateTime.Today;
+            var today = DateTime.Today;
+
+            if (endDate.Date < today)
+                return BudgetListScope.Archived;
+
+            if (startDate.Date > today)
+                return BudgetListScope.Future;
+
+            return BudgetListScope.Current;
+        }
+
+        private void SetBudgetListScope(DateTime startDate, DateTime endDate)
+        {
+            _budgetListScope = GetBudgetListScope(startDate, endDate);
+
+            if (BudgetStatusTabs == null)
+                return;
+
+            var wantedTag = _budgetListScope switch
+            {
+                BudgetListScope.Future => "Future",
+                BudgetListScope.Archived => "Archived",
+                _ => "Current"
+            };
+
+            foreach (var tab in BudgetStatusTabs.Items.OfType<TabItem>())
+            {
+                if (string.Equals(tab.Tag as string, wantedTag, StringComparison.OrdinalIgnoreCase))
+                {
+                    tab.IsSelected = true;
+                    break;
+                }
+            }
         }
 
         private BudgetListScope ResolveBudgetListScope()
         {
-            if (BudgetStatusTabs?.SelectedItem is TabItem tab &&
-                string.Equals(tab.Tag as string, "Archived", StringComparison.OrdinalIgnoreCase))
+            if (BudgetStatusTabs?.SelectedItem is TabItem tab)
             {
-                return BudgetListScope.Archived;
+                var tag = (tab.Tag as string ?? string.Empty).Trim();
+
+                if (tag.Equals("Future", StringComparison.OrdinalIgnoreCase))
+                    return BudgetListScope.Future;
+
+                if (tag.Equals("Archived", StringComparison.OrdinalIgnoreCase))
+                    return BudgetListScope.Archived;
             }
 
             return BudgetListScope.Current;
@@ -220,6 +257,14 @@ namespace Finly.Pages
             try
             {
                 LoadBudgetsFromDatabase();
+
+                if (selectedId.HasValue)
+                {
+                    var selectedFromAll = _allBudgets.FirstOrDefault(x => x.Id == selectedId.Value);
+                    if (selectedFromAll != null)
+                        SetBudgetListScope(selectedFromAll.StartDate, selectedFromAll.EndDate);
+                }
+
                 ApplyFilters();
                 UpdateTopKpis();
 
@@ -464,7 +509,8 @@ ORDER BY date(b.StartDate);";
             query = _budgetListScope switch
             {
                 BudgetListScope.Archived => query.Where(b => b.EndDate.Date < today),
-                _ => query.Where(b => b.EndDate.Date >= today)
+                BudgetListScope.Future => query.Where(b => b.StartDate.Date > today),
+                _ => query.Where(b => b.StartDate.Date <= today && b.EndDate.Date >= today)
             };
 
             var typeValue = "";
@@ -487,11 +533,25 @@ ORDER BY date(b.StartDate);";
                     (b.Period ?? string.Empty).IndexOf(search, StringComparison.OrdinalIgnoreCase) >= 0);
             }
 
-            var result = query
-                .OrderByDescending(b => b.EndDate)
-                .ThenByDescending(b => b.StartDate)
-                .ThenBy(b => b.Name)
-                .ToList();
+            List<BudgetRow> result = _budgetListScope switch
+            {
+                BudgetListScope.Future => query
+                    .OrderBy(b => b.StartDate)
+                    .ThenBy(b => b.EndDate)
+                    .ThenBy(b => b.Name)
+                    .ToList(),
+
+                BudgetListScope.Archived => query
+                    .OrderByDescending(b => b.EndDate)
+                    .ThenByDescending(b => b.StartDate)
+                    .ThenBy(b => b.Name)
+                    .ToList(),
+
+                _ => query
+                    .OrderBy(b => b.EndDate)
+                    .ThenBy(b => b.Name)
+                    .ToList()
+            };
 
             BudgetsList.ItemsSource = result;
 
@@ -1067,6 +1127,7 @@ ORDER BY date(Date);";
                 };
 
                 dialog.SetMode(Views.Dialogs.EditBudgetDialog.BudgetDialogMode.Add);
+                dialog.SetCopyCandidates(_allBudgets);
 
                 var result = dialog.ShowDialog();
 
@@ -1188,6 +1249,14 @@ ORDER BY date(Date);";
             try
             {
                 LoadBudgetsFromDatabase();
+
+                if (preferredId.HasValue)
+                {
+                    var preferred = _allBudgets.FirstOrDefault(x => x.Id == preferredId.Value);
+                    if (preferred != null)
+                        SetBudgetListScope(preferred.StartDate, preferred.EndDate);
+                }
+
                 ApplyFilters();
                 UpdateTopKpis();
 
