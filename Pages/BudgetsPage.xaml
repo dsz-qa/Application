@@ -159,6 +159,64 @@
             <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
         </Style>
 
+
+        <Style x:Key="BudgetPeriodSub" TargetType="TextBlock">
+            <Setter Property="Foreground" Value="{DynamicResource App.Foreground}"/>
+            <Setter Property="Opacity" Value="0.72"/>
+            <Setter Property="FontSize" Value="11"/>
+            <Setter Property="Margin" Value="6,0,6,2"/>
+            <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
+        </Style>
+
+        <Style x:Key="BudgetStatusTabsControlStyle" TargetType="TabControl">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Padding" Value="0"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="TabControl">
+                        <Grid Background="Transparent">
+                            <TabPanel IsItemsHost="True"
+                              Background="Transparent"
+                              KeyboardNavigation.TabIndex="1"/>
+                        </Grid>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="BudgetStatusTabItemStyle" TargetType="TabItem">
+            <Setter Property="Foreground" Value="{DynamicResource App.Foreground}"/>
+            <Setter Property="Margin" Value="0,0,8,0"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="TabItem">
+                        <Border x:Name="TabBorder"
+                        Background="{DynamicResource Surface.Background}"
+                        BorderBrush="{DynamicResource Surface.Border}"
+                        BorderThickness="1"
+                        CornerRadius="8"
+                        Padding="14,8"
+                        SnapsToDevicePixels="True">
+                            <ContentPresenter HorizontalAlignment="Center"
+                                      VerticalAlignment="Center"
+                                      ContentSource="Header"
+                                      RecognizesAccessKey="True"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsSelected" Value="True">
+                                <Setter TargetName="TabBorder" Property="BorderBrush" Value="{DynamicResource Brand.Orange}"/>
+                                <Setter TargetName="TabBorder" Property="BorderThickness" Value="2"/>
+                            </Trigger>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="TabBorder" Property="BorderBrush" Value="{DynamicResource Brand.Blue}"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+        
         <Style x:Key="BudgetListItemStyle" TargetType="ListBoxItem">
             <Setter Property="Padding" Value="0"/>
             <Setter Property="Margin" Value="0,2,0,2"/>
@@ -602,30 +660,55 @@
                                          ToolTip="Wyszukiwanie po nazwie budżetu lub typie (np. Miesięczny, Inny)"/>
                             </Grid>
 
+
+                            <TabControl x:Name="BudgetStatusTabs"
+            Margin="0,0,0,10"
+            SelectedIndex="0"
+            SelectionChanged="BudgetStatusTabs_SelectionChanged"
+            Style="{StaticResource BudgetStatusTabsControlStyle}">
+                                <TabItem Header="Budżety aktualne"
+             Tag="Current"
+             Style="{StaticResource BudgetStatusTabItemStyle}"/>
+                                <TabItem Header="Budżety zarchiwizowane"
+             Tag="Archived"
+             Style="{StaticResource BudgetStatusTabItemStyle}"/>
+                            </TabControl>
+
                             <Border Style="{StaticResource MiniTableHeaderBorder}">
                                 <Grid Background="Transparent">
                                     <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="2.4*"/>
+                                        <ColumnDefinition Width="2.8*"/>
                                         <ColumnDefinition Width="1.1*"/>
                                         <ColumnDefinition Width="1.1*"/>
                                         <ColumnDefinition Width="1.1*"/>
-                                        <ColumnDefinition Width="1.6*"/>
                                         <ColumnDefinition Width="Auto"/>
                                     </Grid.ColumnDefinitions>
 
-                                    <TextBlock Grid.Column="0" Text="Budżet" Style="{StaticResource MiniTableHeaderText}"/>
+                                    <TextBlock Grid.Column="0"
+                   Text="Budżet"
+                   Style="{StaticResource MiniTableHeaderText}"/>
 
-                                    <TextBlock Grid.Column="1" Text="Zaplanowano" Style="{StaticResource MiniTableHeaderText}"
-                                               HorizontalAlignment="Stretch" TextAlignment="Right"/>
+                                    <TextBlock Grid.Column="1"
+                   Text="Zaplanowano"
+                   Style="{StaticResource MiniTableHeaderText}"
+                   HorizontalAlignment="Stretch"
+                   TextAlignment="Right"/>
 
-                                    <TextBlock Grid.Column="2" Text="Wydano" Style="{StaticResource MiniTableHeaderText}"
-                                               HorizontalAlignment="Stretch" TextAlignment="Right"/>
+                                    <TextBlock Grid.Column="2"
+                   Text="Wydano"
+                   Style="{StaticResource MiniTableHeaderText}"
+                   HorizontalAlignment="Stretch"
+                   TextAlignment="Right"/>
 
-                                    <TextBlock Grid.Column="3" Text="Przekroczono" Style="{StaticResource MiniTableHeaderText}"
-                                               HorizontalAlignment="Stretch" TextAlignment="Right"/>
+                                    <TextBlock Grid.Column="3"
+                   Text="Przekroczono"
+                   Style="{StaticResource MiniTableHeaderText}"
+                   HorizontalAlignment="Stretch"
+                   TextAlignment="Right"/>
 
-                                    <TextBlock Grid.Column="4" Text="Okres" Style="{StaticResource MiniTableHeaderText}"/>
-                                    <TextBlock Grid.Column="5" Text="" Style="{StaticResource MiniTableHeaderText}"/>
+                                    <TextBlock Grid.Column="4"
+                   Text=""
+                   Style="{StaticResource MiniTableHeaderText}"/>
                                 </Grid>
                             </Border>
 
@@ -641,51 +724,52 @@
                                     <DataTemplate>
                                         <StackPanel Margin="2,2" Background="Transparent">
 
-                                            <Grid MinHeight="46" Background="Transparent">
+                                            <Grid MinHeight="58" Background="Transparent">
                                                 <Grid.ColumnDefinitions>
-                                                    <ColumnDefinition Width="2.4*"/>
+                                                    <ColumnDefinition Width="2.8*"/>
                                                     <ColumnDefinition Width="1.1*"/>
                                                     <ColumnDefinition Width="1.1*"/>
                                                     <ColumnDefinition Width="1.1*"/>
-                                                    <ColumnDefinition Width="1.6*"/>
                                                     <ColumnDefinition Width="Auto"/>
                                                 </Grid.ColumnDefinitions>
 
-                                                <StackPanel Grid.Column="0" Orientation="Vertical" Background="Transparent">
-                                                    <TextBlock Text="{Binding Name}" Style="{StaticResource BudgetNameCell}"/>
-                                                    <TextBlock Text="{Binding TypeDisplay}" Style="{StaticResource BudgetTypeSub}"/>
+                                                <StackPanel Grid.Column="0"
+                Orientation="Vertical"
+                Background="Transparent">
+                                                    <TextBlock Text="{Binding Name}"
+                   Style="{StaticResource BudgetNameCell}"/>
+                                                    <TextBlock Text="{Binding TypeDisplay}"
+                   Style="{StaticResource BudgetTypeSub}"/>
+                                                    <TextBlock Text="{Binding PeriodLabel}"
+                   Style="{StaticResource BudgetPeriodSub}"/>
                                                 </StackPanel>
 
                                                 <TextBlock Grid.Column="1"
-                                                           Text="{Binding PlannedAmount, StringFormat={}{0:N2} zł}"
-                                                           Style="{StaticResource AmountPlannedGreen}"/>
+               Text="{Binding PlannedAmount, StringFormat={}{0:N2} zł}"
+               Style="{StaticResource AmountPlannedGreen}"/>
 
                                                 <TextBlock Grid.Column="2"
-                                                           Text="{Binding SpentAmount, StringFormat={}{0:N2} zł}"
-                                                           Style="{StaticResource AmountSpentOrange}"/>
+               Text="{Binding SpentAmount, StringFormat={}{0:N2} zł}"
+               Style="{StaticResource AmountSpentOrange}"/>
 
                                                 <TextBlock Grid.Column="3"
-                                                           Text="{Binding OverDisplayAmount, StringFormat={}{0:N2} zł}"
-                                                           Style="{StaticResource AmountOverRed}"/>
+               Text="{Binding OverDisplayAmount, StringFormat={}{0:N2} zł}"
+               Style="{StaticResource AmountOverRed}"/>
 
-                                                <TextBlock Grid.Column="4"
-                                                           Text="{Binding Period}"
-                                                           Style="{StaticResource MiniTableCellText}"/>
-
-                                                <StackPanel Grid.Column="5"
-                                                            Orientation="Horizontal"
-                                                            HorizontalAlignment="Right"
-                                                            VerticalAlignment="Center"
-                                                            Margin="0"
-                                                            Background="Transparent">
+                                                <StackPanel Grid.Column="4"
+                Orientation="Horizontal"
+                HorizontalAlignment="Right"
+                VerticalAlignment="Center"
+                Margin="0"
+                Background="Transparent">
                                                     <Button Style="{StaticResource EditIconButton}"
-                                                            ToolTip="Edytuj"
-                                                            Click="EditBudget_Click"
-                                                            Tag="{Binding}"/>
+                ToolTip="Edytuj"
+                Click="EditBudget_Click"
+                Tag="{Binding}"/>
                                                     <Button Style="{StaticResource DeleteIconButton}"
-                                                            ToolTip="Usuń"
-                                                            Click="DeleteBudget_Click"
-                                                            Tag="{Binding}"/>
+                ToolTip="Usuń"
+                Click="DeleteBudget_Click"
+                Tag="{Binding}"/>
                                                 </StackPanel>
                                             </Grid>
 

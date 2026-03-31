@@ -1,0 +1,328 @@
+
+Budujemy stronę raporty w taki sposób
+Pierwsza zakładka to Przegląd ogólny, w tej zakładce mamy wykres słupkowy pokazujący ilość wydatków, przychodów i trasnferów
+oraz drugi wykres słupkowy pokazujący w złotówkach wydatki, przychody i tranfery. Zestawienie na podium 3 największych przychodów i zestawienie na podium 3 największych wydatków. 
+Druga zakładka to Budżety i w tej zakładce bedą wszystkie istniejące Budżety użytkownika ich analiza, czy w tym okresie(wybranym oczywiscie na pasku okresu), których budżetów się udało
+nie przekroczyć oraz które zostały przekroczone, o ile procent i o ile złotych zostały przekroczone, a jeżeli nie zostały przekroczone to ile jeszcze zapsu zostało i do tego jakiś wykres ilustrujący
+te przekroczone oraz nie przekroczone budżety.
+Trzecia zakładka to Inwestycje ile sie udało osiągnąć w tym okresie wzrostu na danej inwestycji itp. i jakiejś inne fajne dane z tym związane i też może jakiś wykres.
+Czwarta zakładka to Kategorie i tam dane odnośnie wydatków, przychodów, transferów według kategorii. Osobne trzy wykresy dla każdego typu wydatku. Wykres ma być typu Donut z wyciętym środkiem.  
+Piąta zakładka to Kredyty i tutaj użytkownikowi pokazuje dane, ile po tym danym okresie zostało użytkownikowi do spłaty, ile splacił pieniędzy w tym okresie i ogólnie takie dane dotyczące kredytu,
+ile nadpłat wykonał i na jakie kwoty itp. i tez jakis wykres ładny porównawczy.
+Szósta zakładka to cele i tam ma użytkownik, ile procent celu danego udało mu sie wykonać i ile musi w kolejnym okresie np. wydac, żeby osiągnał cel jak mu sie nie udało w tym okresie wykonać, 
+które cele nie zostały zakończone itp. i też jakiś wykres porównawczy
+Siódma zakładka to Symulacja stanu majątku i użytkownik będzie mógł sobie zasymulować swój majątek, jak zaplanowane płatności zejdą i oczywiście 
+to tez bedziee polaczone z okresem ktory uztkonik ma zaznaczony czyli jak np. uzytkownik ma zazanczony okres meisiac i zaplanoawane trasnakcje sa za miesiac to symuluje te trasnkacje
+(co sa na meisiac do przdou) a jak ma rok to symuluje te zaplanowane trnkascje na caly rok wiesz o co mi chodzie? Dużo pracy, ale zajebista strona raoprtów wyjdzie jak tak zrobimy.
+W każdej zakładce ma być przycisk Eksportuj raport, i ten raport będzie tylko z tej danej zakładki. To co lecimy? Zrobmy to raz a dobrze. Popraw wszytskie pliki w taki spoosb, aby zawierały szkielet tego co napisał i wyrzuć z tych plików śmieci z których już nie korzystamy.
+Górne kafelki KPI maja zostać Wybierz okres z kteogro chcesz zoabczyć dane też Przycisk ogolny pobierania raportu też ma zostać no i porpaw wygląd zakładek i dodaj brakujące. Zakłądki mają być równo po dprzycskiem Pobierz raport całościowy
+i mają być niebieskie, agdy kliknę w zakładke to ma miec obramowanie pomarańczowe. Mają te zakldki być równo na srokdu pod przyciskiem pobierz raport całosciowy. 
+
+1) Założenia nadrzędne (żeby to “miało ręce i nogi”)
+Jedno źródło prawdy: okres
+
+FromDate/ToDate w ReportsViewModel są jedynym źródłem prawdy.
+
+Zmiana okresu -> jedno odświeżenie (debounce w ReportsPage już robisz dobrze).
+
+Każda zakładka bazuje na tym samym snapshotcie.
+
+Snapshot zamiast “BuildX()” na żywo
+
+Robimy jedno liczenie w tle: BuildSnapshot(uid, from, to, prevFrom, prevTo) i wynik wkładamy do VM w ApplySnapshot.
+
+Snapshot zawiera wszystko, czego zakładki potrzebują: KPI, listy, agregaty, serie do wykresów.
+
+Zero wyjątków w UI
+
+W VM nie ma MessageBoxów.
+
+Każda część snapshotu jest best-effort: jak budżety się wywalą, to reszta raportów nadal działa.
+
+Wykresy zawsze dostają niepuste Labels/Values (Twoje SafeLabels/SafeValues – zostają).
+
+UX i wydajność
+
+Długie listy (wszystkie transakcje) = CollectionView + filtr i wirtualizacja w DataGrid/ListView.
+
+Wykresy: maksymalnie czytelne, ograniczona liczba etykiet, brak “miliona słupków”.
+
+2) Layout strony raportów (szkielet UI)
+
+Na stronie ReportsPage trzy stałe sekcje, zawsze w tym samym miejscu:
+
+Góra
+
+PeriodBar (From/To + przyciski Szukaj/Wyczyść)
+
+Pod nim: przycisk “Pobierz raport całościowy (PDF)” (zostaje)
+
+KPI kafle (zostają)
+
+3 kafle: Przychody / Wydatki / Bilans
+
+W każdym: “Obecny okres” (u góry), wartość, delta vs poprzedni okres
+
+Zakładki (pod przyciskiem PDF, wycentrowane)
+
+Niebieskie, po kliknięciu pomarańczowa ramka
+
+Treść w środku w ScrollViewer lub w kontenerach, które nie tną UI
+
+To jest “kręgosłup”. Reszta to zawartość zakładek.
+
+3) Zakładki – co dokładnie ma być i jak ułożone
+Zakładka 1: Przegląd ogólny (najważniejsza)
+
+Cel: szybki “dashboard” + lista transakcji.
+
+Układ (polecam 2 kolumny):
+
+Lewa kolumna (ok. 55–60%)
+
+Wykres słupkowy: ilość [Wydatki / Przychody / Transfery]
+
+Wykres słupkowy: wartość zł [Wydatki / Przychody / Transfery]
+
+Podium: TOP3 wydatki + TOP3 przychody (dwie listy obok siebie lub jedna pod drugą)
+
+Prawa kolumna (ok. 40–45%)
+
+Filtry listy transakcji:
+
+Toggle/Radio: Wszystko / Wydatki / Przychody / Transfery
+
+Opcjonalnie: wyszukiwarka tekstowa (opis/kategoria)
+
+Lista transakcji z okresu (DataGrid/ListView):
+
+Data, Kategoria, Opis, Kwota, Typ
+
+Sortowanie po dacie desc domyślnie
+
+Dane:
+
+Rows już masz (dla okresu).
+
+Do listy po prawej: trzymaj ICollectionView TransactionsView i filtruj po SelectedTransactionType.
+
+Klucz stabilności:
+Lista transakcji nie może tworzyć 3 osobnych kolekcji. Robisz filtr na view, bo to jest szybkie i nie rozwala bindingów.
+
+Zakładka 2: Budżety
+
+Cel: “czy przekroczyłam i o ile” + czytelny ranking.
+
+Układ:
+
+U góry: mini-podsumowanie:
+
+ile budżetów przekroczonych
+
+ile w normie
+
+łączna kwota przekroczeń (sumarycznie)
+
+Wykres:
+
+Top 8 budżetów: “Wydano” vs “Limit” (kolumny obok siebie)
+
+(opcjonalnie później) drugi wykres: “% wykorzystania” (progress)
+
+Tabela wszystkich budżetów:
+
+Nazwa, Limit, Wydano, Pozostało, % użycia, Status (OK/Przekroczony)
+
+Kolumna “Przekroczono o” / “Zapas” (delta)
+
+Dane:
+
+Z Rows liczysz wydatki per kategoria.
+
+Budżety z BudgetService.GetBudgetsWithSummary(uid).
+
+Spent w okresie: podmieniasz Spent po kategorii.
+
+Ochrona:
+Jeżeli nie ma budżetów -> wykres pokazuje placeholder, a tabela jest pusta + “Brak budżetów”.
+
+Zakładka 3: Inwestycje
+
+Tu jest najwięcej ryzyka, bo zależy od danych. Dlatego robimy to etapami:
+
+Wersja 1 (stabilna):
+
+Komunikat “Moduł inwestycji w przygotowaniu” jeśli brak danych.
+
+Tabela (jeśli masz jakiekolwiek dane): Nazwa, wartość start, wartość koniec, zysk/strata, %ROI
+
+Wykres: słupki zysk/strata per inwestycja (Top 10)
+
+Klucz:
+Nie wymyślamy na siłę źródła danych. Najpierw stabilny szkielet + placeholder.
+
+Zakładka 4: Kategorie (Donuty)
+
+Cel: struktura wydatków/przychodów/transferów po kategoriach.
+
+Układ:
+
+3 kafle obok siebie (lub 2+1 zależnie od szerokości):
+
+Donut: Wydatki
+
+Donut: Przychody
+
+Donut: Transfery
+
+Pod spodem tabelka “Top kategorii” (dla wybranego typu) albo 3 małe tabelki.
+
+Ważna decyzja techniczna:
+Masz obecnie w ReportsPage.xaml.cs własne kontrolki ExpenseDonut.Draw(...).
+Musisz wybrać jedno:
+
+A) LiveCharts PieSeries (w VM) + XAML
+B) Twoje DonutControl (code-behind) + UpdateDonuts() (to już masz)
+
+Jeśli zależy Ci na minimalnej ilości błędów:
+
+Zostaw B na teraz (bo już działa i jest odporne na null-e).
+
+Dopiero potem migruj do A, jeśli chcesz ładniejsze legendy/animacje LiveCharts.
+
+Zakładka 5: Kredyty
+
+Cel: realne, praktyczne KPI dla kredytu.
+
+Układ:
+
+U góry: kafle:
+
+Pozostało do spłaty (suma)
+
+Spłacono w okresie
+
+Nadpłacono w okresie
+
+Wykres porównawczy (Top N kredytów):
+
+np. słupki: Spłacono vs Nadpłaty
+
+Tabela:
+
+kredyt, saldo, rata (jeśli masz), spłata w okresie, nadpłata w okresie
+
+Dane – etapowanie:
+Masz u siebie cały moduł kredytów w Finly.Services.Features i “LedgerService”.
+Wersja 1: w snapshotcie nie licz “pozostało” dopóki nie podepniesz twardego źródła (żeby nie kłamać).
+
+Najpierw: pokaż listę kredytów i placeholdery 0 z opisem “Dane w przygotowaniu”.
+
+Wersja 2: dopinasz faktyczne wyliczenia z Twojego LoanService/LoanMathService (to już masz w projekcie z pamięci).
+
+Zakładka 6: Cele
+
+Układ:
+
+U góry: licznik:
+
+ile celów aktywnych / zakończonych
+
+Wykres:
+
+słupki “Postęp %” (Top 10) albo “Brakuje” (kwota)
+
+Tabela:
+
+cel, docelowo, odłożone, brakuje, postęp %, termin, rekomendacja na następny okres (NeededNextPeriod)
+
+Twoje CalculateNeededForNextPeriod jest sensowne i UX-owo dobre. Zostaje.
+
+Zakładka 7: Symulacja majątku
+
+Cel: symulacja w przyszłość o długości okresu (dokładnie jak opisałaś).
+
+Układ:
+
+U góry: wybór “co symulujemy”
+
+checkbox: planowane wydatki / planowane przychody
+
+(opcjonalnie) typy planowanych transakcji
+
+Wykres liniowy: saldo narastająco
+
+Lista planowanych transakcji + suma wpływu (delta)
+
+Dane:
+
+Budujesz przyszły zakres: [ToDate+1 .. ToDate+len].
+
+Wczytujesz z bazy IsPlanned = 1 (tak jak masz).
+
+Agregacja tygodniowa dla dużych zakresów – już to zrobiłaś i to jest dobre.
+
+4) Eksport PDF per zakładka (bez bólu)
+
+Twoje wymaganie: “w każdej zakładce Export PDF tylko tej zakładki”.
+
+Najprościej i najczyściej:
+
+ExportPdfCommand dostaje tabKey np.: "overview" | "budgets" | "investments" ...
+
+PdfExportService.ExportReportsPdf(ReportsViewModel vm, string tabKey) generuje tylko sekcję.
+
+Ważne: to nie może korzystać z UI kontrolek, tylko z danych w VM (snapshot).
+
+5) Co bym zmienił / ulepszył względem Twojego planu
+
+Przegląd ogólny: dodaj “Saldo w okresie” jako mały wykres trendu (linia) dopiero w wersji 2.
+W v1 zostaw 2 słupki + podium + lista transakcji. To daje największą wartość najmniejszym kosztem.
+
+Budżety: zamiast “wykres przekroczone / nieprzekroczone” lepszy jest:
+
+Top 8: Wydano vs Limit (już masz)
+
+w tabeli status + % wykorzystania
+To jest czytelniejsze i bardziej “profesjonalne”.
+
+Kategorie: donuty są świetne wizualnie, ale ogranicz do Top 10–12 + “Pozostałe”.
+Inaczej robi się chaos.
+
+Lazy-loading zakładek (opcjonalne): na start możesz ładować wszystko w snapshotcie, bo to proste.
+Jak będzie wolno, wtedy optymalizujemy: liczymy ciężkie zakładki dopiero gdy user w nie wejdzie.
+
+6) Plan wdrożenia (żeby nie utknąć)
+Etap 1: Stabilny szkielet UI + dane
+
+Zakładki 1, 2, 4, 6, 7 działają realnie (na bazie Rows i istniejących tabel).
+
+Zakładka 3 i 5: placeholder + brak wyjątków.
+
+Etap 2: Kredyty realnie
+
+Dopinasz wyliczenia z Twojego modułu kredytów.
+
+Etap 3: Inwestycje realnie
+
+Dopinasz źródło danych i ROI.
+
+Etap 4: Eksport per zakładka
+
+Rozdział sekcji w PdfExportService.
+
+7) Następny krok, konkretnie “co robimy teraz”
+
+Żeby ruszyć bez chaosu, proponuję zacząć od pełnego szkieletu XAML ReportsPage:
+
+KPI + PeriodBar + przycisk PDF
+
+TabControl z 7 zakładkami (wycentrowane, styl: niebieskie + pomarańczowa ramka dla aktywnej)
+
+W zakładce “Przegląd” od razu:
+
+2 wykresy LiveCharts (kolumnowe)
+
+podium top 3/3
+
+prawa lista transakcji + filtr

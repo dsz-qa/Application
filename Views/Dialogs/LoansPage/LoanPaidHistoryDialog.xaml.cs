@@ -32,64 +32,36 @@ namespace Finly.Views.Dialogs
         {
             InitializeComponent();
 
+            _ = paidScheduleRows;
+
             TitleText.Text = "Historia spłaconych rat i nadpłat";
             HeaderText.Text = $"Historia – {loanName}";
             TopLineText.Text = "spłacone raty + nadpłaty";
 
-            paidScheduleRows ??= Array.Empty<LoanInstallmentRow>();
-
-            // 1) Raty zapłacone: preferuj DB (Status=1). Jeśli pusto -> fallback do listy z harmonogramu.
-            var paidDb = DatabaseService.GetPaidInstallmentsByLoan(userId, loanId);
-
-            // map: nr raty -> harmonogram (żeby uzupełniać kapitał/odsetki/saldo jeśli DB ma null)
-            var schedMap = paidScheduleRows
-                .Where(x => x.InstallmentNo.HasValue && x.InstallmentNo.Value > 0)
-                .GroupBy(x => x.InstallmentNo!.Value)
-                .ToDictionary(g => g.Key, g => g.OrderBy(r => r.Date).First());
-
             var rows = new List<(DateTime date, RowVm vm)>();
 
-            if (paidDb.Count > 0)
-            {
-                foreach (var inst in paidDb.OrderBy(x => x.DueDate).ThenBy(x => x.InstallmentNo))
-                {
-                    schedMap.TryGetValue(inst.InstallmentNo, out var srow);
+            var paidDb = DatabaseService.GetLoanInstallments(userId, loanId)
+                .Where(x => x.Status == 1)
+                .OrderBy(x => x.PaidAt ?? x.DueDate)
+                .ThenBy(x => x.InstallmentNo)
+                .ToList();
 
-                    decimal? cap = inst.PrincipalAmount ?? srow?.Principal;
-                    decimal? intr = inst.InterestAmount ?? srow?.Interest;
-                    decimal? rem = inst.RemainingBalance ?? srow?.Remaining;
-
-                    rows.Add((inst.DueDate.Date, new RowVm
-                    {
-                        Type = "Rata",
-                        No = inst.InstallmentNo > 0 ? inst.InstallmentNo.ToString() : "—",
-                        Date = inst.DueDate.ToString("dd.MM.yyyy"),
-                        Principal = cap.HasValue ? cap.Value.ToString("N2", Pl) : "—",
-                        Interest = intr.HasValue ? intr.Value.ToString("N2", Pl) : "—",
-                        Total = inst.TotalAmount.ToString("N2", Pl),
-                        Remaining = rem.HasValue ? rem.Value.ToString("N2", Pl) : "—"
-                    }));
-                }
-            }
-            else
+            foreach (var inst in paidDb)
             {
-                // fallback: pokazujemy “zapłacone” z harmonogramu (Twoja logika: 2,3 bo kolejna 4)
-                foreach (var r in paidScheduleRows.OrderBy(x => x.Date))
+                var sortDate = (inst.PaidAt ?? inst.DueDate).Date;
+
+                rows.Add((sortDate, new RowVm
                 {
-                    rows.Add((r.Date.Date, new RowVm
-                    {
-                        Type = "Rata",
-                        No = r.InstallmentNo?.ToString() ?? "—",
-                        Date = r.Date.ToString("dd.MM.yyyy"),
-                        Principal = r.Principal.HasValue ? r.Principal.Value.ToString("N2", Pl) : "—",
-                        Interest = r.Interest.HasValue ? r.Interest.Value.ToString("N2", Pl) : "—",
-                        Total = r.Total.ToString("N2", Pl),
-                        Remaining = r.Remaining.HasValue ? r.Remaining.Value.ToString("N2", Pl) : "—"
-                    }));
-                }
+                    Type = "Rata",
+                    No = inst.InstallmentNo > 0 ? inst.InstallmentNo.ToString() : "—",
+                    Date = sortDate.ToString("dd.MM.yyyy"),
+                    Principal = inst.PrincipalAmount.HasValue ? inst.PrincipalAmount.Value.ToString("N2", Pl) : "—",
+                    Interest = inst.InterestAmount.HasValue ? inst.InterestAmount.Value.ToString("N2", Pl) : "—",
+                    Total = inst.TotalAmount.ToString("N2", Pl),
+                    Remaining = inst.RemainingBalance.HasValue ? inst.RemainingBalance.Value.ToString("N2", Pl) : "—"
+                }));
             }
 
-            // 2) Nadpłaty: z tabeli LoanOperations (Type=Overpayment)
             var ops = DatabaseService.GetLoanOperations(userId, loanId)
                 .Where(o => o.Type == LoanOperationType.Overpayment)
                 .OrderBy(o => o.Date)
@@ -109,10 +81,14 @@ namespace Finly.Views.Dialogs
                 }));
             }
 
-            var ordered = rows.OrderBy(x => x.date).Select(x => x.vm).ToList();
+            var ordered = rows
+                .OrderBy(x => x.date)
+                .ThenBy(x => x.vm.Type == "Rata" ? 0 : 1)
+                .Select(x => x.vm)
+                .ToList();
+
             RowsMiniTable.ItemsSource = ordered;
 
-            // 3) Podsumowania
             int paidCount = ordered.Count(x => x.Type == "Rata");
             int overpayCount = ordered.Count(x => x.Type == "Nadpłata");
 
@@ -128,6 +104,9 @@ namespace Finly.Views.Dialogs
 
             SubText.Text = $"Pozycje: {ordered.Count} (Raty: {paidCount}, Nadpłaty: {overpayCount}).";
             SummaryText.Text = $"Suma rat: {sumPaid.ToString("N2", Pl)} zł  •  Suma nadpłat: {sumOver.ToString("N2", Pl)} zł";
+
+            if (ordered.Count == 0)
+                TopLineText.Text = "brak zapisanych spłat i nadpłat";
         }
 
         private static decimal TryParseMoney(string s)

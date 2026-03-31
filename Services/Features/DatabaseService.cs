@@ -4135,118 +4135,262 @@ SELECT last_insert_rowid();";
             int scheduleId,
             IEnumerable<LoanInstallmentDb> rows,
             DateTime from)
-
         {
-            if (userId <= 0) return;
-            if (loanId <= 0) return;
-            if (scheduleId <= 0) return;
-            if (rows == null) return;
+            if (userId <= 0) throw new ArgumentException("Nieprawid³owy userId.", nameof(userId));
+            if (loanId <= 0) throw new ArgumentException("Nieprawid³owy loanId.", nameof(loanId));
+            if (scheduleId <= 0) throw new ArgumentException("Nieprawid³owy scheduleId.", nameof(scheduleId));
+            if (rows == null) throw new ArgumentNullException(nameof(rows));
 
             var fromDate = from.Date;
 
-            using var con = GetConnection();
-            con.Open();
+            var preparedRows = rows
+                .Where(x => x != null)
+                .Select(x => new LoanInstallmentDb
+                {
+                    UserId = userId,
+                    LoanId = loanId,
+                    ScheduleId = scheduleId,
+                    InstallmentNo = x.InstallmentNo,
+                    DueDate = x.DueDate.Date,
+                    TotalAmount = x.TotalAmount,
+                    PrincipalAmount = x.PrincipalAmount,
+                    InterestAmount = x.InterestAmount,
+                    RemainingBalance = x.RemainingBalance,
+                    Status = 0,
+                    PaidAt = null,
+                    PaymentKind = x.PaymentKind,
+                    PaymentRefId = x.PaymentRefId
+                })
+                .Where(x =>
+                    x.InstallmentNo > 0 &&
+                    x.DueDate != DateTime.MinValue &&
+                    x.TotalAmount > 0m)
+                .OrderBy(x => x.DueDate)
+                .ThenBy(x => x.InstallmentNo)
+                .ToList();
+
+            var duplicatedNos = preparedRows
+                .GroupBy(x => x.InstallmentNo)
+                .Where(g => g.Count() > 1)
+                .Select(g => g.Key)
+                .OrderBy(x => x)
+                .ToList();
+
+            if (duplicatedNos.Count > 0)
+            {
+                throw new InvalidOperationException(
+                    "Import harmonogramu zosta³ przerwany, poniewa¿ plik zawiera duplikaty numerów rat: " +
+                    string.Join(", ", duplicatedNos));
+            }
+
+            using var con = OpenAndEnsureSchema();
             using var tx = con.BeginTransaction();
 
-            // 1) Usuñ planned-y od "from" + planned-y z invalid DueDate (to najczêœciej powoduje UNIQUE constraint przy imporcie)
-            using (var cmdDelete = con.CreateCommand())
+            try
             {
-                cmdDelete.Transaction = tx;
-                cmdDelete.CommandText = @"
-DELETE FROM LoanInstallments
-WHERE UserId=@u AND LoanId=@l AND Status=0
-  AND (
-        DueDate IS NULL
-        OR trim(DueDate)=''
-        OR date(DueDate) IS NULL
-        OR date(DueDate) < date('1900-01-01')
-        OR date(DueDate) >= date(@from)
-      );";
-                cmdDelete.Parameters.AddWithValue("@u", userId);
-                cmdDelete.Parameters.AddWithValue("@l", loanId);
-                cmdDelete.Parameters.AddWithValue("@from", fromDate.ToString("yyyy-MM-dd"));
-                cmdDelete.ExecuteNonQuery();
-            }
-
-            // 2) Pobierz istniej¹ce PAID (¿eby przypadkiem nie próbowaæ wstawiaæ tego samego InstallmentNo)
-            var paidNos = new HashSet<int>();
-            using (var cmdPaid = con.CreateCommand())
-            {
-                cmdPaid.Transaction = tx;
-                cmdPaid.CommandText = @"
-SELECT InstallmentNo
-FROM LoanInstallments
-WHERE UserId=@u AND LoanId=@l AND Status=1;";
-                cmdPaid.Parameters.AddWithValue("@u", userId);
-                cmdPaid.Parameters.AddWithValue("@l", loanId);
-
-                using var r = cmdPaid.ExecuteReader();
-                while (r.Read())
+                // 1. Usuñ konflikty dla tych samych numerów rat, ale tylko jeœli rekord by³ NIEOP£ACONY
+                foreach (var no in preparedRows.Select(x => x.InstallmentNo).Distinct())
                 {
-                    if (!r.IsDBNull(0))
-                        paidNos.Add(r.GetInt32(0));
+                    using var cmdDeleteSameNo = con.CreateCommand();
+                    cmdDeleteSameNo.Transaction = tx;
+                    cmdDeleteSameNo.CommandText = @"
+DELETE FROM LoanInstallments
+WHERE UserId = @userId
+  AND LoanId = @loanId
+  AND Status = 0
+  AND InstallmentNo = @installmentNo;";
+                    cmdDeleteSameNo.Parameters.AddWithValue("@userId", userId);
+                    cmdDeleteSameNo.Parameters.AddWithValue("@loanId", loanId);
+                    cmdDeleteSameNo.Parameters.AddWithValue("@installmentNo", no);
+                    cmdDeleteSameNo.ExecuteNonQuery();
                 }
-            }
 
-            // 3) Wstaw raty od "from"
-            using var cmdIns = con.CreateCommand();
-            cmdIns.Transaction = tx;
-            cmdIns.CommandText = @"
+                // 2. Usuñ wszystkie przysz³e NIEOP£ACONE raty starego harmonogramu
+                using (var cmdDeleteFutureUnpaid = con.CreateCommand())
+                {
+                    cmdDeleteFutureUnpaid.Transaction = tx;
+                    cmdDeleteFutureUnpaid.CommandText = @"
+DELETE FROM LoanInstallments
+WHERE UserId = @userId
+  AND LoanId = @loanId
+  AND Status = 0
+  AND date(DueDate) >= date(@from);";
+                    cmdDeleteFutureUnpaid.Parameters.AddWithValue("@userId", userId);
+                    cmdDeleteFutureUnpaid.Parameters.AddWithValue("@loanId", loanId);
+                    cmdDeleteFutureUnpaid.Parameters.AddWithValue("@from", fromDate.ToString("yyyy-MM-dd"));
+                    cmdDeleteFutureUnpaid.ExecuteNonQuery();
+                }
+
+                // 3. Odczytaj to, co zosta³o w DB po czyszczeniu
+                var existingByNo = new Dictionary<int, LoanInstallmentDb>();
+
+                using (var cmdExisting = con.CreateCommand())
+                {
+                    cmdExisting.Transaction = tx;
+                    cmdExisting.CommandText = @"
+SELECT
+    Id,
+    UserId,
+    LoanId,
+    ScheduleId,
+    InstallmentNo,
+    DueDate,
+    TotalAmount,
+    PrincipalAmount,
+    InterestAmount,
+    RemainingBalance,
+    Status,
+    PaidAt,
+    PaymentKind,
+    PaymentRefId
+FROM LoanInstallments
+WHERE UserId = @userId
+  AND LoanId = @loanId
+ORDER BY InstallmentNo, date(DueDate), Id;";
+                    cmdExisting.Parameters.AddWithValue("@userId", userId);
+                    cmdExisting.Parameters.AddWithValue("@loanId", loanId);
+
+                    using var r = cmdExisting.ExecuteReader();
+                    while (r.Read())
+                    {
+                        var item = new LoanInstallmentDb
+                        {
+                            Id = r.IsDBNull(0) ? 0 : r.GetInt32(0),
+                            UserId = r.IsDBNull(1) ? userId : r.GetInt32(1),
+                            LoanId = r.IsDBNull(2) ? loanId : r.GetInt32(2),
+                            ScheduleId = r.IsDBNull(3) ? 0 : r.GetInt32(3),
+                            InstallmentNo = r.IsDBNull(4) ? 0 : r.GetInt32(4),
+                            DueDate = r.IsDBNull(5) ? DateTime.MinValue : DateTime.Parse(r.GetString(5)),
+                            TotalAmount = r.IsDBNull(6) ? 0m : Convert.ToDecimal(r.GetValue(6)),
+                            PrincipalAmount = r.IsDBNull(7) ? (decimal?)null : Convert.ToDecimal(r.GetValue(7)),
+                            InterestAmount = r.IsDBNull(8) ? (decimal?)null : Convert.ToDecimal(r.GetValue(8)),
+                            RemainingBalance = r.IsDBNull(9) ? (decimal?)null : Convert.ToDecimal(r.GetValue(9)),
+                            Status = r.IsDBNull(10) ? 0 : r.GetInt32(10),
+                            PaidAt = r.IsDBNull(11) ? (DateTime?)null : DateTime.Parse(r.GetString(11)),
+                            PaymentKind = r.IsDBNull(12) ? 0 : r.GetInt32(12),
+                            PaymentRefId = r.IsDBNull(13) ? (int?)null : r.GetInt32(13)
+                        };
+
+                        if (item.InstallmentNo > 0 && !existingByNo.ContainsKey(item.InstallmentNo))
+                            existingByNo[item.InstallmentNo] = item;
+                    }
+                }
+
+                // 4. Upsert ca³ego importu:
+                //    - raty z przesz³oœci zapisujemy jako Status=1,
+                //    - raty od dziœ wzwy¿ jako Status=0
+                foreach (var row in preparedRows)
+                {
+                    bool shouldBePaid = row.DueDate.Date < fromDate;
+
+                    if (existingByNo.TryGetValue(row.InstallmentNo, out var existing))
+                    {
+                        using var cmdUpdate = con.CreateCommand();
+                        cmdUpdate.Transaction = tx;
+                        cmdUpdate.CommandText = @"
+UPDATE LoanInstallments
+SET ScheduleId       = @scheduleId,
+    DueDate          = @dueDate,
+    TotalAmount      = @totalAmount,
+    PrincipalAmount  = @principalAmount,
+    InterestAmount   = @interestAmount,
+    RemainingBalance = @remainingBalance,
+    Status           = @status,
+    PaidAt           = @paidAt,
+    PaymentKind      = @paymentKind,
+    PaymentRefId     = @paymentRefId
+WHERE Id = @id
+  AND UserId = @userId;";
+
+                        cmdUpdate.Parameters.AddWithValue("@scheduleId", scheduleId);
+                        cmdUpdate.Parameters.AddWithValue("@dueDate", row.DueDate.ToString("yyyy-MM-dd"));
+                        cmdUpdate.Parameters.AddWithValue("@totalAmount", row.TotalAmount);
+                        cmdUpdate.Parameters.AddWithValue("@principalAmount", (object?)row.PrincipalAmount ?? DBNull.Value);
+                        cmdUpdate.Parameters.AddWithValue("@interestAmount", (object?)row.InterestAmount ?? DBNull.Value);
+                        cmdUpdate.Parameters.AddWithValue("@remainingBalance", (object?)row.RemainingBalance ?? DBNull.Value);
+
+                        int finalStatus = existing.Status == 1 ? 1 : (shouldBePaid ? 1 : 0);
+                        DateTime? finalPaidAt = existing.Status == 1
+                            ? (existing.PaidAt ?? row.DueDate.Date)
+                            : (shouldBePaid ? row.DueDate.Date : (DateTime?)null);
+
+                        cmdUpdate.Parameters.AddWithValue("@status", finalStatus);
+                        cmdUpdate.Parameters.AddWithValue("@paidAt", finalPaidAt.HasValue
+                            ? finalPaidAt.Value.ToString("yyyy-MM-dd")
+                            : (object)DBNull.Value);
+
+                        cmdUpdate.Parameters.AddWithValue("@paymentKind", row.PaymentKind);
+                        cmdUpdate.Parameters.AddWithValue("@paymentRefId", (object?)row.PaymentRefId ?? DBNull.Value);
+                        cmdUpdate.Parameters.AddWithValue("@id", existing.Id);
+                        cmdUpdate.Parameters.AddWithValue("@userId", userId);
+
+                        cmdUpdate.ExecuteNonQuery();
+                    }
+                    else
+                    {
+                        using var cmdInsert = con.CreateCommand();
+                        cmdInsert.Transaction = tx;
+                        cmdInsert.CommandText = @"
 INSERT INTO LoanInstallments(
-    UserId, LoanId, ScheduleId, InstallmentNo, DueDate,
-    TotalAmount, PrincipalAmount, InterestAmount, RemainingBalance,
-    Status, PaidAt, PaymentKind, PaymentRefId
+    UserId,
+    LoanId,
+    ScheduleId,
+    InstallmentNo,
+    DueDate,
+    TotalAmount,
+    PrincipalAmount,
+    InterestAmount,
+    RemainingBalance,
+    Status,
+    PaidAt,
+    PaymentKind,
+    PaymentRefId
 )
 VALUES(
-    @u, @loanId, @scheduleId, @no, @due,
-    @total, @principal, @interest, @remaining,
-    0, NULL, @payKind, @payRef
+    @userId,
+    @loanId,
+    @scheduleId,
+    @installmentNo,
+    @dueDate,
+    @totalAmount,
+    @principalAmount,
+    @interestAmount,
+    @remainingBalance,
+    @status,
+    @paidAt,
+    @paymentKind,
+    @paymentRefId
 );";
 
+                        cmdInsert.Parameters.AddWithValue("@userId", userId);
+                        cmdInsert.Parameters.AddWithValue("@loanId", loanId);
+                        cmdInsert.Parameters.AddWithValue("@scheduleId", scheduleId);
+                        cmdInsert.Parameters.AddWithValue("@installmentNo", row.InstallmentNo);
+                        cmdInsert.Parameters.AddWithValue("@dueDate", row.DueDate.ToString("yyyy-MM-dd"));
+                        cmdInsert.Parameters.AddWithValue("@totalAmount", row.TotalAmount);
+                        cmdInsert.Parameters.AddWithValue("@principalAmount", (object?)row.PrincipalAmount ?? DBNull.Value);
+                        cmdInsert.Parameters.AddWithValue("@interestAmount", (object?)row.InterestAmount ?? DBNull.Value);
+                        cmdInsert.Parameters.AddWithValue("@remainingBalance", (object?)row.RemainingBalance ?? DBNull.Value);
+                        cmdInsert.Parameters.AddWithValue("@status", shouldBePaid ? 1 : 0);
+                        cmdInsert.Parameters.AddWithValue("@paidAt", shouldBePaid
+                            ? row.DueDate.ToString("yyyy-MM-dd")
+                            : (object)DBNull.Value);
+                        cmdInsert.Parameters.AddWithValue("@paymentKind", row.PaymentKind);
+                        cmdInsert.Parameters.AddWithValue("@paymentRefId", (object?)row.PaymentRefId ?? DBNull.Value);
 
-            var pU = cmdIns.CreateParameter(); pU.ParameterName = "@u"; cmdIns.Parameters.Add(pU);
-            var pLoanId = cmdIns.CreateParameter(); pLoanId.ParameterName = "@loanId"; cmdIns.Parameters.Add(pLoanId);
-            var pScheduleId = cmdIns.CreateParameter(); pScheduleId.ParameterName = "@scheduleId"; cmdIns.Parameters.Add(pScheduleId);
-            var pNo = cmdIns.CreateParameter(); pNo.ParameterName = "@no"; cmdIns.Parameters.Add(pNo);
-            var pDue = cmdIns.CreateParameter(); pDue.ParameterName = "@due"; cmdIns.Parameters.Add(pDue);
-            var pTotal = cmdIns.CreateParameter(); pTotal.ParameterName = "@total"; cmdIns.Parameters.Add(pTotal);
-            var pPrincipal = cmdIns.CreateParameter(); pPrincipal.ParameterName = "@principal"; cmdIns.Parameters.Add(pPrincipal);
-            var pInterest = cmdIns.CreateParameter(); pInterest.ParameterName = "@interest"; cmdIns.Parameters.Add(pInterest);
-            var pRemaining = cmdIns.CreateParameter(); pRemaining.ParameterName = "@remaining"; cmdIns.Parameters.Add(pRemaining);
-            var pPayKind = cmdIns.CreateParameter(); pPayKind.ParameterName = "@payKind"; cmdIns.Parameters.Add(pPayKind);
-            var pPayRef = cmdIns.CreateParameter(); pPayRef.ParameterName = "@payRef"; cmdIns.Parameters.Add(pPayRef);
+                        cmdInsert.ExecuteNonQuery();
+                    }
+                }
 
-            foreach (var it in rows)
-            {
-                if (it == null) continue;
-                if (it.InstallmentNo <= 0) continue;
-
-                var due = it.DueDate.Date;
-                if (due == DateTime.MinValue) continue;
-                if (due < fromDate) continue;
-
-                // jeœli ta rata jest ju¿ PAID w DB, nie wstawiamy jej ponownie (unikalne InstallmentNo)
-                if (paidNos.Contains(it.InstallmentNo))
-                    continue;
-
-                pU.Value = userId;
-                pLoanId.Value = loanId;
-                pScheduleId.Value = scheduleId;
-                pNo.Value = it.InstallmentNo;
-                pDue.Value = due.ToString("yyyy-MM-dd");
-                pTotal.Value = it.TotalAmount;
-                pPrincipal.Value = (object?)it.PrincipalAmount ?? DBNull.Value;
-                pInterest.Value = (object?)it.InterestAmount ?? DBNull.Value;
-                pRemaining.Value = (object?)it.RemainingBalance ?? DBNull.Value;
-                pPayKind.Value = it.PaymentKind;
-                pPayRef.Value = (object?)it.PaymentRefId ?? DBNull.Value;
-
-                cmdIns.ExecuteNonQuery();
+                tx.Commit();
+                RaiseDataChanged();
             }
-
-            tx.Commit();
+            catch
+            {
+                try { tx.Rollback(); } catch { }
+                throw;
+            }
         }
-
 
         public static int InsertLoanOperation(int userId, LoanOperationModel op)
         {
@@ -4315,6 +4459,64 @@ ORDER BY date(Date) ASC, Id ASC;";
             }
 
             return list;
+        }
+
+        public static List<LoanInstallmentDb> GetLoanInstallments(int userId, int loanId)
+        {
+            var result = new List<LoanInstallmentDb>();
+
+            using var con = GetConnection();
+            EnsureTables();
+
+            using var cmd = con.CreateCommand();
+            cmd.CommandText = @"
+SELECT
+    Id,
+    UserId,
+    LoanId,
+    ScheduleId,
+    InstallmentNo,
+    DueDate,
+    TotalAmount,
+    PrincipalAmount,
+    InterestAmount,
+    RemainingBalance,
+    Status,
+    PaidAt,
+    PaymentKind,
+    PaymentRefId
+FROM LoanInstallments
+WHERE UserId = @userId
+  AND LoanId = @loanId
+ORDER BY date(DueDate), InstallmentNo, Id;";
+            cmd.Parameters.AddWithValue("@userId", userId);
+            cmd.Parameters.AddWithValue("@loanId", loanId);
+
+            using var r = cmd.ExecuteReader();
+            while (r.Read())
+            {
+                result.Add(new LoanInstallmentDb
+                {
+                    Id = r.GetInt32(0),
+                    UserId = r.GetInt32(1),
+                    LoanId = r.GetInt32(2),
+                    ScheduleId = r.GetInt32(3),
+                    InstallmentNo = r.IsDBNull(4) ? 0 : r.GetInt32(4),
+                    DueDate = r.IsDBNull(5)
+                        ? DateTime.MinValue
+                        : DateTime.Parse(r.GetString(5)),
+                    TotalAmount = r.IsDBNull(6) ? 0m : Convert.ToDecimal(r.GetValue(6)),
+                    PrincipalAmount = r.IsDBNull(7) ? (decimal?)null : Convert.ToDecimal(r.GetValue(7)),
+                    InterestAmount = r.IsDBNull(8) ? (decimal?)null : Convert.ToDecimal(r.GetValue(8)),
+                    RemainingBalance = r.IsDBNull(9) ? (decimal?)null : Convert.ToDecimal(r.GetValue(9)),
+                    Status = r.IsDBNull(10) ? 0 : r.GetInt32(10),
+                    PaidAt = r.IsDBNull(11) ? (DateTime?)null : DateTime.Parse(r.GetString(11)),
+                    PaymentKind = r.IsDBNull(12) ? 0 : r.GetInt32(12),
+                    PaymentRefId = r.IsDBNull(13) ? (int?)null : r.GetInt32(13)
+                });
+            }
+
+            return result;
         }
 
         public static (int planned, int paid) GetLoanInstallmentsStatusCounts(int userId, int loanId)
@@ -4572,7 +4774,116 @@ WHERE UserId=@u AND LoanId=@l AND Status=1";
             return e.UserId == userId ? e : null;
         }
 
+        public sealed class LoanScheduleHistoryDb
+        {
+            public int Id { get; set; }
+            public int LoanId { get; set; }
+            public string? LoanName { get; set; }
+            public DateTime ImportedAt { get; set; }
+            public string? SourceName { get; set; }
+            public string? SchedulePath { get; set; }
+            public string? Note { get; set; }
+        }
 
+
+        public static List<LoanScheduleHistoryDb> GetLoanScheduleHistory(int userId)
+        {
+            var result = new List<LoanScheduleHistoryDb>();
+
+            using var con = GetConnection();
+            EnsureTables();
+
+            using var cmd = con.CreateCommand();
+            cmd.CommandText = @"
+SELECT
+    ls.Id,
+    ls.LoanId,
+    l.Name,
+    ls.ImportedAt,
+    ls.SourceName,
+    ls.SchedulePath,
+    ls.Note
+FROM LoanSchedules ls
+JOIN Loans l
+    ON l.Id = ls.LoanId
+   AND l.UserId = ls.UserId
+WHERE ls.UserId = @userId
+ORDER BY datetime(ls.ImportedAt) DESC, ls.Id DESC;";
+            cmd.Parameters.AddWithValue("@userId", userId);
+
+            using var r = cmd.ExecuteReader();
+            while (r.Read())
+            {
+                result.Add(new LoanScheduleHistoryDb
+                {
+                    Id = r.GetInt32(0),
+                    LoanId = r.GetInt32(1),
+                    LoanName = r.IsDBNull(2) ? null : r.GetString(2),
+                    ImportedAt = r.IsDBNull(3) ? DateTime.MinValue : DateTime.Parse(r.GetString(3)),
+                    SourceName = r.IsDBNull(4) ? null : r.GetString(4),
+                    SchedulePath = r.IsDBNull(5) ? null : r.GetString(5),
+                    Note = r.IsDBNull(6) ? null : r.GetString(6)
+                });
+            }
+
+            return result;
+        }
+
+        public static List<LoanInstallmentDb> GetInstallmentsBySchedule(int userId, int scheduleId)
+        {
+            var result = new List<LoanInstallmentDb>();
+
+            using var con = GetConnection();
+            EnsureTables();
+
+            using var cmd = con.CreateCommand();
+            cmd.CommandText = @"
+SELECT
+    Id,
+    UserId,
+    LoanId,
+    ScheduleId,
+    InstallmentNo,
+    DueDate,
+    TotalAmount,
+    PrincipalAmount,
+    InterestAmount,
+    RemainingBalance,
+    Status,
+    PaidAt,
+    PaymentKind,
+    PaymentRefId
+FROM LoanInstallments
+WHERE UserId = @userId
+  AND ScheduleId = @scheduleId
+ORDER BY InstallmentNo, date(DueDate), Id;";
+            cmd.Parameters.AddWithValue("@userId", userId);
+            cmd.Parameters.AddWithValue("@scheduleId", scheduleId);
+
+            using var r = cmd.ExecuteReader();
+            while (r.Read())
+            {
+                result.Add(new LoanInstallmentDb
+                {
+                    Id = r.GetInt32(0),
+                    UserId = r.GetInt32(1),
+                    LoanId = r.GetInt32(2),
+                    ScheduleId = r.GetInt32(3),
+                    InstallmentNo = r.IsDBNull(4) ? 0 : r.GetInt32(4),
+                    DueDate = r.IsDBNull(5) ? DateTime.MinValue : DateTime.Parse(r.GetString(5)),
+                    TotalAmount = r.IsDBNull(6) ? 0m : Convert.ToDecimal(r.GetValue(6)),
+                    PrincipalAmount = r.IsDBNull(7) ? (decimal?)null : Convert.ToDecimal(r.GetValue(7)),
+                    InterestAmount = r.IsDBNull(8) ? (decimal?)null : Convert.ToDecimal(r.GetValue(8)),
+                    RemainingBalance = r.IsDBNull(9) ? (decimal?)null : Convert.ToDecimal(r.GetValue(9)),
+                    Status = r.IsDBNull(10) ? 0 : r.GetInt32(10),
+                    PaidAt = r.IsDBNull(11) ? (DateTime?)null : DateTime.Parse(r.GetString(11)),
+                    PaymentKind = r.IsDBNull(12) ? 0 : r.GetInt32(12),
+                    PaymentRefId = r.IsDBNull(13) ? (int?)null : r.GetInt32(13)
+                });
+            }
+
+            return result;
+        }
 
         private static int? TryResolveAccountIdFromExpenseAccountText(SqliteConnection c, SqliteTransaction tx, int userId, string? accountText)
         {

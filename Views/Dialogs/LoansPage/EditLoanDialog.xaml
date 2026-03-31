@@ -226,12 +226,12 @@
 							<ColumnDefinition Width="*"/>
 						</Grid.ColumnDefinitions>
 
-						<Button Grid.Column="0"
-                                Content="Załącz harmonogram (CSV/PDF)"
-                                Style="{StaticResource SecondaryButton}"
-                                Click="AttachSchedule_Click"/>
+                        <Button Grid.Column="0"
+        Content="Załącz harmonogram (CSV)"
+        Style="{StaticResource SecondaryButton}"
+        Click="AttachSchedule_Click"/>
 
-						<TextBlock Grid.Column="2"
+                        <TextBlock Grid.Column="2"
                                    x:Name="ScheduleFileText"
                                    Text="Brak pliku"
                                    VerticalAlignment="Center"

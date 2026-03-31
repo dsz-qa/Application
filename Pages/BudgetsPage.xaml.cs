@@ -35,6 +35,42 @@ namespace Finly.Pages
         private bool _dataChangedHooked;
         private long _reloadToken;
 
+
+        private enum BudgetListScope
+        {
+            Current,
+            Archived
+        }
+
+        private BudgetListScope _budgetListScope = BudgetListScope.Current;
+
+        private static bool IsArchivedBudget(BudgetRow row)
+        {
+            if (row == null) return false;
+            return row.EndDate.Date < DateTime.Today;
+        }
+
+        private BudgetListScope ResolveBudgetListScope()
+        {
+            if (BudgetStatusTabs?.SelectedItem is TabItem tab &&
+                string.Equals(tab.Tag as string, "Archived", StringComparison.OrdinalIgnoreCase))
+            {
+                return BudgetListScope.Archived;
+            }
+
+            return BudgetListScope.Current;
+        }
+
+        private void BudgetStatusTabs_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            if (!ReferenceEquals(e.Source, BudgetStatusTabs))
+                return;
+
+            _budgetListScope = ResolveBudgetListScope();
+            HideAllDeleteConfirms();
+            ApplyFilters();
+        }
+
         public BudgetsPage(int userId)
         {
             try
@@ -73,6 +109,7 @@ namespace Finly.Pages
 
             if (_isInitializedOnce)
             {
+                _budgetListScope = ResolveBudgetListScope();
                 SafeReloadKeepSelection();
                 return;
             }
@@ -80,6 +117,15 @@ namespace Finly.Pages
             _isInitializedOnce = true;
 
             try { InitTypeFilterCombo(); } catch { }
+
+            try
+            {
+                if (BudgetStatusTabs != null && BudgetStatusTabs.SelectedIndex < 0)
+                    BudgetStatusTabs.SelectedIndex = 0;
+
+                _budgetListScope = ResolveBudgetListScope();
+            }
+            catch { }
 
             SafeReloadKeepSelection();
 
@@ -411,10 +457,18 @@ ORDER BY date(b.StartDate);";
             int? previouslySelectedId = null;
             try { previouslySelectedId = (BudgetsList.SelectedItem as BudgetRow)?.Id; } catch { }
 
-            var typeValue = "";
-            try { typeValue = TypeFilterCombo.SelectedValue as string ?? ""; } catch { }
+            var today = DateTime.Today;
 
             IEnumerable<BudgetRow> query = _allBudgets;
+
+            query = _budgetListScope switch
+            {
+                BudgetListScope.Archived => query.Where(b => b.EndDate.Date < today),
+                _ => query.Where(b => b.EndDate.Date >= today)
+            };
+
+            var typeValue = "";
+            try { typeValue = TypeFilterCombo.SelectedValue as string ?? ""; } catch { }
 
             if (!string.IsNullOrWhiteSpace(typeValue))
             {
@@ -429,11 +483,13 @@ ORDER BY date(b.StartDate);";
             {
                 query = query.Where(b =>
                     (b.Name ?? string.Empty).IndexOf(search, StringComparison.OrdinalIgnoreCase) >= 0 ||
-                    (b.TypeDisplay ?? string.Empty).IndexOf(search, StringComparison.OrdinalIgnoreCase) >= 0);
+                    (b.TypeDisplay ?? string.Empty).IndexOf(search, StringComparison.OrdinalIgnoreCase) >= 0 ||
+                    (b.Period ?? string.Empty).IndexOf(search, StringComparison.OrdinalIgnoreCase) >= 0);
             }
 
             var result = query
-                .OrderByDescending(b => b.StartDate)
+                .OrderByDescending(b => b.EndDate)
+                .ThenByDescending(b => b.StartDate)
                 .ThenBy(b => b.Name)
                 .ToList();
 
@@ -1195,7 +1251,7 @@ ORDER BY date(Date);";
         public DateTime EndDate { get; set; }
 
         public string Period => $"{StartDate:dd.MM.yyyy} – {EndDate:dd.MM.yyyy}";
-
+        public string PeriodLabel => $"Okres: {Period}";
         public decimal PlannedAmount { get; set; }
         public decimal SpentAmount { get; set; }
         public decimal IncomeAmount { get; set; }

@@ -167,11 +167,14 @@ namespace Finly.Views.Dialogs
         {
             var dlg = new Microsoft.Win32.OpenFileDialog
             {
-                Filter = "Pliki CSV|*.csv|Pliki PDF|*.pdf|Wszystkie pliki|*.*"
+                Title = "Wybierz harmonogram kredytu",
+                Filter = "Pliki CSV (*.csv)|*.csv",
+                Multiselect = false,
+                CheckFileExists = true
             };
 
-            var ok = dlg.ShowDialog();
-            if (ok != true) return;
+            if (dlg.ShowDialog() != true)
+                return;
 
             AttachedSchedulePath = dlg.FileName;
             ScheduleFileText.Text = Path.GetFileName(dlg.FileName);
